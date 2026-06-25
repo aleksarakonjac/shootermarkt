@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
-import { shooters, clubs, results, disciplines } from "@/lib/db/schema";
-import { eq, desc, and, isNotNull } from "drizzle-orm";
+import { shooters, clubs, results, disciplines, competitions } from "@/lib/db/schema";
+import { eq, isNotNull, and, asc } from "drizzle-orm";
 import Link from "next/link";
+import { computeFormaScore, trendLabel, trendColor } from "@/lib/forma-score";
 
 export const metadata = { title: "Rangiranje" };
 
@@ -24,25 +25,79 @@ export default async function RangiranjeePage({ searchParams }: Props) {
     where: eq(disciplines.code, activeCode as "ARM" | "ARW" | "APM" | "APW"),
   });
 
-  const ranking = discipline
+  // Fetch all results for this discipline with dates, grouped per shooter
+  const rawResults = discipline
     ? await db
         .select({
           shooterId: results.shooterId,
           firstName: shooters.firstName,
           lastName: shooters.lastName,
           clubName: clubs.name,
-          bestQual: results.qualTotal,
+          qualTotal: results.qualTotal,
           qualInners: results.qualInners,
+          competitionDate: competitions.date,
         })
         .from(results)
         .innerJoin(shooters, eq(results.shooterId, shooters.id))
         .leftJoin(clubs, eq(shooters.clubId, clubs.id))
+        .innerJoin(competitions, eq(results.competitionId, competitions.id))
         .where(and(eq(results.disciplineId, discipline.id), isNotNull(results.qualTotal)))
-        .orderBy(desc(results.qualTotal))
-        .limit(50)
+        .orderBy(asc(competitions.date))
     : [];
 
+  const maxScore = discipline ? parseFloat(discipline.maxQualScore) : 600;
+
+  // Group by shooter, compute forma score, sort by forma score desc
+  const shooterMap = new Map<
+    number,
+    { firstName: string; lastName: string; clubName: string | null; entries: { qualTotal: number; date: string }[] }
+  >();
+
+  for (const r of rawResults) {
+    if (!shooterMap.has(r.shooterId)) {
+      shooterMap.set(r.shooterId, {
+        firstName: r.firstName,
+        lastName: r.lastName,
+        clubName: r.clubName,
+        entries: [],
+      });
+    }
+    if (r.qualTotal != null) {
+      shooterMap.get(r.shooterId)!.entries.push({
+        qualTotal: parseFloat(r.qualTotal),
+        date: r.competitionDate,
+      });
+    }
+  }
+
+  const ranking = Array.from(shooterMap.entries())
+    .map(([shooterId, data]) => {
+      const forma = computeFormaScore(data.entries, maxScore);
+      const peak = data.entries.length > 0 ? Math.max(...data.entries.map((e) => e.qualTotal)) : null;
+      // Best inners for AP disciplines
+      const bestInners = rawResults
+        .filter((r) => r.shooterId === shooterId && r.qualInners != null)
+        .reduce((best, r) => (r.qualInners! > (best ?? -1) ? r.qualInners! : best), null as number | null);
+      return { shooterId, ...data, forma, peak, bestInners };
+    })
+    .filter((s) => s.forma !== null)
+    .sort((a, b) => b.forma!.score - a.forma!.score);
+
+  // Shooters with results but only 1 nastup (no forma trend) — append after
+  const noForma = Array.from(shooterMap.entries())
+    .filter(([id]) => !ranking.find((r) => r.shooterId === id))
+    .map(([shooterId, data]) => ({
+      shooterId,
+      ...data,
+      forma: null,
+      peak: data.entries.length > 0 ? Math.max(...data.entries.map((e) => e.qualTotal)) : null,
+      bestInners: null as number | null,
+    }))
+    .sort((a, b) => (b.peak ?? 0) - (a.peak ?? 0));
+
+  const allRanked = [...ranking, ...noForma];
   const activeTab = TABS.find((t) => t.code === activeCode);
+  const isAP = activeCode.startsWith("AP");
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
@@ -55,7 +110,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
           Rangiranje
         </h1>
         <p className="text-sm mt-1 text-[var(--muted)]">
-          Najbolji rezultat po disciplini
+          Poredak po forma score-u — weighted average poslednjih nastupa
         </p>
       </div>
 
@@ -67,11 +122,10 @@ export default async function RangiranjeePage({ searchParams }: Props) {
             <Link
               key={code}
               href={`/rangiranje?disciplina=${code.toLowerCase()}`}
-              className="flex flex-col items-center px-4 py-2 rounded-md text-center transition-colors duration-150"
+              className="flex flex-col items-center px-4 py-2 rounded-md text-center transition-colors duration-150 no-underline"
               style={{
                 background: active ? "var(--bg)" : "transparent",
                 boxShadow: active ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                textDecoration: "none",
               }}
             >
               <span
@@ -93,7 +147,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
 
       {/* Table */}
       <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-        {ranking.length === 0 ? (
+        {allRanked.length === 0 ? (
           <div className="py-20 text-center">
             <p className="text-sm text-[var(--muted)]">
               Nema podataka za {activeTab?.name ?? activeCode}.
@@ -106,15 +160,17 @@ export default async function RangiranjeePage({ searchParams }: Props) {
                 <th className="w-12 px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">#</th>
                 <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Strelac</th>
                 <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
-                {activeCode.startsWith("AP") && (
+                <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Forma</th>
+                <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Peak</th>
+                {isAP && (
                   <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inners</th>
                 )}
-                <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Rezultat</th>
+                <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Nastupa</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
-              {ranking.map((r, i) => (
-                <tr key={`${r.shooterId}-${i}`} className="hover:bg-[var(--surface)] transition-colors">
+              {allRanked.map((s, i) => (
+                <tr key={s.shooterId} className="hover:bg-[var(--surface)] transition-colors">
                   <td
                     className="w-12 px-4 py-3 text-right font-[family-name:var(--font-barlow-condensed)] font-bold text-lg"
                     style={{ color: i === 0 ? "var(--brand-primary)" : "var(--subtle)" }}
@@ -123,22 +179,37 @@ export default async function RangiranjeePage({ searchParams }: Props) {
                   </td>
                   <td className="px-4 py-3">
                     <Link
-                      href={`/strelci/${r.shooterId}`}
+                      href={`/strelci/${s.shooterId}`}
                       className="font-semibold text-[var(--ink)] hover:underline"
                     >
-                      {r.lastName} {r.firstName}
+                      {s.lastName} {s.firstName}
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-[var(--muted)]">
-                    {r.clubName ?? <span className="text-[var(--subtle)]">—</span>}
+                    {s.clubName ?? <span className="text-[var(--subtle)]">—</span>}
                   </td>
-                  {activeCode.startsWith("AP") && (
-                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm text-[var(--muted)]">
-                      {r.qualInners != null ? `${r.qualInners}x` : <span className="text-[var(--subtle)]">—</span>}
+                  <td className="px-4 py-3 text-right">
+                    {s.forma ? (
+                      <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
+                        {s.forma.score.toFixed(1)}
+                        <span className="ml-1 text-xs" style={{ color: trendColor(s.forma.trend) }}>
+                          {trendLabel(s.forma.trend)}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[var(--subtle)]">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)]">
+                    {s.peak ?? <span className="text-[var(--subtle)]">—</span>}
+                  </td>
+                  {isAP && (
+                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
+                      {s.bestInners != null ? `${s.bestInners}x` : <span className="text-[var(--subtle)]">—</span>}
                     </td>
                   )}
-                  <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
-                    {r.bestQual}
+                  <td className="px-4 py-3 text-right text-xs text-[var(--subtle)]">
+                    {s.entries.length}
                   </td>
                 </tr>
               ))}

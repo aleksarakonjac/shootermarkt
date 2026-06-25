@@ -1,26 +1,113 @@
 @import "tailwindcss";
 
+/* ── Brand tokens ──────────────────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Primary — competition crimson */
+  --brand-primary:        oklch(0.50 0.22 28);
+  --brand-primary-hover:  oklch(0.44 0.22 28);
+  --brand-primary-light:  oklch(0.94 0.04 28);
+
+  /* Accent — deep navy */
+  --brand-accent:         oklch(0.28 0.065 255);
+  --brand-accent-hover:   oklch(0.22 0.065 255);
+
+  /* Surface scale */
+  --bg:       oklch(1.000 0.000 0);
+  --surface:  oklch(0.965 0.004 28);
+  --surface-2: oklch(0.94 0.006 28);
+  --border:   oklch(0.88 0.005 28);
+  --border-strong: oklch(0.78 0.008 28);
+
+  /* Typography */
+  --ink:      oklch(0.16 0.010 28);
+  --muted:    oklch(0.45 0.008 28);
+  --subtle:   oklch(0.62 0.006 28);
+
+  /* Status */
+  --success:  oklch(0.52 0.15 145);
+  --warning:  oklch(0.72 0.18 75);
+  --danger:   oklch(0.50 0.22 28); /* reuses primary */
+
+  /* Z-index scale */
+  --z-dropdown: 100;
+  --z-sticky:   200;
+  --z-modal-bd: 300;
+  --z-modal:    400;
+  --z-toast:    500;
+  --z-tooltip:  600;
 }
 
+/* ── Tailwind theme bridge ─────────────────────────────────────────────────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background:   var(--bg);
+  --color-foreground:   var(--ink);
+  --color-surface:      var(--surface);
+  --color-border:       var(--border);
+  --color-primary:      var(--brand-primary);
+  --color-accent:       var(--brand-accent);
+  --color-muted:        var(--muted);
+
+  --font-sans:  var(--font-plus-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono:  var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+  --font-display: var(--font-barlow-condensed), "Barlow Condensed", sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+  min-height: 100dvh;
+}
+
+/* ── Typography ────────────────────────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2;
+  text-wrap: balance;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+p, li {
+  max-width: 70ch;
+  text-wrap: pretty;
+}
+
+/* Score / number display — monospaced, tight */
+.score {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ── Focus ring ────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+
+/* ── Reduced motion ────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NavLinks } from "./nav-links";
 
 export default function PublicLayout({
   children,
@@ -7,35 +8,41 @@ export default function PublicLayout({
 }) {
   return (
     <>
-      <header className="border-b border-zinc-200 bg-white">
+      <header className="sticky top-0 z-[200] bg-[var(--bg)] border-b border-[var(--border)]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <Link href="/" className="text-xl font-bold tracking-tight">
-              Shootermarkt
+          <div className="flex h-14 items-center justify-between gap-8">
+            <Link href="/" className="flex items-baseline gap-0 shrink-0 no-underline">
+              <span className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-[1.35rem] uppercase tracking-tight text-[var(--brand-primary)] leading-none">
+                Shooter
+              </span>
+              <span className="font-[family-name:var(--font-barlow-condensed)] font-semibold text-[1.35rem] uppercase tracking-tight text-[var(--ink)] leading-none">
+                markt
+              </span>
             </Link>
-            <nav className="flex items-center gap-6 text-sm font-medium text-zinc-600">
-              <Link href="/strelci" className="hover:text-zinc-900 transition-colors">
-                Strelci
-              </Link>
-              <Link href="/rangiranje" className="hover:text-zinc-900 transition-colors">
-                Rangiranje
-              </Link>
-              <Link href="/takmicenja" className="hover:text-zinc-900 transition-colors">
-                Takmičenja
-              </Link>
-              <Link
-                href="/portal"
-                className="rounded-md bg-zinc-900 px-3 py-1.5 text-white hover:bg-zinc-700 transition-colors"
-              >
-                Moj profil
-              </Link>
-            </nav>
+
+            <NavLinks />
+
+            <Link
+              href="/portal"
+              className="shrink-0 rounded-md bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] px-3.5 py-1.5 text-[0.8125rem] font-semibold text-white transition-colors duration-150"
+            >
+              Moj profil
+            </Link>
           </div>
         </div>
       </header>
+
       <main className="flex-1">{children}</main>
-      <footer className="border-t border-zinc-200 py-8 text-center text-sm text-zinc-500">
-        © {new Date().getFullYear()} Shootermarkt · Srpsko streljaštvo
+
+      <footer className="border-t border-[var(--border)] py-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between flex-wrap gap-4">
+          <span className="font-[family-name:var(--font-barlow-condensed)] font-bold text-sm uppercase tracking-widest text-[var(--subtle)]">
+            Shootermarkt
+          </span>
+          <p className="text-[0.8125rem] text-[var(--muted)]">
+            © {new Date().getFullYear()} · Srpsko streljaštvo
+          </p>
+        </div>
       </footer>
     </>
   );
