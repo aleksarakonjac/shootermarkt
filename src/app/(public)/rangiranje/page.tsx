@@ -7,6 +7,13 @@ export const metadata = { title: "Rangiranje" };
 
 type DisciplineCode = "ARM" | "ARW" | "APM" | "APW";
 
+const TABS: { code: DisciplineCode; name: string }[] = [
+  { code: "ARM", name: "Air Rifle Men" },
+  { code: "ARW", name: "Air Rifle Women" },
+  { code: "APM", name: "Air Pistol Men" },
+  { code: "APW", name: "Air Pistol Women" },
+];
+
 type Props = { searchParams: Promise<{ disciplina?: string }> };
 
 export default async function RangiranjeePage({ searchParams }: Props) {
@@ -25,80 +32,119 @@ export default async function RangiranjeePage({ searchParams }: Props) {
           lastName: shooters.lastName,
           clubName: clubs.name,
           bestQual: results.qualTotal,
+          qualInners: results.qualInners,
         })
         .from(results)
         .innerJoin(shooters, eq(results.shooterId, shooters.id))
         .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-        .where(
-          and(
-            eq(results.disciplineId, discipline.id),
-            isNotNull(results.qualTotal)
-          )
-        )
+        .where(and(eq(results.disciplineId, discipline.id), isNotNull(results.qualTotal)))
         .orderBy(desc(results.qualTotal))
         .limit(50)
     : [];
 
-  const tabs: DisciplineCode[] = ["ARM", "ARW", "APM", "APW"];
+  const activeTab = TABS.find((t) => t.code === activeCode);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-bold text-zinc-900">Rangiranje</h1>
-      <p className="mt-1 text-zinc-500">Najbolji rezultat po disciplini</p>
-
-      <div className="mt-6 flex gap-2">
-        {tabs.map((code) => (
-          <Link
-            key={code}
-            href={`/rangiranje?disciplina=${code.toLowerCase()}`}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-              activeCode === code
-                ? "bg-zinc-900 text-white"
-                : "border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
-            }`}
-          >
-            {code}
-          </Link>
-        ))}
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+      {/* Header */}
+      <div className="mb-8 pb-6 border-b border-[var(--border)]">
+        <h1
+          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase tracking-tight text-[var(--ink)]"
+          style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.02em" }}
+        >
+          Rangiranje
+        </h1>
+        <p className="text-sm mt-1 text-[var(--muted)]">
+          Najbolji rezultat po disciplini
+        </p>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200">
-        <table className="w-full text-sm">
-          <thead className="bg-zinc-50 text-zinc-500 text-xs uppercase tracking-wider">
-            <tr>
-              <th className="px-4 py-3 text-left w-12">#</th>
-              <th className="px-4 py-3 text-left">Strelac</th>
-              <th className="px-4 py-3 text-left">Klub</th>
-              <th className="px-4 py-3 text-right">Rezultat</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {ranking.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-zinc-400">
-                  Nema podataka za ovu disciplinu.
-                </td>
+      {/* Discipline tabs */}
+      <div className="flex gap-1 mb-6 p-1 rounded-lg bg-[var(--surface)] w-fit">
+        {TABS.map(({ code, name }) => {
+          const active = activeCode === code;
+          return (
+            <Link
+              key={code}
+              href={`/rangiranje?disciplina=${code.toLowerCase()}`}
+              className="flex flex-col items-center px-4 py-2 rounded-md text-center transition-colors duration-150"
+              style={{
+                background: active ? "var(--bg)" : "transparent",
+                boxShadow: active ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                textDecoration: "none",
+              }}
+            >
+              <span
+                className="font-[family-name:var(--font-barlow-condensed)] font-bold text-base tracking-tight"
+                style={{ color: active ? "var(--brand-primary)" : "var(--muted)" }}
+              >
+                {code}
+              </span>
+              <span
+                className="text-[0.65rem] hidden sm:block leading-tight"
+                style={{ color: active ? "var(--muted)" : "var(--subtle)" }}
+              >
+                {name}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Table */}
+      <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+        {ranking.length === 0 ? (
+          <div className="py-20 text-center">
+            <p className="text-sm text-[var(--muted)]">
+              Nema podataka za {activeTab?.name ?? activeCode}.
+            </p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
+                <th className="w-12 px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">#</th>
+                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Strelac</th>
+                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
+                {activeCode.startsWith("AP") && (
+                  <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inners</th>
+                )}
+                <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Rezultat</th>
               </tr>
-            )}
-            {ranking.map((r, i) => (
-              <tr key={`${r.shooterId}-${i}`} className="hover:bg-zinc-50">
-                <td className="px-4 py-3 text-zinc-400 font-mono">{i + 1}</td>
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/strelci/${r.shooterId}`}
-                    className="font-medium text-zinc-900 hover:underline"
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]">
+              {ranking.map((r, i) => (
+                <tr key={`${r.shooterId}-${i}`} className="hover:bg-[var(--surface)] transition-colors">
+                  <td
+                    className="w-12 px-4 py-3 text-right font-[family-name:var(--font-barlow-condensed)] font-bold text-lg"
+                    style={{ color: i === 0 ? "var(--brand-primary)" : "var(--subtle)" }}
                   >
-                    {r.lastName} {r.firstName}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-zinc-600">{r.clubName ?? "—"}</td>
-                <td className="px-4 py-3 text-right font-mono font-semibold text-zinc-900">
-                  {r.bestQual}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    {i + 1}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/strelci/${r.shooterId}`}
+                      className="font-semibold text-[var(--ink)] hover:underline"
+                    >
+                      {r.lastName} {r.firstName}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-[var(--muted)]">
+                    {r.clubName ?? <span className="text-[var(--subtle)]">—</span>}
+                  </td>
+                  {activeCode.startsWith("AP") && (
+                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm text-[var(--muted)]">
+                      {r.qualInners != null ? `${r.qualInners}x` : <span className="text-[var(--subtle)]">—</span>}
+                    </td>
+                  )}
+                  <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
+                    {r.bestQual}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

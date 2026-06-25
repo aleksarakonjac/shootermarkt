@@ -3,6 +3,7 @@ import { shooters, clubs, results, competitions, disciplines } from "@/lib/db/sc
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -31,6 +32,7 @@ export default async function ShooterPage({ params }: Props) {
       id: results.id,
       qualTotal: results.qualTotal,
       qualRank: results.qualRank,
+      qualInners: results.qualInners,
       qualified: results.qualified,
       finalTotal: results.finalTotal,
       finalRank: results.finalRank,
@@ -38,7 +40,6 @@ export default async function ShooterPage({ params }: Props) {
       competitionDate: competitions.date,
       competitionLevel: competitions.level,
       disciplineCode: disciplines.code,
-      disciplineName: disciplines.name,
     })
     .from(results)
     .innerJoin(competitions, eq(results.competitionId, competitions.id))
@@ -46,64 +47,117 @@ export default async function ShooterPage({ params }: Props) {
     .where(eq(results.shooterId, shooterId))
     .orderBy(competitions.date);
 
+  const initials = `${shooter.firstName[0]}${shooter.lastName[0]}`;
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="flex items-start gap-6">
-        <div className="h-20 w-20 rounded-full bg-zinc-100 flex items-center justify-center text-2xl font-bold text-zinc-400">
-          {shooter.firstName[0]}{shooter.lastName[0]}
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-xs text-[var(--muted)] mb-8">
+        <Link href="/strelci" className="hover:text-[var(--ink)] transition-colors">Strelci</Link>
+        <span className="text-[var(--subtle)]">/</span>
+        <span className="text-[var(--ink)] font-medium">{shooter.lastName} {shooter.firstName}</span>
+      </nav>
+
+      {/* Profile header */}
+      <div className="flex items-start gap-5 mb-8 pb-8 border-b border-[var(--border)]">
+        <div
+          className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 font-[family-name:var(--font-barlow-condensed)] font-bold text-xl text-white"
+          style={{ background: "var(--brand-primary)" }}
+        >
+          {initials}
         </div>
-        <div>
-          <h1 className="text-3xl font-bold text-zinc-900">
-            {shooter.lastName} {shooter.firstName}
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-3 flex-wrap">
+            <h1
+              className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase tracking-tight text-[var(--ink)]"
+              style={{ fontSize: "clamp(1.5rem, 4vw, 2.25rem)", letterSpacing: "-0.02em" }}
+            >
+              {shooter.lastName} {shooter.firstName}
+            </h1>
             {shooter.verified && (
-              <span className="ml-3 text-base font-normal text-emerald-600">Verifikovan</span>
+              <span
+                className="mt-1 inline-flex items-center gap-1 text-[0.7rem] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}
+              >
+                ✓ Verifikovan
+              </span>
             )}
-          </h1>
-          <div className="mt-1 flex gap-4 text-sm text-zinc-500">
+          </div>
+
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-[var(--muted)]">
             {shooter.club && <span>{shooter.club.name}</span>}
             {shooter.birthYear && <span>Rođ. {shooter.birthYear}</span>}
             {shooter.gender && (
               <span>{shooter.gender === "M" ? "Muški" : "Ženski"}</span>
             )}
+            {shooter.licenseNumber && (
+              <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--subtle)]">
+                #{shooter.licenseNumber}
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="mt-10">
-        <h2 className="text-lg font-semibold text-zinc-900">Istorija nastupa</h2>
+      {/* Results */}
+      <div>
+        <h2
+          className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-tight text-[var(--ink)] mb-4"
+        >
+          Istorija nastupa
+        </h2>
+
         {shooterResults.length === 0 ? (
-          <p className="mt-4 text-zinc-400">Nema unešenih rezultata.</p>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center">
+            <p className="text-sm text-[var(--muted)]">Nema unešenih rezultata.</p>
+          </div>
         ) : (
-          <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-zinc-50 text-zinc-500 text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3 text-left">Takmičenje</th>
-                  <th className="px-4 py-3 text-left">Datum</th>
-                  <th className="px-4 py-3 text-left">Disciplina</th>
-                  <th className="px-4 py-3 text-right">Kval.</th>
-                  <th className="px-4 py-3 text-right">Rank</th>
-                  <th className="px-4 py-3 text-right">Final</th>
+              <thead>
+                <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
+                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Takmičenje</th>
+                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Datum</th>
+                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Disciplina</th>
+                  <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Kval.</th>
+                  <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Rank</th>
+                  <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Final</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100">
+              <tbody className="divide-y divide-[var(--border)]">
                 {shooterResults.map((r) => (
-                  <tr key={r.id} className="hover:bg-zinc-50">
-                    <td className="px-4 py-3 font-medium text-zinc-900">{r.competitionName}</td>
-                    <td className="px-4 py-3 text-zinc-600">{r.competitionDate}</td>
+                  <tr key={r.id} className="hover:bg-[var(--surface)] transition-colors">
+                    <td className="px-4 py-3 font-medium text-[var(--ink)]">{r.competitionName}</td>
+                    <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
+                      {r.competitionDate}
+                    </td>
                     <td className="px-4 py-3">
-                      <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs font-mono">
+                      <span
+                        className="inline-block rounded px-2 py-0.5 text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] tracking-wide"
+                        style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+                      >
                         {r.disciplineCode}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-zinc-900">
-                      {r.qualTotal ?? "—"}
+                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
+                      {r.qualTotal ?? <span className="text-[var(--subtle)]">—</span>}
+                      {r.qualInners != null && (
+                        <span className="text-xs text-[var(--muted)] ml-1">{r.qualInners}x</span>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right text-zinc-600">
-                      #{r.qualRank ?? "—"}
+                    <td className="px-4 py-3 text-right text-[var(--muted)]">
+                      {r.qualRank != null ? (
+                        <span>
+                          <span className="text-[var(--subtle)] text-xs">#</span>
+                          {r.qualRank}
+                        </span>
+                      ) : (
+                        <span className="text-[var(--subtle)]">—</span>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-zinc-600">
-                      {r.finalTotal ?? "—"}
+                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)]">
+                      {r.finalTotal ?? <span className="text-[var(--subtle)]">—</span>}
                     </td>
                   </tr>
                 ))}
