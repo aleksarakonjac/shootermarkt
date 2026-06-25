@@ -5,6 +5,12 @@ import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-impor
 
 type Step = "upload" | "review" | "done";
 
+interface ParseResponse {
+  rows: ReviewRow[];
+  eventsCount: number;
+  skippedDisciplines: string[];
+}
+
 interface CommitResult {
   inserted: number;
   skipped: number;
@@ -26,17 +32,16 @@ export function ImportClient() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Upload step
   const fileRef = useRef<HTMLInputElement>(null);
   const [compName, setCompName] = useState("");
   const [compDate, setCompDate] = useState("");
   const [compLocation, setCompLocation] = useState("");
   const [compLevel, setCompLevel] = useState<CompetitionLevel>("drzavno");
 
-  // Review step
   const [rows, setRows] = useState<ReviewRow[]>([]);
+  const [parseInfo, setParseInfo] = useState<Omit<ParseResponse, "rows"> | null>(null);
+  const [nocFilter, setNocFilter] = useState<string>("");
 
-  // Done step
   const [result, setResult] = useState<CommitResult | null>(null);
 
   async function handleParse() {
@@ -46,17 +51,14 @@ export function ImportClient() {
 
     setLoading(true);
     setError(null);
-
     try {
       const fd = new FormData();
       fd.append("pdf", file);
-
       const res = await fetch("/api/admin/import/parse", { method: "POST", body: fd });
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error ?? "Parse error");
-
-      setRows(data.rows as ReviewRow[]);
+      const data = (await res.json()) as ParseResponse;
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "Parse error");
+      setRows(data.rows);
+      setParseInfo({ eventsCount: data.eventsCount, skippedDisciplines: data.skippedDisciplines });
       setStep("review");
     } catch (e) {
       setError(String(e));
@@ -68,26 +70,19 @@ export function ImportClient() {
   async function handleCommit() {
     setLoading(true);
     setError(null);
-
     const payload: CommitPayload = {
-      competition: {
-        name: compName,
-        date: compDate,
-        location: compLocation || undefined,
-        level: compLevel,
-      },
+      competition: { name: compName, date: compDate, location: compLocation || undefined, level: compLevel },
       rows,
     };
-
     try {
       const res = await fetch("/api/admin/import/commit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Commit error");
-      setResult(data as CommitResult);
+      const data = (await res.json()) as CommitResult;
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "Commit error");
+      setResult(data);
       setStep("done");
     } catch (e) {
       setError(String(e));
@@ -100,16 +95,27 @@ export function ImportClient() {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
 
+  function skipByNoc(noc: string) {
+    setRows((prev) => prev.map((r) => r.teamNoc === noc ? { ...r, skip: true } : r));
+  }
+
   function reset() {
     setStep("upload");
     setRows([]);
+    setParseInfo(null);
     setResult(null);
     setError(null);
+    setNocFilter("");
     if (fileRef.current) fileRef.current.value = "";
   }
 
+  // Unique countries in parsed results
+  const allNocs = Array.from(new Set(rows.map((r) => r.teamNoc))).sort();
+  const filteredRows = nocFilter ? rows.filter((r) => r.teamNoc === nocFilter) : rows;
+  const activeCount = rows.filter((r) => !r.skip).length;
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
+    <div className="max-w-6xl mx-auto px-4 py-10">
       <div className="mb-8 pb-6 border-b border-[var(--border)]">
         <h1
           className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase tracking-tight text-[var(--ink)]"
@@ -140,16 +146,14 @@ export function ImportClient() {
         </div>
       )}
 
-      {/* ── Step 1: Upload ─────────────────────────────────────────────── */}
+      {/* ── Step 1: Upload ── */}
       {step === "upload" && (
         <div className="space-y-6">
           <div className="rounded-xl border border-[var(--border)] p-6 space-y-4">
             <h2 className="font-semibold text-[var(--ink)]">Podaci o takmičenju</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
-                  Naziv *
-                </label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Naziv *</label>
                 <input
                   value={compName}
                   onChange={(e) => setCompName(e.target.value)}
@@ -158,39 +162,31 @@ export function ImportClient() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
-                  Datum *
-                </label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum *</label>
                 <input
                   type="date"
                   value={compDate}
                   onChange={(e) => setCompDate(e.target.value)}
-                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]"
+                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
-                  Nivo
-                </label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo</label>
                 <select
                   value={compLevel}
                   onChange={(e) => setCompLevel(e.target.value as CompetitionLevel)}
-                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]"
+                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
                 >
-                  {LEVELS.map((l) => (
-                    <option key={l.value} value={l.value}>{l.label}</option>
-                  ))}
+                  {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
                 </select>
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
-                  Lokacija
-                </label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija</label>
                 <input
                   value={compLocation}
                   onChange={(e) => setCompLocation(e.target.value)}
                   placeholder="npr. Beograd, SC Crvena zvezda"
-                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]"
+                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
                 />
               </div>
             </div>
@@ -221,31 +217,88 @@ export function ImportClient() {
         </div>
       )}
 
-      {/* ── Step 2: Review ─────────────────────────────────────────────── */}
+      {/* ── Step 2: Review ── */}
       {step === "review" && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-[var(--muted)]">
-              <span className="font-semibold text-[var(--ink)]">{rows.filter((r) => !r.skip).length}</span> rezultata za unos
-              {rows.some((r) => r.warning) && (
-                <span className="ml-2 text-[var(--warning)]">
-                  · {rows.filter((r) => r.warning).length} upozorenja
+        <div className="space-y-5">
+          {/* Stats bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-4 text-sm text-[var(--muted)]">
+              <span>
+                <span className="font-semibold text-[var(--ink)]">{activeCount}</span> za unos
+              </span>
+              <span>
+                <span className="font-semibold text-[var(--ink)]">{rows.filter((r) => r.skip).length}</span> preskočeno
+              </span>
+              {rows.filter((r) => r.warning).length > 0 && (
+                <span style={{ color: "var(--warning)" }}>
+                  ⚠ {rows.filter((r) => r.warning).length} novih strelaca
                 </span>
               )}
-            </p>
+              {parseInfo?.skippedDisciplines.length ? (
+                <span style={{ color: "var(--warning)" }}>
+                  Preskočene discipline: {parseInfo.skippedDisciplines.join(", ")}
+                </span>
+              ) : null}
+            </div>
             <button onClick={reset} className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
               ← Nazad
             </button>
           </div>
 
+          {/* Country filter + bulk skip */}
+          {allNocs.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja:</span>
+              <button
+                onClick={() => setNocFilter("")}
+                className="rounded-full px-3 py-1 text-xs font-semibold transition-colors"
+                style={{
+                  background: nocFilter === "" ? "var(--brand-primary)" : "var(--surface)",
+                  color: nocFilter === "" ? "white" : "var(--ink)",
+                }}
+              >
+                Sve ({rows.length})
+              </button>
+              {allNocs.map((noc) => {
+                const count = rows.filter((r) => r.teamNoc === noc).length;
+                const skipped = rows.filter((r) => r.teamNoc === noc && r.skip).length;
+                return (
+                  <div key={noc} className="flex items-center gap-1">
+                    <button
+                      onClick={() => setNocFilter(nocFilter === noc ? "" : noc)}
+                      className="rounded-full px-3 py-1 text-xs font-[family-name:var(--font-jetbrains-mono)] font-semibold transition-colors"
+                      style={{
+                        background: nocFilter === noc ? "var(--brand-accent)" : "var(--surface)",
+                        color: nocFilter === noc ? "white" : "var(--ink)",
+                      }}
+                    >
+                      {noc} ({count - skipped}/{count})
+                    </button>
+                    {skipped < count && (
+                      <button
+                        onClick={() => skipByNoc(noc)}
+                        title={`Skip sve ${noc}`}
+                        className="text-[0.65rem] text-[var(--subtle)] hover:text-[var(--brand-primary)] transition-colors"
+                      >
+                        skip sve
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Table */}
           <div className="rounded-xl border border-[var(--border)] overflow-auto">
-            <table className="w-full text-sm min-w-[700px]">
+            <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                  <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
+                  <th className="px-3 py-2.5 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
                   <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Prezime</th>
                   <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ime</th>
-                  <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub (NOC)</th>
+                  <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
+                  <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
                   <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Disc.</th>
                   <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Rank</th>
                   <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Total</th>
@@ -254,69 +307,78 @@ export function ImportClient() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {rows.map((row, idx) => (
-                  <tr
-                    key={idx}
-                    className={`transition-colors ${row.skip ? "opacity-40" : "hover:bg-[var(--surface)]"}`}
-                  >
-                    <td className="px-3 py-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={!!row.skip}
-                        onChange={(e) => updateRow(idx, { skip: e.target.checked })}
-                        className="accent-[var(--brand-primary)]"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        value={row.lastName}
-                        onChange={(e) => updateRow(idx, { lastName: e.target.value })}
-                        className="w-full bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none text-[var(--ink)] text-sm py-0.5"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        value={row.firstName}
-                        onChange={(e) => updateRow(idx, { firstName: e.target.value })}
-                        className="w-full bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none text-[var(--ink)] text-sm py-0.5"
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-[var(--muted)] text-xs font-[family-name:var(--font-jetbrains-mono)]">
-                      {row.clubNoc ?? "—"}
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={row.disciplineCode}
-                        onChange={(e) => updateRow(idx, { disciplineCode: e.target.value as ReviewRow["disciplineCode"] })}
-                        className="bg-transparent text-xs font-[family-name:var(--font-barlow-condensed)] font-semibold text-[var(--ink)] focus:outline-none"
-                      >
-                        {DISCIPLINES.map((d) => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs">
-                      {row.qualRank != null ? `#${row.qualRank}` : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <input
-                        type="number"
-                        value={row.qualTotal}
-                        onChange={(e) => updateRow(idx, { qualTotal: parseFloat(e.target.value) })}
-                        step="0.1"
-                        className="w-16 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] text-sm py-0.5"
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs">
-                      {row.qualInners != null ? `${row.qualInners}x` : "—"}
-                    </td>
-                    <td className="px-3 py-2">
-                      {row.shooterId ? (
-                        <span className="text-xs text-[var(--success)]">✓ Pronađen</span>
-                      ) : row.warning ? (
-                        <span className="text-xs text-[var(--warning)]" title={row.warning}>⚠ Novi</span>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
+                {filteredRows.map((row, visIdx) => {
+                  // Find true index in rows array
+                  const trueIdx = rows.indexOf(row);
+                  return (
+                    <tr
+                      key={visIdx}
+                      className={`transition-colors ${row.skip ? "opacity-40" : "hover:bg-[var(--surface)]"}`}
+                    >
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={!!row.skip}
+                          onChange={(e) => updateRow(trueIdx, { skip: e.target.checked })}
+                          className="accent-[var(--brand-primary)]"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          value={row.lastName}
+                          onChange={(e) => updateRow(trueIdx, { lastName: e.target.value })}
+                          className="w-full bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none text-[var(--ink)] text-sm py-0.5"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          value={row.firstName}
+                          onChange={(e) => updateRow(trueIdx, { firstName: e.target.value })}
+                          className="w-full bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none text-[var(--ink)] text-sm py-0.5"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">
+                          {row.teamNoc}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-[var(--muted)] text-xs">
+                        {row.clubAbbr ?? <span className="text-[var(--subtle)]">—</span>}
+                      </td>
+                      <td className="px-3 py-2">
+                        <select
+                          value={row.disciplineCode}
+                          onChange={(e) => updateRow(trueIdx, { disciplineCode: e.target.value as ReviewRow["disciplineCode"] })}
+                          className="bg-transparent text-xs font-[family-name:var(--font-barlow-condensed)] font-semibold text-[var(--ink)] focus:outline-none"
+                        >
+                          {DISCIPLINES.map((d) => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs">
+                        {row.qualRank != null ? `#${row.qualRank}` : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <input
+                          type="number"
+                          value={row.qualTotal}
+                          onChange={(e) => updateRow(trueIdx, { qualTotal: parseFloat(e.target.value) })}
+                          step="0.1"
+                          className="w-16 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] text-sm py-0.5"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs">
+                        {row.qualInners != null ? `${row.qualInners}x` : "—"}
+                      </td>
+                      <td className="px-3 py-2">
+                        {row.shooterId ? (
+                          <span className="text-xs" style={{ color: "var(--success)" }}>✓ Pronađen</span>
+                        ) : row.warning ? (
+                          <span className="text-xs" style={{ color: "var(--warning)" }}>⚠ Novi</span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -324,10 +386,10 @@ export function ImportClient() {
           <div className="flex gap-3">
             <button
               onClick={handleCommit}
-              disabled={loading}
+              disabled={loading || activeCount === 0}
               className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
             >
-              {loading ? "Unosim..." : `Potvrdi i unesi ${rows.filter((r) => !r.skip).length} rezultata →`}
+              {loading ? "Unosim..." : `Potvrdi i unesi ${activeCount} rezultata →`}
             </button>
             <button
               onClick={reset}
@@ -339,7 +401,7 @@ export function ImportClient() {
         </div>
       )}
 
-      {/* ── Step 3: Done ───────────────────────────────────────────────── */}
+      {/* ── Step 3: Done ── */}
       {step === "done" && result && (
         <div className="space-y-6">
           <div className="rounded-xl border border-[var(--border)] p-8 text-center">
@@ -359,7 +421,6 @@ export function ImportClient() {
               </div>
             )}
           </div>
-
           <div className="flex gap-3">
             <button
               onClick={reset}

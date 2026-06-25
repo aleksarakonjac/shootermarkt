@@ -5,7 +5,7 @@ import { shooters, clubs, competitions, results, disciplines } from "@/lib/db/sc
 import { eq, and } from "drizzle-orm";
 import type { CommitPayload } from "@/lib/pdf-import/types";
 
-function isAdmin(email: string | undefined): boolean {
+function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
 }
 
@@ -24,27 +24,22 @@ export async function POST(req: NextRequest) {
   }
 
   // 1. Upsert competition
-  let competitionId: number;
-  const existing = await db.query.competitions.findFirst({
+  const existingComp = await db.query.competitions.findFirst({
     where: and(eq(competitions.name, comp.name), eq(competitions.date, comp.date)),
   });
 
-  if (existing) {
-    competitionId = existing.id;
+  let competitionId: number;
+  if (existingComp) {
+    competitionId = existingComp.id;
   } else {
-    const [inserted] = await db
+    const [ins] = await db
       .insert(competitions)
-      .values({
-        name: comp.name,
-        date: comp.date,
-        location: comp.location,
-        level: comp.level,
-      })
+      .values({ name: comp.name, date: comp.date, location: comp.location, level: comp.level })
       .returning({ id: competitions.id });
-    competitionId = inserted.id;
+    competitionId = ins.id;
   }
 
-  // 2. Load disciplines map
+  // 2. Disciplines map
   const disciplineRows = await db.select().from(disciplines);
   const disciplineMap = Object.fromEntries(disciplineRows.map((d) => [d.code, d.id]));
 
@@ -56,40 +51,52 @@ export async function POST(req: NextRequest) {
     if (row.skip) { skipped++; continue; }
 
     try {
-      // 3. Upsert club if clubNoc given but no clubId
+      // 3. Upsert club
       let clubId = row.clubId;
-      if (!clubId && row.clubNoc) {
+      if (!clubId && row.clubAbbr) {
+        // Try to find by name or noc_code
         const existingClub = await db.query.clubs.findFirst({
-          where: eq(clubs.nocCode, row.clubNoc),
+          where: eq(clubs.nocCode, row.clubAbbr),
         });
         if (existingClub) {
           clubId = existingClub.id;
         } else {
+          // Create provisional club — admin can enrich later
           const [newClub] = await db
             .insert(clubs)
-            .values({ name: row.clubNoc, nocCode: row.clubNoc })
+            .values({
+              name: row.clubAbbr,
+              nocCode: row.clubAbbr,
+              countryCode: row.teamNoc,
+            })
             .returning({ id: clubs.id });
           clubId = newClub.id;
         }
       }
 
-      // 4. Upsert shooter
+      // 4. Upsert shooter — match by name + nationality
       let shooterId = row.shooterId;
       if (!shooterId) {
-        const existingShooter = await db.query.shooters.findFirst({
+        const existing = await db.query.shooters.findFirst({
           where: and(
             eq(shooters.firstName, row.firstName),
-            eq(shooters.lastName, row.lastName)
+            eq(shooters.lastName, row.lastName),
+            ...(row.teamNoc ? [eq(shooters.nationality, row.teamNoc)] : [])
           ),
         });
-        if (existingShooter) {
-          shooterId = existingShooter.id;
+        if (existing) {
+          shooterId = existing.id;
+          // Update clubId if not set and we now have one
+          if (!existing.clubId && clubId) {
+            await db.update(shooters).set({ clubId }).where(eq(shooters.id, existing.id));
+          }
         } else {
           const [newShooter] = await db
             .insert(shooters)
             .values({
               firstName: row.firstName,
               lastName: row.lastName,
+              nationality: row.teamNoc || null,
               clubId: clubId ?? null,
               createdBySelf: false,
               verified: false,
@@ -105,7 +112,7 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      // 5. Insert result (ignore conflict — same shooter/comp/discipline)
+      // 5. Insert result
       await db
         .insert(results)
         .values({
@@ -125,7 +132,7 @@ export async function POST(req: NextRequest) {
 
       inserted++;
     } catch (err) {
-      errors.push(`${row.lastName} ${row.firstName}: ${String(err)}`);
+      errors.push(`${row.lastName} ${row.firstName} (${row.teamNoc}): ${String(err)}`);
     }
   }
 

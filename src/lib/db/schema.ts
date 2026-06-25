@@ -53,7 +53,8 @@ export const clubs = pgTable("clubs", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 200 }).notNull(),
   city: varchar("city", { length: 100 }),
-  nocCode: varchar("noc_code", { length: 10 }),
+  countryCode: varchar("country_code", { length: 3 }), // ISO 3166-1 alpha-3: SRB, GER, KOR
+  nocCode: varchar("noc_code", { length: 20 }),         // federation/club abbreviation
   sssId: varchar("sss_id", { length: 50 }),
 });
 
@@ -69,6 +70,7 @@ export const shooters = pgTable(
     gender: varchar("gender", { length: 1 }), // 'M' | 'F'
     clubId: integer("club_id").references(() => clubs.id),
     licenseNumber: varchar("license_number", { length: 50 }),
+    nationality: varchar("nationality", { length: 3 }), // ISO 3166-1 alpha-3: SRB, GER, KOR
     createdBySelf: boolean("created_by_self").notNull().default(false),
     verified: boolean("verified").notNull().default(false),
     avatarUrl: text("avatar_url"),
@@ -78,6 +80,7 @@ export const shooters = pgTable(
   (t) => [
     index("shooters_last_name_idx").on(t.lastName),
     index("shooters_club_id_idx").on(t.clubId),
+    index("shooters_nationality_idx").on(t.nationality),
   ]
 );
 

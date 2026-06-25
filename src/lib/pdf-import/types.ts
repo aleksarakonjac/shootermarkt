@@ -6,7 +6,10 @@ export interface ParsedShooterResult {
   bibNumber?: number;
   lastName: string;
   firstName: string;
-  clubNoc?: string;
+  /** Country/team IOC code (SRB, GER, KOR...) — always present */
+  teamNoc: string;
+  /** Actual club name or abbreviation — only in national biltens */
+  clubName?: string;
   series: number[];
   total: number;
   inners?: number | null;
@@ -17,13 +20,15 @@ export interface ParsedFinalResult {
   rank: number;
   lastName: string;
   firstName: string;
-  clubNoc?: string;
+  teamNoc: string;
   total: number;
 }
 
 export interface ParsedEvent {
   discipline: DisciplineCode;
   stage: "qualification" | "final";
+  /** true when the PDF is from an international competition */
+  isInternational?: boolean;
   results: ParsedShooterResult[] | ParsedFinalResult[];
 }
 
@@ -32,14 +37,16 @@ export interface ParsedBilten {
   rawText?: string;
 }
 
-/** After admin review, ready for commit */
+/** One row in the admin review table, ready for commit */
 export interface ReviewRow {
-  /** Matched or to-be-created shooter */
-  shooterId?: number;
+  shooterId?: number;        // matched DB shooter
   firstName: string;
   lastName: string;
-  clubNoc?: string;
-  clubId?: number;
+  /** Country/team IOC code — used as nationality */
+  teamNoc: string;
+  /** Actual club abbreviation, only from national biltens */
+  clubAbbr?: string;
+  clubId?: number;           // matched DB club
 
   disciplineCode: DisciplineCode;
   qualTotal: number;
@@ -50,7 +57,7 @@ export interface ReviewRow {
   finalTotal?: number | null;
   finalRank?: number | null;
 
-  /** UI state */
+  /** UI controls */
   skip?: boolean;
   warning?: string;
 }

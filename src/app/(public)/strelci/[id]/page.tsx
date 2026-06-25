@@ -103,6 +103,11 @@ export default async function ShooterPage({ params }: Props) {
             )}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-[var(--muted)]">
+            {shooter.nationality && (
+              <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)] bg-[var(--surface-2)] px-2 py-0.5 rounded">
+                {shooter.nationality}
+              </span>
+            )}
             {shooter.club && <span>{shooter.club.name}</span>}
             {shooter.birthYear && <span>Rođ. {shooter.birthYear}</span>}
             {shooter.gender && <span>{shooter.gender === "M" ? "Muški" : "Ženski"}</span>}
