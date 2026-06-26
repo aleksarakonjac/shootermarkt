@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { NavLinks } from "./nav-links";
+import ThemeToggle from "./components/ThemeToggle";
 
 export default function PublicLayout({
   children,
@@ -21,7 +22,7 @@ export default function PublicLayout({
             </Link>
 
             <NavLinks />
-
+                        <ThemeToggle />
             <Link
               href="/portal"
               className="shrink-0 rounded-md bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] px-3.5 py-1.5 text-[0.8125rem] font-semibold text-white transition-colors duration-150"

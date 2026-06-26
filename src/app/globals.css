@@ -7,9 +7,9 @@
   --brand-primary-hover: #A00000;
   --brand-primary-light: #ffb3b3;
 
-  /* Accent — teal secondary */
-  --brand-accent:         #006d77;
-  --brand-accent-hover:   #005a66;
+  /* Accent — darker secondary blue */
+  --brand-accent:         #003366;
+  --brand-accent-hover:   #00224D;
 
   /* Surface scale */
   --bg:       oklch(1.000 0.000 0);
@@ -36,6 +36,7 @@
   --z-toast:    500;
   --z-tooltip:  600;
 }
+
 
 
 /* ── Tailwind theme bridge ─────────────────────────────────────────────────── */
