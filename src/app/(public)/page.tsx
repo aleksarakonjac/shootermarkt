@@ -350,19 +350,7 @@ export default async function HomePage() {
       <SearchBarClient shootersList={allVerified} />
 
       {/* Main Dashboard Grid */}
-      <div className="masonry">
-        {/* Left Column - Main Content */}
-        <div className="break-inside-avoid mb-8 flex flex-col gap-8">
-          {/* Recent Match Results */}
-          {/* ... existing content unchanged ... */}
-        </div>
-        {/* Right Column - Sidebars */}
-        <div className="break-inside-avoid mb-8 flex flex-col gap-8">
-          {/* Quick H2H Duel Widget */}
-          {/* Upcoming Calendar / Announcements */}
-          {/* Club Leaderboard */}
-        </div>
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Left Column - Main Content (66% width) */}
         <div className="lg:col-span-2 flex flex-col gap-8">
