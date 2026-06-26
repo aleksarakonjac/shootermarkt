@@ -1,0 +1,20 @@
+/* Masonry layout for the homepage */
+.masonry {
+  column-gap: 1rem;
+  column-count: 1;
+}
+@media (min-width: 640px) {
+  .masonry {
+    column-count: 2;
+  }
+}
+@media (min-width: 1024px) {
+  .masonry {
+    column-count: 3;
+  }
+}
+/* Ensure child elements avoid breaking inside columns */
+.masonry > * {
+  break-inside: avoid;
+  margin-bottom: 1rem;
+}

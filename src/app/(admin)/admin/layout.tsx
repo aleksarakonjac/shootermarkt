@@ -32,7 +32,17 @@ export default async function AdminLayout({
           {[
             { href: "/admin", label: "Pregled" },
             { href: "/admin/strelci", label: "Strelci" },
+            { href: "/admin/strelci/novi", label: "  + Novi strelac" },
+            { href: "/admin/strelci/issf", label: "  Bulk ISSF" },
+            { href: "/admin/takmicenja", label: "Takmičenja" },
+            { href: "/admin/takmicenja/novi", label: "  + Novo" },
+            { href: "/admin/takmicenja/issf", label: "  Sync ISSF" },
             { href: "/admin/import", label: "PDF Import" },
+            { href: "/admin/issf", label: "ISSF Rezultati" },
+            { href: "/admin/sius", label: "SIUS Rezultati" },
+            { href: "/admin/sss", label: "SSS Bilteni" },
+            { href: "/admin/kalendar", label: "Kalendar" },
+            { href: "/admin/obavestenja", label: "Obaveštenja" },
           ].map((item) => (
             <Link
               key={item.href}

@@ -2,14 +2,14 @@
 
 /* ── Brand tokens ──────────────────────────────────────────────────────────── */
 :root {
-  /* Primary — competition crimson */
-  --brand-primary:        oklch(0.50 0.22 28);
-  --brand-primary-hover:  oklch(0.44 0.22 28);
-  --brand-primary-light:  oklch(0.94 0.04 28);
+  /* Primary — red accent */
+  --brand-primary:        #C20000;
+  --brand-primary-hover: #A00000;
+  --brand-primary-light: #ffb3b3;
 
-  /* Accent — deep navy */
-  --brand-accent:         oklch(0.28 0.065 255);
-  --brand-accent-hover:   oklch(0.22 0.065 255);
+  /* Accent — teal secondary */
+  --brand-accent:         #006d77;
+  --brand-accent-hover:   #005a66;
 
   /* Surface scale */
   --bg:       oklch(1.000 0.000 0);
@@ -19,9 +19,9 @@
   --border-strong: oklch(0.78 0.008 28);
 
   /* Typography */
-  --ink:      oklch(0.16 0.010 28);
-  --muted:    oklch(0.45 0.008 28);
-  --subtle:   oklch(0.62 0.006 28);
+  --ink:      oklch(0.22 0.012 28);
+  --muted:    oklch(0.48 0.008 28);
+  --subtle:   oklch(0.64 0.006 28);
 
   /* Status */
   --success:  oklch(0.52 0.15 145);
@@ -36,6 +36,7 @@
   --z-toast:    500;
   --z-tooltip:  600;
 }
+
 
 /* ── Tailwind theme bridge ─────────────────────────────────────────────────── */
 @theme inline {

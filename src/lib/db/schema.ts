@@ -75,6 +75,7 @@ export const shooters = pgTable(
     verified: boolean("verified").notNull().default(false),
     avatarUrl: text("avatar_url"),
     supabaseUserId: text("supabase_user_id").unique(), // null if admin-created
+    issfId: varchar("issf_id", { length: 50 }).unique(), // ISSF athlete ID e.g. SHSRBM...
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -93,6 +94,7 @@ export const competitions = pgTable("competitions", {
   location: varchar("location", { length: 200 }),
   level: competitionLevelEnum("level").notNull(),
   sourcePdfUrl: text("source_pdf_url"),
+  issfId: varchar("issf_id", { length: 20 }).unique(), // ISSF competition ID, prevents re-import
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -166,6 +168,28 @@ export const resultRelations = relations(results, ({ one }) => ({
     references: [disciplines.id],
   }),
 }));
+
+// ── Calendar Alerts ───────────────────────────────────────────────────────────
+
+export const calendarAlerts = pgTable("calendar_alerts", {
+  id: serial("id").primaryKey(),
+  source: varchar("source", { length: 20 }).notNull(), // 'sss' | 'issf' | 'esc'
+  eventName: text("event_name").notNull(),
+  changeType: varchar("change_type", { length: 20 }).notNull(), // 'new' | 'removed'
+  data: jsonb("data").$type<{
+    dateFrom?: string;
+    dateTo?: string;
+    location?: string;
+    country?: string;
+    url?: string;
+    externalId?: string;
+  }>(),
+  seen: boolean("seen").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type CalendarAlert = typeof calendarAlerts.$inferSelect;
+export type NewCalendarAlert = typeof calendarAlerts.$inferInsert;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
