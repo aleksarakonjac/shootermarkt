@@ -45,11 +45,11 @@ export function SearchBarClient({ shootersList }: SearchBarClientProps) {
   };
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto" ref={dropdownRef}>
+    <div className="relative w-full" ref={dropdownRef}>
       {/* Search Input Container */}
-      <div className="relative rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] shadow-xs focus-within:border-[var(--brand-primary)] focus-within:ring-1 focus-within:ring-[var(--brand-primary)] transition-all">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[var(--subtle)]">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <div className="relative rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] focus-within:border-[var(--brand-primary)] focus-within:ring-1 focus-within:ring-[var(--brand-primary)] transition-all">
+        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-[var(--subtle)]">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path
               d="M7.333 12.667A5.333 5.333 0 107.333 2a5.333 5.333 0 000 10.667zM14 14l-2.9-2.9"
               stroke="currentColor"
@@ -61,14 +61,14 @@ export function SearchBarClient({ shootersList }: SearchBarClientProps) {
         </div>
         <input
           type="text"
-          placeholder="Pretraži strelce po imenu ili klubu..."
+          placeholder="Pretraži strelce..."
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          className="w-full text-sm pl-10 pr-4 py-2.5 bg-transparent text-[var(--ink)] placeholder-[var(--subtle)] outline-none rounded-lg"
+          className="w-full text-sm pl-8 pr-3 py-1.5 bg-transparent text-[var(--ink)] placeholder-[var(--subtle)] outline-none rounded-lg"
           aria-label="Pretraga strelaca"
         />
       </div>

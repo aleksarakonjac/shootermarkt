@@ -37,6 +37,27 @@
   --z-tooltip:  600;
 }
 
+/* ── Dark mode overrides (.dark class set by ThemeToggle) ──────────────────── */
+html.dark {
+  color-scheme: dark;
+
+  /* Surface scale — dark */
+  --bg:          oklch(0.14 0.008 240);
+  --surface:     oklch(0.18 0.010 240);
+  --surface-2:   oklch(0.22 0.012 240);
+  --border:      oklch(0.28 0.010 240);
+  --border-strong: oklch(0.36 0.012 240);
+
+  /* Typography — dark */
+  --ink:    oklch(0.94 0.004 240);
+  --muted:  oklch(0.62 0.006 240);
+  --subtle: oklch(0.50 0.006 240);
+
+  /* Brand stays the same, slightly lighter accent */
+  --brand-accent:       #1a5fa8;
+  --brand-accent-hover: #1450a0;
+}
+
 
 
 /* ── Tailwind theme bridge ─────────────────────────────────────────────────── */
