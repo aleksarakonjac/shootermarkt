@@ -9,6 +9,12 @@ const ISSF_EVENT_MAP: Record<string, DisciplineCode> = {
   APW: "APW",
 };
 
+export interface ISSFCompetitionType {
+  id: number;
+  name: string;
+  acronym: string;
+}
+
 export interface ISSFCompetition {
   id: number;
   name: string;
@@ -17,6 +23,8 @@ export interface ISSFCompetition {
   city: string;
   nationCode: string;
   nationName: string;
+  competitionType?: ISSFCompetitionType;
+  disciplines?: Array<{ id: number; name: string }>;
 }
 
 export interface ISSFResultPhase {
@@ -45,6 +53,7 @@ export interface ISSFAthlete {
   nationCode: string;
   gender: string;
   birthday: string;
+  portraitUrl?: string;
   achievements: ISSFAchievement[];
 }
 
@@ -102,16 +111,40 @@ export function extractMvpEvents(
   return out;
 }
 
-/** Search athletes by name. Returns up to ~50 results. */
-export async function searchAthletes(query: string): Promise<ISSFAthlete[]> {
+const API_LIMIT = 300;
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+async function searchRaw(query: string): Promise<ISSFAthlete[]> {
   const res = await fetch(
     `${ISSF_API}/athletes?search=${encodeURIComponent(query)}`,
-    { next: { revalidate: 3600 } }
+    { cache: "no-store" }
   );
   if (!res.ok) throw new Error(`ISSF athlete search failed: ${res.status}`);
-  const raw = await res.json();
-  // Full profile is at /athletes/{issfId} — search returns lightweight list
-  return raw;
+  return res.json();
+}
+
+/** Search athletes by NOC. Paginates via alphabet if API limit is hit. */
+export async function searchAthletes(noc: string): Promise<ISSFAthlete[]> {
+  const first = await searchRaw(noc);
+
+  if (first.length < API_LIMIT) return first;
+
+  // Hit limit — fan out A–Z
+  const seen = new Set<string>();
+  const all: ISSFAthlete[] = [];
+
+  for (const letter of ALPHABET) {
+    const batch = await searchRaw(`${noc} ${letter}`);
+    for (const a of batch) {
+      if (!seen.has(a.issfId)) {
+        seen.add(a.issfId);
+        all.push(a);
+      }
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+
+  return all;
 }
 
 /** Fetch full athlete profile including achievements. */

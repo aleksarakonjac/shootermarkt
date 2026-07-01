@@ -5,17 +5,19 @@ import { useRouter } from "next/navigation";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "drzavno", label: "Državno" },
-  { value: "kup", label: "Kup" },
-  { value: "regionalno", label: "Regionalno" },
-  { value: "medjunarodno", label: "Međunarodno" },
+  { value: "national", label: "Državno" },
+  { value: "regional", label: "Regionalno" },
+  { value: "continental", label: "Kontinentalno" },
+  { value: "world", label: "Svetsko" },
+  { value: "club", label: "Klubsko" },
+  { value: "olympic", label: "Olimpijsko" },
 ];
 
 export function CompetitionFormClient() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", date: "", location: "", level: "drzavno" as CompetitionLevel, issfId: "" });
+  const [form, setForm] = useState({ name: "", date: "", location: "", level: "national" as CompetitionLevel, issfId: "" });
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }));

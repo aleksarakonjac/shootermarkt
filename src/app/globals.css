@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "flag-icons/css/flag-icons.min.css";
 
 /* ── Brand tokens ──────────────────────────────────────────────────────────── */
 :root {
@@ -41,17 +42,17 @@
 html.dark {
   color-scheme: dark;
 
-  /* Surface scale — dark */
-  --bg:          oklch(0.14 0.008 240);
-  --surface:     oklch(0.18 0.010 240);
-  --surface-2:   oklch(0.22 0.012 240);
-  --border:      oklch(0.28 0.010 240);
-  --border-strong: oklch(0.36 0.012 240);
+  /* Surface scale — dark (softer, slate-tinted neutrals) */
+  --bg:            oklch(0.20 0.006 250);
+  --surface:       oklch(0.24 0.007 250);
+  --surface-2:     oklch(0.28 0.008 250);
+  --border:        oklch(0.33 0.007 250);
+  --border-strong: oklch(0.42 0.009 250);
 
   /* Typography — dark */
-  --ink:    oklch(0.94 0.004 240);
-  --muted:  oklch(0.62 0.006 240);
-  --subtle: oklch(0.50 0.006 240);
+  --ink:    oklch(0.90 0.004 250);
+  --muted:  oklch(0.64 0.005 250);
+  --subtle: oklch(0.52 0.005 250);
 
   /* Brand stays the same, slightly lighter accent */
   --brand-accent:       #1a5fa8;

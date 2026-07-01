@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { searchAthletes } from "@/lib/issf/adapter";
 import { db } from "@/lib/db";
 import { shooters } from "@/lib/db/schema";
-import { inArray } from "drizzle-orm";
+import { inArray, eq } from "drizzle-orm";
+import { uploadAvatarFromUrl, NoAvatarError } from "@/lib/avatars/upload-avatar";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
     nationCode: string;
     gender: string;
     birthday: string;
+    portraitUrl?: string;
   }> = body.athletes;
 
   if (!Array.isArray(selected) || selected.length === 0) {
@@ -72,6 +74,26 @@ export async function POST(req: NextRequest) {
     .values(values)
     .onConflictDoNothing()
     .returning({ id: shooters.id, issfId: shooters.issfId });
+
+  // Upload avatars for newly inserted shooters (parallel, silent fail per shooter)
+  if (inserted.length > 0) {
+    const portraitMap = new Map(selected.map((a) => [a.issfId, a.portraitUrl]));
+    await Promise.allSettled(
+      inserted.map(async (s) => {
+        const portraitUrl = s.issfId ? portraitMap.get(s.issfId) : undefined;
+        if (!portraitUrl || !s.issfId) return;
+        try {
+          const avatarUrl = await uploadAvatarFromUrl(s.issfId, portraitUrl);
+          await db
+            .update(shooters)
+            .set({ avatarUrl })
+            .where(eq(shooters.id, s.id));
+        } catch {
+          // NoAvatarError or network error — skip silently
+        }
+      })
+    );
+  }
 
   return NextResponse.json({ inserted: inserted.length, skipped: selected.length - inserted.length });
 }

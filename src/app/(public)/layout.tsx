@@ -1,18 +1,36 @@
 import Link from "next/link";
-import { NavLinks } from "./nav-links";
+import { db } from "@/lib/db";
+import { shooters, clubs } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { MainNav } from "./components/MainNav";
+import { SearchBarClient } from "./search-bar-client";
 import ThemeToggle from "./components/ThemeToggle";
-import { HeaderSearch } from "./components/HeaderSearch";
+import { RegionSelector } from "./components/RegionSelector";
 
-export default function PublicLayout({
+export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const shootersList = await db
+    .select({
+      id: shooters.id,
+      firstName: shooters.firstName,
+      lastName: shooters.lastName,
+      clubName: clubs.name,
+    })
+    .from(shooters)
+    .leftJoin(clubs, eq(shooters.clubId, clubs.id))
+    .where(eq(shooters.verified, true))
+    .orderBy(shooters.lastName, shooters.firstName);
+
   return (
     <>
       <header className="sticky top-0 z-[200] bg-[var(--bg)] border-b border-[var(--border)]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-14 items-center justify-between gap-8">
+          <div className="flex h-14 items-center gap-4">
+
+            {/* Logo */}
             <Link href="/" className="flex items-baseline gap-0 shrink-0 no-underline">
               <span className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-[1.35rem] uppercase tracking-tight text-[var(--brand-primary)] leading-none">
                 Shooter
@@ -22,18 +40,20 @@ export default function PublicLayout({
               </span>
             </Link>
 
-            <NavLinks />
+            {/* Main nav — dropdown groups on desktop, hamburger + drawer on mobile */}
+            <div className="flex-1 flex items-center">
+              <MainNav shootersList={shootersList} />
+            </div>
 
-            {/* Search bar in header */}
-            <HeaderSearch />
+            {/* Desktop right controls */}
+            <div className="hidden md:flex items-center gap-2 shrink-0">
+              <RegionSelector />
+              <div className="w-48 lg:w-56">
+                <SearchBarClient shootersList={shootersList} />
+              </div>
+              <ThemeToggle />
+            </div>
 
-            <ThemeToggle />
-            <Link
-              href="/portal"
-              className="shrink-0 rounded-md bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] px-3.5 py-1.5 text-[0.8125rem] font-semibold text-white transition-colors duration-150"
-            >
-              Moj profil
-            </Link>
           </div>
         </div>
       </header>
@@ -42,9 +62,14 @@ export default function PublicLayout({
 
       <footer className="border-t border-[var(--border)] py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between flex-wrap gap-4">
-          <span className="font-[family-name:var(--font-barlow-condensed)] font-bold text-sm uppercase tracking-widest text-[var(--subtle)]">
-            Shootermarkt
-          </span>
+          <Link href="/" className="flex items-baseline gap-0 no-underline">
+            <span className="font-[family-name:var(--font-barlow-condensed)] font-bold text-sm uppercase tracking-widest text-[var(--subtle)]">
+              Shooter
+            </span>
+            <span className="font-[family-name:var(--font-barlow-condensed)] font-semibold text-sm uppercase tracking-widest text-[var(--subtle)]">
+              markt
+            </span>
+          </Link>
           <p className="text-[0.8125rem] text-[var(--muted)]">
             © {new Date().getFullYear()} · Srpsko streljaštvo
           </p>

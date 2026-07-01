@@ -7,6 +7,7 @@ const links = [
   { href: "/strelci", label: "Strelci" },
   { href: "/rangiranje", label: "Rangiranje" },
   { href: "/takmicenja", label: "Takmičenja" },
+  { href: "/kalendar", label: "Kalendar" },
 ];
 
 export function NavLinks() {

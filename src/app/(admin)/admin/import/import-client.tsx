@@ -19,10 +19,12 @@ interface CommitResult {
 }
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "drzavno", label: "Državno" },
-  { value: "kup", label: "Kup" },
-  { value: "regionalno", label: "Regionalno" },
-  { value: "medjunarodno", label: "Međunarodno" },
+  { value: "national", label: "Državno" },
+  { value: "regional", label: "Regionalno" },
+  { value: "continental", label: "Kontinentalno" },
+  { value: "world", label: "Svetsko" },
+  { value: "club", label: "Klubsko" },
+  { value: "olympic", label: "Olimpijsko" },
 ];
 
 const DISCIPLINES = ["ARM", "ARW", "APM", "APW"] as const;
@@ -36,7 +38,7 @@ export function ImportClient() {
   const [compName, setCompName] = useState("");
   const [compDate, setCompDate] = useState("");
   const [compLocation, setCompLocation] = useState("");
-  const [compLevel, setCompLevel] = useState<CompetitionLevel>("drzavno");
+  const [compLevel, setCompLevel] = useState<CompetitionLevel>("national");
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [parseInfo, setParseInfo] = useState<Omit<ParseResponse, "rows"> | null>(null);

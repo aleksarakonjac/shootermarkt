@@ -34,7 +34,14 @@ export async function POST(req: NextRequest) {
   } else {
     const [ins] = await db
       .insert(competitions)
-      .values({ name: comp.name, date: comp.date, location: comp.location, level: comp.level })
+      .values({
+        name: comp.name,
+        date: comp.date,
+        location: comp.location,
+        level: comp.level,
+        eventType: comp.eventType ?? "other",
+        organizer: comp.organizer ?? null,
+      })
       .returning({ id: competitions.id });
     competitionId = ins.id;
   }
@@ -119,10 +126,11 @@ export async function POST(req: NextRequest) {
           shooterId,
           competitionId,
           disciplineId,
+          clubId: clubId ?? null,
           qualTotal: row.qualTotal.toString(),
           qualInners: row.qualInners ?? null,
           qualRank: row.qualRank ?? null,
-          qualSeries: row.qualSeries ?? null,
+          qualDetail: row.qualSeries ? { series: row.qualSeries } : null,
           qualified: row.qualified ?? null,
           finalTotal: row.finalTotal?.toString() ?? null,
           finalRank: row.finalRank ?? null,

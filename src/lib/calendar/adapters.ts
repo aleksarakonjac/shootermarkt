@@ -13,15 +13,17 @@ export interface CalendarEvent {
   is10m: boolean;
   url: string | null;
   externalId: string | null;
+  competitionTypeId?: number;
+  competitionTypeName?: string;
+  competitionTypeAcronym?: string;
 }
 
 // ── SSS ───────────────────────────────────────────────────────────────────────
 
 export async function fetchSssEvents(year: number): Promise<CalendarEvent[]> {
   const raw = await fetchSssCalendar();
-  const yearStr = String(year);
+  // SSS calendar has no year in dates — publishes only current season, include all
   return raw
-    .filter((e) => !e.date || e.date.includes(yearStr.slice(-2)))
     .map((e) => ({
       source: "sss" as const,
       name: e.name,
@@ -56,9 +58,12 @@ export async function fetchIssfEvents(year: number): Promise<CalendarEvent[]> {
     dateTo: c.dateTo ? c.dateTo.split("T")[0] : null,
     location: c.city ?? null,
     country: c.nationCode ?? null,
-    is10m: true, // ISSF API returns only shooting comps; all have 10m events
+    is10m: true,
     url: null,
     externalId: String(c.id),
+    competitionTypeId: c.competitionType?.id,
+    competitionTypeName: c.competitionType?.name,
+    competitionTypeAcronym: c.competitionType?.acronym,
   }));
 }
 
@@ -147,13 +152,16 @@ function escDateToIso(raw: string): string {
 
 // ── Aggregator ────────────────────────────────────────────────────────────────
 
-export async function fetchAllCalendarEvents(year: number): Promise<CalendarEvent[]> {
-  const results = await Promise.allSettled([
-    fetchSssEvents(year),
-    fetchIssfEvents(year),
-    fetchEscEvents(year),
-  ]);
+export async function fetchAllCalendarEvents(
+  year: number,
+  sources: CalendarSource[] = ["sss", "issf", "esc"],
+): Promise<CalendarEvent[]> {
+  const fetchers: Promise<CalendarEvent[]>[] = [];
+  if (sources.includes("sss"))  fetchers.push(fetchSssEvents(year));
+  if (sources.includes("issf")) fetchers.push(fetchIssfEvents(year));
+  if (sources.includes("esc"))  fetchers.push(fetchEscEvents(year));
 
+  const results = await Promise.allSettled(fetchers);
   const events: CalendarEvent[] = [];
   for (const r of results) {
     if (r.status === "fulfilled") events.push(...r.value);

@@ -27,10 +27,12 @@ const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i);
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "medjunarodno", label: "Međunarodno" },
-  { value: "drzavno", label: "Državno" },
-  { value: "kup", label: "Kup" },
-  { value: "regionalno", label: "Regionalno" },
+  { value: "world",       label: "Svetski (ISSF)" },
+  { value: "continental", label: "Kontinentalno (ESC)" },
+  { value: "national",    label: "Državno" },
+  { value: "regional",    label: "Regionalno" },
+  { value: "club",        label: "Klubsko (liga)" },
+  { value: "olympic",     label: "Olimpijsko" },
 ];
 
 export function ISSFImportClient() {
@@ -43,7 +45,7 @@ export function ISSFImportClient() {
   const [competitionsLoaded, setCompetitionsLoaded] = useState(false);
   const [selectedComp, setSelectedComp] = useState<ISSFCompetition | null>(null);
 
-  const [compLevel, setCompLevel] = useState<CompetitionLevel>("medjunarodno");
+  const [compLevel, setCompLevel] = useState<CompetitionLevel>("world");
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [eventCount, setEventCount] = useState(0);
   const [nocFilter, setNocFilter] = useState("");

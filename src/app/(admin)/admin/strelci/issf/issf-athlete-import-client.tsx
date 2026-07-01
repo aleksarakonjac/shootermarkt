@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { SearchDropdown } from "@/components/ui/SearchDropdown";
+import { NOC_LIST } from "@/components/ui/NocDropdown";
 
 interface ISSFAthlete {
   issfId: string;
@@ -13,7 +15,7 @@ interface ISSFAthlete {
   alreadyInDb: boolean;
 }
 
-const NOC_PRESETS = ["SRB", "CRO", "SLO", "HUN", "BIH", "MNE", "MKD", "ROU", "BUL", "GRE"];
+interface BulkResult { noc: string; inserted: number; skipped: number; total: number }
 
 export function ISSFAthleteImportClient() {
   const [query, setQuery] = useState("");
@@ -24,6 +26,61 @@ export function ISSFAthleteImportClient() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
+
+  // Bulk nation import
+  const [bulkLoading, setBulkLoading] = useState<string | null>(null);
+  const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
+  const [selectedNoc, setSelectedNoc] = useState("SRB");
+
+  // Scan all
+  const [scanRunning, setScanRunning] = useState(false);
+  const [scanProgress, setScanProgress] = useState<{ current: number; total: number; noc: string } | null>(null);
+  const scanAbortRef = useRef(false);
+
+  async function handleScanAll() {
+    scanAbortRef.current = false;
+    setScanRunning(true);
+    setScanProgress({ current: 0, total: NOC_LIST.length, noc: "" });
+    for (let i = 0; i < NOC_LIST.length; i++) {
+      if (scanAbortRef.current) break;
+      const { noc } = NOC_LIST[i];
+      setScanProgress({ current: i + 1, total: NOC_LIST.length, noc });
+      try {
+        const res = await fetch("/api/admin/issf/athletes/bulk-nation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ noc }),
+        });
+        const data = await res.json();
+        if (res.ok && data.total > 0) {
+          setBulkResults((prev) => [{ noc, ...data }, ...prev.filter((r) => r.noc !== noc)]);
+        }
+      } catch {
+        // skip failed nations silently
+      }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    setScanRunning(false);
+    setScanProgress(null);
+  }
+
+  async function handleBulkNation(noc: string) {
+    setBulkLoading(noc);
+    try {
+      const res = await fetch("/api/admin/issf/athletes/bulk-nation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noc }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Greška");
+      setBulkResults((prev) => [{ noc, ...data }, ...prev.filter((r) => r.noc !== noc)]);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBulkLoading(null);
+    }
+  }
 
   async function handleSearch(q?: string) {
     const term = q ?? query;
@@ -118,6 +175,94 @@ export function ISSFAthleteImportClient() {
         </div>
       )}
 
+      {/* Bulk import po naciji */}
+      <div className="rounded-xl border border-[var(--border)] p-4 mb-5 max-w-lg">
+        <p className="text-sm font-semibold text-[var(--ink)] mb-1">Bulk import po naciji</p>
+        <p className="text-xs text-[var(--muted)] mb-3">Uvozi sve strelce iz ISSF baze za izabranu naciju, ili skeniraj sve nacije odjednom.</p>
+
+        {/* Single nation row */}
+        <div className="flex gap-2 mb-3">
+          <SearchDropdown
+            value={selectedNoc}
+            onChange={setSelectedNoc}
+            options={NOC_LIST.map((n) => ({
+              value: n.noc,
+              label: n.noc,
+              sublabel: n.name,
+              prefix: (
+                <span
+                  className={`fi fi-${(n.alpha2 ?? "").toLowerCase()}`}
+                  style={{ fontSize: "0.95em", borderRadius: "2px", flexShrink: 0 }}
+                />
+              ),
+            }))}
+            placeholder="Izaberi naciju..."
+            emptyLabel="— izaberi —"
+            searchPlaceholder="Pretraži naciju..."
+            className="flex-1"
+          />
+          <button
+            onClick={() => handleBulkNation(selectedNoc)}
+            disabled={!!bulkLoading || scanRunning}
+            className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50 shrink-0"
+          >
+            {bulkLoading === selectedNoc ? (
+              <><svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeDashoffset="12"/></svg>Uvozim...</>
+            ) : "Uvezi naciju"}
+          </button>
+        </div>
+
+        {/* Scan all nations */}
+        <div className="flex items-center gap-3 pt-3 border-t border-[var(--border)]">
+          {scanRunning ? (
+            <>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-[var(--muted)]">
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">{scanProgress?.noc}</span>
+                    <span className="ml-2">{scanProgress?.current}/{scanProgress?.total}</span>
+                  </span>
+                  <span className="text-xs text-[var(--subtle)]">{Math.round(((scanProgress?.current ?? 0) / (scanProgress?.total ?? 1)) * 100)}%</span>
+                </div>
+                <div className="h-1 rounded-full bg-[var(--surface-2)] overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: `${((scanProgress?.current ?? 0) / (scanProgress?.total ?? 1)) * 100}%`, background: "var(--brand-primary)" }}
+                  />
+                </div>
+              </div>
+              <button
+                onClick={() => { scanAbortRef.current = true; }}
+                className="shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold border border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
+              >
+                Zaustavi
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={handleScanAll}
+              disabled={!!bulkLoading}
+              className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors disabled:opacity-50"
+            >
+              Skeniraj celu ISSF bazu ({NOC_LIST.length} nacija)
+            </button>
+          )}
+        </div>
+
+        {bulkResults.length > 0 && (
+          <div className="mt-3 rounded-lg border border-[var(--border)] divide-y divide-[var(--border)] overflow-hidden max-h-60 overflow-y-auto">
+            {bulkResults.map((r) => (
+              <div key={r.noc} className="flex items-center gap-3 px-3 py-2 bg-[var(--surface)]">
+                <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--ink)] w-10">{r.noc}</span>
+                <span className="text-xs font-semibold" style={{ color: "var(--success)" }}>+{r.inserted} uvezeno</span>
+                {r.skipped > 0 && <span className="text-xs text-[var(--subtle)]">{r.skipped} preskočeno</span>}
+                <span className="text-xs text-[var(--subtle)] ml-auto">{r.total} ukupno</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Search bar */}
       <div className="rounded-xl border border-[var(--border)] p-5 mb-5 space-y-3">
         <div className="flex gap-2">
@@ -137,20 +282,6 @@ export function ISSFAthleteImportClient() {
           </button>
         </div>
 
-        {/* NOC quick-search */}
-        <div className="flex flex-wrap gap-1.5 items-center">
-          <span className="text-xs text-[var(--muted)] font-semibold uppercase tracking-wider">Brza pretraga:</span>
-          {NOC_PRESETS.map((noc) => (
-            <button
-              key={noc}
-              onClick={() => { setQuery(noc); handleSearch(noc); }}
-              className="rounded px-2.5 py-1 text-xs font-[family-name:var(--font-jetbrains-mono)] font-semibold transition-colors"
-              style={{ background: "var(--surface)", color: "var(--ink)" }}
-            >
-              {noc}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Results */}

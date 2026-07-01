@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { computeFormaScore, trendLabel, trendColor } from "@/lib/forma-score";
+import { ResultsHistoryTable } from "@/components/result-display/ResultsHistoryTable";
+import { NOC_LIST } from "@/components/ui/NocDropdown";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -38,10 +40,13 @@ export default async function ShooterPage({ params }: Props) {
         qualified: results.qualified,
         finalTotal: results.finalTotal,
         finalRank: results.finalRank,
+        qualDetail: results.qualDetail,
+        finalDetail: results.finalDetail,
         competitionName: competitions.name,
         competitionDate: competitions.date,
         disciplineCode: disciplines.code,
         disciplineId: disciplines.id,
+        apparatus: disciplines.apparatus,
         maxQualScore: disciplines.maxQualScore,
       })
       .from(results)
@@ -103,19 +108,18 @@ export default async function ShooterPage({ params }: Props) {
             )}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-[var(--muted)]">
-            {shooter.nationality && (
-              <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)] bg-[var(--surface-2)] px-2 py-0.5 rounded">
-                {shooter.nationality}
-              </span>
-            )}
+            {shooter.nationality && (() => {
+              const alpha2 = NOC_LIST.find((n) => n.noc === shooter.nationality)?.alpha2;
+              return (
+                <span className="flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)] bg-[var(--surface-2)] px-2 py-0.5 rounded">
+                  {alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ fontSize: "1em", borderRadius: "2px" }} />}
+                  {shooter.nationality}
+                </span>
+              );
+            })()}
             {shooter.club && <span>{shooter.club.name}</span>}
             {shooter.birthYear && <span>Rođ. {shooter.birthYear}</span>}
             {shooter.gender && <span>{shooter.gender === "M" ? "Muški" : "Ženski"}</span>}
-            {shooter.licenseNumber && (
-              <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--subtle)]">
-                #{shooter.licenseNumber}
-              </span>
-            )}
           </div>
         </div>
       </div>
@@ -173,57 +177,7 @@ export default async function ShooterPage({ params }: Props) {
             <p className="text-sm text-[var(--muted)]">Nema unešenih rezultata.</p>
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Takmičenje</th>
-                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Datum</th>
-                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Disc.</th>
-                  <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Kval.</th>
-                  <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Rank</th>
-                  <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Final</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {[...shooterResults].reverse().map((r) => (
-                  <tr key={r.id} className="hover:bg-[var(--surface)] transition-colors">
-                    <td className="px-4 py-3 font-medium text-[var(--ink)]">{r.competitionName}</td>
-                    <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
-                      {r.competitionDate}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="inline-block rounded px-2 py-0.5 text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] tracking-wide"
-                        style={{ background: "var(--surface-2)", color: "var(--ink)" }}
-                      >
-                        {r.disciplineCode}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
-                      {r.qualTotal ?? <span className="text-[var(--subtle)]">—</span>}
-                      {r.qualInners != null && (
-                        <span className="text-xs text-[var(--muted)] ml-1">{r.qualInners}x</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-[var(--muted)]">
-                      {r.qualRank != null ? (
-                        <span>
-                          <span className="text-[var(--subtle)] text-xs">#</span>
-                          {r.qualRank}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--subtle)]">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)]">
-                      {r.finalTotal ?? <span className="text-[var(--subtle)]">—</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResultsHistoryTable results={shooterResults} />
         )}
       </div>
     </div>

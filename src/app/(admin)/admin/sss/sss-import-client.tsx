@@ -22,10 +22,12 @@ interface CommitResult {
 const DISCIPLINES = ["ARM", "ARW", "APM", "APW"] as const;
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "drzavno", label: "Državno" },
-  { value: "kup", label: "Kup" },
-  { value: "regionalno", label: "Regionalno" },
-  { value: "medjunarodno", label: "Međunarodno" },
+  { value: "national",    label: "Državno" },
+  { value: "regional",    label: "Regionalno" },
+  { value: "continental", label: "Kontinentalno (ESC)" },
+  { value: "world",       label: "Svetski (ISSF)" },
+  { value: "club",        label: "Klubsko (liga)" },
+  { value: "olympic",     label: "Olimpijsko" },
 ];
 
 export function SssImportClient() {
@@ -43,7 +45,7 @@ export function SssImportClient() {
   const [compName, setCompName] = useState("");
   const [compDate, setCompDate] = useState("");
   const [compLocation, setCompLocation] = useState("");
-  const [compLevel, setCompLevel] = useState<CompetitionLevel>("drzavno");
+  const [compLevel, setCompLevel] = useState<CompetitionLevel>("national");
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [eventCount, setEventCount] = useState(0);
@@ -71,7 +73,7 @@ export function SssImportClient() {
     setCompName(b.filename);
     setCompDate("");
     setCompLocation("");
-    setCompLevel("drzavno");
+    setCompLevel("national");
   }
 
   async function handleImport() {

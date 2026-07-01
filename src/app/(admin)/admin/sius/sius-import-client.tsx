@@ -21,10 +21,12 @@ interface CommitResult {
 const DISCIPLINES = ["ARM", "ARW", "APM", "APW"] as const;
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "medjunarodno", label: "Međunarodno" },
-  { value: "drzavno", label: "Državno" },
-  { value: "kup", label: "Kup" },
-  { value: "regionalno", label: "Regionalno" },
+  { value: "world",       label: "Svetski (ISSF)" },
+  { value: "continental", label: "Kontinentalno (ESC)" },
+  { value: "national",    label: "Državno" },
+  { value: "regional",    label: "Regionalno" },
+  { value: "club",        label: "Klubsko (liga)" },
+  { value: "olympic",     label: "Olimpijsko" },
 ];
 
 const DISC_LABELS: Record<string, string> = {
@@ -44,7 +46,7 @@ export function SiusImportClient() {
   const [search, setSearch] = useState("");
   const [selectedComp, setSelectedComp] = useState<SiusChampionship | null>(null);
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
-  const [compLevel, setCompLevel] = useState<CompetitionLevel>("medjunarodno");
+  const [compLevel, setCompLevel] = useState<CompetitionLevel>("world");
   const [compDate, setCompDate] = useState("");
   const [compLocation, setCompLocation] = useState("");
 

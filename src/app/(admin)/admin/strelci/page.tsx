@@ -1,28 +1,75 @@
 import { db } from "@/lib/db";
-import { shooters, clubs } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { VerifyButton } from "./verify-button";
-import Link from "next/link";
+import { shooters, clubs, countries } from "@/lib/db/schema";
+import { eq, ilike, or, and, isNotNull, sql, asc, desc } from "drizzle-orm";
 import type { Metadata } from "next";
+import { StrelciClient } from "./strelci-client";
+import { StrelciFilters } from "./strelci-filters";
 
 export const metadata: Metadata = { title: "Admin · Strelci" };
 
-export default async function AdminStrelciPage() {
-  const data = await db
-    .select({
-      id: shooters.id,
-      firstName: shooters.firstName,
-      lastName: shooters.lastName,
-      nationality: shooters.nationality,
-      licenseNumber: shooters.licenseNumber,
-      verified: shooters.verified,
-      createdBySelf: shooters.createdBySelf,
-      issfId: shooters.issfId,
-      clubName: clubs.name,
-    })
-    .from(shooters)
-    .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-    .orderBy(shooters.verified, shooters.lastName);
+const PAGE_SIZE = 30;
+
+export default async function AdminStrelciPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
+  const sp = await searchParams;
+  const page = Math.max(1, parseInt(sp.page ?? "1"));
+  const q = sp.q?.trim() ?? "";
+  const nat = sp.nat?.trim() ?? "";
+  const onlyUnverified = sp.verified === "0";
+  const sortCol = sp.sort ?? "name";
+  const sortDir = sp.dir === "desc" ? "desc" : "asc";
+
+  const conditions = [
+    q ? or(ilike(shooters.firstName, `%${q}%`), ilike(shooters.lastName, `%${q}%`)) : undefined,
+    nat ? eq(shooters.nationality, nat) : undefined,
+    onlyUnverified ? eq(shooters.verified, false) : undefined,
+  ].filter(Boolean) as Parameters<typeof and>;
+
+  const where = conditions.length ? and(...conditions) : undefined;
+
+  const [data, [{ total }], nats] = await Promise.all([
+    db
+      .select({
+        id: shooters.id,
+        firstName: shooters.firstName,
+        lastName: shooters.lastName,
+        nationality: shooters.nationality,
+        countryName: countries.name,
+        verified: shooters.verified,
+        createdBySelf: shooters.createdBySelf,
+        issfId: shooters.issfId,
+        clubName: clubs.name,
+      })
+      .from(shooters)
+      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
+      .leftJoin(countries, eq(shooters.nationality, countries.code))
+      .where(where)
+      .orderBy(
+        ...(sortCol === "country"
+          ? [sortDir === "desc" ? desc(shooters.nationality) : asc(shooters.nationality)]
+          : sortCol === "status"
+          ? [sortDir === "desc" ? desc(shooters.verified) : asc(shooters.verified), asc(shooters.lastName)]
+          : [sortDir === "desc" ? desc(shooters.lastName) : asc(shooters.lastName), asc(shooters.firstName)])
+      )
+      .limit(PAGE_SIZE)
+      .offset((page - 1) * PAGE_SIZE),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(shooters)
+      .where(where),
+    db
+      .selectDistinct({
+        code: shooters.nationality,
+        name: countries.name,
+      })
+      .from(shooters)
+      .leftJoin(countries, eq(shooters.nationality, countries.code))
+      .where(isNotNull(shooters.nationality))
+      .orderBy(shooters.nationality),
+  ]);
 
   return (
     <div>
@@ -34,83 +81,37 @@ export default async function AdminStrelciPage() {
           >
             Strelci
           </h1>
-          <p className="text-sm text-[var(--muted)] mt-0.5">{data.length} u bazi</p>
+          <p className="text-sm text-[var(--muted)] mt-0.5">prikazano {data.length} od {total}</p>
         </div>
         <div className="flex gap-2">
-          <Link
+          <a
             href="/admin/strelci/issf"
             className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
           >
             Bulk ISSF →
-          </Link>
-          <Link
+          </a>
+          <a
             href="/admin/strelci/novi"
             className="rounded-md px-4 py-2 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors"
           >
             + Dodaj strelca
-          </Link>
+          </a>
         </div>
       </div>
 
-      <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-        {data.length === 0 ? (
-          <div className="py-16 text-center text-sm text-[var(--muted)]">
-            Nema strelaca. <Link href="/admin/strelci/novi" className="text-[var(--brand-primary)] hover:underline">Dodaj prvog →</Link>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Strelac</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Licenca</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">ISSF</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Status</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {data.map((s) => (
-                <tr key={s.id} className="hover:bg-[var(--surface)] transition-colors">
-                  <td className="px-4 py-3 font-medium text-[var(--ink)]">
-                    {s.lastName} {s.firstName}
-                    {s.createdBySelf && (
-                      <span className="ml-2 text-[0.65rem] font-semibold px-1.5 py-0.5 rounded" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}>
-                        self
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">
-                    {s.nationality ?? <span className="text-[var(--subtle)]">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--muted)]">{s.clubName ?? <span className="text-[var(--subtle)]">—</span>}</td>
-                  <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
-                    {s.licenseNumber ?? <span className="text-[var(--subtle)]">—</span>}
-                  </td>
-                  <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)]">
-                    {s.issfId ?? "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    {s.verified ? (
-                      <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}>
-                        ✓ Verifikovan
-                      </span>
-                    ) : (
-                      <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded-full" style={{ background: "oklch(0.97 0.05 75)", color: "var(--warning)" }}>
-                        Na čekanju
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {!s.verified && <VerifyButton shooterId={s.id} />}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="mb-4">
+        <StrelciFilters
+          nationalities={nats.map((n) => ({ code: n.code!, name: n.name ?? n.code! }))}
+          onlyUnverified={onlyUnverified}
+        />
       </div>
+
+      <StrelciClient
+        data={data}
+        page={page}
+        total={total}
+        pageSize={PAGE_SIZE}
+      />
     </div>
   );
 }

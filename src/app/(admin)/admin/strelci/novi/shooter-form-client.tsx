@@ -2,16 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { NocDropdown } from "@/components/ui/NocDropdown";
+import { GenderDropdown } from "@/components/ui/GenderDropdown";
+import { SearchDropdown } from "@/components/ui/SearchDropdown";
 
 interface Club { id: number; name: string; countryCode: string | null; }
 
-const GENDERS = [{ value: "M", label: "Muški" }, { value: "F", label: "Ženski" }];
-const NOC_SUGGESTIONS = ["SRB", "CRO", "SLO", "HUN", "GER", "ROU", "BIH", "MKD", "MNE", "BUL"];
+const inputCls = "w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]";
 
-export function ShooterFormClient({ clubs }: { clubs: Club[] }) {
+export function ShooterFormClient({ clubs: initialClubs }: { clubs: Club[] }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [clubs, setClubs] = useState(initialClubs);
 
   const [form, setForm] = useState({
     firstName: "",
@@ -19,13 +22,24 @@ export function ShooterFormClient({ clubs }: { clubs: Club[] }) {
     nationality: "SRB",
     gender: "",
     birthYear: "",
-    licenseNumber: "",
     clubId: "",
     issfId: "",
   });
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function createClub(name: string) {
+    const res = await fetch("/api/admin/clubs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "Greška");
+    setClubs((prev) => [...prev, { id: data.id, name: data.name, countryCode: null }]);
+    set("clubId", String(data.id));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -48,6 +62,12 @@ export function ShooterFormClient({ clubs }: { clubs: Club[] }) {
       setLoading(false);
     }
   }
+
+  const clubOptions = clubs.map((c) => ({
+    value: String(c.id),
+    label: c.name,
+    sublabel: c.countryCode ?? undefined,
+  }));
 
   return (
     <div className="max-w-xl">
@@ -72,56 +92,22 @@ export function ShooterFormClient({ clubs }: { clubs: Club[] }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Prezime *</label>
-              <input
-                value={form.lastName}
-                onChange={(e) => set("lastName", e.target.value)}
-                required
-                placeholder="Petrović"
-                className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]"
-              />
+              <input value={form.lastName} onChange={(e) => set("lastName", e.target.value)} required placeholder="Petrović" className={inputCls} />
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Ime *</label>
-              <input
-                value={form.firstName}
-                onChange={(e) => set("firstName", e.target.value)}
-                required
-                placeholder="Marko"
-                className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]"
-              />
+              <input value={form.firstName} onChange={(e) => set("firstName", e.target.value)} required placeholder="Marko" className={inputCls} />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Zemlja</label>
-              <input
-                value={form.nationality}
-                onChange={(e) => set("nationality", e.target.value.toUpperCase().slice(0, 3))}
-                placeholder="SRB"
-                maxLength={3}
-                className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm font-[family-name:var(--font-jetbrains-mono)] text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-              />
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {NOC_SUGGESTIONS.slice(0, 5).map((noc) => (
-                  <button key={noc} type="button" onClick={() => set("nationality", noc)}
-                    className="rounded px-1.5 py-0.5 text-[0.6rem] font-[family-name:var(--font-jetbrains-mono)] font-semibold transition-colors"
-                    style={{ background: form.nationality === noc ? "var(--brand-primary)" : "var(--surface)", color: form.nationality === noc ? "white" : "var(--muted)" }}>
-                    {noc}
-                  </button>
-                ))}
-              </div>
+              <NocDropdown value={form.nationality} onChange={(v) => set("nationality", v)} />
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Pol</label>
-              <select
-                value={form.gender}
-                onChange={(e) => set("gender", e.target.value)}
-                className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-              >
-                <option value="">—</option>
-                {GENDERS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-              </select>
+              <GenderDropdown value={form.gender} onChange={(v) => set("gender", v)} />
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">God. rođenja</label>
@@ -132,36 +118,25 @@ export function ShooterFormClient({ clubs }: { clubs: Club[] }) {
                 placeholder="1995"
                 min={1940}
                 max={new Date().getFullYear()}
-                className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm font-[family-name:var(--font-jetbrains-mono)] text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
+                className={`${inputCls} font-[family-name:var(--font-jetbrains-mono)]`}
               />
             </div>
           </div>
         </div>
 
         <div className="rounded-xl border border-[var(--border)] p-5 space-y-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Klub i licenca</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</h2>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Klub</label>
-            <select
+            <SearchDropdown
               value={form.clubId}
-              onChange={(e) => set("clubId", e.target.value)}
-              className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-            >
-              <option value="">— bez kluba —</option>
-              {clubs.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}{c.countryCode ? ` (${c.countryCode})` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Licencni broj</label>
-            <input
-              value={form.licenseNumber}
-              onChange={(e) => set("licenseNumber", e.target.value)}
-              placeholder="npr. 12345"
-              className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm font-[family-name:var(--font-jetbrains-mono)] text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
+              onChange={(v) => set("clubId", v)}
+              options={clubOptions}
+              placeholder="Izaberi klub..."
+              emptyLabel="— bez kluba —"
+              searchPlaceholder="Pretraži klub..."
+              onCreateNew={createClub}
+              createNewLabel={(q) => `+ Kreiraj "${q}"`}
             />
           </div>
         </div>
@@ -174,7 +149,7 @@ export function ShooterFormClient({ clubs }: { clubs: Club[] }) {
               value={form.issfId}
               onChange={(e) => set("issfId", e.target.value)}
               placeholder="npr. SHSRBM2703200501"
-              className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm font-[family-name:var(--font-jetbrains-mono)] text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
+              className={`${inputCls} font-[family-name:var(--font-jetbrains-mono)]`}
             />
             <p className="text-xs text-[var(--subtle)] mt-1">Opcionalno. Vezuje profil za ISSF bazu.</p>
           </div>

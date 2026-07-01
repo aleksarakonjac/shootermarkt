@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { shooters, clubs, results, disciplines, competitions, calendarAlerts } from "@/lib/db/schema";
+import { shooters, clubs, results, disciplines, competitions } from "@/lib/db/schema";
 import { eq, desc, asc, and, isNotNull, sql } from "drizzle-orm";
 import { computeFormaScore } from "@/lib/forma-score";
 import { TopFormaClient } from "./top-forma-client";
@@ -243,14 +243,6 @@ export default async function HomePage() {
     .where(sql`${competitions.date} >= ${yearStart} AND ${competitions.date} <= ${yearEnd}`)
     .orderBy(asc(competitions.date));
 
-  // Fetch recent alerts for calendar
-  const recentAlerts = await db
-    .select()
-    .from(calendarAlerts)
-    .where(eq(calendarAlerts.seen, false))
-    .orderBy(desc(calendarAlerts.createdAt))
-    .limit(3);
-
   // 5. Club Leaderboard: Group shooters by club, calculate average form score
   const clubAvgForm = await db
     .select({
@@ -435,33 +427,6 @@ export default async function HomePage() {
 
           {/* Calendar Module – top of sidebar */}
           <CalendarModule competitions={calendarComps} />
-
-          {/* Unseen calendar alerts */}
-          {recentAlerts.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {recentAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="flex items-start gap-3 p-2.5 rounded-lg border border-[rgba(194,0,0,0.15)] bg-[rgba(194,0,0,0.02)]"
-                >
-                  <div className="flex items-center justify-center rounded-full bg-[var(--brand-primary-light)] text-[var(--brand-primary)] w-5 h-5 shrink-0 text-[10px] font-bold mt-0.5">
-                    !
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[8px] font-bold text-[var(--brand-primary)] uppercase tracking-wider block">
-                      Nova najava ({alert.source.toUpperCase()})
-                    </span>
-                    <h4 className="font-semibold text-xs text-[var(--ink)] truncate mt-0.5" title={alert.eventName}>
-                      {alert.eventName}
-                    </h4>
-                    <p className="text-[10px] text-[var(--muted)] truncate mt-0.5">
-                      {alert.data?.dateFrom ? `${alert.data.dateFrom} · ` : ""} {alert.data?.location || "Nepoznato"}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
 
           {/* Club Leaderboard */}
           <section className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
