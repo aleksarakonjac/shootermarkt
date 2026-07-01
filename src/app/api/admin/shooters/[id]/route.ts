@@ -19,7 +19,7 @@ export async function PATCH(
   if (isNaN(shooterId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const body = await req.json();
-  const { firstName, lastName, nationality, gender, birthYear, clubId } = body;
+  const { firstName, lastName, nationality, gender, birthYear, birthDate, clubId } = body;
 
   if (!firstName?.trim() || !lastName?.trim()) {
     return NextResponse.json({ error: "Ime i prezime su obavezni" }, { status: 400 });
@@ -30,7 +30,10 @@ export async function PATCH(
     lastName: lastName.trim(),
     nationality: nationality?.trim() || null,
     gender: gender || null,
-    birthYear: birthYear ? parseInt(birthYear) : null,
+    birthYear: birthDate
+      ? new Date(birthDate).getFullYear()
+      : birthYear ? parseInt(birthYear) : null,
+    birthDate: birthDate || null,
     clubId: clubId ? parseInt(clubId) : null,
   }).where(eq(shooters.id, shooterId));
 

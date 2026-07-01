@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { searchAthletes } from "@/lib/issf/adapter";
+import { searchAthletes, fetchAthleteProfile, inferApparatus } from "@/lib/issf/adapter";
 import { db } from "@/lib/db";
 import { shooters } from "@/lib/db/schema";
 import { inArray, eq } from "drizzle-orm";
@@ -58,16 +58,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nema odabranih strelaca" }, { status: 400 });
   }
 
-  const values = selected.map((a) => ({
-    firstName: a.firstName,
-    lastName: a.familyName,
-    nationality: a.nationCode || null,
-    gender: a.gender === "Male" ? "M" : a.gender === "Female" ? "F" : null,
-    birthYear: a.birthday ? new Date(a.birthday).getFullYear() : null,
-    issfId: a.issfId,
-    verified: false,
-    createdBySelf: false,
-  }));
+  // Fetch full profiles in parallel for real birthday + events
+  const profiles = await Promise.all(selected.map((a) => fetchAthleteProfile(a.issfId)));
+  const profileMap = new Map(profiles.map((p, i) => [selected[i].issfId, p]));
+
+  const values = selected.map((a) => {
+    const profile = profileMap.get(a.issfId) ?? {};
+    const birthday = profile.birthday ?? a.birthday;
+    // ISSF search returns Jan 1 as placeholder; profile has real date
+    const fullDate = birthday ? birthday.slice(0, 10) : null;
+    return {
+      firstName: a.firstName,
+      lastName: a.familyName,
+      nationality: a.nationCode || null,
+      gender: a.gender === "Male" ? "M" : a.gender === "Female" ? "F" : null,
+      birthYear: fullDate ? new Date(fullDate).getFullYear() : null,
+      birthDate: fullDate,
+      apparatus: inferApparatus(profile.events),
+      issfId: a.issfId,
+      verified: false,
+      createdBySelf: false,
+    };
+  });
 
   const inserted = await db
     .insert(shooters)

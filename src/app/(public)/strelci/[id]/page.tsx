@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { computeFormaScore, trendLabel, trendColor } from "@/lib/forma-score";
 import { ResultsHistoryTable } from "@/components/result-display/ResultsHistoryTable";
-import { NOC_LIST } from "@/components/ui/NocDropdown";
+import { NOC_LIST } from "@/lib/noc-list";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -85,10 +85,19 @@ export default async function ShooterPage({ params }: Props) {
       {/* Profile header */}
       <div className="flex items-start gap-5 mb-8 pb-8 border-b border-[var(--border)]">
         <div
-          className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 font-[family-name:var(--font-barlow-condensed)] font-bold text-xl text-white"
-          style={{ background: "var(--brand-primary)" }}
+          className="w-24 h-24 rounded-xl shrink-0 overflow-hidden flex items-center justify-center font-[family-name:var(--font-barlow-condensed)] font-bold text-2xl text-white"
+          style={{ background: shooter.avatarUrl ? "transparent" : "var(--brand-primary)" }}
         >
-          {initials}
+          {shooter.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={shooter.avatarUrl}
+              alt={`${shooter.firstName} ${shooter.lastName}`}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            initials
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start gap-3 flex-wrap">
@@ -118,8 +127,17 @@ export default async function ShooterPage({ params }: Props) {
               );
             })()}
             {shooter.club && <span>{shooter.club.name}</span>}
-            {shooter.birthYear && <span>Rođ. {shooter.birthYear}</span>}
+            {(shooter.birthDate || shooter.birthYear) && (
+              <span>
+                Datum rođenja: {shooter.birthDate
+                  ? shooter.birthDate.split("-").reverse().join(".")
+                  : shooter.birthYear}
+              </span>
+            )}
             {shooter.gender && <span>{shooter.gender === "M" ? "Muški" : "Ženski"}</span>}
+            {shooter.apparatus && (
+              <span>{shooter.apparatus === "rifle" ? "Puška" : shooter.apparatus === "pistol" ? "Pištolj" : "Puška i pištolj"}</span>
+            )}
           </div>
         </div>
       </div>

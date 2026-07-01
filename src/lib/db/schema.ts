@@ -9,6 +9,7 @@ import {
   decimal,
   jsonb,
   timestamp,
+  date,
   pgEnum,
   index,
   uniqueIndex,
@@ -275,6 +276,8 @@ export const shooters = pgTable(
     firstName: varchar("first_name", { length: 100 }).notNull(),
     lastName: varchar("last_name", { length: 100 }).notNull(),
     birthYear: smallint("birth_year"),
+    birthDate: date("birth_date"),
+    apparatus: varchar("apparatus", { length: 10 }),
     gender: varchar("gender", { length: 1 }),
     // Denormalized current club (source of truth: club_memberships)
     clubId: integer("club_id").references(() => clubs.id),

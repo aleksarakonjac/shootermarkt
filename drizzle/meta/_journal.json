@@ -8,6 +8,27 @@
       "when": 1782854239341,
       "tag": "0000_kind_puck",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1751376000000,
+      "tag": "0001_add_birth_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1751376001000,
+      "tag": "0002_add_apparatus",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1751376002000,
+      "tag": "0003_widen_apparatus",
+      "breakpoints": true
     }
   ]
 }

@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { firstName, lastName, nationality, gender, birthYear, clubId, issfId } = body;
+  const { firstName, lastName, nationality, gender, birthYear, birthDate, clubId, issfId } = body;
 
   if (!firstName?.trim() || !lastName?.trim()) {
     return NextResponse.json({ error: "Ime i prezime su obavezni" }, { status: 400 });
@@ -57,7 +57,10 @@ export async function POST(req: NextRequest) {
       lastName: lastName.trim(),
       nationality: nationality?.trim() || null,
       gender: gender || null,
-      birthYear: birthYear ? parseInt(birthYear) : null,
+      birthYear: birthDate
+        ? new Date(birthDate).getFullYear()
+        : birthYear ? parseInt(birthYear) : null,
+      birthDate: birthDate || null,
       clubId: clubId ? parseInt(clubId) : null,
       issfId: issfId?.trim() || null,
       verified: false,

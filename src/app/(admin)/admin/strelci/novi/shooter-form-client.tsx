@@ -21,7 +21,7 @@ export function ShooterFormClient({ clubs: initialClubs }: { clubs: Club[] }) {
     lastName: "",
     nationality: "SRB",
     gender: "",
-    birthYear: "",
+    birthDate: "",
     clubId: "",
     issfId: "",
   });
@@ -110,14 +110,12 @@ export function ShooterFormClient({ clubs: initialClubs }: { clubs: Club[] }) {
               <GenderDropdown value={form.gender} onChange={(v) => set("gender", v)} />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">God. rođenja</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum rođenja</label>
               <input
-                type="number"
-                value={form.birthYear}
-                onChange={(e) => set("birthYear", e.target.value)}
-                placeholder="1995"
-                min={1940}
-                max={new Date().getFullYear()}
+                type="date"
+                value={form.birthDate}
+                onChange={(e) => set("birthDate", e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
                 className={`${inputCls} font-[family-name:var(--font-jetbrains-mono)]`}
               />
             </div>

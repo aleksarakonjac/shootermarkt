@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { searchAthletes } from "@/lib/issf/adapter";
+import { searchAthletes, fetchAthleteProfile, inferApparatus } from "@/lib/issf/adapter";
 import { db } from "@/lib/db";
 import { shooters } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -51,16 +51,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ inserted: 0, skipped: filtered.length, total: filtered.length });
   }
 
-  const values = deduped.map((a) => ({
-    firstName: a.firstName.trim(),
-    lastName: a.familyName.trim(),
-    nationality: a.nationCode || null,
-    gender: a.gender === "Male" ? "M" : a.gender === "Female" ? "F" : null,
-    birthYear: a.birthday ? new Date(a.birthday).getFullYear() : null,
-    issfId: a.issfId,
-    verified: false,
-    createdBySelf: false,
-  }));
+  // Fetch full profiles in batches of 10 (real birthday + events)
+  const profiles: Partial<(typeof deduped)[0] & { events?: string }>[] = [];
+  for (let i = 0; i < deduped.length; i += 10) {
+    const batch = deduped.slice(i, i + 10);
+    const results = await Promise.all(batch.map((a) => fetchAthleteProfile(a.issfId)));
+    profiles.push(...results);
+    if (i + 10 < deduped.length) await new Promise((r) => setTimeout(r, 300));
+  }
+  const profileMap = new Map(profiles.map((p, i) => [deduped[i].issfId, p]));
+
+  const values = deduped.map((a) => {
+    const profile = profileMap.get(a.issfId) ?? {};
+    const birthday = (profile as { birthday?: string }).birthday ?? a.birthday;
+    const fullDate = birthday ? birthday.slice(0, 10) : null;
+    return {
+      firstName: a.firstName.trim(),
+      lastName: a.familyName.trim(),
+      nationality: a.nationCode || null,
+      gender: a.gender === "Male" ? "M" : a.gender === "Female" ? "F" : null,
+      birthYear: fullDate ? new Date(fullDate).getFullYear() : null,
+      birthDate: fullDate,
+      apparatus: inferApparatus((profile as { events?: string }).events),
+      issfId: a.issfId,
+      verified: false,
+      createdBySelf: false,
+    };
+  });
 
   let inserted;
   try {

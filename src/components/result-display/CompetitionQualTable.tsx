@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { QualDetail } from "@/lib/db/schema";
+import { NOC_LIST } from "@/components/ui/NocDropdown";
 
 export type CompResultRow = {
   id: number;
@@ -167,11 +168,20 @@ export function CompetitionQualTable({ results }: Props) {
                   {/* Club / NOC */}
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2 min-w-0">
-                      {r.nationality && (
-                        <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">
-                          {r.nationality}
-                        </span>
-                      )}
+                      {r.nationality && (() => {
+                        const alpha2 = NOC_LIST.find((n) => n.noc === r.nationality)?.alpha2;
+                        return (
+                          <span className="shrink-0 flex items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">
+                            {alpha2 && (
+                              <span
+                                className={`fi fi-${alpha2.toLowerCase()}`}
+                                style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block", flexShrink: 0 }}
+                              />
+                            )}
+                            {r.nationality}
+                          </span>
+                        );
+                      })()}
                       {r.clubDisplay && (
                         <span className="text-[var(--muted)] text-xs truncate">
                           {r.clubDisplay}

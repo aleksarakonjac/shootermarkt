@@ -32,6 +32,40 @@ export function ISSFAthleteImportClient() {
   const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
   const [selectedNoc, setSelectedNoc] = useState("SRB");
 
+  // Enrich existing shooters
+  const [enrichRunning, setEnrichRunning] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState<{ processed: number; enriched: number; done: boolean } | null>(null);
+  const enrichAbortRef = useRef(false);
+
+  async function handleEnrich() {
+    enrichAbortRef.current = false;
+    setEnrichRunning(true);
+    setEnrichProgress({ processed: 0, enriched: 0, done: false });
+    let offset = 0;
+    let totalEnriched = 0;
+    let totalProcessed = 0;
+    while (!enrichAbortRef.current) {
+      try {
+        const res = await fetch("/api/admin/issf/athletes/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ batchSize: 20, offset }),
+        });
+        const data = await res.json();
+        if (!res.ok) break;
+        totalEnriched  += data.enriched;
+        totalProcessed += data.processed;
+        setEnrichProgress({ processed: totalProcessed, enriched: totalEnriched, done: data.done });
+        if (data.done) break;
+        offset += 20;
+        await new Promise((r) => setTimeout(r, 500));
+      } catch {
+        break;
+      }
+    }
+    setEnrichRunning(false);
+  }
+
   // Scan all
   const [scanRunning, setScanRunning] = useState(false);
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number; noc: string } | null>(null);
@@ -260,6 +294,47 @@ export function ISSFAthleteImportClient() {
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* Enrich existing shooters */}
+      <div className="rounded-xl border border-[var(--border)] p-4 mb-5 max-w-lg">
+        <p className="text-sm font-semibold text-[var(--ink)] mb-1">Ažuriraj postojeće strelce</p>
+        <p className="text-xs text-[var(--muted)] mb-3">
+          Dohvata pun datum rođenja i oružje (puška/pištolj) sa ISSF profila za sve strelce koji imaju ISSF ID.
+        </p>
+        {enrichRunning ? (
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-[var(--muted)]">
+                Obrađeno <span className="font-semibold text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{enrichProgress?.processed}</span>
+                {" · "}ažurirano <span className="font-semibold text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{enrichProgress?.enriched}</span>
+              </span>
+              <button
+                onClick={() => { enrichAbortRef.current = true; }}
+                className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
+              >
+                Zaustavi
+              </button>
+            </div>
+            <div className="h-1 rounded-full bg-[var(--surface-2)] overflow-hidden">
+              <div className="h-full rounded-full bg-[var(--brand-primary)] animate-pulse" style={{ width: "100%" }} />
+            </div>
+          </div>
+        ) : enrichProgress?.done ? (
+          <div className="text-sm">
+            <span className="font-semibold" style={{ color: "var(--success)" }}>Gotovo</span>
+            <span className="text-[var(--muted)] ml-2">
+              {enrichProgress.enriched} ažurirano od {enrichProgress.processed} strelaca
+            </span>
+          </div>
+        ) : (
+          <button
+            onClick={handleEnrich}
+            className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
+          >
+            Pokreni ažuriranje
+          </button>
         )}
       </div>
 

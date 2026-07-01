@@ -14,6 +14,7 @@ interface ShooterData {
   countryName: string | null;
   gender: string;
   birthYear: number | null;
+  birthDate: string | null;
   clubId: number | null;
   clubName: string | null;
   issfId: string | null;
@@ -59,7 +60,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
     lastName: shooter.lastName,
     nationality: shooter.nationality,
     gender: shooter.gender,
-    birthYear: shooter.birthYear ? String(shooter.birthYear) : "",
+    birthDate: shooter.birthDate ?? "",
     clubId: shooter.clubId ? String(shooter.clubId) : "",
   });
 
@@ -69,7 +70,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
     form.lastName !== shooter.lastName ||
     form.nationality !== shooter.nationality ||
     form.gender !== shooter.gender ||
-    form.birthYear !== (shooter.birthYear ? String(shooter.birthYear) : "") ||
+    form.birthDate !== (shooter.birthDate ?? "") ||
     form.clubId !== (shooter.clubId ? String(shooter.clubId) : "");
 
   function setField(key: keyof typeof form, value: string) {
@@ -105,7 +106,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
           lastName: form.lastName,
           nationality: form.nationality || null,
           gender: form.gender || null,
-          birthYear: form.birthYear ? parseInt(form.birthYear) : null,
+          birthDate: form.birthDate || null,
           clubId: form.clubId ? parseInt(form.clubId) : null,
         }),
       });
@@ -228,7 +229,13 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
                 )}
               </span>
             )}
-            {shooter.birthYear && <span>Rođ. {shooter.birthYear}</span>}
+            {(shooter.birthDate || shooter.birthYear) && (
+              <span>
+                Datum rođenja: {shooter.birthDate
+                  ? shooter.birthDate.split("-").reverse().join(".")
+                  : shooter.birthYear}
+              </span>
+            )}
             {shooter.gender && <span>{shooter.gender === "M" ? "Muški" : "Ženski"}</span>}
             {shooter.clubName && <span>{shooter.clubName}</span>}
             {shooter.issfId && (
@@ -265,14 +272,12 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
             <GenderDropdown value={form.gender} onChange={(v) => setField("gender", v)} />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--ink)] mb-1.5">Godina rođenja</label>
+            <label className="block text-xs font-semibold text-[var(--ink)] mb-1.5">Datum rođenja</label>
             <input
-              type="number"
-              value={form.birthYear}
-              onChange={field("birthYear")}
-              min={1920}
-              max={new Date().getFullYear()}
-              placeholder="npr. 1995"
+              type="date"
+              value={form.birthDate}
+              onChange={field("birthDate")}
+              max={new Date().toISOString().slice(0, 10)}
               className="w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-colors font-[family-name:var(--font-jetbrains-mono)]"
             />
           </div>
@@ -318,7 +323,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
                 lastName: shooter.lastName,
                 nationality: shooter.nationality,
                 gender: shooter.gender,
-                birthYear: shooter.birthYear ? String(shooter.birthYear) : "",
+                birthDate: shooter.birthDate ?? "",
                 clubId: shooter.clubId ? String(shooter.clubId) : "",
               })}
               className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors"

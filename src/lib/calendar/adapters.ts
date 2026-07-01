@@ -72,53 +72,77 @@ export async function fetchIssfEvents(year: number): Promise<CalendarEvent[]> {
 const ESC_BASE = "https://esc-shooting.org";
 
 export async function fetchEscEvents(year: number): Promise<CalendarEvent[]> {
-  const res = await fetch(`${ESC_BASE}/calendar?year=${year}`, {
-    headers: { "User-Agent": "Mozilla/5.0" },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`ESC calendar fetch failed: ${res.status}`);
-  const html = await res.text();
-  return parseEscHtml(html);
+  // ESC shows one month at a time — fetch all 12 in parallel
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const results = await Promise.allSettled(
+    months.map((month) =>
+      fetch(
+        `${ESC_BASE}/calendar?filter%5Bevent_year%5D=${year}&filter%5Bevent_month%5D=${month}`,
+        { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store" }
+      ).then((r) => {
+        if (!r.ok) throw new Error(`ESC fetch failed: ${r.status}`);
+        return r.text();
+      })
+    )
+  );
+
+  const events: CalendarEvent[] = [];
+  const seen = new Set<string>();
+  for (const r of results) {
+    if (r.status !== "fulfilled") continue;
+    for (const e of parseEscHtml(r.value)) {
+      // Dedup by name+dateFrom (same event can appear in adjacent months)
+      const key = `${e.name}|${e.dateFrom}`;
+      if (!seen.has(key)) { seen.add(key); events.push(e); }
+    }
+  }
+  return events;
+}
+
+function stripTags(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function parseEscHtml(html: string): CalendarEvent[] {
-  const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const cellPattern = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+  // Columns: DATE | COMPETITION | EVENT | COUNTRY | CITY | RESULTS
+  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
   const events: CalendarEvent[] = [];
   let row;
 
-  while ((row = rowPattern.exec(html)) !== null) {
-    const cells: string[] = [];
-    const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+  while ((row = rowRe.exec(html)) !== null) {
+    const rawCells: string[] = [];
+    const cellReLocal = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
     let cell;
-    while ((cell = cellRe.exec(row[1])) !== null) {
-      const text = cell[1]
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&amp;/g, "&")
-        .replace(/&nbsp;/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-      cells.push(text);
+    while ((cell = cellReLocal.exec(row[1])) !== null) {
+      rawCells.push(cell[1]);
     }
 
-    // Skip header and short rows
-    if (cells.length < 3 || cells[0] === "DATE") continue;
+    if (rawCells.length < 3) continue;
+    const cells = rawCells.map(stripTags);
+    if (cells[0] === "DATE") continue; // header row
 
-    // Columns: "DD.MM.YYYY DD.MM.YYYY" | name | event_type | country | city | results?
-    const dateRaw = cells[0];
-    const name = cells[1];
+    const dates = cells[0].match(/\d{2}\.\d{2}\.\d{4}/g) ?? [];
+    const dateFrom = dates[0] ? escDateToIso(dates[0]) : null;
+    const dateTo   = dates[1] ? escDateToIso(dates[1]) : null;
+
+    const name      = cells[1];
     const eventType = cells[2] ?? "";
-    const country = cells[3] ?? null;
-    const city = cells[4] ?? null;
+    const country   = cells[3]?.trim() || null;
+    const city      = cells[4]?.trim() || null;
 
     if (!name || name.length < 3) continue;
 
-    // Parse dates: "DD.MM.YYYY DD.MM.YYYY" or "DD.MM.YYYY"
-    const dates = dateRaw.match(/\d{2}\.\d{2}\.\d{4}/g) ?? [];
-    const dateFrom = dates[0] ? escDateToIso(dates[0]) : null;
-    const dateTo = dates[1] ? escDateToIso(dates[1]) : null;
+    // Extract ESC event ID and URL from the link in the name cell
+    const linkMatch = rawCells[1]?.match(/href="([^"]*calendar\/view\/(\d+)[^"]*)"/i);
+    const escUrl    = linkMatch ? linkMatch[1] : null;
+    const escId     = linkMatch ? linkMatch[2] : null;
 
-    // 10m = air rifle or air pistol event types
     const upper = eventType.toUpperCase();
     const is10m =
       upper.includes("AR") ||
@@ -136,8 +160,8 @@ function parseEscHtml(html: string): CalendarEvent[] {
       location: city,
       country,
       is10m,
-      url: null,
-      externalId: null,
+      url: escUrl,
+      externalId: escId,
     });
   }
 

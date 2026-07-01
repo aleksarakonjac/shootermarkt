@@ -54,7 +54,36 @@ export interface ISSFAthlete {
   gender: string;
   birthday: string;
   portraitUrl?: string;
+  events?: string;
   achievements: ISSFAchievement[];
+}
+
+const RIFLE_PREFIXES   = ["AR", "R3", "RFM", "RFW"];
+const PISTOL_PREFIXES  = ["AP", "FP", "SP", "CFP", "STP", "RFP"];
+const SHOTGUN_PREFIXES = ["TR", "SK", "DT", "FT"];
+
+export function inferApparatus(events: string | undefined | null): "rifle" | "pistol" | "both" | "shotgun" | null {
+  if (!events?.trim()) return null;
+  const codes = events.split(",").map((e) => e.trim().toUpperCase());
+  const isRifle   = codes.some((c) => RIFLE_PREFIXES.some((p)   => c === p || c.startsWith(p)));
+  const isPistol  = codes.some((c) => PISTOL_PREFIXES.some((p)  => c === p || c.startsWith(p)));
+  const isShotgun = codes.some((c) => SHOTGUN_PREFIXES.some((p) => c === p || c.startsWith(p)));
+  if (isRifle && isPistol) return "both";
+  if (isRifle)   return "rifle";
+  if (isPistol)  return "pistol";
+  if (isShotgun) return "shotgun";
+  return null;
+}
+
+/** Fetch full athlete profile (includes events + full birthday). */
+export async function fetchAthleteProfile(issfId: string): Promise<Partial<ISSFAthlete>> {
+  try {
+    const res = await fetch(`${ISSF_API}/athletes/${issfId}`, { next: { revalidate: 86400 } });
+    if (!res.ok) return {};
+    return res.json();
+  } catch {
+    return {};
+  }
 }
 
 export interface ISSFAchievement {

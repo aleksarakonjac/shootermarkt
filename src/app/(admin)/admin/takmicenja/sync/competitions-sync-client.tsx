@@ -258,7 +258,18 @@ export function CompetitionsSyncClient() {
           <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">Godina</label>
           <SearchDropdown
             value={String(year)}
-            onChange={(v) => { if (v) { setYear(parseInt(v)); setLoaded(false); setEvents([]); } }}
+            onChange={(v) => {
+              if (!v) return;
+              const y = parseInt(v);
+              setYear(y);
+              setLoaded(false);
+              setEvents([]);
+              if (y !== CURRENT_YEAR) {
+                setActiveSources((prev) => { const next = new Set(prev); next.delete("sss"); return next; });
+              } else {
+                setActiveSources((prev) => new Set([...prev, "sss"]));
+              }
+            }}
             options={YEARS.map((y) => ({ value: String(y), label: String(y) }))}
             searchable={false}
             emptyLabel="— izaberi —"
@@ -269,20 +280,27 @@ export function CompetitionsSyncClient() {
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">Izvor</label>
           <div className="flex gap-2">
-            {ALL_SOURCES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => toggleSource(s)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-md border transition-colors ${
-                  activeSources.has(s)
-                    ? "border-transparent " + SOURCE_COLORS[s]
-                    : "border-[var(--border)] text-[var(--muted)] bg-[var(--bg)]"
-                }`}
-              >
-                {SOURCE_LABELS[s]}
-              </button>
-            ))}
+            {ALL_SOURCES.map((s) => {
+              const sssDisabled = s === "sss" && year !== CURRENT_YEAR;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => !sssDisabled && toggleSource(s)}
+                  disabled={sssDisabled}
+                  title={sssDisabled ? "SSS kalendar sadrži samo tekuću godinu" : undefined}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-md border transition-colors ${
+                    sssDisabled
+                      ? "border-[var(--border)] text-[var(--subtle)] bg-[var(--bg)] opacity-40 cursor-not-allowed"
+                      : activeSources.has(s)
+                      ? "border-transparent " + SOURCE_COLORS[s]
+                      : "border-[var(--border)] text-[var(--muted)] bg-[var(--bg)]"
+                  }`}
+                >
+                  {SOURCE_LABELS[s]}
+                </button>
+              );
+            })}
           </div>
         </div>
         <button
