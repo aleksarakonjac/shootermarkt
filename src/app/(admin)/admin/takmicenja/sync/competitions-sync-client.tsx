@@ -19,24 +19,28 @@ interface SyncEvent {
   detectedLevel: CompetitionLevel | null;
   alreadyInDb: boolean;
   currentTags: string[];
+  conflictGroupId: string | null;
+  conflictPriority: number;
 }
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "world",       label: "Svetsko" },
-  { value: "continental", label: "Kontinentalno" },
-  { value: "olympic",     label: "Olimpijsko" },
-  { value: "national",    label: "Državno" },
-  { value: "regional",    label: "Regionalno" },
-  { value: "club",        label: "Klubsko" },
+  { value: "world",         label: "ISSF–Svetsko" },
+  { value: "continental",   label: "Kontinentalno" },
+  { value: "international", label: "Međunarodno" },
+  { value: "olympic",       label: "Olimpijsko" },
+  { value: "national",      label: "Državno" },
+  { value: "regional",      label: "Regionalno" },
+  { value: "club",          label: "Klubsko" },
 ];
 
 const LEVEL_COLORS: Record<CompetitionLevel, string> = {
-  world:       "bg-blue-50 text-blue-700",
-  continental: "bg-purple-50 text-purple-700",
-  olympic:     "bg-yellow-50 text-yellow-700",
-  national:    "bg-green-50 text-green-700",
-  regional:    "bg-orange-50 text-orange-700",
-  club:        "bg-gray-100 text-gray-600",
+  world:         "bg-blue-50 text-blue-700",
+  continental:   "bg-purple-50 text-purple-700",
+  international: "bg-sky-50 text-sky-700",
+  olympic:       "bg-yellow-50 text-yellow-700",
+  national:      "bg-green-50 text-green-700",
+  regional:      "bg-orange-50 text-orange-700",
+  club:          "bg-gray-100 text-gray-600",
 };
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -154,14 +158,31 @@ export function CompetitionsSyncClient() {
       if (!res.ok) throw new Error(data.error ?? "Greška");
       setEvents(data);
       setLoaded(true);
-      // Auto-select: new with level, AND already-in-db missing current source tag
+
+      // Per conflict group: keep only highest-priority source selected
+      const groupBest = new Map<string, { priority: number; key: string }>();
+      for (const e of data as SyncEvent[]) {
+        if (!e.conflictGroupId) continue;
+        const cur = groupBest.get(e.conflictGroupId);
+        if (!cur || e.conflictPriority < cur.priority) {
+          groupBest.set(e.conflictGroupId, { priority: e.conflictPriority, key: e.key });
+        }
+      }
+      const conflictLoserKeys = new Set(
+        (data as SyncEvent[])
+          .filter((e) => e.conflictGroupId && groupBest.get(e.conflictGroupId)?.key !== e.key)
+          .map((e) => e.key)
+      );
+
+      // Auto-select: new with level, missing source tag, not a conflict loser
       setSelected(new Set(
-        data
-          .filter((e: SyncEvent) =>
+        (data as SyncEvent[])
+          .filter((e) =>
             e.detectedLevel !== null &&
-            (!e.alreadyInDb || !e.currentTags.includes(e.source))
+            (!e.alreadyInDb || !e.currentTags.includes(e.source)) &&
+            !conflictLoserKeys.has(e.key)
           )
-          .map((e: SyncEvent) => e.key)
+          .map((e) => e.key)
       ));
     } catch (e) {
       setError(String(e));
@@ -195,6 +216,38 @@ export function CompetitionsSyncClient() {
   const allSelected = allSelectableKeys.length > 0 && allSelectableKeys.every((k) => selected.has(k));
   const unknownCount = needsAction.filter((e) => e.detectedLevel === null).length;
   const tagAddCount = events.filter((e) => e.alreadyInDb && !e.currentTags.includes(e.source)).length;
+  const conflictGroupIds = new Set(events.map((e) => e.conflictGroupId).filter(Boolean));
+  const conflictCount = conflictGroupIds.size;
+
+  // Sort: conflict groups first (grouped), then rest in original order
+  const displayEvents = (() => {
+    const conflictFirst: typeof events = [];
+    const rest: typeof events = [];
+    const groupOrder = new Map<string, number>();
+    for (const e of events) {
+      if (e.conflictGroupId && !groupOrder.has(e.conflictGroupId)) {
+        groupOrder.set(e.conflictGroupId, groupOrder.size);
+      }
+    }
+    const conflictMap = new Map<string, typeof events>();
+    for (const e of events) {
+      if (e.conflictGroupId) {
+        const g = conflictMap.get(e.conflictGroupId) ?? [];
+        g.push(e);
+        conflictMap.set(e.conflictGroupId, g);
+      } else {
+        rest.push(e);
+      }
+    }
+    const sortedGroups = [...conflictMap.entries()].sort(
+      ([a], [b]) => (groupOrder.get(a) ?? 0) - (groupOrder.get(b) ?? 0)
+    );
+    for (const [, group] of sortedGroups) {
+      group.sort((a, b) => a.conflictPriority - b.conflictPriority);
+      conflictFirst.push(...group);
+    }
+    return [...conflictFirst, ...rest];
+  })();
 
   function toggleAll() {
     if (allSelected) setSelected(new Set());
@@ -325,6 +378,11 @@ export function CompetitionsSyncClient() {
                   · {unknownCount} bez nivoa — izaberi ručno
                 </span>
               )}
+              {conflictCount > 0 && (
+                <span className="text-orange-600 text-xs font-medium">
+                  · {conflictCount} potencijalnih duplikata — proveri
+                </span>
+              )}
             </div>
             {selected.size > 0 && (
               <button
@@ -363,15 +421,22 @@ export function CompetitionsSyncClient() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {events.map((e) => {
+                  {displayEvents.map((e) => {
                     const effectiveLevel = getEffectiveLevel(e);
                     const hasSourceTag = e.currentTags.includes(e.source);
                     const fullyDone = e.alreadyInDb && hasSourceTag;
                     const canSelect = !fullyDone && effectiveLevel !== null;
+                    const isConflict = !!e.conflictGroupId;
                     return (
                       <tr
                         key={e.key}
-                        className={`transition-colors ${fullyDone ? "opacity-35" : "hover:bg-[var(--surface)] cursor-pointer"}`}
+                        className={`transition-colors border-l-2 ${
+                          fullyDone
+                            ? "opacity-35 border-l-transparent"
+                            : isConflict
+                            ? "border-l-orange-400 bg-orange-50/40 hover:bg-orange-50 cursor-pointer"
+                            : "border-l-transparent hover:bg-[var(--surface)] cursor-pointer"
+                        }`}
                         onClick={() => canSelect && toggle(e.key)}
                       >
                         <td className="px-3 py-2.5 text-center">
@@ -391,6 +456,11 @@ export function CompetitionsSyncClient() {
                         </td>
                         <td className="px-3 py-2.5 font-medium text-[var(--ink)] max-w-[220px]">
                           <span className="line-clamp-2">{e.name}</span>
+                          {isConflict && (
+                            <span className="block text-[0.65rem] text-orange-600 font-medium mt-0.5">
+                              ⚠ moguć duplikat
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 min-w-[140px]">
                           {e.competitionTypeName ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { DatePicker } from "@/components/ui/DatePicker";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 
 type Step = "upload" | "review" | "done";
@@ -126,20 +127,8 @@ export function ImportClient() {
           Import PDF biltena
         </h1>
         <p className="text-sm mt-1 text-[var(--muted)]">
-          Uploaduj bilten → Gemini parsira → Pregledate i potvrđujete
+          Uvoz rezultata iz PDF biltena i ručni pregled pred potvrdu.
         </p>
-      </div>
-
-      {/* Step indicator */}
-      <div className="flex items-center gap-2 mb-8 text-xs font-semibold uppercase tracking-wider">
-        {(["upload", "review", "done"] as Step[]).map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            {i > 0 && <span className="text-[var(--subtle)]">→</span>}
-            <span style={{ color: step === s ? "var(--brand-primary)" : "var(--subtle)" }}>
-              {i + 1}. {s === "upload" ? "Upload" : s === "review" ? "Pregled" : "Gotovo"}
-            </span>
-          </div>
-        ))}
       </div>
 
       {error && (
@@ -165,12 +154,7 @@ export function ImportClient() {
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum *</label>
-                <input
-                  type="date"
-                  value={compDate}
-                  onChange={(e) => setCompDate(e.target.value)}
-                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-                />
+                <DatePicker value={compDate} onChange={setCompDate} />
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo</label>

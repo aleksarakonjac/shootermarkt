@@ -114,12 +114,7 @@ export function ManualMode() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Datum *</label>
-            <input
-              type="date"
-              value={compDate}
-              onChange={(e) => setCompDate(e.target.value)}
-              className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-            />
+              <DatePicker value={compDate} onChange={setCompDate} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Nivo</label>
@@ -132,7 +127,7 @@ export function ManualMode() {
             </select>
           </div>
           <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Lokacija</label>
+              <DatePicker value={compDate} onChange={setCompDate} />
             <input
               value={compLocation}
               onChange={(e) => setCompLocation(e.target.value)}

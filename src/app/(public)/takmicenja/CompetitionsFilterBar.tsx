@@ -5,13 +5,14 @@ import { useCallback, useRef } from "react";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 
 const LEVELS: { value: CompetitionLevel | "all"; label: string }[] = [
-  { value: "all",         label: "Svi nivoi"    },
-  { value: "olympic",     label: "Olimpijsko"   },
-  { value: "world",       label: "Svetsko"      },
-  { value: "continental", label: "Kont."        },
-  { value: "national",    label: "Državno"      },
-  { value: "regional",    label: "Regionalno"   },
-  { value: "club",        label: "Klubsko"      },
+  { value: "all",           label: "Svi nivoi"    },
+  { value: "olympic",       label: "Olimpijsko"   },
+  { value: "world",         label: "ISSF–Svetsko" },
+  { value: "continental",   label: "Kont."        },
+  { value: "international", label: "Međunar."     },
+  { value: "national",      label: "Državno"      },
+  { value: "regional",      label: "Regionalno"   },
+  { value: "club",          label: "Klubsko"      },
 ];
 
 const TAGS: { value: string; label: string; bg: string; activeBg: string; color: string }[] = [

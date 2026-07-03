@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DatePicker } from "@/components/ui/DatePicker";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 
 type Step = "select" | "review" | "done";
@@ -22,12 +23,13 @@ interface CommitResult {
 const DISCIPLINES = ["ARM", "ARW", "APM", "APW"] as const;
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "national",    label: "Državno" },
-  { value: "regional",    label: "Regionalno" },
-  { value: "continental", label: "Kontinentalno (ESC)" },
-  { value: "world",       label: "Svetski (ISSF)" },
-  { value: "club",        label: "Klubsko (liga)" },
-  { value: "olympic",     label: "Olimpijsko" },
+  { value: "national",      label: "Državno" },
+  { value: "regional",      label: "Regionalno" },
+  { value: "international", label: "Međunarodno" },
+  { value: "continental",   label: "Kontinentalno (ESC)" },
+  { value: "world",         label: "ISSF–Svetsko" },
+  { value: "club",          label: "Klubsko (liga)" },
+  { value: "olympic",       label: "Olimpijsko" },
 ];
 
 export function SssImportClient() {
@@ -170,11 +172,10 @@ export function SssImportClient() {
           SSS Import
         </h1>
         <p className="text-sm mt-1 text-[var(--muted)]">
-          Bilteni sa serbianshooting.rs — srpska državna i regionalna takmičenja
+          Uvoz biltena sa serbianshooting.rs/rezultati.htm
         </p>
       </div>
 
-      {/* Step indicator */}
       <div className="flex items-center gap-2 mb-8 text-xs font-semibold uppercase tracking-wider">
         {(["select", "review", "done"] as Step[]).map((s, i) => (
           <div key={s} className="flex items-center gap-2">
@@ -292,12 +293,7 @@ export function SssImportClient() {
                     </div>
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum</label>
-                      <input
-                        type="date"
-                        value={compDate}
-                        onChange={(e) => setCompDate(e.target.value)}
-                        className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-                      />
+                      <DatePicker value={compDate} onChange={setCompDate} />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo</label>

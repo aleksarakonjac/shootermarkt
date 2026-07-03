@@ -1,5 +1,5 @@
 export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "RFM" | "RFW" | "R3JM" | "R3JW" | "SPW" | "RFPM" | "FPM";
-export type CompetitionLevel = "club" | "regional" | "national" | "continental" | "world" | "olympic";
+export type CompetitionLevel = "club" | "regional" | "national" | "international" | "continental" | "world" | "olympic";
 export type EventType = "championship" | "world_cup" | "champions_league" | "cup" | "grand_prix" | "league_round" | "friendly" | "other";
 
 export interface ParsedShooterResult {

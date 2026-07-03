@@ -24,6 +24,53 @@ function buildKey(source: CalendarSource, externalId: string | null, name: strin
   return `esc:${normalizeEventName(name)}:${dateFrom ?? year}`;
 }
 
+// ── Cross-source fuzzy duplicate detection ────────────────────────────────────
+
+function tokenize(name: string): Set<string> {
+  return new Set(
+    name.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2)
+  );
+}
+
+function jaccardSimilarity(a: string, b: string): number {
+  const ta = tokenize(a);
+  const tb = tokenize(b);
+  const intersection = [...ta].filter((w) => tb.has(w)).length;
+  const union = new Set([...ta, ...tb]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+function datesClose(d1: string | null, d2: string | null, windowDays = 4): boolean {
+  if (!d1 || !d2) return false;
+  return Math.abs(new Date(d1).getTime() - new Date(d2).getTime()) <= windowDays * 86_400_000;
+}
+
+const SOURCE_PRIORITY: Record<CalendarSource, number> = { issf: 0, esc: 1, sss: 2 };
+
+function detectConflictGroups(events: Array<{ key: string; source: CalendarSource; name: string; dateFrom: string | null }>): Map<string, string> {
+  const groups = new Map<string, string>(); // key → groupId
+  let counter = 0;
+
+  for (let i = 0; i < events.length; i++) {
+    for (let j = i + 1; j < events.length; j++) {
+      const a = events[i], b = events[j];
+      if (a.source === b.source) continue;
+      if (!datesClose(a.dateFrom, b.dateFrom)) continue;
+      if (jaccardSimilarity(a.name, b.name) < 0.35) continue;
+
+      const gA = groups.get(a.key);
+      const gB = groups.get(b.key);
+      const groupId = gA ?? gB ?? `conflict-${++counter}`;
+      groups.set(a.key, groupId);
+      groups.set(b.key, groupId);
+    }
+  }
+  return groups;
+}
+
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -72,6 +119,8 @@ export async function GET(req: NextRequest) {
   const issfTagMap = new Map(existingIssf.map((r) => [r.issfId!, r.tags ?? []]));
   const extTagMap  = new Map(existingExt.map((r) => [r.externalId!, r.tags ?? []]));
 
+  const conflictGroups = detectConflictGroups(deduped);
+
   const result = deduped.map((e) => {
     const currentTags: string[] =
       (e.source === "issf" && e.externalId ? issfTagMap.get(e.externalId) : undefined)
@@ -98,6 +147,8 @@ export async function GET(req: NextRequest) {
         : SOURCE_DEFAULT_LEVEL[e.source],
       alreadyInDb,
       currentTags,
+      conflictGroupId: conflictGroups.get(e.key) ?? null,
+      conflictPriority: SOURCE_PRIORITY[e.source],
     };
   });
 

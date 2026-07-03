@@ -7,7 +7,7 @@ import { StrelciFilters } from "./strelci-filters";
 
 export const metadata: Metadata = { title: "Admin · Strelci" };
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 50;
 
 export default async function AdminStrelciPage({
   searchParams,
@@ -18,6 +18,8 @@ export default async function AdminStrelciPage({
   const page = Math.max(1, parseInt(sp.page ?? "1"));
   const q = sp.q?.trim() ?? "";
   const nat = sp.nat?.trim() ?? "";
+  const gender = sp.gender?.trim() ?? "";
+  const apparatus = sp.apparatus?.trim() ?? "";
   const onlyUnverified = sp.verified === "0";
   const sortCol = sp.sort ?? "name";
   const sortDir = sp.dir === "desc" ? "desc" : "asc";
@@ -25,10 +27,23 @@ export default async function AdminStrelciPage({
   const conditions = [
     q ? or(ilike(shooters.firstName, `%${q}%`), ilike(shooters.lastName, `%${q}%`)) : undefined,
     nat ? eq(shooters.nationality, nat) : undefined,
+    gender ? eq(shooters.gender, gender) : undefined,
+    apparatus ? eq(shooters.apparatus, apparatus) : undefined,
     onlyUnverified ? eq(shooters.verified, false) : undefined,
   ].filter(Boolean) as Parameters<typeof and>;
 
   const where = conditions.length ? and(...conditions) : undefined;
+
+  const orderBy = (() => {
+    const d = sortDir === "desc";
+    switch (sortCol) {
+      case "country":   return [d ? desc(shooters.nationality) : asc(shooters.nationality)];
+      case "gender":    return [d ? desc(shooters.gender) : asc(shooters.gender), asc(shooters.lastName)];
+      case "apparatus": return [d ? desc(shooters.apparatus) : asc(shooters.apparatus), asc(shooters.lastName)];
+      case "birthDate": return [d ? desc(shooters.birthDate) : asc(shooters.birthDate)];
+      default:          return [d ? desc(shooters.lastName) : asc(shooters.lastName), asc(shooters.firstName)];
+    }
+  })();
 
   const [data, [{ total }], nats] = await Promise.all([
     db
@@ -42,18 +57,16 @@ export default async function AdminStrelciPage({
         createdBySelf: shooters.createdBySelf,
         issfId: shooters.issfId,
         clubName: clubs.name,
+        birthDate: shooters.birthDate,
+        birthYear: shooters.birthYear,
+        apparatus: shooters.apparatus,
+        gender: shooters.gender,
       })
       .from(shooters)
       .leftJoin(clubs, eq(shooters.clubId, clubs.id))
       .leftJoin(countries, eq(shooters.nationality, countries.code))
       .where(where)
-      .orderBy(
-        ...(sortCol === "country"
-          ? [sortDir === "desc" ? desc(shooters.nationality) : asc(shooters.nationality)]
-          : sortCol === "status"
-          ? [sortDir === "desc" ? desc(shooters.verified) : asc(shooters.verified), asc(shooters.lastName)]
-          : [sortDir === "desc" ? desc(shooters.lastName) : asc(shooters.lastName), asc(shooters.firstName)])
-      )
+      .orderBy(...orderBy)
       .limit(PAGE_SIZE)
       .offset((page - 1) * PAGE_SIZE),
     db
@@ -103,6 +116,8 @@ export default async function AdminStrelciPage({
         <StrelciFilters
           nationalities={nats.map((n) => ({ code: n.code!, name: n.name ?? n.code! }))}
           onlyUnverified={onlyUnverified}
+          gender={gender}
+          apparatus={apparatus}
         />
       </div>
 

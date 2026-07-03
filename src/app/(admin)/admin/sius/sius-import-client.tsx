@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DatePicker } from "@/components/ui/DatePicker";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 
 type Step = "select" | "review" | "done";
@@ -21,12 +22,13 @@ interface CommitResult {
 const DISCIPLINES = ["ARM", "ARW", "APM", "APW"] as const;
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "world",       label: "Svetski (ISSF)" },
-  { value: "continental", label: "Kontinentalno (ESC)" },
-  { value: "national",    label: "Državno" },
-  { value: "regional",    label: "Regionalno" },
-  { value: "club",        label: "Klubsko (liga)" },
-  { value: "olympic",     label: "Olimpijsko" },
+  { value: "world",         label: "ISSF–Svetsko" },
+  { value: "continental",   label: "Kontinentalno (ESC)" },
+  { value: "international", label: "Međunarodno" },
+  { value: "national",      label: "Državno" },
+  { value: "regional",      label: "Regionalno" },
+  { value: "club",          label: "Klubsko (liga)" },
+  { value: "olympic",       label: "Olimpijsko" },
 ];
 
 const DISC_LABELS: Record<string, string> = {
@@ -186,7 +188,6 @@ export function SiusImportClient() {
         </p>
       </div>
 
-      {/* Step indicator */}
       <div className="flex items-center gap-2 mb-8 text-xs font-semibold uppercase tracking-wider">
         {(["select", "review", "done"] as Step[]).map((s, i) => (
           <div key={s} className="flex items-center gap-2">
@@ -222,8 +223,7 @@ export function SiusImportClient() {
             </div>
           ) : (
             <>
-              {/* Search */}
-              <div className="flex gap-3">
+              <div className="flex gap-3 items-center">
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -307,12 +307,7 @@ export function SiusImportClient() {
                       <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
                         Datum
                       </label>
-                      <input
-                        type="date"
-                        value={compDate}
-                        onChange={(e) => setCompDate(e.target.value)}
-                        className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-                      />
+                      <DatePicker value={compDate} onChange={setCompDate} />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">

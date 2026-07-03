@@ -135,3 +135,94 @@ p, li {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Global date picker ───────────────────────────────────────────────────── */
+.shootermarkt-calendar {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.shootermarkt-calendar button {
+  color: inherit;
+}
+
+.shootermarkt-calendar .react-calendar__navigation {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.shootermarkt-calendar .react-calendar__navigation button {
+  min-width: 2rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: var(--surface);
+  padding: 0.45rem 0.5rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.shootermarkt-calendar .react-calendar__navigation button:enabled:hover {
+  background: var(--surface-2);
+}
+
+.shootermarkt-calendar .react-calendar__navigation__label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.shootermarkt-calendar .react-calendar__month-view__weekdays {
+  margin-bottom: 0.35rem;
+  text-align: center;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  color: var(--subtle);
+}
+
+.shootermarkt-calendar .react-calendar__month-view__weekdays__weekday {
+  padding: 0.35rem 0;
+}
+
+.shootermarkt-calendar .react-calendar__month-view__weekdays abbr {
+  text-decoration: none;
+}
+
+.shootermarkt-calendar .react-calendar__month-view__days {
+  display: grid !important;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.shootermarkt-calendar .react-calendar__tile {
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 0.75rem;
+  background: transparent;
+  padding: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.shootermarkt-calendar .react-calendar__tile:enabled:hover {
+  background: var(--surface-2);
+}
+
+.shootermarkt-calendar .react-calendar__tile--now {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.shootermarkt-calendar .shootermarkt-calendar__tile--selected,
+.shootermarkt-calendar .react-calendar__tile--active {
+  background: var(--brand-primary) !important;
+  color: white !important;
+}
+
+.shootermarkt-calendar .react-calendar__month-view__days__day--neighboringMonth {
+  color: var(--subtle);
+}

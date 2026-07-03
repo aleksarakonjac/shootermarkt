@@ -14,7 +14,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -39,6 +39,7 @@ export const competitionLevelEnum = pgEnum("competition_level", [
   "club",
   "regional",
   "national",
+  "international",
   "continental",
   "world",
   "olympic",
@@ -400,6 +401,7 @@ export const competitions = pgTable(
     index("competitions_level_idx").on(t.level),
     index("competitions_country_id_idx").on(t.countryId),
     index("competitions_league_season_idx").on(t.leagueSeasonId),
+    uniqueIndex("competitions_external_id_uidx").on(t.externalId).where(sql`${t.externalId} IS NOT NULL`),
   ]
 );
 

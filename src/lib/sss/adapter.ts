@@ -76,47 +76,56 @@ export async function fetchSssCalendar(): Promise<SssCalendarEvent[]> {
   return parseCalendarHtml(html);
 }
 
+function stripTags(s: string): string {
+  return s
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&#\d+;/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function parseCalendarHtml(html: string): SssCalendarEvent[] {
-  // SSS calendar is a static HTML table — extract row text
-  // Each row: date | competition name | location
-  const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const cellPattern = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+  // SSS table columns: date | name+location (same td, name=bold, location=p after bold) | Info (skip)
+  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   const events: SssCalendarEvent[] = [];
 
   let row;
-  while ((row = rowPattern.exec(html)) !== null) {
+  while ((row = rowRe.exec(html)) !== null) {
     const rowHtml = row[1];
-    const cells: string[] = [];
+    const cellRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    const rawCells: string[] = [];
     let cell;
-    const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-    while ((cell = cellRe.exec(rowHtml)) !== null) {
-      const text = cell[1]
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&#\d+;/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-      if (text) cells.push(text);
-    }
+    while ((cell = cellRe.exec(rowHtml)) !== null) rawCells.push(cell[1]);
 
-    if (cells.length < 2) continue;
+    if (rawCells.length < 2) continue;
 
-    // Guess which cell is date, name, location
-    const dateCell = cells.find((c) => /\d{1,2}\.\d{1,2}\./.test(c));
-    const nameCell = cells.find((c) => c !== dateCell && c.length > 3);
-    const locationCell = cells.find((c) => c !== dateCell && c !== nameCell && c.length > 1);
+    // Col 0: date
+    const dateText = stripTags(rawCells[0]);
+    if (!/\d{1,2}\.\d{1,2}/.test(dateText)) continue;
 
-    if (!nameCell) continue;
+    // Col 1: name (bold) + location (non-bold <p> after bold)
+    const nameCell = rawCells[1];
 
-    const upper = nameCell.toUpperCase();
+    // Extract bold segments → name
+    const boldMatches = [...nameCell.matchAll(/<b[^>]*>([\s\S]*?)<\/b>/gi)];
+    const name = boldMatches.map((m) => stripTags(m[1])).join(" / ").replace(/\s+/g, " ").trim();
+    if (!name || name.length < 3) continue;
+
+    // Extract non-bold text segments after removing bold blocks → location
+    // SSS uses unclosed <p> tags (closed by </td>), so match up to </p> OR </td>
+    const withoutBold = nameCell.replace(/<b[^>]*>[\s\S]*?<\/b>/gi, "");
+    const pMatches = [...withoutBold.matchAll(/<p[^>]*>([\s\S]*?)(?:<\/p>|$)/gi)];
+    const location = pMatches
+      .map((m) => stripTags(m[1]))
+      .filter((t) => t.length > 1)
+      .join(", ") || null;
+
+    const upper = name.toUpperCase();
     const is10m = upper.includes("10M") || upper.includes("VAZDUŠN") || upper.includes("VAZDUSN");
 
-    events.push({
-      name: nameCell,
-      date: dateCell ?? null,
-      location: locationCell ?? null,
-      is10m,
-    });
+    events.push({ name, date: dateText, location, is10m });
   }
 
   return events.filter((e) => e.name.length > 3);

@@ -13,9 +13,13 @@ interface NatOption {
 interface Props {
   nationalities: NatOption[];
   onlyUnverified: boolean;
+  gender: string;
+  apparatus: string;
 }
 
-export function StrelciFilters({ nationalities, onlyUnverified }: Props) {
+const SELECT_CLS = "rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] cursor-pointer";
+
+export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatus }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -37,7 +41,6 @@ export function StrelciFilters({ nationalities, onlyUnverified }: Props) {
     debounceRef.current = setTimeout(() => update("q", v), 300);
   }
 
-  // Build options from DB nationalities, enriched with flags from NOC_LIST
   const natOptions = nationalities.map((n) => {
     const meta = NOC_LIST.find((m) => m.noc === n.code);
     return {
@@ -52,6 +55,8 @@ export function StrelciFilters({ nationalities, onlyUnverified }: Props) {
       ) : undefined,
     };
   });
+
+  const hasActiveFilters = currentNat || gender || apparatus;
 
   return (
     <div className="flex gap-2 flex-wrap items-center">
@@ -72,12 +77,38 @@ export function StrelciFilters({ nationalities, onlyUnverified }: Props) {
         className="w-52"
       />
 
-      {currentNat && (
+      <select
+        value={gender}
+        onChange={(e) => update("gender", e.target.value)}
+        className={SELECT_CLS}
+      >
+        <option value="">Oba pola</option>
+        <option value="M">Muški</option>
+        <option value="F">Ženski</option>
+      </select>
+
+      <select
+        value={apparatus}
+        onChange={(e) => update("apparatus", e.target.value)}
+        className={SELECT_CLS}
+      >
+        <option value="">Sve discipline</option>
+        <option value="rifle">Puška</option>
+        <option value="pistol">Pištolj</option>
+        <option value="both">Puška + Pištolj</option>
+        <option value="shotgun">Shotgun</option>
+      </select>
+
+      {hasActiveFilters && (
         <button
-          onClick={() => update("nat", "")}
+          onClick={() => {
+            update("nat", "");
+            update("gender", "");
+            update("apparatus", "");
+          }}
           className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors px-1"
         >
-          × Ukloni filter
+          × Ukloni filtere
         </button>
       )}
 

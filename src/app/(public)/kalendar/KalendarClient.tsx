@@ -20,12 +20,13 @@ interface Props {
 }
 
 const LEVEL_META: Record<CompetitionLevel, { label: string; bg: string; color: string }> = {
-  club:        { label: "Klubsko",    bg: "var(--surface-2)",     color: "var(--muted)"  },
-  regional:    { label: "Regionalno", bg: "var(--brand-accent)",  color: "white"         },
-  national:    { label: "Državno",    bg: "var(--success)",       color: "white"         },
-  continental: { label: "Kont.",      bg: "oklch(0.62 0.18 55)",  color: "white"         },
-  world:       { label: "Svetsko",    bg: "var(--brand-primary)", color: "white"         },
-  olympic:     { label: "Olimpijsko", bg: "oklch(0.65 0.18 75)", color: "white"          },
+  club:          { label: "Klubsko",      bg: "var(--surface-2)",     color: "var(--muted)"  },
+  regional:      { label: "Regionalno",   bg: "var(--brand-accent)",  color: "white"         },
+  national:      { label: "Državno",      bg: "var(--success)",       color: "white"         },
+  international: { label: "Međunarodno",  bg: "oklch(0.52 0.15 220)", color: "white"         },
+  continental:   { label: "Kont.",        bg: "oklch(0.62 0.18 55)",  color: "white"         },
+  world:         { label: "ISSF–Svetsko", bg: "var(--brand-primary)", color: "white"         },
+  olympic:       { label: "Olimpijsko",   bg: "oklch(0.65 0.18 75)",  color: "white"         },
 };
 
 const MONTHS_SR = [

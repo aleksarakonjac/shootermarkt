@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { NocDropdown } from "@/components/ui/NocDropdown";
 import { GenderDropdown } from "@/components/ui/GenderDropdown";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
@@ -18,6 +19,8 @@ interface ShooterData {
   clubId: number | null;
   clubName: string | null;
   issfId: string | null;
+  avatarUrl: string | null;
+  apparatus: string | null;
   verified: boolean;
   createdBySelf: boolean;
 }
@@ -40,12 +43,20 @@ interface Props {
   results: Result[];
 }
 
-const DISCIPLINE_COLORS: Record<string, string> = {
-  ARM: "oklch(0.55 0.18 250)",
-  ARW: "oklch(0.55 0.18 320)",
-  APM: "oklch(0.55 0.18 150)",
-  APW: "oklch(0.55 0.18 30)",
+const DISCIPLINE_COLORS: Record<string, { fg: string; bg: string }> = {
+  ARM: { fg: "oklch(0.38 0.16 250)", bg: "oklch(0.93 0.04 250)" },
+  ARW: { fg: "oklch(0.42 0.16 320)", bg: "oklch(0.93 0.04 320)" },
+  APM: { fg: "oklch(0.36 0.14 150)", bg: "oklch(0.93 0.04 150)" },
+  APW: { fg: "oklch(0.48 0.16 30)",  bg: "oklch(0.93 0.04 30)"  },
 };
+const DEFAULT_DISCIPLINE = { fg: "var(--muted)", bg: "var(--surface-2)" };
+
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const parts = iso.split("-");
+  if (parts.length !== 3) return iso;
+  return `${parts[2]}.${parts[1]}.${parts[0]}`;
+}
 
 export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Props) {
   const router = useRouter();
@@ -54,6 +65,12 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
   const [verifying, startVerifying] = useTransition();
   const [flash, setFlash] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const [clubs, setClubs] = useState(initialClubs);
+
+  useEffect(() => {
+    if (!flash || flash.type === "err") return;
+    const t = setTimeout(() => setFlash(null), 3000);
+    return () => clearTimeout(t);
+  }, [flash]);
 
   const [form, setForm] = useState({
     firstName: shooter.firstName,
@@ -151,9 +168,11 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
             ← Strelci
           </a>
           <span className="text-[var(--subtle)]">/</span>
-          <span className="text-[var(--ink)] font-medium">{shooter.lastName} {shooter.firstName}</span>
+          <span className="text-[var(--ink)] font-semibold">
+            {shooter.lastName} {shooter.firstName}
+          </span>
         </nav>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2">
           {!shooter.verified && (
             <button
               onClick={verify}
@@ -161,7 +180,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
               className="rounded-md px-3 py-1.5 text-xs font-semibold border transition-colors disabled:opacity-50"
               style={{ borderColor: "var(--border)", background: "var(--surface)", color: "var(--ink)" }}
             >
-              {verifying ? "..." : "Verifikuj"}
+              {verifying ? "Verifikujem..." : "Verifikuj"}
             </button>
           )}
           <button
@@ -169,7 +188,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
             disabled={anyBusy}
             className="rounded-md px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
           >
-            {deleting ? "..." : "Obriši"}
+            {deleting ? "Brišem..." : "Obriši"}
           </button>
         </div>
       </div>
@@ -190,15 +209,24 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
       )}
 
       {/* Profile header */}
-      <div className="flex items-center gap-4 mb-8 pb-6 border-b border-[var(--border)]">
-        <div
-          className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-white select-none"
-          style={{ background: "var(--brand-primary)" }}
-        >
-          {initials}
-        </div>
+      <div className="flex items-start gap-4 mb-8 pb-6 border-b border-[var(--border)]">
+        {shooter.avatarUrl ? (
+          <img
+            src={shooter.avatarUrl}
+            alt={`${shooter.firstName} ${shooter.lastName}`}
+            loading="lazy"
+            className="h-[144px] w-auto max-w-[108px] rounded-xl object-cover shrink-0"
+          />
+        ) : (
+          <div
+            className="h-[144px] w-[96px] rounded-xl flex items-center justify-center shrink-0 font-[family-name:var(--font-barlow-condensed)] font-bold text-3xl tracking-tight text-white select-none"
+            style={{ background: "var(--brand-primary)" }}
+          >
+            {initials}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap mb-3">
             <h1
               className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
               style={{ fontSize: "clamp(1.25rem, 3vw, 1.75rem)", letterSpacing: "-0.02em", lineHeight: 1.1 }}
@@ -220,30 +248,62 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
               </span>
             )}
           </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-[var(--muted)]">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
             {shooter.nationality && (
-              <span className="flex items-center gap-1.5">
-                <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)]">{shooter.nationality}</span>
-                {shooter.countryName && shooter.countryName !== shooter.nationality && (
-                  <span className="text-[var(--muted)]">{shooter.countryName}</span>
-                )}
-              </span>
+              <>
+                <dt className="text-[var(--muted)]">Zemlja</dt>
+                <dd className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
+                  {shooter.nationality}{shooter.countryName && shooter.countryName !== shooter.nationality ? ` · ${shooter.countryName}` : ""}
+                </dd>
+              </>
             )}
-            {(shooter.birthDate || shooter.birthYear) && (
-              <span>
-                Datum rođenja: {shooter.birthDate
-                  ? shooter.birthDate.split("-").reverse().join(".")
-                  : shooter.birthYear}
-              </span>
+            {(shooter.birthDate || shooter.birthYear) && (() => {
+              const dateStr = shooter.birthDate
+                ? shooter.birthDate.split("-").reverse().join(".")
+                : String(shooter.birthYear);
+              let age: number | null = null;
+              if (shooter.birthDate) {
+                const today = new Date();
+                const dob = new Date(shooter.birthDate);
+                age = today.getFullYear() - dob.getFullYear() -
+                  (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+              }
+              return (
+                <>
+                  <dt className="text-[var(--muted)]">Datum rođenja</dt>
+                  <dd className="text-[var(--ink)]">
+                    {dateStr}{age !== null && <span className="text-[var(--muted)] ml-1">({age} god.)</span>}
+                  </dd>
+                </>
+              );
+            })()}
+            {shooter.apparatus && (
+              <>
+                <dt className="text-[var(--muted)]">Oružje</dt>
+                <dd className="text-[var(--ink)]">
+                  {{rifle:"Puška", pistol:"Pištolj", both:"Puška i pištolj", shotgun:"Shotgun"}[shooter.apparatus] ?? shooter.apparatus}
+                </dd>
+              </>
             )}
-            {shooter.gender && <span>{shooter.gender === "M" ? "Muški" : "Ženski"}</span>}
-            {shooter.clubName && <span>{shooter.clubName}</span>}
+            {shooter.gender && (
+              <>
+                <dt className="text-[var(--muted)]">Pol</dt>
+                <dd className="text-[var(--ink)]">{shooter.gender === "M" ? "Muški" : "Ženski"}</dd>
+              </>
+            )}
+            {shooter.clubName && (
+              <>
+                <dt className="text-[var(--muted)]">Klub</dt>
+                <dd className="text-[var(--ink)]">{shooter.clubName}</dd>
+              </>
+            )}
             {shooter.issfId && (
-              <span className="font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)]">
-                ISSF {shooter.issfId}
-              </span>
+              <>
+                <dt className="text-[var(--muted)]">ISSF ID</dt>
+                <dd className="font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)]">{shooter.issfId}</dd>
+              </>
             )}
-          </div>
+          </dl>
         </div>
       </div>
 
@@ -273,12 +333,11 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
           </div>
           <div>
             <label className="block text-xs font-semibold text-[var(--ink)] mb-1.5">Datum rođenja</label>
-            <input
-              type="date"
+            <DatePicker
               value={form.birthDate}
-              onChange={field("birthDate")}
+              onChange={(value) => setField("birthDate", value)}
               max={new Date().toISOString().slice(0, 10)}
-              className="w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-colors font-[family-name:var(--font-jetbrains-mono)]"
+              className="font-[family-name:var(--font-jetbrains-mono)]"
             />
           </div>
           <div>
@@ -299,7 +358,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[var(--muted)] mb-1.5">ISSF ID</label>
+            <label className="block text-xs font-semibold text-[var(--ink)] mb-1.5">ISSF ID <span className="font-normal text-[var(--subtle)]">(read-only)</span></label>
             <input
               value={shooter.issfId ?? ""}
               readOnly
@@ -312,7 +371,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
           <button
             onClick={save}
             disabled={anyBusy || !dirty}
-            className="rounded-md px-5 py-2 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-40"
+            className="rounded-md px-5 py-2 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
           >
             {saving ? "Čuvam..." : "Sačuvaj izmene"}
           </button>
@@ -335,7 +394,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
       </section>
 
       {/* Results */}
-      <section>
+      <section className="border-t border-[var(--border)] pt-8">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-4">
           Rezultati
           <span className="ml-2 font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)]">{results.length}</span>
@@ -361,14 +420,14 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
               <tbody className="divide-y divide-[var(--border)]">
                 {results.map((r) => (
                   <tr key={r.id} className="hover:bg-[var(--surface)] transition-colors">
-                    <td className="px-4 py-2.5 text-[var(--ink)] max-w-[220px] truncate font-medium text-xs">{r.competitionName}</td>
-                    <td className="px-4 py-2.5 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{r.competitionDate}</td>
+                    <td className="px-4 py-2.5 text-[var(--ink)] max-w-xs truncate font-medium text-xs">{r.competitionName}</td>
+                    <td className="px-4 py-2.5 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{fmtDate(r.competitionDate)}</td>
                     <td className="px-4 py-2.5">
                       <span
                         className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded font-[family-name:var(--font-jetbrains-mono)]"
                         style={{
-                          background: "var(--surface-2)",
-                          color: DISCIPLINE_COLORS[r.disciplineCode] ?? "var(--muted)",
+                          background: (DISCIPLINE_COLORS[r.disciplineCode] ?? DEFAULT_DISCIPLINE).bg,
+                          color: (DISCIPLINE_COLORS[r.disciplineCode] ?? DEFAULT_DISCIPLINE).fg,
                         }}
                       >
                         {r.disciplineCode}

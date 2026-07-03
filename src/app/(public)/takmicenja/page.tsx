@@ -14,12 +14,13 @@ export const metadata: Metadata = { title: "Takmičenja" };
 const DISC_ORDER = ["ARM","ARW","APM","APW","RFM","RFW","R3JM","R3JW","SPW","RFPM","FPM"];
 
 const LEVEL_META: Record<CompetitionLevel, { label: string; bg: string; color: string }> = {
-  club:        { label: "Klubsko",       bg: "var(--surface-2)",      color: "var(--muted)"  },
-  regional:    { label: "Regionalno",    bg: "oklch(0.52 0.15 25)",   color: "white"         },
-  national:    { label: "Državno",       bg: "var(--success)",        color: "white"         },
-  continental: { label: "Kont.",         bg: "oklch(0.50 0.18 290)",  color: "white"         },
-  world:       { label: "Svetsko",       bg: "var(--brand-primary)",  color: "white"         },
-  olympic:     { label: "Olimpijsko",    bg: "oklch(0.65 0.18 75)",   color: "white"         },
+  club:          { label: "Klubsko",        bg: "var(--surface-2)",      color: "var(--muted)"  },
+  regional:      { label: "Regionalno",     bg: "oklch(0.52 0.15 25)",   color: "white"         },
+  national:      { label: "Državno",        bg: "var(--success)",        color: "white"         },
+  international: { label: "Međunarodno",    bg: "oklch(0.52 0.15 220)",  color: "white"         },
+  continental:   { label: "Kont.",          bg: "oklch(0.50 0.18 290)",  color: "white"         },
+  world:         { label: "ISSF–Svetsko",   bg: "var(--brand-primary)",  color: "white"         },
+  olympic:       { label: "Olimpijsko",     bg: "oklch(0.65 0.18 75)",   color: "white"         },
 };
 
 const TAG_META: Record<string, { bg: string; color: string }> = {

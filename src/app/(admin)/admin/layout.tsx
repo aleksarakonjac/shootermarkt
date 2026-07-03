@@ -33,7 +33,7 @@ export default async function AdminLayout({
               markt
             </span>
           </Link>
-          <span className="ml-auto text-[0.55rem] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-[var(--brand-primary)] text-white leading-none">
+          <span className="ml-auto inline-flex min-h-6 items-center text-[0.55rem] font-bold uppercase tracking-widest px-2 py-1 rounded bg-[var(--brand-primary)] text-white leading-none">
             Admin
           </span>
         </div>
@@ -44,12 +44,23 @@ export default async function AdminLayout({
         {/* Footer */}
         <div className="shrink-0 border-t border-[var(--border)] px-4 py-3">
           <p className="text-[0.65rem] text-[var(--subtle)] truncate mb-1">{user.email}</p>
-          <Link
-            href="/"
-            className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
-          >
-            ← Nazad na sajt
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/"
+              className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
+            >
+              ← Nazad na sajt
+            </Link>
+            <span className="text-[var(--border-strong)]">·</span>
+            <form action="/logout" method="post">
+              <button
+                type="submit"
+                className="text-xs font-medium text-[var(--brand-primary)] hover:text-[var(--brand-primary-hover)] transition-colors"
+              >
+                Odjavi se
+              </button>
+            </form>
+          </div>
         </div>
       </aside>
 

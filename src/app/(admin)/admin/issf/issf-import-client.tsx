@@ -27,12 +27,13 @@ const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i);
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "world",       label: "Svetski (ISSF)" },
-  { value: "continental", label: "Kontinentalno (ESC)" },
-  { value: "national",    label: "Državno" },
-  { value: "regional",    label: "Regionalno" },
-  { value: "club",        label: "Klubsko (liga)" },
-  { value: "olympic",     label: "Olimpijsko" },
+  { value: "world",         label: "ISSF–Svetsko" },
+  { value: "continental",   label: "Kontinentalno (ESC)" },
+  { value: "international", label: "Međunarodno" },
+  { value: "national",      label: "Državno" },
+  { value: "regional",      label: "Regionalno" },
+  { value: "club",          label: "Klubsko (liga)" },
+  { value: "olympic",       label: "Olimpijsko" },
 ];
 
 export function ISSFImportClient() {

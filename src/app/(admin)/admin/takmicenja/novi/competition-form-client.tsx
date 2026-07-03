@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DatePicker } from "@/components/ui/DatePicker";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "national", label: "Državno" },
-  { value: "regional", label: "Regionalno" },
-  { value: "continental", label: "Kontinentalno" },
-  { value: "world", label: "Svetsko" },
-  { value: "club", label: "Klubsko" },
-  { value: "olympic", label: "Olimpijsko" },
+  { value: "national",      label: "Državno" },
+  { value: "regional",      label: "Regionalno" },
+  { value: "international", label: "Međunarodno" },
+  { value: "continental",   label: "Kontinentalno" },
+  { value: "world",         label: "ISSF–Svetsko" },
+  { value: "club",          label: "Klubsko" },
+  { value: "olympic",       label: "Olimpijsko" },
 ];
 
 export function CompetitionFormClient() {
@@ -56,11 +58,7 @@ export function CompetitionFormClient() {
         <p className="text-sm text-[var(--muted)] mt-0.5">Ručni unos takmičenja</p>
       </div>
 
-      {error && (
-        <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="rounded-xl border border-[var(--border)] p-5 space-y-4">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Podaci</h2>
 
@@ -78,12 +76,10 @@ export function CompetitionFormClient() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum *</label>
-              <input
-                type="date"
+              <DatePicker
                 value={form.date}
-                onChange={(e) => set("date", e.target.value)}
+                onChange={(value) => set("date", value)}
                 required
-                className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
               />
             </div>
             <div>

@@ -199,7 +199,7 @@ export function SssMode() {
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Datum</label>
-                      <input type="date" value={compDate} onChange={(e) => setCompDate(e.target.value)} className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]" />
+                      <DatePicker value={compDate} onChange={setCompDate} />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Nivo</label>

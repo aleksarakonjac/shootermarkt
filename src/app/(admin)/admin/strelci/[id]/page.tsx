@@ -32,6 +32,8 @@ export default async function AdminShooterPage({ params }: Props) {
         birthDate: shooters.birthDate,
         clubId: shooters.clubId,
         issfId: shooters.issfId,
+        avatarUrl: shooters.avatarUrl,
+        apparatus: shooters.apparatus,
         verified: shooters.verified,
         createdBySelf: shooters.createdBySelf,
         clubName: clubs.name,
@@ -76,6 +78,8 @@ export default async function AdminShooterPage({ params }: Props) {
         clubName: shooter.clubName ?? null,
         countryName: shooter.countryName ?? null,
         issfId: shooter.issfId ?? null,
+        avatarUrl: shooter.avatarUrl ?? null,
+        apparatus: shooter.apparatus ?? null,
         verified: shooter.verified,
         createdBySelf: shooter.createdBySelf,
       }}

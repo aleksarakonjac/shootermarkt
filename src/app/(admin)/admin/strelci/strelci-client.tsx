@@ -16,9 +16,33 @@ export interface ShooterRow {
   createdBySelf: boolean;
   issfId: string | null;
   clubName: string | null;
+  birthDate: string | null;
+  birthYear: number | null;
+  apparatus: string | null;
+  gender: string | null;
 }
 
-type SortCol = "name" | "country" | "status";
+const APPARATUS_LABELS: Record<string, string> = {
+  rifle: "Puška",
+  pistol: "Pištolj",
+  both: "Puška+Pištolj",
+  shotgun: "Shotgun",
+};
+
+function calcAge(birthDate: string): number | null {
+  const dob = new Date(birthDate);
+  const today = new Date();
+  const age = today.getFullYear() - dob.getFullYear() -
+    (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+  return age;
+}
+
+function fmtDate(iso: string): string {
+  const parts = iso.split("-");
+  return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : iso;
+}
+
+type SortCol = "name" | "country" | "gender" | "birthDate" | "apparatus";
 
 export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRow[]; page: number; total: number; pageSize: number }) {
   const router = useRouter();
@@ -51,8 +75,29 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
   const [cleanupNats, setCleanupNats] = useState("YUG");
   const [cleaning, startCleaning] = useTransition();
 
+  const [verifyingAll, startVerifyingAll] = useTransition();
+
   const unverified = data.filter((s) => !s.verified);
   const allUnverifiedSelected = unverified.length > 0 && unverified.every((s) => selected.has(s.id));
+
+  async function verifyAll() {
+    if (!confirm("Verifikuj SVE neverifikovane strelce u bazi? Ova akcija se odnosi na sve stranice.")) return;
+    startVerifyingAll(async () => {
+      const res = await fetch("/api/admin/shooters/bulk-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFlash(`Greška: ${data.error}`);
+      } else {
+        setFlash(`${data.verified} strelaca verifikovano`);
+        setSelected(new Set());
+        router.refresh();
+      }
+    });
+  }
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -124,6 +169,19 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
         </div>
       )}
 
+      {/* Verify all */}
+      {unverified.length > 0 && selectedUnverified.length === 0 && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={verifyAll}
+            disabled={verifyingAll}
+            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors disabled:opacity-50"
+          >
+            {verifyingAll ? "Verifikujem sve..." : "Verifikuj sve"}
+          </button>
+        </div>
+      )}
+
       {/* Bulk action bar */}
       {selectedUnverified.length > 0 && (
         <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3">
@@ -173,9 +231,14 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
                   Zemlja<SortIcon col="country" />
                 </th>
                 <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">ISSF ID</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("status")}>
-                  Status<SortIcon col="status" />
+                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("gender")}>
+                  Pol<SortIcon col="gender" />
+                </th>
+                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("birthDate")}>
+                  Datum rođ.<SortIcon col="birthDate" />
+                </th>
+                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("apparatus")}>
+                  Disciplina<SortIcon col="apparatus" />
                 </th>
                 <th className="px-4 py-3" />
               </tr>
@@ -226,18 +289,32 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
                     )}
                   </td>
                   <td className="px-4 py-3 text-[var(--muted)]">{s.clubName ?? <span className="text-[var(--subtle)]">—</span>}</td>
-                  <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)]">
-                    {s.issfId ?? "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    {s.verified ? (
-                      <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}>
-                        ✓ Verifikovan
-                      </span>
+                  <td className="px-4 py-3 text-xs font-bold">
+                    {s.gender === "M" ? (
+                      <span style={{ color: "oklch(0.52 0.18 250)" }}>M</span>
+                    ) : s.gender === "F" ? (
+                      <span style={{ color: "oklch(0.55 0.18 350)" }}>Ž</span>
                     ) : (
-                      <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded-full" style={{ background: "oklch(0.97 0.05 75)", color: "var(--warning)" }}>
-                        Na čekanju
-                      </span>
+                      <span className="text-[var(--subtle)] font-normal">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-[var(--ink)] whitespace-nowrap">
+                    {s.birthDate ? (
+                      <>
+                        <span className="font-[family-name:var(--font-jetbrains-mono)]">{fmtDate(s.birthDate)}</span>
+                        <span className="text-[var(--muted)] ml-1">({calcAge(s.birthDate)} g.)</span>
+                      </>
+                    ) : s.birthYear ? (
+                      <span className="text-[var(--muted)]">{s.birthYear}</span>
+                    ) : (
+                      <span className="text-[var(--subtle)]">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-[var(--ink)]">
+                    {s.apparatus ? (
+                      <span className="text-[var(--muted)]">{APPARATUS_LABELS[s.apparatus] ?? s.apparatus}</span>
+                    ) : (
+                      <span className="text-[var(--subtle)]">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3">

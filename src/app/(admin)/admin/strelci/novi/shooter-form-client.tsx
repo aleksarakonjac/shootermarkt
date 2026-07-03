@@ -111,12 +111,11 @@ export function ShooterFormClient({ clubs: initialClubs }: { clubs: Club[] }) {
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum rođenja</label>
-              <input
-                type="date"
+              <DatePicker
                 value={form.birthDate}
-                onChange={(e) => set("birthDate", e.target.value)}
+                onChange={(value) => setField("birthDate", value)}
                 max={new Date().toISOString().slice(0, 10)}
-                className={`${inputCls} font-[family-name:var(--font-jetbrains-mono)]`}
+                className="font-[family-name:var(--font-jetbrains-mono)]"
               />
             </div>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { DatePicker } from "@/components/ui/DatePicker";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
@@ -55,9 +56,15 @@ export function PdfMode() {
   }
 
   async function handleCommit() {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     const payload: CommitPayload = {
-      competition: { name: compName, date: compDate, location: compLocation || undefined, level: compLevel },
+      competition: {
+        name: compName,
+        date: compDate,
+        location: compLocation || undefined,
+        level: compLevel,
+      },
       rows,
     };
     try {
@@ -68,9 +75,13 @@ export function PdfMode() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Commit error");
-      setResult(data); setStep("done");
-    } catch (e) { setError(String(e)); }
-    finally { setLoading(false); }
+      setResult(data);
+      setStep("done");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
   }
 
   function updateRow(idx: number, patch: Partial<ReviewRow>) {
@@ -78,8 +89,13 @@ export function PdfMode() {
   }
 
   function reset() {
-    setStep("upload"); setRows([]); setParseInfo(null); setResult(null);
-    setError(null); setNocFilter(""); setSelectedFile(null);
+    setStep("upload");
+    setRows([]);
+    setParseInfo(null);
+    setResult(null);
+    setError(null);
+    setNocFilter("");
+    setSelectedFile(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -100,29 +116,25 @@ export function PdfMode() {
       {step === "upload" && (
         <>
           {/* Competition metadata */}
-          <div className="rounded-xl border border-[var(--border)] p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-[var(--ink)]">Podaci o takmičenju</h3>
+        <div className="space-y-6">
+          <div className="rounded-xl border border-[var(--border)] p-6 space-y-4">
+            <h2 className="font-semibold text-[var(--ink)]">Podaci o takmičenju</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Naziv *</label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Naziv *</label>
                 <input
                   value={compName}
                   onChange={(e) => setCompName(e.target.value)}
                   placeholder="npr. Državno prvenstvo Srbije 2025"
-                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
+                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Datum *</label>
-                <input
-                  type="date"
-                  value={compDate}
-                  onChange={(e) => setCompDate(e.target.value)}
-                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-                />
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum *</label>
+                <DatePicker value={compDate} onChange={setCompDate} required />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Nivo</label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo</label>
                 <select
                   value={compLevel}
                   onChange={(e) => setCompLevel(e.target.value as CompetitionLevel)}
@@ -132,7 +144,7 @@ export function PdfMode() {
                 </select>
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Lokacija</label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija</label>
                 <input
                   value={compLocation}
                   onChange={(e) => setCompLocation(e.target.value)}
