@@ -4,6 +4,7 @@ import { buildConfig } from "payload";
 import sharp from "sharp";
 import path from "path";
 import { CmsUsers } from "./src/cms/collections/CmsUsers";
+import { Media } from "./src/cms/collections/Media";
 
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET!,
@@ -16,7 +17,7 @@ export default buildConfig({
       connectionString: process.env.DATABASE_URL!,
     },
   }),
-  collections: [CmsUsers],
+  collections: [CmsUsers, Media],
   sharp,
   typescript: {
     outputFile: path.resolve(__dirname, "src/payload-types.ts"),
