@@ -12,6 +12,10 @@ export default buildConfig({
   admin: {
     user: "cms-users",
   },
+  routes: {
+    admin: "/cms/admin",
+    api: "/cms/api",
+  },
   editor: lexicalEditor({}),
   db: postgresAdapter({
     pool: {
