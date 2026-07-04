@@ -51,6 +51,15 @@ export const Articles: CollectionConfig = {
       relationTo: "cms-users",
       required: true,
       defaultValue: ({ user }: { user?: { id: number } }) => user?.id,
+      access: {
+        // Only admins may set an explicit author (e.g. reassigning
+        // ownership). Non-admins always fall back to defaultValue (their
+        // own id) — this field's incoming value is silently dropped for
+        // them, not the whole request. Prevents authors from spoofing
+        // attribution to another user on create or update.
+        create: ({ req }) => req.user?.role === "admin",
+        update: ({ req }) => req.user?.role === "admin",
+      },
     },
     {
       name: "status",
@@ -63,8 +72,12 @@ export const Articles: CollectionConfig = {
         { label: "Published", value: "published" },
       ],
       access: {
-        // Only admins may set status to "published". Authors can still
-        // move between draft/in_review via the update hook validation below.
+        // Only admins may set status to "published". Both operations are
+        // locked down: "create" alone would leave a gap where an author
+        // sets status: "published" directly in their initial create
+        // payload, bypassing the publish gate entirely (Payload defaults
+        // unspecified field-access operations to allowed).
+        create: ({ req }) => req.user?.role === "admin",
         update: ({ req }) => req.user?.role === "admin",
       },
     },

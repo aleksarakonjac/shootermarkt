@@ -40,4 +40,32 @@ describe("Articles collection", () => {
     const result = readAccess({ req: fakeReq("admin") });
     expect(result).toBe(true);
   });
+
+  it("status field denies non-admins from setting status on CREATE, not just update", () => {
+    const statusField = Articles.fields?.find(
+      (f): f is { name: string; access: { create: (args: { req: ReturnType<typeof fakeReq> }) => unknown } } =>
+        "name" in f && f.name === "status"
+    );
+    expect(statusField!.access.create).toBeDefined();
+    expect(statusField!.access.create({ req: fakeReq("author") })).toBe(false);
+    expect(statusField!.access.create({ req: fakeReq("admin") })).toBe(true);
+  });
+
+  it("author field denies non-admins from setting an arbitrary author id on create or update", () => {
+    const authorField = Articles.fields?.find(
+      (f): f is {
+        name: string;
+        access: {
+          create: (args: { req: ReturnType<typeof fakeReq> }) => unknown;
+          update: (args: { req: ReturnType<typeof fakeReq> }) => unknown;
+        };
+      } => "name" in f && f.name === "author"
+    );
+    expect(authorField!.access.create).toBeDefined();
+    expect(authorField!.access.update).toBeDefined();
+    expect(authorField!.access.create({ req: fakeReq("author") })).toBe(false);
+    expect(authorField!.access.create({ req: fakeReq("admin") })).toBe(true);
+    expect(authorField!.access.update({ req: fakeReq("author") })).toBe(false);
+    expect(authorField!.access.update({ req: fakeReq("admin") })).toBe(true);
+  });
 });
