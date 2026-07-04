@@ -1,5 +1,8 @@
 import type { CollectionConfig } from "payload";
-import { lexicalEditor } from "@payloadcms/richtext-lexical";
+import { BlocksFeature, lexicalEditor } from "@payloadcms/richtext-lexical";
+import { CompetitionEmbedBlock } from "../blocks/CompetitionEmbedBlock";
+import { ShooterEmbedBlock } from "../blocks/ShooterEmbedBlock";
+import { GalleryBlock } from "../blocks/GalleryBlock";
 
 export const Articles: CollectionConfig = {
   slug: "articles",
@@ -36,7 +39,14 @@ export const Articles: CollectionConfig = {
     {
       name: "content",
       type: "richText",
-      editor: lexicalEditor({}),
+      editor: lexicalEditor({
+        features: ({ defaultFeatures }) => [
+          ...defaultFeatures,
+          BlocksFeature({
+            blocks: [CompetitionEmbedBlock, ShooterEmbedBlock, GalleryBlock],
+          }),
+        ],
+      }),
       required: true,
     },
     {
