@@ -35,10 +35,19 @@ export default buildConfig({
     // and, since those tables aren't in Payload's own schema, proposes
     // DROPPING them to make the database match. Scoping tablesFilter to
     // only Payload-owned tables makes push ignore everything else in the
-    // database entirely. Update this list whenever a new Payload
-    // collection/block is added (e.g. Task 6's blocks may add
-    // "articles_blocks_*" join tables).
-    tablesFilter: ["payload_*", "cms_users", "media", "articles"],
+    // database entirely.
+    //
+    // Each entry is a Minimatch GLOB, not a prefix — "cms_users" matches
+    // only the literal table "cms_users", NOT "cms_users_sessions" (the
+    // child table Payload generates for CmsUsers' built-in auth `sessions`
+    // array field). Use a trailing "*" on any collection slug that has (or
+    // gains) array/relationship/block sub-fields, which Payload
+    // materializes as "<collection>_<field>" child tables. Verify against
+    // `information_schema.tables` after any push, and update this list
+    // BEFORE re-enabling push whenever a collection's fields change (e.g.
+    // Task 6's blocks will add "articles_blocks_*" tables, and any
+    // hasMany/array field on Articles adds "articles_<field>*").
+    tablesFilter: ["payload_*", "cms_users*", "media*", "articles*"],
     // Schema was pushed once (2026-07-04) and all Payload-owned tables
     // now exist. Disabling further auto-push: on every fresh dev-server
     // process, Payload's in-memory "did I already push this" cache resets
