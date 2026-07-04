@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { CompetitionEmbedBlock } from "./CompetitionEmbedBlock";
 import { ShooterEmbedBlock } from "./ShooterEmbedBlock";
 import { GalleryBlock } from "./GalleryBlock";
@@ -31,14 +32,16 @@ async function renderNode(node: LexicalNode, key: number): Promise<React.ReactNo
     // async function component invoked via JSX; it silently renders
     // nothing. Since this whole tree is already resolved eagerly via
     // Promise.all, resolving these here keeps the final tree fully
-    // synchronous JSX by the time ArticleContent returns it.
+    // synchronous JSX by the time ArticleContent returns it. Wrapped in
+    // a keyed Fragment (not <span>, which is inline and would sit
+    // awkwardly around these blocks' block-level content — <p>/<Link>).
     if (blockType === "competition-embed") {
       const el = await CompetitionEmbedBlock({ competitionId: node.fields.competitionId as number });
-      return <span key={key}>{el}</span>;
+      return <Fragment key={key}>{el}</Fragment>;
     }
     if (blockType === "shooter-embed") {
       const el = await ShooterEmbedBlock({ shooterId: node.fields.shooterId as number });
-      return <span key={key}>{el}</span>;
+      return <Fragment key={key}>{el}</Fragment>;
     }
     if (blockType === "gallery") {
       return (
