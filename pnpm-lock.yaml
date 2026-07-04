@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@next/env':
-        specifier: 15.0.0
-        version: 15.0.0
       '@payloadcms/db-postgres':
         specifier: ^3.85.2
         version: 3.85.2(payload@3.85.2(graphql@16.14.2)(typescript@5.9.3))(postgres@3.4.9)
@@ -1254,9 +1251,6 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
-
-  '@next/env@15.0.0':
-    resolution: {integrity: sha512-Mcv8ZVmEgTO3bePiH/eJ7zHqQEs2gCqZ0UId2RxHmDDc7Pw6ngfSrOFlxG8XDpaex+n2G+TKPsQAf28MO+88Gw==}
 
   '@next/env@15.1.5':
     resolution: {integrity: sha512-jg8ygVq99W3/XXb9Y6UQsritwhjc+qeiO7QrGZRYOfviyr/HcdnhdBQu4gbp2rBIh2ZyBYTBMWbPw3JSCb0GHw==}
@@ -5317,8 +5311,6 @@ snapshots:
       '@emnapi/runtime': 1.10.0
       '@tybys/wasm-util': 0.10.3
     optional: true
-
-  '@next/env@15.0.0': {}
 
   '@next/env@15.1.5': {}
 

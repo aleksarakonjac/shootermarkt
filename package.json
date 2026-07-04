@@ -14,7 +14,6 @@
     "db:seed": "tsx --env-file=.env.local src/lib/db/seed.ts"
   },
   "dependencies": {
-    "@next/env": "15.0.0",
     "@payloadcms/db-postgres": "^3.85.2",
     "@payloadcms/next": "^3.85.2",
     "@payloadcms/richtext-lexical": "^3.85.2",
