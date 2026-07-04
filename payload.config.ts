@@ -3,6 +3,7 @@ import { lexicalEditor } from "@payloadcms/richtext-lexical";
 import { buildConfig } from "payload";
 import sharp from "sharp";
 import path from "path";
+import { CmsUsers } from "./src/cms/collections/CmsUsers";
 
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET!,
@@ -15,7 +16,7 @@ export default buildConfig({
       connectionString: process.env.DATABASE_URL!,
     },
   }),
-  collections: [],
+  collections: [CmsUsers],
   sharp,
   typescript: {
     outputFile: path.resolve(__dirname, "src/payload-types.ts"),
