@@ -242,7 +242,7 @@ export default function PrivatnostPage() {
               items={[
                 "Pristupite podacima koji se o vama obrađuju",
                 "Zatražite ispravku netačnih ili dopunu nepotpunih podataka",
-                "Zatražite brisanje podataka („pravo na zaborav") kada osnov za obradu prestane da postoji ili kada uložite prigovor koji pretegne nad legitimnim interesom",
+                "Zatražite brisanje podataka („pravo na zaborav“) kada osnov za obradu prestane da postoji ili kada uložite prigovor koji pretegne nad legitimnim interesom",
                 "Ograničite obradu dok se vaš zahtev razmatra",
                 "Uložite prigovor na obradu zasnovanu na legitimnom interesu — u tom slučaju prestaćemo sa obradom osim ako ne dokažemo da postoje uvažljivi legitimni razlozi koji pretežu nad vašim interesima",
                 "Podnesete pritužbu Povereniku za informacije od javnog značaja i zaštitu podataka o ličnosti (Bulevar kralja Aleksandra 15, Beograd; poverenik.rs)",
