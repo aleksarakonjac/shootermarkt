@@ -25,6 +25,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "url required" }, { status: 400 });
   }
 
+  // Validate URL — only allow HTTPS from known SSS domain
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+  }
+  const ALLOWED_HOSTS = ["serbianshooting.rs", "www.serbianshooting.rs"];
+  if (parsedUrl.protocol !== "https:" || !ALLOWED_HOSTS.includes(parsedUrl.hostname)) {
+    return NextResponse.json({ error: "URL mora biti sa serbianshooting.rs (HTTPS)" }, { status: 400 });
+  }
+
   // Download PDF
   let pdfBuffer: Buffer;
   try {
