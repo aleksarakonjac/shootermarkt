@@ -377,6 +377,8 @@ export const competitions = pgTable(
   {
     id: serial("id").primaryKey(),
     name: varchar("name", { length: 300 }).notNull(),
+    nameSr: varchar("name_sr", { length: 300 }),         // Serbian translation (if original is English)
+    nameEn: varchar("name_en", { length: 300 }),         // English translation (if original is Serbian)
     date: varchar("date", { length: 10 }).notNull(),     // YYYY-MM-DD start date
     dateEnd: varchar("date_end", { length: 10 }),        // YYYY-MM-DD, null = single day
     location: varchar("location", { length: 200 }),
