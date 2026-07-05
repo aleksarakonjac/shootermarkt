@@ -186,8 +186,8 @@ export function DatePicker({
         </button>
 
         {open && (
-          <div className="absolute left-0 top-full z-50 mt-1 w-[19rem] max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 shadow-lg">
-            <div className="mb-3">
+          <div className="absolute left-0 top-full z-50 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--border)] bg-[var(--bg)] p-2.5 shadow-lg">
+            <div className="mb-2">
               <input
                 value={draft}
                 onChange={(e) => handleDraftChange(e.target.value)}
@@ -195,9 +195,8 @@ export function DatePicker({
                 placeholder={placeholder}
                 inputMode="numeric"
                 autoComplete="off"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]"
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]"
               />
-              <p className="mt-1 text-[0.65rem] text-[var(--subtle)]">Format: dd/mm/yyyy</p>
             </div>
 
             <Calendar
@@ -205,7 +204,7 @@ export function DatePicker({
               onChange={handleSelect}
               minDate={minDate ?? undefined}
               maxDate={maxDate ?? undefined}
-              locale="sr-RS"
+              locale="sr-Latn-RS"
               next2Label={null}
               prev2Label={null}
               showNeighboringMonth={false}
@@ -219,7 +218,7 @@ export function DatePicker({
               }}
             />
 
-            <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-[var(--border)] pt-2">
               <button
                 type="button"
                 onClick={() => commit("")}

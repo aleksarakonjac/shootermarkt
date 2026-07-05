@@ -3,17 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { LevelDropdown } from "@/components/ui/LevelDropdown";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
-
-const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "national",      label: "Državno" },
-  { value: "regional",      label: "Regionalno" },
-  { value: "international", label: "Međunarodno" },
-  { value: "continental",   label: "Kontinentalno" },
-  { value: "world",         label: "ISSF–Svetsko" },
-  { value: "club",          label: "Klubsko" },
-  { value: "olympic",       label: "Olimpijsko" },
-];
 
 export function CompetitionFormClient() {
   const router = useRouter();
@@ -84,13 +75,7 @@ export function CompetitionFormClient() {
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo *</label>
-              <select
-                value={form.level}
-                onChange={(e) => set("level", e.target.value)}
-                className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-              >
-                {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-              </select>
+              <LevelDropdown value={form.level} onChange={(v) => set("level", v)} />
             </div>
           </div>
 

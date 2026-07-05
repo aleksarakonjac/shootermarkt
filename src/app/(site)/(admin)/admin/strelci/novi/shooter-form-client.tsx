@@ -24,7 +24,6 @@ export function ShooterFormClient({ clubs: initialClubs }: { clubs: Club[] }) {
     gender: "",
     birthDate: "",
     clubId: "",
-    issfId: "",
   });
 
   function set(field: string, value: string) {
@@ -136,20 +135,6 @@ export function ShooterFormClient({ clubs: initialClubs }: { clubs: Club[] }) {
               onCreateNew={createClub}
               createNewLabel={(q) => `+ Kreiraj "${q}"`}
             />
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-[var(--border)] p-5 space-y-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">ISSF</h2>
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">ISSF ID</label>
-            <input
-              value={form.issfId}
-              onChange={(e) => set("issfId", e.target.value)}
-              placeholder="npr. SHSRBM2703200501"
-              className={`${inputCls} font-[family-name:var(--font-jetbrains-mono)]`}
-            />
-            <p className="text-xs text-[var(--subtle)] mt-1">Opcionalno. Vezuje profil za ISSF bazu.</p>
           </div>
         </div>
 
