@@ -122,6 +122,7 @@ export default async function AdminTakmicenjaPage({
                   <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Nivo</th>
                   <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Tagovi</th>
                   <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Izvor</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -153,6 +154,14 @@ export default async function AdminTakmicenjaPage({
                     </td>
                     <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)]">
                       {c.organizer ?? c.issfId ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/admin/takmicenja/${c.id}/edit`}
+                        className="text-xs font-medium text-[var(--muted)] hover:text-[var(--brand-primary)] transition-colors"
+                      >
+                        Uredi →
+                      </Link>
                     </td>
                   </tr>
                 ))}
