@@ -78,13 +78,16 @@ export default async function StrelciPage({ searchParams }: Props) {
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-6 pb-6 border-b border-[var(--border)]">
+      <div className="mb-6">
         <h1
           className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
-          style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.02em" }}
+          style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
         >
           Strelci
         </h1>
+        <p className="text-sm text-[var(--muted)] mt-1">
+          Profili srpskih strelaca sa istorijom nastupa i forma score-om.
+        </p>
       </div>
 
       {/* Filter bar (client) */}
@@ -140,7 +143,7 @@ export default async function StrelciPage({ searchParams }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {data.map((s, idx) => {
+                {data.map((s) => {
                   const alpha2 = s.nationality
                     ? NOC_LIST.find((n) => n.noc === s.nationality)?.alpha2
                     : undefined;
@@ -148,9 +151,7 @@ export default async function StrelciPage({ searchParams }: Props) {
                   return (
                     <tr
                       key={s.id}
-                      className={`border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface-2)] transition-colors ${
-                        idx % 2 === 1 ? "bg-[var(--surface)]" : ""
-                      }`}
+                      className="border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface)] transition-colors group"
                     >
                       {/* Name */}
                       <td className="px-4 py-3">
@@ -198,19 +199,28 @@ export default async function StrelciPage({ searchParams }: Props) {
                         {s.birthYear ?? <span className="text-[var(--subtle)]">—</span>}
                       </td>
 
-                      {/* Verified badge */}
+                      {/* Verified + chevron */}
                       <td className="px-4 py-3 text-right">
-                        {s.verified && (
-                          <span
-                            className="inline-flex items-center gap-1 text-[0.7rem] font-semibold px-2 py-0.5 rounded-full"
-                            style={{
-                              background: "var(--brand-primary-light)",
-                              color: "var(--brand-primary)",
-                            }}
+                        <div className="flex items-center justify-end gap-2">
+                          {s.verified && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[0.7rem] font-semibold px-2 py-0.5 rounded-full"
+                              style={{
+                                background: "var(--brand-primary-light)",
+                                color: "var(--brand-primary)",
+                              }}
+                            >
+                              ✓ Verifikovan
+                            </span>
+                          )}
+                          <svg
+                            width="12" height="12" viewBox="0 0 12 12"
+                            className="shrink-0 text-[var(--border-strong)] group-hover:text-[var(--muted)] transition-colors hidden sm:block"
+                            aria-hidden="true"
                           >
-                            ✓ Verifikovan
-                          </span>
-                        )}
+                            <path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                          </svg>
+                        </div>
                       </td>
                     </tr>
                   );
