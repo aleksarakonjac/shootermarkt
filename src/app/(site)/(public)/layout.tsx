@@ -78,7 +78,7 @@ export default async function PublicLayout({
       <main className="flex-1">{children}</main>
 
       <footer className="border-t border-[var(--border)] py-8">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between flex-wrap gap-4">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <Link href="/" className="flex items-baseline gap-0 no-underline">
             <span className="font-[family-name:var(--font-barlow-condensed)] font-bold text-sm uppercase tracking-widest text-[var(--subtle)]">
               Shooter
@@ -87,9 +87,17 @@ export default async function PublicLayout({
               markt
             </span>
           </Link>
-          <p className="text-[0.8125rem] text-[var(--muted)]">
-            © {new Date().getFullYear()} · Srpsko streljaštvo
-          </p>
+          <div className="flex items-center gap-5 flex-wrap">
+            <Link href="/kontakt" className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+              Kontakt
+            </Link>
+            <Link href="/privatnost" className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+              Politika privatnosti
+            </Link>
+            <p className="text-xs text-[var(--subtle)]">
+              © {new Date().getFullYear()} · Srpsko streljaštvo
+            </p>
+          </div>
         </div>
       </footer>
     </>
