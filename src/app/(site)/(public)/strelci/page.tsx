@@ -4,9 +4,10 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { shooters, clubs } from "@/lib/db/schema";
-import { eq, asc, ilike, or, and, isNotNull, sql } from "drizzle-orm";
+import { eq, asc, ilike, or, and, isNotNull, inArray, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { NOC_LIST } from "@/lib/noc-list";
+import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { StrelciFilterBar } from "./StrelciFilterBar";
 
 export const metadata = { title: "Strelci" };
@@ -27,6 +28,7 @@ export default async function StrelciPage({ searchParams }: Props) {
 
   // Build WHERE
   const conditions: (SQL | undefined)[] = [
+    inArray(shooters.apparatus, [...MVP_APPARATUS]),
     activeQ
       ? or(
           ilike(shooters.firstName, `%${activeQ}%`),

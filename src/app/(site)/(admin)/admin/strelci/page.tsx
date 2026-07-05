@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { shooters, clubs, countries } from "@/lib/db/schema";
-import { eq, ilike, or, and, isNotNull, sql, asc, desc } from "drizzle-orm";
+import { eq, ilike, or, and, isNotNull, inArray, sql, asc, desc } from "drizzle-orm";
 import type { Metadata } from "next";
+import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { StrelciClient } from "./strelci-client";
 import { StrelciFilters } from "./strelci-filters";
 
@@ -25,6 +26,7 @@ export default async function AdminStrelciPage({
   const sortDir = sp.dir === "desc" ? "desc" : "asc";
 
   const conditions = [
+    inArray(shooters.apparatus, [...MVP_APPARATUS]),
     q ? or(ilike(shooters.firstName, `%${q}%`), ilike(shooters.lastName, `%${q}%`)) : undefined,
     nat ? eq(shooters.nationality, nat) : undefined,
     gender ? eq(shooters.gender, gender) : undefined,

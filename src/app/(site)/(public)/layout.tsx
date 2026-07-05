@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { shooters, clubs, competitions } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray, and } from "drizzle-orm";
+import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { MainNav } from "./components/MainNav";
 import { GlobalSearch } from "./GlobalSearch";
 import ThemeToggle from "./components/ThemeToggle";
@@ -25,7 +26,7 @@ export default async function PublicLayout({
       })
       .from(shooters)
       .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-      .where(eq(shooters.verified, true))
+      .where(and(eq(shooters.verified, true), inArray(shooters.apparatus, [...MVP_APPARATUS])))
       .orderBy(shooters.lastName, shooters.firstName),
 
     db

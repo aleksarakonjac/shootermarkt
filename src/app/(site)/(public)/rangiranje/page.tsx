@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions } from "@/lib/db/schema";
-import { eq, isNotNull, and, asc } from "drizzle-orm";
+import { eq, isNotNull, and, inArray, asc } from "drizzle-orm";
+import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { computeFormaScore, trendLabel, trendColor } from "@/lib/forma-score";
@@ -83,7 +84,11 @@ export default async function RangiranjeePage({ searchParams }: Props) {
         .leftJoin(clubs, eq(shooters.clubId, clubs.id))
         .innerJoin(competitions, eq(results.competitionId, competitions.id))
         .where(
-          and(eq(results.disciplineId, discipline.id), isNotNull(results.qualTotal))
+          and(
+            eq(results.disciplineId, discipline.id),
+            isNotNull(results.qualTotal),
+            inArray(shooters.apparatus, [...MVP_APPARATUS]),
+          )
         )
         .orderBy(asc(competitions.date))
     : [];
