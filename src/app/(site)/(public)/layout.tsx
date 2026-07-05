@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { shooters, clubs } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { shooters, clubs, competitions } from "@/lib/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { MainNav } from "./components/MainNav";
-import { SearchBarClient } from "./search-bar-client";
+import { GlobalSearch } from "./GlobalSearch";
 import ThemeToggle from "./components/ThemeToggle";
 import { RegionSelector } from "./components/RegionSelector";
 
@@ -12,17 +12,31 @@ export default async function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const shootersList = await db
-    .select({
-      id: shooters.id,
-      firstName: shooters.firstName,
-      lastName: shooters.lastName,
-      clubName: clubs.name,
-    })
-    .from(shooters)
-    .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-    .where(eq(shooters.verified, true))
-    .orderBy(shooters.lastName, shooters.firstName);
+  const [shootersList, competitionsList] = await Promise.all([
+    db
+      .select({
+        id: shooters.id,
+        firstName: shooters.firstName,
+        lastName: shooters.lastName,
+        clubName: clubs.name,
+        avatarUrl: shooters.avatarUrl,
+      })
+      .from(shooters)
+      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
+      .where(eq(shooters.verified, true))
+      .orderBy(shooters.lastName, shooters.firstName),
+
+    db
+      .select({
+        id: competitions.id,
+        name: competitions.name,
+        date: competitions.date,
+        level: competitions.level,
+      })
+      .from(competitions)
+      .orderBy(desc(competitions.date))
+      .limit(500),
+  ]);
 
   return (
     <>
@@ -40,17 +54,20 @@ export default async function PublicLayout({
               </span>
             </Link>
 
-            {/* Main nav — dropdown groups on desktop, hamburger + drawer on mobile */}
+            {/* Nav groups (desktop) + hamburger (mobile, inside MainNav) */}
             <div className="flex-1 flex items-center">
-              <MainNav shootersList={shootersList} />
+              <MainNav />
             </div>
+
+            {/* Global search — renders desktop pill + mobile icon */}
+            <GlobalSearch
+              shooters={shootersList}
+              competitions={competitionsList}
+            />
 
             {/* Desktop right controls */}
             <div className="hidden md:flex items-center gap-2 shrink-0">
               <RegionSelector />
-              <div className="w-48 lg:w-56">
-                <SearchBarClient shootersList={shootersList} />
-              </div>
               <ThemeToggle />
             </div>
 

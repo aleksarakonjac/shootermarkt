@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SearchBarClient } from "../search-bar-client";
 import ThemeToggle from "./ThemeToggle";
 import { RegionSelector } from "./RegionSelector";
 
@@ -20,17 +19,6 @@ interface NavGroup {
   key: string;
   label: string;
   items: NavSubItem[];
-}
-
-interface SearchShooterItem {
-  id: number;
-  firstName: string;
-  lastName: string;
-  clubName: string | null;
-}
-
-interface Props {
-  shootersList: SearchShooterItem[];
 }
 
 // ── Nav config ─────────────────────────────────────────────────────────────────
@@ -75,13 +63,21 @@ function SoonBadge() {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function MainNav({ shootersList }: Props) {
+export function MainNav() {
   const pathname = usePathname();
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openMobileGroup, setOpenMobileGroup] = useState<string | null>(null);
   const desktopNavRef = useRef<HTMLDivElement>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const openGlobalSearch = useCallback(() => {
+    setMobileOpen(false);
+    setTimeout(
+      () => document.dispatchEvent(new CustomEvent("global-search:open")),
+      180
+    );
+  }, []);
 
   // Close everything on route change
   useEffect(() => {
@@ -270,9 +266,18 @@ export function MainNav({ shootersList }: Props) {
         aria-label="Navigacija"
         aria-modal="true"
       >
-        {/* Search */}
-        <div className="px-4 pt-4 pb-3 border-b border-[var(--border)] relative">
-          <SearchBarClient shootersList={shootersList} />
+        {/* Search trigger */}
+        <div className="px-4 pt-4 pb-3 border-b border-[var(--border)]">
+          <button
+            onClick={openGlobalSearch}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-sm text-[var(--muted)] hover:border-[var(--border-strong)] hover:text-[var(--ink)] transition-all"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0 text-[var(--subtle)]">
+              <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+              <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span className="flex-1 text-left text-sm">Pretraži strelce i takmičenja…</span>
+          </button>
         </div>
 
         {/* Nav links */}
