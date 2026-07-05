@@ -1,0 +1,93 @@
+{
+  "nav": {
+    "shooters": "Shooters",
+    "statistics": "Statistics",
+    "competitions": "Competitions",
+    "profiles": "Shooter Profiles",
+    "profilesDesc": "Browse all registered shooters",
+    "h2h": "Head-to-head",
+    "h2hDesc": "Compare two shooters side by side",
+    "ranking": "Rankings",
+    "rankingDesc": "Live list by discipline and form score",
+    "clubLeaderboard": "Club Leaderboard",
+    "clubLeaderboardDesc": "Club comparison and statistics",
+    "trendAnalysis": "Trend Analysis",
+    "trendAnalysisDesc": "Form score and performance prediction",
+    "competitionList": "Competition List",
+    "competitionListDesc": "Archive with filters and results",
+    "calendar": "Calendar",
+    "calendarDesc": "Competition schedule by date",
+    "soon": "Soon"
+  },
+  "search": {
+    "desktopPlaceholder": "Search…",
+    "mobilePlaceholder": "Search shooters and competitions…",
+    "fullPlaceholder": "Search shooters and competitions…",
+    "drawerPlaceholder": "Search shooters and competitions…",
+    "shootersSection": "Shooters",
+    "competitionsSection": "Competitions",
+    "noResults": "No results for \"{query}\"",
+    "emptyHint": "Type to search shooters and competitions",
+    "clear": "Clear",
+    "navArrows": "navigate",
+    "navEnter": "open",
+    "navEsc": "close",
+    "ariaLabel": "Search"
+  },
+  "competition": {
+    "levels": {
+      "drzavno": "National",
+      "kup": "Cup",
+      "regionalno": "Regional",
+      "medjunarodno": "International"
+    }
+  },
+  "ranking": {
+    "title": "Rankings",
+    "rank": "#",
+    "shooter": "Shooter",
+    "country": "Country",
+    "club": "Club",
+    "appearances": "Appearances",
+    "form": "Form",
+    "peak": "Peak",
+    "inners": "Inners",
+    "noForm": "no form yet"
+  },
+  "shooters": {
+    "title": "Shooters",
+    "subtitle": "Registered Serbian shooters"
+  },
+  "common": {
+    "soon": "Soon",
+    "admin": "Admin",
+    "scopeLabel": "Data scope",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "navigation": "Navigation",
+    "mobileNav": "Mobile navigation"
+  },
+  "footer": {
+    "tagline": "The central platform for tracking Serbian shooting sports.",
+    "shootersSection": "Shooters",
+    "statisticsSection": "Statistics",
+    "competitionsSection": "Competitions",
+    "platformSection": "Platform",
+    "profiles": "Profiles",
+    "ranking": "Rankings",
+    "h2h": "Head-to-head",
+    "clubLeaderboard": "Club Leaderboard",
+    "trendAnalysis": "Trend Analysis",
+    "competitionList": "List & Archive",
+    "calendar": "Calendar",
+    "contact": "Contact",
+    "privacy": "Privacy Policy",
+    "rights": "Serbian Shooting Union · Pančevo, Serbia"
+  },
+  "locale": {
+    "sr": "Srpski",
+    "en": "English",
+    "switchToEn": "Switch to English",
+    "switchToSr": "Switch to Serbian"
+  }
+}

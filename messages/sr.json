@@ -1,0 +1,93 @@
+{
+  "nav": {
+    "shooters": "Strelci",
+    "statistics": "Statistike",
+    "competitions": "Takmičenja",
+    "profiles": "Profili strelaca",
+    "profilesDesc": "Pretraži sve registrovane strelce",
+    "h2h": "Head-to-head",
+    "h2hDesc": "Poređenje dvojice strelaca",
+    "ranking": "Rangiranje",
+    "rankingDesc": "Live lista po disciplini i formi",
+    "clubLeaderboard": "Klub leaderboard",
+    "clubLeaderboardDesc": "Poređenje i statistike klubova",
+    "trendAnalysis": "Trend analiza",
+    "trendAnalysisDesc": "Forma score i predikcija",
+    "competitionList": "Lista takmičenja",
+    "competitionListDesc": "Arhiva sa filtrima i rezultatima",
+    "calendar": "Kalendar",
+    "calendarDesc": "Pregled takmičenja po datumu",
+    "soon": "Uskoro"
+  },
+  "search": {
+    "desktopPlaceholder": "Pretraži…",
+    "mobilePlaceholder": "Pretraži strelce i takmičenja…",
+    "fullPlaceholder": "Pretraži strelce i takmičenja…",
+    "drawerPlaceholder": "Pretraži strelce i takmičenja…",
+    "shootersSection": "Strelci",
+    "competitionsSection": "Takmičenja",
+    "noResults": "Nema rezultata za „{query}"",
+    "emptyHint": "Kucajte za pretragu strelaca i takmičenja",
+    "clear": "Obriši",
+    "navArrows": "navigacija",
+    "navEnter": "otvori",
+    "navEsc": "zatvori",
+    "ariaLabel": "Pretraga"
+  },
+  "competition": {
+    "levels": {
+      "drzavno": "Državno",
+      "kup": "Kup",
+      "regionalno": "Regionalno",
+      "medjunarodno": "Međunarodno"
+    }
+  },
+  "ranking": {
+    "title": "Rangiranje",
+    "rank": "#",
+    "shooter": "Strelac",
+    "country": "Zemlja",
+    "club": "Klub",
+    "appearances": "Nastupa",
+    "form": "Forma",
+    "peak": "Peak",
+    "inners": "Ineri",
+    "noForm": "nema forme"
+  },
+  "shooters": {
+    "title": "Strelci",
+    "subtitle": "Registrovani srpski strelaci"
+  },
+  "common": {
+    "soon": "Uskoro",
+    "admin": "Admin",
+    "scopeLabel": "Opseg podataka",
+    "openMenu": "Otvori meni",
+    "closeMenu": "Zatvori meni",
+    "navigation": "Navigacija",
+    "mobileNav": "Mobilna navigacija"
+  },
+  "footer": {
+    "tagline": "Centralna platforma za praćenje srpskog streljačkog sporta.",
+    "shootersSection": "Strelci",
+    "statisticsSection": "Statistike",
+    "competitionsSection": "Takmičenja",
+    "platformSection": "Platforma",
+    "profiles": "Profili",
+    "ranking": "Rangiranje",
+    "h2h": "Head-to-head",
+    "clubLeaderboard": "Klub leaderboard",
+    "trendAnalysis": "Trend analiza",
+    "competitionList": "Lista i arhiva",
+    "calendar": "Kalendar",
+    "contact": "Kontakt",
+    "privacy": "Politika privatnosti",
+    "rights": "Srpski streljački savez · Pančevo, Srbija"
+  },
+  "locale": {
+    "sr": "Srpski",
+    "en": "English",
+    "switchToEn": "Switch to English",
+    "switchToSr": "Prebaci na srpski"
+  }
+}

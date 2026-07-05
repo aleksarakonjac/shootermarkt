@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import ThemeToggle from "./ThemeToggle";
 import { RegionSelector } from "./RegionSelector";
 
@@ -23,33 +24,37 @@ interface NavGroup {
 
 // ── Nav config ─────────────────────────────────────────────────────────────────
 
-const NAV: NavGroup[] = [
-  {
-    key: "strelci",
-    label: "Strelci",
-    items: [
-      { href: "/strelci",    label: "Profili strelaca",  desc: "Pretraži sve registrovane strelce" },
-      { href: "/h2h",        label: "Head-to-head",      desc: "Poređenje dvojice strelaca",   soon: true },
-    ],
-  },
-  {
-    key: "statistike",
-    label: "Statistike",
-    items: [
-      { href: "/rangiranje", label: "Rangiranje",        desc: "Live lista po disciplini i formi" },
-      { href: "/klubovi",    label: "Klub leaderboard",  desc: "Poređenje i statistike klubova", soon: true },
-      { href: "/forma",      label: "Trend analiza",     desc: "Forma score i predikcija",      soon: true },
-    ],
-  },
-  {
-    key: "takmicenja",
-    label: "Takmičenja",
-    items: [
-      { href: "/takmicenja", label: "Lista takmičenja",  desc: "Arhiva sa filtrima i rezultatima" },
-      { href: "/kalendar",   label: "Kalendar",          desc: "Pregled takmičenja po datumu" },
-    ],
-  },
-];
+type TFn = (key: string) => string;
+
+function buildNav(t: TFn): NavGroup[] {
+  return [
+    {
+      key: "strelci",
+      label: t("shooters"),
+      items: [
+        { href: "/strelci",    label: t("profiles"),       desc: t("profilesDesc") },
+        { href: "/h2h",        label: t("h2h"),            desc: t("h2hDesc"),            soon: true },
+      ],
+    },
+    {
+      key: "statistike",
+      label: t("statistics"),
+      items: [
+        { href: "/rangiranje", label: t("ranking"),        desc: t("rankingDesc") },
+        { href: "/klubovi",    label: t("clubLeaderboard"),desc: t("clubLeaderboardDesc"), soon: true },
+        { href: "/forma",      label: t("trendAnalysis"),  desc: t("trendAnalysisDesc"),   soon: true },
+      ],
+    },
+    {
+      key: "takmicenja",
+      label: t("competitions"),
+      items: [
+        { href: "/takmicenja", label: t("competitionList"),desc: t("competitionListDesc") },
+        { href: "/kalendar",   label: t("calendar"),       desc: t("calendarDesc") },
+      ],
+    },
+  ];
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -65,11 +70,16 @@ function SoonBadge() {
 
 export function MainNav() {
   const pathname = usePathname();
+  const tNav = useTranslations("nav");
+  const NAV = buildNav(tNav);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openMobileGroup, setOpenMobileGroup] = useState<string | null>(null);
   const desktopNavRef = useRef<HTMLDivElement>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const tSearch = useTranslations("search");
+  const tCommon = useTranslations("common");
 
   const openGlobalSearch = useCallback(() => {
     setMobileOpen(false);
@@ -238,7 +248,7 @@ export function MainNav() {
       {/* ── Mobile hamburger ─────────────────────────────────────────── */}
       <button
         onClick={() => setMobileOpen((v) => !v)}
-        aria-label={mobileOpen ? "Zatvori meni" : "Otvori meni"}
+        aria-label={mobileOpen ? tCommon("closeMenu") : tCommon("openMenu")}
         aria-expanded={mobileOpen}
         className="md:hidden ml-auto flex flex-col items-center justify-center w-9 h-9 rounded-md hover:bg-[var(--surface-2)] transition-colors gap-[5px] shrink-0"
       >
@@ -263,7 +273,7 @@ export function MainNav() {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         role="dialog"
-        aria-label="Navigacija"
+        aria-label={tCommon("navigation")}
         aria-modal="true"
       >
         {/* Search trigger */}
@@ -276,12 +286,12 @@ export function MainNav() {
               <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" fill="none"/>
               <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            <span className="flex-1 text-left text-sm">Pretraži strelce i takmičenja…</span>
+            <span className="flex-1 text-left text-sm">{tSearch("drawerPlaceholder")}</span>
           </button>
         </div>
 
         {/* Nav links */}
-        <nav className="flex-1 overflow-y-auto py-2" aria-label="Mobilna navigacija">
+        <nav className="flex-1 overflow-y-auto py-2" aria-label={tCommon("mobileNav")}>
           {NAV.map((group) => {
             const isExpanded = openMobileGroup === group.key;
             const active = isGroupActive(group);
@@ -352,7 +362,7 @@ export function MainNav() {
 
         {/* Region selector */}
         <div className="border-t border-[var(--border)] px-4 py-3 relative">
-          <p className="text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)] mb-2">Opseg podataka</p>
+          <p className="text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)] mb-2">{tCommon("scopeLabel")}</p>
           <RegionSelector placement="top" />
         </div>
 

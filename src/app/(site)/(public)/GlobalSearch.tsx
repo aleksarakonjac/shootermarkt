@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
   const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const t = useTranslations("search");
 
   useEffect(() => setMounted(true), []);
 
@@ -217,7 +219,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
       onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
       role="dialog"
       aria-modal="true"
-      aria-label="Pretraga"
+      aria-label={t("ariaLabel")}
     >
       <div
         className="w-full max-w-xl rounded-xl border border-[var(--border)] overflow-hidden"
@@ -234,7 +236,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Pretraži strelce i takmičenja…"
+            placeholder={t("fullPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKeyDown}
@@ -247,7 +249,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
               onClick={() => setQuery("")}
               className="shrink-0 text-xs text-[var(--subtle)] hover:text-[var(--muted)] transition-colors px-1 py-0.5"
             >
-              Obriši
+              {t("clear")}
             </button>
           )}
           <kbd
@@ -263,13 +265,13 @@ export function GlobalSearch({ shooters, competitions }: Props) {
           {!q ? (
             <div className="px-4 py-10 text-center">
               <p className="text-sm text-[var(--subtle)]">
-                Kucajte za pretragu strelaca i takmičenja
+                {t("emptyHint")}
               </p>
             </div>
           ) : total === 0 ? (
             <div className="px-4 py-10 text-center">
               <p className="text-sm text-[var(--muted)]">
-                Nema rezultata za „{query}"
+                {t("noResults", { query })}
               </p>
             </div>
           ) : (
@@ -279,7 +281,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
                 <div>
                   <div className="px-4 pt-3 pb-1">
                     <span className="text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)]">
-                      Strelci
+                      {t("shootersSection")}
                     </span>
                   </div>
                   {filteredShooters.map((s, i) => {
@@ -322,7 +324,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
                 >
                   <div className="px-4 pt-3 pb-1">
                     <span className="text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)]">
-                      Takmičenja
+                      {t("competitionsSection")}
                     </span>
                   </div>
                   {filteredComps.map((c, i) => {
@@ -405,15 +407,15 @@ export function GlobalSearch({ shooters, competitions }: Props) {
           <div className="border-t border-[var(--border)] px-4 py-2 flex items-center gap-4 text-[0.6rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] select-none">
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 rounded border border-[var(--border)] bg-[var(--surface-2)]">↑↓</kbd>
-              navigacija
+              {t("navArrows")}
             </span>
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 rounded border border-[var(--border)] bg-[var(--surface-2)]">↵</kbd>
-              otvori
+              {t("navEnter")}
             </span>
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 rounded border border-[var(--border)] bg-[var(--surface-2)]">esc</kbd>
-              zatvori
+              {t("navEsc")}
             </span>
           </div>
         )}
@@ -431,7 +433,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
         <span className="text-[var(--subtle)] shrink-0">
           <SearchIcon size={13} />
         </span>
-        <span className="flex-1 text-left">Pretraži…</span>
+        <span className="flex-1 text-left">{t("desktopPlaceholder")}</span>
         <kbd className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] px-1.5 py-0.5 rounded bg-[var(--surface)] border border-[var(--border)] text-[var(--subtle)] shrink-0 select-none">
           ⌘K
         </kbd>
@@ -441,7 +443,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
       <button
         onClick={openModal}
         className="md:hidden flex items-center justify-center w-8 h-8 rounded-md text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
-        aria-label="Pretraga"
+        aria-label={t("ariaLabel")}
       >
         <SearchIcon size={16} />
       </button>

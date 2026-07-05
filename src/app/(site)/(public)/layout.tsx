@@ -6,13 +6,15 @@ import { MainNav } from "./components/MainNav";
 import { GlobalSearch } from "./GlobalSearch";
 import ThemeToggle from "./components/ThemeToggle";
 import { RegionSelector } from "./components/RegionSelector";
+import { LocaleSwitcher } from "./components/LocaleSwitcher";
+import { getTranslations } from "next-intl/server";
 
 export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [shootersList, competitionsList] = await Promise.all([
+  const [shootersList, competitionsList, t] = await Promise.all([
     db
       .select({
         id: shooters.id,
@@ -36,6 +38,8 @@ export default async function PublicLayout({
       .from(competitions)
       .orderBy(desc(competitions.date))
       .limit(500),
+
+    getTranslations("footer"),
   ]);
 
   return (
@@ -66,8 +70,9 @@ export default async function PublicLayout({
             />
 
             {/* Desktop right controls */}
-            <div className="hidden md:flex items-center gap-2 shrink-0">
+            <div className="hidden md:flex items-center gap-1 shrink-0">
               <RegionSelector />
+              <LocaleSwitcher />
               <ThemeToggle />
             </div>
 
@@ -94,7 +99,7 @@ export default async function PublicLayout({
                 </span>
               </Link>
               <p className="text-[0.8125rem] text-[var(--muted)] leading-snug" style={{ textWrap: "pretty" } as React.CSSProperties}>
-                Centralna platforma za praćenje srpskog streljačkog sporta.
+                {t("tagline")}
               </p>
             </div>
 
@@ -104,21 +109,21 @@ export default async function PublicLayout({
               {/* Strelci */}
               <div>
                 <p className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-sm tracking-tight text-[var(--ink)] mb-3">
-                  Strelci
+                  {t("shootersSection")}
                 </p>
                 <ul className="space-y-2">
                   <li>
                     <Link href="/strelci" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
-                      Profili
+                      {t("profiles")}
                     </Link>
                   </li>
                   <li>
                     <Link href="/rangiranje" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
-                      Rangiranje
+                      {t("ranking")}
                     </Link>
                   </li>
                   <li className="flex items-center gap-1.5">
-                    <span className="text-sm text-[var(--subtle)]">Head-to-head</span>
+                    <span className="text-sm text-[var(--subtle)]">{t("h2h")}</span>
                     <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">soon</span>
                   </li>
                 </ul>
@@ -127,17 +132,17 @@ export default async function PublicLayout({
               {/* Takmičenja */}
               <div>
                 <p className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-sm tracking-tight text-[var(--ink)] mb-3">
-                  Takmičenja
+                  {t("competitionsSection")}
                 </p>
                 <ul className="space-y-2">
                   <li>
                     <Link href="/takmicenja" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
-                      Lista i arhiva
+                      {t("competitionList")}
                     </Link>
                   </li>
                   <li>
                     <Link href="/kalendar" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
-                      Kalendar
+                      {t("calendar")}
                     </Link>
                   </li>
                 </ul>
@@ -146,15 +151,15 @@ export default async function PublicLayout({
               {/* Statistike */}
               <div>
                 <p className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-sm tracking-tight text-[var(--ink)] mb-3">
-                  Statistike
+                  {t("statisticsSection")}
                 </p>
                 <ul className="space-y-2">
                   <li className="flex items-center gap-1.5">
-                    <span className="text-sm text-[var(--subtle)]">Klub leaderboard</span>
+                    <span className="text-sm text-[var(--subtle)]">{t("clubLeaderboard")}</span>
                     <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">soon</span>
                   </li>
                   <li className="flex items-center gap-1.5">
-                    <span className="text-sm text-[var(--subtle)]">Trend analiza</span>
+                    <span className="text-sm text-[var(--subtle)]">{t("trendAnalysis")}</span>
                     <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">soon</span>
                   </li>
                 </ul>
@@ -163,17 +168,17 @@ export default async function PublicLayout({
               {/* Platforma */}
               <div>
                 <p className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-sm tracking-tight text-[var(--ink)] mb-3">
-                  Platforma
+                  {t("platformSection")}
                 </p>
                 <ul className="space-y-2">
                   <li>
                     <Link href="/kontakt" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
-                      Kontakt
+                      {t("contact")}
                     </Link>
                   </li>
                   <li>
                     <Link href="/privatnost" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
-                      Politika privatnosti
+                      {t("privacy")}
                     </Link>
                   </li>
                 </ul>
@@ -188,7 +193,7 @@ export default async function PublicLayout({
               © {new Date().getFullYear()} Shootermarkt
             </p>
             <p className="text-xs text-[var(--subtle)]">
-              Srpski streljački savez · Pančevo, Srbija
+              {t("rights")}
             </p>
           </div>
 
