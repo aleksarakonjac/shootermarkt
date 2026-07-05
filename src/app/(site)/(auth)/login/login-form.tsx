@@ -25,7 +25,7 @@ export function LoginForm() {
       return;
     }
 
-    router.push("/portal");
+    router.push("/admin");
     router.refresh();
   }
 
@@ -65,12 +65,6 @@ export function LoginForm() {
       >
         {loading ? "Prijavljujem..." : "Prijavi se"}
       </button>
-      <p className="text-center text-sm text-zinc-500">
-        Nemaš nalog?{" "}
-        <a href="/register" className="font-medium text-zinc-900 hover:underline">
-          Registruj se
-        </a>
-      </p>
     </form>
   );
 }
