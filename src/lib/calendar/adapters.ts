@@ -24,27 +24,43 @@ export async function fetchSssEvents(year: number): Promise<CalendarEvent[]> {
   const raw = await fetchSssCalendar();
   // SSS calendar has no year in dates — publishes only current season, include all
   return raw
-    .map((e) => ({
-      source: "sss" as const,
-      name: e.name,
-      dateFrom: parseSssDate(e.date, year),
-      dateTo: null,
-      location: e.location ?? null,
-      country: "SRB",
-      is10m: e.is10m,
-      url: null,
-      externalId: null,
-    }));
+    .map((e) => {
+      const { dateFrom, dateTo } = parseSssDates(e.date, year);
+      return {
+        source: "sss" as const,
+        name: e.name,
+        dateFrom,
+        dateTo,
+        location: e.location ?? null,
+        country: "SRB",
+        is10m: e.is10m,
+        url: null,
+        externalId: null,
+      };
+    });
 }
 
-/** Parse SSS date like "13.01 - 18.01." to YYYY-MM-DD (start date) */
-function parseSssDate(raw: string | null, year: number): string | null {
-  if (!raw) return null;
-  const m = raw.match(/(\d{1,2})\.(\d{1,2})/);
-  if (!m) return null;
-  const d = m[1].padStart(2, "0");
-  const mo = m[2].padStart(2, "0");
-  return `${year}-${mo}-${d}`;
+/** Parse SSS date strings into ISO date range.
+ *  Handles: "15.01.", "15-18.01.", "15.01 - 18.01.", "30.01 - 01.02."
+ */
+function parseSssDates(raw: string | null, year: number): { dateFrom: string | null; dateTo: string | null } {
+  if (!raw) return { dateFrom: null, dateTo: null };
+
+  // "15-18.01." — range within same month (no dot after first day)
+  const sameMonthRange = raw.match(/(\d{1,2})-(\d{1,2})\.(\d{1,2})/);
+  const allDmPairs = [...raw.matchAll(/(\d{1,2})\.(\d{1,2})/g)];
+
+  if (sameMonthRange && allDmPairs.length <= 1) {
+    const fromD = sameMonthRange[1].padStart(2, "0");
+    const toD   = sameMonthRange[2].padStart(2, "0");
+    const mo    = sameMonthRange[3].padStart(2, "0");
+    return { dateFrom: `${year}-${mo}-${fromD}`, dateTo: `${year}-${mo}-${toD}` };
+  }
+
+  const toIso = (m: RegExpMatchArray) => `${year}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  const dateFrom = allDmPairs[0] ? toIso(allDmPairs[0]) : null;
+  const dateTo   = allDmPairs[1] ? toIso(allDmPairs[1]) : null;
+  return { dateFrom, dateTo };
 }
 
 // ── ISSF ──────────────────────────────────────────────────────────────────────

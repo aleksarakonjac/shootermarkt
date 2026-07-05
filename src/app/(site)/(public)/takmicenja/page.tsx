@@ -7,7 +7,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CompetitionsFilterBar } from "./CompetitionsFilterBar";
-import type { CompetitionLevel, EventType } from "@/lib/pdf-import/types";
+import type { CompetitionLevel } from "@/lib/pdf-import/types";
+import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 
 export const metadata: Metadata = { title: "Takmičenja" };
 
@@ -15,314 +16,543 @@ export const metadata: Metadata = { title: "Takmičenja" };
 
 const DISC_ORDER = ["ARM","ARW","APM","APW","RFM","RFW","R3JM","R3JW","SPW","RFPM","FPM"];
 
-const LEVEL_META: Record<CompetitionLevel, { label: string; bg: string; color: string }> = {
-  club:          { label: "Klubsko",        bg: "var(--surface-2)",      color: "var(--muted)"  },
-  regional:      { label: "Regionalno",     bg: "oklch(0.52 0.15 25)",   color: "white"         },
-  national:      { label: "Državno",        bg: "var(--success)",        color: "white"         },
-  international: { label: "Međunarodno",    bg: "oklch(0.52 0.15 220)",  color: "white"         },
-  continental:   { label: "Kont.",          bg: "oklch(0.50 0.18 290)",  color: "white"         },
-  world:         { label: "ISSF–Svetsko",   bg: "var(--brand-primary)",  color: "white"         },
-  olympic:       { label: "Olimpijsko",     bg: "oklch(0.65 0.18 75)",   color: "white"         },
+const LEVEL_PRIORITY: Record<string, number> = {
+  olympic: 0, world: 1, continental: 2, international: 3, national: 4, regional: 5, club: 6,
 };
 
-const TAG_META: Record<string, { bg: string; color: string }> = {
-  sss:  { bg: "oklch(0.52 0.15 145)", color: "white" },
-  issf: { bg: "var(--brand-primary)", color: "white" },
-  esc:  { bg: "var(--brand-accent)",  color: "white" },
+const TAG_STYLE: Record<string, { background: string; color: string }> = {
+  sss:  { background: "#f0fdf4", color: "#15803d" },
+  issf: { background: "#fef2f2", color: "#b91c1c" },
+  esc:  { background: "#eff6ff", color: "#1d4ed8" },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(date: string, dateEnd?: string | null): string {
-  const MONTHS = ["jan","feb","mar","apr","maj","jun","jul","avg","sep","okt","nov","dec"];
+  const M = ["jan","feb","mar","apr","maj","jun","jul","avg","sep","okt","nov","dec"];
   const d = new Date(date + "T00:00:00");
-  const s = `${d.getDate()}. ${MONTHS[d.getMonth()]}`;
+  const s = `${d.getDate()}. ${M[d.getMonth()]}`;
   if (!dateEnd || dateEnd === date) return s;
   const de = new Date(dateEnd + "T00:00:00");
-  if (de.getMonth() === d.getMonth()) return `${d.getDate()}–${de.getDate()}. ${MONTHS[d.getMonth()]}`;
-  return `${s} – ${de.getDate()}. ${MONTHS[de.getMonth()]}`;
+  return de.getMonth() === d.getMonth()
+    ? `${d.getDate()}–${de.getDate()}. ${M[d.getMonth()]}`
+    : `${s} – ${de.getDate()}. ${M[de.getMonth()]}`;
+}
+
+function daysUntil(dateStr: string): number {
+  const target = new Date(dateStr + "T00:00:00");
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - now.getTime()) / 86400000);
+}
+
+function formatCountdown(days: number): string {
+  if (days <= 0) return "danas";
+  if (days === 1) return "sutra";
+  if (days < 7) return `za ${days} dana`;
+  if (days < 14) return "za nedelju";
+  if (days < 21) return "za 2 ned.";
+  if (days < 30) return "za 3 ned.";
+  if (days < 45) return "za mesec";
+  return `za ${Math.floor(days / 30)} mes.`;
 }
 
 function sortDiscs(codes: string[]): string[] {
   return [...codes].sort(
-    (a, b) => (DISC_ORDER.indexOf(a) >= 0 ? DISC_ORDER.indexOf(a) : 99) -
-              (DISC_ORDER.indexOf(b) >= 0 ? DISC_ORDER.indexOf(b) : 99)
+    (a, b) =>
+      (DISC_ORDER.indexOf(a) >= 0 ? DISC_ORDER.indexOf(a) : 99) -
+      (DISC_ORDER.indexOf(b) >= 0 ? DISC_ORDER.indexOf(b) : 99)
+  );
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface CompItem {
+  id: number;
+  name: string;
+  date: string;
+  dateEnd: string | null;
+  location: string | null;
+  level: string;
+  tags: string[] | null;
+  countryCode2: string | null;
+  countryName: string | null;
+  disciplineCodes: string[];
+  resultCount: number;
+}
+
+// ── Row component ─────────────────────────────────────────────────────────────
+
+function CompRow({
+  comp,
+  isLast,
+  showCountdown,
+}: {
+  comp: CompItem;
+  isLast: boolean;
+  showCountdown: boolean;
+}) {
+  const levelStyle = LEVEL_STYLE[comp.level] ?? { background: "#f3f4f6", color: "#4b5563" };
+  const discCodes = sortDiscs(comp.disciplineCodes ?? []);
+  const hasResults = comp.resultCount > 0;
+  const tags = comp.tags ?? [];
+  const countdown = showCountdown ? formatCountdown(daysUntil(comp.date)) : null;
+
+  return (
+    <Link
+      href={`/takmicenja/${comp.id}`}
+      className={`group flex items-center gap-3 sm:gap-4 px-4 py-3.5 transition-colors hover:bg-[var(--surface)] ${
+        !isLast ? "border-b border-[var(--border)]" : ""
+      }`}
+    >
+      {/* Date */}
+      <div className="shrink-0 w-[92px] hidden sm:flex flex-col gap-0.5">
+        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] tabular-nums leading-none">
+          {formatDate(comp.date, comp.dateEnd)}
+        </span>
+        {countdown && (
+          <span className="text-[0.65rem] font-semibold text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)] leading-none">
+            {countdown}
+          </span>
+        )}
+      </div>
+
+      {/* Name + location */}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors truncate leading-snug">
+          {comp.name}
+        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="sm:hidden font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)] tabular-nums">
+            {formatDate(comp.date, comp.dateEnd)}{countdown ? ` · ${countdown}` : ""}
+          </span>
+          {(comp.location || comp.countryCode2) && (
+            <span className="hidden md:flex items-center gap-1 text-xs text-[var(--subtle)] min-w-0">
+              {comp.countryCode2 && (
+                <span
+                  className={`fi fi-${comp.countryCode2.toLowerCase()} shrink-0`}
+                  style={{ width: "13px", height: "9px", borderRadius: "1px", display: "inline-block" }}
+                />
+              )}
+              <span className="truncate">
+                {comp.location}
+                {comp.countryName && comp.location ? ` · ${comp.countryName}` : ""}
+                {comp.countryName && !comp.location ? comp.countryName : ""}
+              </span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Disciplines */}
+      <div className="hidden lg:flex items-center gap-1 shrink-0 flex-wrap justify-end" style={{ maxWidth: "130px" }}>
+        {discCodes.slice(0, 4).map((code) => (
+          <span
+            key={code}
+            className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.58rem] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--muted)]"
+          >
+            {code}
+          </span>
+        ))}
+        {discCodes.length > 4 && (
+          <span className="text-[0.58rem] text-[var(--subtle)]">+{discCodes.length - 4}</span>
+        )}
+      </div>
+
+      {/* Tags */}
+      {tags.length > 0 && (
+        <div className="hidden sm:flex items-center gap-1 shrink-0">
+          {tags.map((t) => {
+            const ts = TAG_STYLE[t] ?? { background: "#f3f4f6", color: "#4b5563" };
+            return (
+              <span
+                key={t}
+                className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.6rem] uppercase px-1.5 py-0.5 rounded"
+                style={ts}
+              >
+                {t}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Level badge */}
+      <span
+        className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[0.65rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)] whitespace-nowrap"
+        style={levelStyle}
+      >
+        {LEVEL_LABEL[comp.level] ?? comp.level}
+      </span>
+
+      {/* Result count */}
+      {hasResults && (
+        <span className="hidden xl:block shrink-0 text-[0.65rem] font-semibold text-green-600 dark:text-green-400 font-[family-name:var(--font-jetbrains-mono)] tabular-nums whitespace-nowrap">
+          ✓ {comp.resultCount}
+        </span>
+      )}
+
+      {/* Chevron */}
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 12 12"
+        className="shrink-0 text-[var(--border-strong)] group-hover:text-[var(--muted)] transition-colors hidden sm:block"
+        aria-hidden="true"
+      >
+        <path
+          d="M4.5 2L8.5 6L4.5 10"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </svg>
+    </Link>
+  );
+}
+
+// ── Section heading ───────────────────────────────────────────────────────────
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--subtle)] font-[family-name:var(--font-barlow-condensed)] mb-3">
+      {children}
+    </p>
   );
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string }>;
+  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; disc?: string }>;
 }
 
 export default async function TakmicenjaPage({ searchParams }: Props) {
-  const { year, level, q, tag } = await searchParams;
+  const { year, level, q, tag, disc } = await searchParams;
 
   const activeYear  = year  && /^\d{4}$/.test(year)  ? year  : "all";
   const activeLevel = level && level !== "all"        ? level : "all";
   const activeQ     = q?.trim() ?? "";
   const activeTag   = tag?.trim() ?? "";
+  const activeDisc  = disc  && disc  !== "all"        ? disc  : "all";
 
-  // ── Filters ────────────────────────────────────────────────────────────────
-  const filters = [
-    activeQ     ? ilike(competitions.name, `%${activeQ}%`)                              : undefined,
-    activeYear  !== "all" ? ilike(competitions.date, `${activeYear}%`)                  : undefined,
-    activeLevel !== "all" ? eq(competitions.level, activeLevel as CompetitionLevel)     : undefined,
-    activeTag   ? sql`${competitions.tags} @> ARRAY[${activeTag}]::varchar[]`           : undefined,
+  // Date boundaries
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const todayStr = now.toISOString().split("T")[0];
+  const recentCutoff = new Date(now);
+  recentCutoff.setDate(recentCutoff.getDate() - 60);
+  const recentCutoffStr = recentCutoff.toISOString().split("T")[0];
+
+  // SQL filters
+  const sqlFilters = [
+    activeQ     ? ilike(competitions.name, `%${activeQ}%`)                          : undefined,
+    activeYear  !== "all" ? ilike(competitions.date, `${activeYear}%`)              : undefined,
+    activeLevel !== "all" ? eq(competitions.level, activeLevel as CompetitionLevel) : undefined,
+    activeTag   ? sql`${competitions.tags} @> ARRAY[${activeTag}]::varchar[]`       : undefined,
   ].filter(Boolean) as Parameters<typeof and>;
 
-  // ── Main query ─────────────────────────────────────────────────────────────
-  const rows = await db
-    .select({
-      id:              competitions.id,
-      name:            competitions.name,
-      date:            competitions.date,
-      dateEnd:         competitions.dateEnd,
-      location:        competitions.location,
-      level:           competitions.level,
-      eventType:       competitions.eventType,
-      tags:            competitions.tags,
-      countryName:     countries.name,
-      countryCode2:    countries.code2,
-      disciplineCodes: sql<string[]>`
-        coalesce(
-          array_agg(DISTINCT ${disciplines.code}::text) FILTER (WHERE ${disciplines.code} IS NOT NULL),
-          '{}'::text[]
-        )
-      `,
-      resultCount: sql<number>`COUNT(DISTINCT ${results.id})::int`,
-    })
-    .from(competitions)
-    .leftJoin(countries, eq(competitions.countryId, countries.id))
-    .leftJoin(results, eq(results.competitionId, competitions.id))
-    .leftJoin(disciplines, eq(results.disciplineId, disciplines.id))
-    .where(filters.length ? and(...filters) : undefined)
-    .groupBy(competitions.id, countries.name, countries.code2)
-    .orderBy(desc(competitions.date));
+  const [rows, yearRows] = await Promise.all([
+    db
+      .select({
+        id:              competitions.id,
+        name:            competitions.name,
+        date:            competitions.date,
+        dateEnd:         competitions.dateEnd,
+        location:        competitions.location,
+        level:           competitions.level,
+        tags:            competitions.tags,
+        countryCode2:    countries.code2,
+        countryName:     countries.name,
+        disciplineCodes: sql<string[]>`
+          coalesce(
+            array_agg(DISTINCT ${disciplines.code}::text) FILTER (WHERE ${disciplines.code} IS NOT NULL),
+            '{}'::text[]
+          )
+        `,
+        resultCount: sql<number>`COUNT(DISTINCT ${results.id})::int`,
+      })
+      .from(competitions)
+      .leftJoin(countries, eq(competitions.countryId, countries.id))
+      .leftJoin(results, eq(results.competitionId, competitions.id))
+      .leftJoin(disciplines, eq(results.disciplineId, disciplines.id))
+      .where(sqlFilters.length ? and(...sqlFilters) : undefined)
+      .groupBy(competitions.id, countries.name, countries.code2)
+      .orderBy(desc(competitions.date)),
+    db
+      .selectDistinct({ year: sql<string>`LEFT(${competitions.date}, 4)` })
+      .from(competitions)
+      .orderBy(desc(sql`LEFT(${competitions.date}, 4)`)),
+  ]);
 
-  // ── Available years (for filter pills) ────────────────────────────────────
-  const yearRows = await db
-    .selectDistinct({ year: sql<string>`LEFT(${competitions.date}, 4)` })
-    .from(competitions)
-    .orderBy(desc(sql`LEFT(${competitions.date}, 4)`));
   const availableYears = yearRows.map((r) => r.year).filter(Boolean) as string[];
 
-  const isFiltered = activeQ || activeYear !== "all" || activeLevel !== "all" || activeTag;
+  // JS disc filter — upcoming always included (no results yet to filter on)
+  const filtered = rows.filter((c) => {
+    if (activeDisc === "all") return true;
+    if (c.date > todayStr) return true; // upcoming: always show
+    return (c.disciplineCodes ?? []).includes(activeDisc);
+  }) as CompItem[];
 
-  // ── Group by year ──────────────────────────────────────────────────────────
-  const byYear = new Map<string, typeof rows>();
-  for (const row of rows) {
-    const y = row.date.slice(0, 4);
-    const arr = byYear.get(y) ?? [];
-    arr.push(row);
-    byYear.set(y, arr);
+  // Temporal split
+  const live = filtered.filter(
+    (c) => c.date <= todayStr && (c.dateEnd ?? c.date) >= todayStr
+  );
+  const upcoming = filtered
+    .filter((c) => c.date > todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const recent = filtered
+    .filter((c) => c.date < todayStr && c.date >= recentCutoffStr && !live.some((l) => l.id === c.id))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const archive = filtered
+    .filter((c) => c.date < recentCutoffStr)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  // Hero: highest-level upcoming, then soonest
+  const hero =
+    upcoming.length > 0
+      ? [...upcoming].sort(
+          (a, b) =>
+            (LEVEL_PRIORITY[a.level] ?? 9) - (LEVEL_PRIORITY[b.level] ?? 9) ||
+            a.date.localeCompare(b.date)
+        )[0]
+      : null;
+
+  // Archive grouped by year
+  const archiveByYear = new Map<string, CompItem[]>();
+  for (const c of archive) {
+    const y = c.date.slice(0, 4);
+    if (!archiveByYear.has(y)) archiveByYear.set(y, []);
+    archiveByYear.get(y)!.push(c);
   }
-  const sortedYears = [...byYear.keys()].sort((a, b) => b.localeCompare(a));
+  const archiveYears = [...archiveByYear.keys()].sort((a, b) => b.localeCompare(a));
+
+  const isFiltered = activeQ || activeYear !== "all" || activeLevel !== "all" || activeTag || activeDisc !== "all";
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
 
-      {/* ── Page header ──────────────────────────────────────────── */}
-      <div className="mb-7">
+      {/* Header */}
+      <div className="mb-6">
         <h1
           className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
           style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
         >
           Takmičenja
         </h1>
-        <p className="text-sm text-[var(--muted)] mt-1.5 max-w-[55ch]">
-          Arhiva takmičenja sa rezultatima po disciplinama, nivoima i godinama.
+        <p className="text-sm text-[var(--muted)] mt-1 max-w-[55ch]">
+          Kalendar i arhiva rezultata srpskog streljačkog sporta.
         </p>
       </div>
 
-      {/* ── Filter bar ───────────────────────────────────────────── */}
-      <Suspense fallback={<div className="h-10 mb-6" />}>
+      {/* Filter bar */}
+      <Suspense fallback={<div className="h-20 mb-6" />}>
         <CompetitionsFilterBar
           availableYears={availableYears}
           currentYear={activeYear}
           currentLevel={activeLevel}
           currentQ={activeQ}
           currentTag={activeTag}
-          totalCount={rows.length}
+          currentDisc={activeDisc}
+          totalCount={filtered.length}
         />
       </Suspense>
 
-      {/* ── Empty state ───────────────────────────────────────────── */}
-      {rows.length === 0 && (
+      {/* Empty state */}
+      {filtered.length === 0 && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 text-center">
-          <p className="text-sm font-medium text-[var(--muted)]">
-            {isFiltered
-              ? "Nema takmičenja za izabrane filtere."
-              : "Još nema unetih takmičenja."}
+          <p className="text-sm text-[var(--muted)]">
+            {isFiltered ? "Nema takmičenja za izabrane filtere." : "Još nema unetih takmičenja."}
           </p>
           {isFiltered && (
             <Link
               href="/takmicenja"
               className="inline-block mt-3 text-xs text-[var(--brand-primary)] hover:underline"
             >
-              Prikaži sva takmičenja
+              Prikaži sva →
             </Link>
           )}
         </div>
       )}
 
-      {/* ── Grouped list ─────────────────────────────────────────── */}
-      <div className="space-y-2">
-        {sortedYears.map((yr) => {
-          const comps = byYear.get(yr)!;
-          return (
-            <section key={yr} aria-label={`Takmičenja ${yr}`}>
-              {/* Year header */}
-              <div
-                className="flex items-center gap-4 py-4 sticky bg-[var(--bg)]"
-                style={{ top: "64px", zIndex: "var(--z-sticky)" }}
-              >
-                <span
-                  className="font-[family-name:var(--font-barlow-condensed)] font-extrabold leading-none select-none text-[var(--border-strong)]"
-                  style={{ fontSize: "clamp(2rem, 5vw, 2.75rem)", letterSpacing: "-0.03em" }}
-                >
-                  {yr}
+      {filtered.length > 0 && (
+        <div className="space-y-10">
+
+          {/* ── LIVE ──────────────────────────────────────────────────── */}
+          {live.length > 0 && (
+            <section aria-label="Takmičenja u toku">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span
+                    className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                    style={{ background: "#ef4444" }}
+                  />
+                  <span
+                    className="relative inline-flex rounded-full h-2 w-2"
+                    style={{ background: "#ef4444" }}
+                  />
                 </span>
-                <div className="flex-1 h-px bg-[var(--border)]" />
-                <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] shrink-0">
-                  {comps.length}
-                </span>
+                <SectionLabel>Upravo teku</SectionLabel>
               </div>
+              <div
+                className="rounded-xl border overflow-hidden"
+                style={{ borderColor: "#fecaca", background: "rgba(254,242,242,0.45)" }}
+              >
+                {live.map((c, i) => (
+                  <CompRow key={c.id} comp={c} isLast={i === live.length - 1} showCountdown={false} />
+                ))}
+              </div>
+            </section>
+          )}
 
-              {/* Competition rows */}
-              <div className="rounded-xl border border-[var(--border)] overflow-hidden mb-6">
-                {comps.map((comp, idx) => {
-                  const levelMeta = LEVEL_META[comp.level as CompetitionLevel];
-                  const discCodes = sortDiscs(comp.disciplineCodes ?? []);
-                  const isLast = idx === comps.length - 1;
-                  const tags = comp.tags ?? [];
+          {/* ── UPCOMING ──────────────────────────────────────────────── */}
+          {upcoming.length > 0 && (
+            <section aria-label="Nadolazeća takmičenja">
+              <SectionLabel>Uskoro</SectionLabel>
 
-                  return (
-                    <Link
-                      key={comp.id}
-                      href={`/takmicenja/${comp.id}`}
-                      className={`group flex items-center gap-3 sm:gap-4 px-4 py-3.5 transition-colors hover:bg-[var(--surface)] ${
-                        !isLast ? "border-b border-[var(--border)]" : ""
-                      }`}
-                    >
-                      {/* Date */}
-                      <div className="shrink-0 w-[88px] hidden sm:block">
-                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] tabular-nums">
-                          {formatDate(comp.date, comp.dateEnd)}
-                        </span>
-                      </div>
-
-                      {/* Name + sublabel */}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors truncate leading-snug text-sm">
-                          {comp.name}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                          {/* Date on mobile */}
-                          <span className="sm:hidden font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)] tabular-nums">
-                            {formatDate(comp.date, comp.dateEnd)}
-                          </span>
-                          {(comp.location || comp.countryName) && (
-                            <span className="text-xs text-[var(--subtle)] truncate hidden md:block">
-                              {comp.countryCode2 && (
-                                <>
-                                  <span
-                                    className={`fi fi-${comp.countryCode2.toLowerCase()} inline-block align-middle mr-1`}
-                                    style={{ width: "14px", height: "10px", borderRadius: "1px" }}
-                                  />
-                                </>
-                              )}
-                              {comp.location}
-                              {comp.countryName && comp.location && ` · ${comp.countryName}`}
-                              {comp.countryName && !comp.location && comp.countryName}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Discipline badges */}
-                      <div className="hidden lg:flex items-center gap-1 shrink-0 flex-wrap justify-end max-w-[140px]">
-                        {discCodes.slice(0, 5).map((code) => (
+              {/* Hero card */}
+              {hero && (
+                <Link
+                  href={`/takmicenja/${hero.id}`}
+                  className="group block rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:shadow-sm transition-all mb-2 overflow-hidden"
+                >
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="min-w-0 flex-1">
+                        {/* Badges row */}
+                        <div className="flex items-center gap-2 flex-wrap mb-2.5">
                           <span
-                            key={code}
-                            className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.58rem] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--muted)]"
+                            className="inline-flex items-center px-2 py-0.5 rounded text-[0.65rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
+                            style={LEVEL_STYLE[hero.level] ?? { background: "#f3f4f6", color: "#4b5563" }}
                           >
-                            {code}
+                            {LEVEL_LABEL[hero.level] ?? hero.level}
                           </span>
-                        ))}
-                        {discCodes.length > 5 && (
-                          <span className="text-[0.58rem] text-[var(--subtle)]">
-                            +{discCodes.length - 5}
+                          <span className="text-xs font-semibold text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)]">
+                            {formatCountdown(daysUntil(hero.date))}
                           </span>
-                        )}
-                      </div>
-
-                      {/* Tags */}
-                      {tags.length > 0 && (
-                        <div className="hidden sm:flex items-center gap-1 shrink-0">
-                          {tags.map((t) => {
-                            const tm = TAG_META[t] ?? { bg: "var(--surface-2)", color: "var(--muted)" };
+                          {(hero.tags ?? []).map((t) => {
+                            const ts = TAG_STYLE[t] ?? { background: "#f3f4f6", color: "#4b5563" };
                             return (
                               <span
                                 key={t}
                                 className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.6rem] uppercase px-1.5 py-0.5 rounded"
-                                style={{ background: tm.bg, color: tm.color }}
+                                style={ts}
                               >
                                 {t}
                               </span>
                             );
                           })}
                         </div>
-                      )}
 
-                      {/* Level badge */}
-                      <div className="shrink-0">
-                        {levelMeta && (
-                          <span
-                            className="inline-flex items-center px-2 py-0.5 rounded text-[0.65rem] font-bold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide whitespace-nowrap"
-                            style={{ background: levelMeta.bg, color: levelMeta.color }}
-                          >
-                            {levelMeta.label}
+                        {/* Name */}
+                        <h2
+                          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors leading-tight mb-2"
+                          style={{ fontSize: "clamp(1.15rem, 2.5vw, 1.65rem)", letterSpacing: "-0.02em" }}
+                        >
+                          {hero.name}
+                        </h2>
+
+                        {/* Meta */}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
+                          <span className="font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
+                            {formatDate(hero.date, hero.dateEnd)}
                           </span>
-                        )}
+                          {(hero.location || hero.countryCode2) && (
+                            <span className="flex items-center gap-1.5">
+                              {hero.countryCode2 && (
+                                <span
+                                  className={`fi fi-${hero.countryCode2.toLowerCase()} shrink-0`}
+                                  style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }}
+                                />
+                              )}
+                              <span>
+                                {hero.location}
+                                {hero.countryName && hero.location ? ` · ${hero.countryName}` : ""}
+                                {hero.countryName && !hero.location ? hero.countryName : ""}
+                              </span>
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Result count */}
-                      {comp.resultCount > 0 && (
-                        <div className="shrink-0 hidden xl:block text-right" style={{ minWidth: "50px" }}>
-                          <span className="text-[0.65rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
-                            {comp.resultCount}
-                            <span className="ml-0.5 text-[0.6rem]">res.</span>
-                          </span>
+                      {/* Discipline badges */}
+                      {sortDiscs(hero.disciplineCodes ?? []).length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap shrink-0 justify-end pt-0.5">
+                          {sortDiscs(hero.disciplineCodes ?? []).map((code) => (
+                            <span
+                              key={code}
+                              className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.65rem] uppercase tracking-wide px-2 py-1 rounded bg-[var(--surface-2)] text-[var(--muted)]"
+                            >
+                              {code}
+                            </span>
+                          ))}
                         </div>
                       )}
+                    </div>
+                  </div>
+                </Link>
+              )}
 
-                      {/* Chevron */}
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        className="shrink-0 text-[var(--border-strong)] group-hover:text-[var(--muted)] transition-colors hidden sm:block"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d="M4.5 2L8.5 6L4.5 10"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          fill="none"
-                        />
-                      </svg>
-                    </Link>
+              {/* Rest of upcoming */}
+              {upcoming.filter((c) => c.id !== hero?.id).length > 0 && (
+                <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+                  {upcoming
+                    .filter((c) => c.id !== hero?.id)
+                    .map((c, i, arr) => (
+                      <CompRow key={c.id} comp={c} isLast={i === arr.length - 1} showCountdown />
+                    ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── RECENTLY FINISHED ─────────────────────────────────────── */}
+          {recent.length > 0 && (
+            <section aria-label="Nedavno završena takmičenja">
+              <SectionLabel>Nedavno završena</SectionLabel>
+              <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+                {recent.map((c, i) => (
+                  <CompRow key={c.id} comp={c} isLast={i === recent.length - 1} showCountdown={false} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── ARCHIVE ───────────────────────────────────────────────── */}
+          {archive.length > 0 && (
+            <section aria-label="Arhiva takmičenja">
+              <SectionLabel>Arhiva</SectionLabel>
+              <div className="space-y-5">
+                {archiveYears.map((yr) => {
+                  const comps = archiveByYear.get(yr)!;
+                  return (
+                    <div key={yr}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span
+                          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-[var(--muted)] leading-none select-none tabular-nums"
+                          style={{ fontSize: "clamp(1.3rem, 2.5vw, 1.55rem)", letterSpacing: "-0.03em" }}
+                        >
+                          {yr}
+                        </span>
+                        <div className="flex-1 h-px bg-[var(--border)]" />
+                        <span className="text-[0.65rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
+                          {comps.length}
+                        </span>
+                      </div>
+                      <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+                        {comps.map((c, i) => (
+                          <CompRow key={c.id} comp={c} isLast={i === comps.length - 1} showCountdown={false} />
+                        ))}
+                      </div>
+                    </div>
                   );
                 })}
               </div>
             </section>
-          );
-        })}
-      </div>
+          )}
+
+        </div>
+      )}
     </div>
   );
 }

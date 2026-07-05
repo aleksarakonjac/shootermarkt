@@ -36,6 +36,13 @@ function formatDate(value: string | Date | null | undefined) {
   return dateFormatter.format(parsed);
 }
 
+function formatDateRange(start: string | Date | null | undefined, end?: string | Date | null) {
+  if (!start) return "—";
+  const fmtStart = formatDate(start);
+  if (!end || end === start) return fmtStart;
+  return `${fmtStart} – ${formatDate(end)}`;
+}
+
 function formatTimestamp(value: string | Date | null | undefined) {
   if (!value) return "—";
   const parsed = typeof value === "string" ? new Date(value) : value;
@@ -75,6 +82,7 @@ export default async function AdminDashboardPage() {
           id: competitions.id,
           name: competitions.name,
           date: competitions.date,
+          dateEnd: competitions.dateEnd,
           location: competitions.location,
           level: competitions.level,
           organizer: competitions.organizer,
@@ -271,7 +279,7 @@ export default async function AdminDashboardPage() {
                                 {competition.name}
                               </p>
                               <p className="mt-1 text-sm text-[var(--muted)]">
-                                {formatDate(competition.date)}
+                                {formatDateRange(competition.date, competition.dateEnd)}
                                 {competition.location ? ` · ${competition.location}` : ""}
                               </p>
                             </div>

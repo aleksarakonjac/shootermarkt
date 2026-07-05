@@ -14,27 +14,13 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { CompetitionLevel, EventType } from "@/lib/pdf-import/types";
+import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import {
   CompetitionResultsClient,
   type DisciplineGroup,
 } from "./CompetitionResultsClient";
 
 type Props = { params: Promise<{ id: string }> };
-
-// ── Labels ────────────────────────────────────────────────────────────────────
-
-const LEVEL_META: Record<
-  CompetitionLevel,
-  { label: string; bg: string; color: string }
-> = {
-  club:          { label: "Klubsko",        bg: "var(--surface-2)",           color: "var(--muted)"         },
-  regional:      { label: "Regionalno",     bg: "var(--brand-accent)",        color: "white"                },
-  national:      { label: "Državno",        bg: "var(--success)",             color: "white"                },
-  international: { label: "Međunarodno",    bg: "oklch(0.52 0.15 220)",       color: "white"                },
-  continental:   { label: "Kontinentalno",  bg: "oklch(0.62 0.18 55)",        color: "white"                },
-  world:         { label: "ISSF–Svetsko",   bg: "var(--brand-primary)",       color: "white"                },
-  olympic:       { label: "Olimpijsko",     bg: "oklch(0.65 0.18 75)",        color: "white"                },
-};
 
 const EVENT_TYPE_LABELS: Record<EventType, string> = {
   championship:    "Šampionat",
@@ -142,7 +128,8 @@ export default async function CompetitionPage({ params }: Props) {
     ? `${comp.date} – ${comp.dateEnd}`
     : comp.date;
 
-  const levelMeta = LEVEL_META[comp.level as CompetitionLevel];
+  const levelStyle = LEVEL_STYLE[comp.level] ?? { background: "#f3f4f6", color: "#4b5563" };
+  const levelLabel = LEVEL_LABEL[comp.level] ?? comp.level;
   const eventTypeLabel = EVENT_TYPE_LABELS[comp.eventType as EventType] ?? "";
 
   return (
@@ -169,9 +156,9 @@ export default async function CompetitionPage({ params }: Props) {
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <span
             className="inline-flex items-center px-2.5 py-1 rounded-md text-[0.7rem] font-bold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide"
-            style={{ background: levelMeta.bg, color: levelMeta.color }}
+            style={levelStyle}
           >
-            {levelMeta.label}
+            {levelLabel}
           </span>
           {eventTypeLabel && (
             <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[0.7rem] font-semibold bg-[var(--surface-2)] text-[var(--muted)] font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide">

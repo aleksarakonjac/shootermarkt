@@ -1,23 +1,15 @@
 import { db } from "@/lib/db";
 import { competitions } from "@/lib/db/schema";
-import { desc, ilike, and, sql, eq } from "drizzle-orm";
+import { desc, asc, ilike, and, sql, eq, gte, lt } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { TakmicenjaFilters } from "./takmicenja-filters";
 import { Pagination } from "../components/Pagination";
+import { TakmicenjaFilters } from "./takmicenja-filters";
+import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 
 export const metadata: Metadata = { title: "Admin · Takmičenja" };
 
 const PAGE_SIZE = 30;
-
-const LEVEL_LABEL: Record<string, string> = {
-  club: "Klubsko",
-  regional: "Regionalno",
-  national: "Državno",
-  continental: "Kontinentalno",
-  world: "Svetsko",
-  olympic: "Olimpijsko",
-};
 
 export default async function AdminTakmicenjaPage({
   searchParams,
@@ -27,10 +19,12 @@ export default async function AdminTakmicenjaPage({
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page ?? "1"));
   const q = sp.q?.trim() ?? "";
-  const year = sp.year?.trim() ?? "";
+  const currentYear = new Date().getFullYear().toString();
+  const year = sp.year?.trim() ?? currentYear;
   const level = sp.level?.trim() ?? "";
-
   const tag = sp.tag?.trim() ?? "";
+
+  const today = new Date().toISOString().split("T")[0];
 
   const conditions = [
     q ? ilike(competitions.name, `%${q}%`) : undefined,
@@ -39,34 +33,120 @@ export default async function AdminTakmicenjaPage({
     tag ? sql`${competitions.tags} @> ARRAY[${tag}]::varchar[]` : undefined,
   ].filter(Boolean) as Parameters<typeof and>;
 
-  const where = conditions.length ? and(...conditions) : undefined;
+  const baseWhere = conditions.length ? and(...conditions) : undefined;
 
-  const [data, [{ total }], yearRows] = await Promise.all([
+  const upcomingCondition = baseWhere
+    ? and(baseWhere, gte(competitions.date, today))
+    : gte(competitions.date, today);
+
+  const pastCondition = baseWhere
+    ? and(baseWhere, lt(competitions.date, today))
+    : lt(competitions.date, today);
+
+  const [upcomingCountRes, pastCountRes] = await Promise.all([
+    db.select({ total: sql<number>`count(*)::int` }).from(competitions).where(upcomingCondition),
+    db.select({ total: sql<number>`count(*)::int` }).from(competitions).where(pastCondition),
+  ]);
+
+  const upcomingCount = upcomingCountRes[0]?.total ?? 0;
+  const pastCount = pastCountRes[0]?.total ?? 0;
+
+  let status = sp.status?.trim();
+  if (status !== "upcoming" && status !== "past") {
+    status = upcomingCount > 0 ? "upcoming" : "past";
+  }
+
+  const activeWhere = status === "upcoming" ? upcomingCondition : pastCondition;
+  const total = status === "upcoming" ? upcomingCount : pastCount;
+
+  const defaultOrder = status === "upcoming" ? "asc" : "desc";
+  const sort = sp.sort?.trim() || "date";
+  const order = sp.order?.trim() || defaultOrder;
+
+  const sortColumnMap = {
+    name: competitions.name,
+    date: competitions.date,
+    location: competitions.location,
+    level: competitions.level,
+  };
+
+  const sortColumn = sortColumnMap[sort as keyof typeof sortColumnMap] ?? competitions.date;
+  const orderByExpr = order === "asc"
+    ? [asc(sortColumn), desc(competitions.id)]
+    : [desc(sortColumn), desc(competitions.id)];
+
+  const getSortHref = (col: string) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (year) params.set("year", year);
+    if (level) params.set("level", level);
+    if (tag) params.set("tag", tag);
+    params.set("status", status);
+
+    params.set("sort", col);
+    if (sort === col && order === "asc") {
+      params.set("order", "desc");
+    } else {
+      params.set("order", "asc");
+    }
+    params.set("page", "1");
+    return `/admin/takmicenja?${params.toString()}`;
+  };
+
+  const getStatusTabHref = (targetStatus: string) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (year) params.set("year", year);
+    if (level) params.set("level", level);
+    if (tag) params.set("tag", tag);
+
+    params.set("status", targetStatus);
+    params.set("page", "1");
+    return `/admin/takmicenja?${params.toString()}`;
+  };
+
+  const renderSortableHeader = (col: string, label: string) => {
+    const isActive = sort === col;
+    const isAsc = order === "asc";
+    return (
+      <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] select-none">
+        <Link
+          href={getSortHref(col)}
+          className="group inline-flex items-center gap-1 hover:text-[var(--ink)] transition-colors"
+        >
+          {label}
+          <span className={`inline-flex items-center transition-colors ${
+            isActive ? "text-[var(--brand-primary)] opacity-100" : "text-[var(--subtle)] opacity-0 group-hover:opacity-100"
+          }`}>
+            {isActive ? (isAsc ? "↑" : "↓") : "↕"}
+          </span>
+        </Link>
+      </th>
+    );
+  };
+
+  const [data, yearRows] = await Promise.all([
     db
       .select({
         id: competitions.id,
         name: competitions.name,
         date: competitions.date,
+        dateEnd: competitions.dateEnd,
         location: competitions.location,
         level: competitions.level,
-        tags: competitions.tags,
         issfId: competitions.issfId,
         organizer: competitions.organizer,
       })
       .from(competitions)
-      .where(where)
-      .orderBy(desc(competitions.date))
+      .where(activeWhere)
+      .orderBy(...orderByExpr)
       .limit(PAGE_SIZE)
       .offset((page - 1) * PAGE_SIZE),
     db
-      .select({ total: sql<number>`count(*)::int` })
+      .select({ year: sql<number>`date_part('year', ${competitions.date}::date)::int` })
       .from(competitions)
-      .where(where),
-    db
-      .select({ year: sql<number>`date_part('year', date::date)::int` })
-      .from(competitions)
-      .groupBy(sql`date_part('year', date::date)`)
-      .orderBy(desc(sql`date_part('year', date::date)`)),
+      .groupBy(sql`date_part('year', ${competitions.date}::date)`)
+      .orderBy(desc(sql`date_part('year', ${competitions.date}::date)`)),
   ]);
 
   const years = yearRows.map((r) => r.year).filter(Boolean);
@@ -99,6 +179,29 @@ export default async function AdminTakmicenjaPage({
         </div>
       </div>
 
+      <div className="flex border-b border-[var(--border)] mb-6">
+        <Link
+          href={getStatusTabHref("upcoming")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+            status === "upcoming"
+              ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
+              : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
+          }`}
+        >
+          Nadolazeća ({upcomingCount})
+        </Link>
+        <Link
+          href={getStatusTabHref("past")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+            status === "past"
+              ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
+              : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
+          }`}
+        >
+          Prošla ({pastCount})
+        </Link>
+      </div>
+
       <div className="mb-4">
         <TakmicenjaFilters years={years} currentLevel={level} currentTag={tag} />
       </div>
@@ -116,11 +219,10 @@ export default async function AdminTakmicenjaPage({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Naziv</th>
-                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Datum</th>
-                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Lokacija</th>
-                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Nivo</th>
-                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Tagovi</th>
+                  {renderSortableHeader("name", "Naziv")}
+                  {renderSortableHeader("date", "Datum")}
+                  {renderSortableHeader("location", "Lokacija")}
+                  {renderSortableHeader("level", "Nivo")}
                   <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Izvor</th>
                   <th className="px-4 py-3"></th>
                 </tr>
@@ -130,27 +232,15 @@ export default async function AdminTakmicenjaPage({
                   <tr key={c.id} className="hover:bg-[var(--surface)] transition-colors">
                     <td className="px-4 py-3 font-medium text-[var(--ink)] max-w-xs truncate">{c.name}</td>
                     <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
-                      {c.date}
+                      {c.date}{c.dateEnd && c.dateEnd !== c.date ? ` – ${c.dateEnd}` : ""}
                     </td>
                     <td className="px-4 py-3 text-[var(--muted)]">
                       {c.location ?? <span className="text-[var(--subtle)]">—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded-full" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>
+                      <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded" style={LEVEL_STYLE[c.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
                         {LEVEL_LABEL[c.level] ?? c.level}
                       </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {(c.tags ?? []).length > 0
-                          ? (c.tags ?? []).map((t) => (
-                              <span key={t} className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--muted)]">
-                                {t.toUpperCase()}
-                              </span>
-                            ))
-                          : <span className="text-[var(--subtle)] text-xs">—</span>
-                        }
-                      </div>
                     </td>
                     <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)]">
                       {c.organizer ?? c.issfId ?? "—"}

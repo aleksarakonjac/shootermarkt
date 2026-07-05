@@ -3,31 +3,25 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTransition, useRef } from "react";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
+import { LEVEL_DOT_COLOR } from "@/lib/competition-utils";
 
 const LEVEL_OPTIONS = [
-  { value: "olympic",      label: "Olimpijsko" },
-  { value: "world",        label: "Svetsko" },
-  { value: "continental",  label: "Kontinentalno" },
-  { value: "national",     label: "Državno" },
-  { value: "regional",     label: "Regionalno" },
-  { value: "club",         label: "Klubsko" },
+  { value: "olympic",       label: "Olimpijsko" },
+  { value: "world",         label: "Svetsko" },
+  { value: "continental",   label: "Kontinentalno" },
+  { value: "international", label: "Međunarodno" },
+  { value: "national",      label: "Državno" },
+  { value: "regional",      label: "Regionalno" },
+  { value: "club",          label: "Klubsko" },
 ];
 
-const LEVEL_COLORS: Record<string, string> = {
-  olympic:     "oklch(0.75 0.15 50)",
-  world:       "oklch(0.55 0.18 240)",
-  continental: "oklch(0.55 0.18 290)",
-  national:    "oklch(0.50 0.16 145)",
-  regional:    "oklch(0.60 0.15 30)",
-  club:        "oklch(0.55 0.05 240)",
-};
 
 const LEVEL_OPTIONS_WITH_PREFIX = LEVEL_OPTIONS.map((o) => ({
   ...o,
   prefix: (
     <span
       className="inline-block w-2 h-2 rounded-full shrink-0"
-      style={{ background: LEVEL_COLORS[o.value] }}
+      style={{ background: LEVEL_DOT_COLOR[o.value] }}
     />
   ),
 }));
@@ -50,11 +44,19 @@ export function TakmicenjaFilters({ years, currentLevel, currentTag }: Props) {
   const params = useSearchParams();
   const [, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentYear = new Date().getFullYear().toString();
 
   function update(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
-    if (value) next.set(key, value);
-    else next.delete(key);
+    if (key === "year") {
+      // Ensure a year is always set; fallback to currentYear if cleared
+      if (value) next.set(key, value);
+      else next.set(key, currentYear);
+    } else if (value) {
+      next.set(key, value);
+    } else {
+      next.delete(key);
+    }
     next.delete("page");
     startTransition(() => router.push(`${pathname}?${next.toString()}`));
   }
@@ -75,11 +77,10 @@ export function TakmicenjaFilters({ years, currentLevel, currentTag }: Props) {
         className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] w-52"
       />
       <SearchDropdown
-        value={params.get("year") ?? ""}
+        value={params.get("year") ?? currentYear}
         onChange={(v) => update("year", v)}
         options={yearOptions}
-        placeholder="Sve godine"
-        emptyLabel="Sve godine"
+        placeholder={currentYear}
         searchable={false}
         className="w-32"
       />

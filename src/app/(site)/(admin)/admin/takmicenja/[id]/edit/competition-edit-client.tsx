@@ -10,6 +10,7 @@ interface Competition {
   id: number;
   name: string;
   date: string;
+  dateEnd?: string | null;
   location: string | null;
   level: CompetitionLevel;
   resultCount: number;
@@ -27,6 +28,7 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
   const [form, setForm] = useState({
     name: competition.name,
     date: competition.date,
+    dateEnd: competition.dateEnd ?? "",
     location: competition.location ?? "",
     level: competition.level,
   });
@@ -107,13 +109,18 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum *</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum od *</label>
               <DatePicker value={form.date} onChange={(v) => set("date", v)} required />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo *</label>
-              <LevelDropdown value={form.level} onChange={(v) => set("level", v)} />
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum do</label>
+              <DatePicker value={form.dateEnd} onChange={(v) => set("dateEnd", v)} />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo *</label>
+            <LevelDropdown value={form.level} onChange={(v) => set("level", v)} />
           </div>
 
           <div>

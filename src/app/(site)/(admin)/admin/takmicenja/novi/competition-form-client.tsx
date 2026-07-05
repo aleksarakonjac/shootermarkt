@@ -10,7 +10,7 @@ export function CompetitionFormClient() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", date: "", location: "", level: "national" as CompetitionLevel, issfId: "" });
+  const [form, setForm] = useState({ name: "", date: "", dateEnd: "", location: "", level: "national" as CompetitionLevel, issfId: "" });
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -66,7 +66,7 @@ export function CompetitionFormClient() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum *</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum od *</label>
               <DatePicker
                 value={form.date}
                 onChange={(value) => set("date", value)}
@@ -74,9 +74,17 @@ export function CompetitionFormClient() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo *</label>
-              <LevelDropdown value={form.level} onChange={(v) => set("level", v)} />
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum do</label>
+              <DatePicker
+                value={form.dateEnd}
+                onChange={(value) => set("dateEnd", value)}
+              />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo *</label>
+            <LevelDropdown value={form.level} onChange={(v) => set("level", v)} />
           </div>
 
           <div>

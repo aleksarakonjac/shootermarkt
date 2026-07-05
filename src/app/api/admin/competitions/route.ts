@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { name, date, location, level, issfId } = body;
+  const { name, date, dateEnd, location, level, issfId } = body;
 
   if (!name?.trim() || !date || !level) {
     return NextResponse.json({ error: "Naziv, datum i nivo su obavezni" }, { status: 400 });
@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     .values({
       name: name.trim(),
       date,
+      dateEnd: dateEnd?.trim() && dateEnd.trim() !== date ? dateEnd.trim() : null,
       location: location?.trim() || null,
       level: level as CompetitionLevel,
       issfId: issfId ? String(issfId) : null,

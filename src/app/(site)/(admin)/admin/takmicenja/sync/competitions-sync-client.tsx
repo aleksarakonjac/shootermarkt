@@ -23,6 +23,16 @@ interface SyncEvent {
   conflictPriority: number;
 }
 
+const LEVEL_COLORS: Record<string, string> = {
+  world:         "bg-blue-50 text-blue-700",
+  continental:   "bg-purple-50 text-purple-700",
+  international: "bg-sky-50 text-sky-700",
+  olympic:       "bg-yellow-50 text-yellow-700",
+  national:      "bg-green-50 text-green-700",
+  regional:      "bg-orange-50 text-orange-700",
+  club:          "bg-gray-100 text-gray-600",
+};
+
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
   { value: "world",         label: "ISSF–Svetsko" },
   { value: "continental",   label: "Kontinentalno" },
@@ -32,16 +42,6 @@ const LEVELS: { value: CompetitionLevel; label: string }[] = [
   { value: "regional",      label: "Regionalno" },
   { value: "club",          label: "Klubsko" },
 ];
-
-const LEVEL_COLORS: Record<CompetitionLevel, string> = {
-  world:         "bg-blue-50 text-blue-700",
-  continental:   "bg-purple-50 text-purple-700",
-  international: "bg-sky-50 text-sky-700",
-  olympic:       "bg-yellow-50 text-yellow-700",
-  national:      "bg-green-50 text-green-700",
-  regional:      "bg-orange-50 text-orange-700",
-  club:          "bg-gray-100 text-gray-600",
-};
 
 const SOURCE_COLORS: Record<string, string> = {
   issf: "bg-blue-50 text-blue-700",
