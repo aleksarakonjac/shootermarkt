@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ReviewRow, CommitPayload, CompetitionLevel, DisciplineCode } from "@/lib/pdf-import/types";
 import { DonePanel } from "../_shared/DonePanel";
+import { DatePicker } from "@/components/ui/DatePicker";
 
 const ALL_DISCIPLINES: DisciplineCode[] = ["ARM", "ARW", "APM", "APW", "RFM", "RFW", "R3JM", "R3JW", "SPW", "RFPM", "FPM"];
 
@@ -127,7 +128,7 @@ export function ManualMode() {
             </select>
           </div>
           <div className="sm:col-span-2">
-              <DatePicker value={compDate} onChange={setCompDate} />
+            <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Lokacija</label>
             <input
               value={compLocation}
               onChange={(e) => setCompLocation(e.target.value)}

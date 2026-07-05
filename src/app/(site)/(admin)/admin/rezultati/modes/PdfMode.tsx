@@ -191,6 +191,7 @@ export function PdfMode() {
           >
             {loading ? "Parsiranje (Gemini)…" : "Parsiraj sa Gemini →"}
           </button>
+        </div>
         </>
       )}
 

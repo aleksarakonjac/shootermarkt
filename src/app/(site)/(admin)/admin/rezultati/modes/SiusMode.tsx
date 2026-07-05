@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
+import { DatePicker } from "@/components/ui/DatePicker";
 
 type Step = "select" | "review" | "done";
 

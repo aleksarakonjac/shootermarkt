@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { NocDropdown } from "@/components/ui/NocDropdown";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { GenderDropdown } from "@/components/ui/GenderDropdown";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 
@@ -113,7 +114,7 @@ export function ShooterFormClient({ clubs: initialClubs }: { clubs: Club[] }) {
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum rođenja</label>
               <DatePicker
                 value={form.birthDate}
-                onChange={(value) => setField("birthDate", value)}
+                onChange={(value) => set("birthDate", value)}
                 max={new Date().toISOString().slice(0, 10)}
                 className="font-[family-name:var(--font-jetbrains-mono)]"
               />

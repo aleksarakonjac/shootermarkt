@@ -2,6 +2,8 @@ import { postgresAdapter } from "@payloadcms/db-postgres";
 import { lexicalEditor } from "@payloadcms/richtext-lexical";
 import { buildConfig } from "payload";
 import sharp from "sharp";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const sharpDep = sharp as any;
 import path from "path";
 import { CmsUsers } from "./src/cms/collections/CmsUsers";
 import { Media } from "./src/cms/collections/Media";
@@ -60,7 +62,7 @@ export default buildConfig({
     push: false,
   }),
   collections: [CmsUsers, Media, Articles],
-  sharp,
+  sharp: sharpDep,
   typescript: {
     outputFile: path.resolve(__dirname, "src/payload-types.ts"),
   },

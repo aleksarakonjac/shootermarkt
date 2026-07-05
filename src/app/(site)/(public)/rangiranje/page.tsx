@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions } from "@/lib/db/schema";
 import { eq, isNotNull, and, asc } from "drizzle-orm";

@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getPublishedArticles } from "@/lib/cms/get-articles";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = { title: "Vesti" };
 
 export default async function VestiPage() {

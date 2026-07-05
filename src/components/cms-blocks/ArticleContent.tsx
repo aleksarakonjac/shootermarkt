@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type JSX } from "react";
 import { CompetitionEmbedBlock } from "./CompetitionEmbedBlock";
 import { ShooterEmbedBlock } from "./ShooterEmbedBlock";
 import { GalleryBlock } from "./GalleryBlock";
