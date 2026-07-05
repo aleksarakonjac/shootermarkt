@@ -4,28 +4,66 @@ import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions } from "@/lib/db/schema";
 import { eq, isNotNull, and, asc } from "drizzle-orm";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { computeFormaScore, trendLabel, trendColor } from "@/lib/forma-score";
+import { NOC_LIST } from "@/lib/noc-list";
 
-export const metadata = { title: "Rangiranje" };
+export const metadata: Metadata = { title: "Rangiranje" };
 
-type DisciplineCode = "ARM" | "ARW" | "APM" | "APW";
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-const TABS: { code: DisciplineCode; name: string }[] = [
-  { code: "ARM", name: "Air Rifle Men" },
-  { code: "ARW", name: "Air Rifle Women" },
-  { code: "APM", name: "Air Pistol Men" },
-  { code: "APW", name: "Air Pistol Women" },
+type DiscCode = "ARM" | "ARW" | "APM" | "APW";
+
+const TABS: { code: DiscCode; label: string }[] = [
+  { code: "ARM", label: "10m puška M" },
+  { code: "ARW", label: "10m puška Ž" },
+  { code: "APM", label: "10m pištolj M" },
+  { code: "APW", label: "10m pištolj Ž" },
 ];
+
+const TH =
+  "px-4 py-3 text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] select-none";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function nocAlpha2(noc: string | null): string | null {
+  if (!noc) return null;
+  return NOC_LIST.find((n) => n.noc === noc)?.alpha2 ?? null;
+}
+
+function FlagChip({ noc, inline = false }: { noc: string | null; inline?: boolean }) {
+  if (!noc) return <span className="text-[var(--subtle)]">—</span>;
+  const a2 = nocAlpha2(noc);
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)] ${
+        inline ? "" : "px-1.5 py-0.5 rounded bg-[var(--surface-2)]"
+      }`}
+    >
+      {a2 && (
+        <span
+          className={`fi fi-${a2.toLowerCase()} shrink-0`}
+          style={{ width: "13px", height: "9px", borderRadius: "1px", display: "inline-block" }}
+        />
+      )}
+      {noc}
+    </span>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 type Props = { searchParams: Promise<{ disciplina?: string; zemlja?: string }> };
 
 export default async function RangiranjeePage({ searchParams }: Props) {
   const { disciplina, zemlja } = await searchParams;
-  const activeCode = (disciplina?.toUpperCase() ?? "ARM") as DisciplineCode;
+
+  const validCode = TABS.find((t) => t.code === disciplina?.toUpperCase())?.code;
+  const activeCode: DiscCode = validCode ?? "ARM";
   const activeZemlja = zemlja?.toUpperCase() ?? null;
 
   const discipline = await db.query.disciplines.findFirst({
-    where: eq(disciplines.code, activeCode as "ARM" | "ARW" | "APM" | "APW"),
+    where: eq(disciplines.code, activeCode),
   });
 
   const rawResults = discipline
@@ -44,22 +82,31 @@ export default async function RangiranjeePage({ searchParams }: Props) {
         .innerJoin(shooters, eq(results.shooterId, shooters.id))
         .leftJoin(clubs, eq(shooters.clubId, clubs.id))
         .innerJoin(competitions, eq(results.competitionId, competitions.id))
-        .where(and(eq(results.disciplineId, discipline.id), isNotNull(results.qualTotal)))
+        .where(
+          and(eq(results.disciplineId, discipline.id), isNotNull(results.qualTotal))
+        )
         .orderBy(asc(competitions.date))
     : [];
 
   const maxScore = discipline ? parseFloat(discipline.maxQualScore) : 600;
+  const isAP = activeCode.startsWith("AP");
 
-  // All unique countries present in this discipline's results
+  // Unique NOCs for country filter
   const allNocs = Array.from(
     new Set(rawResults.map((r) => r.nationality).filter(Boolean) as string[])
   ).sort();
 
   // Group by shooter
-  const shooterMap = new Map<
-    number,
-    { firstName: string; lastName: string; nationality: string | null; clubName: string | null; entries: { qualTotal: number; date: string }[] }
-  >();
+  type ShooterEntry = {
+    firstName: string;
+    lastName: string;
+    nationality: string | null;
+    clubName: string | null;
+    entries: { qualTotal: number; date: string }[];
+    bestInners: number | null;
+  };
+
+  const shooterMap = new Map<number, ShooterEntry>();
 
   for (const r of rawResults) {
     if (!shooterMap.has(r.shooterId)) {
@@ -69,89 +116,71 @@ export default async function RangiranjeePage({ searchParams }: Props) {
         nationality: r.nationality,
         clubName: r.clubName,
         entries: [],
+        bestInners: null,
       });
     }
+    const entry = shooterMap.get(r.shooterId)!;
     if (r.qualTotal != null) {
-      shooterMap.get(r.shooterId)!.entries.push({
-        qualTotal: parseFloat(r.qualTotal),
-        date: r.competitionDate,
-      });
+      entry.entries.push({ qualTotal: parseFloat(r.qualTotal), date: r.competitionDate });
+    }
+    if (r.qualInners != null && (entry.bestInners === null || r.qualInners > entry.bestInners)) {
+      entry.bestInners = r.qualInners;
     }
   }
 
-  const ranking = Array.from(shooterMap.entries())
-    .map(([shooterId, data]) => {
-      const forma = computeFormaScore(data.entries, maxScore);
-      const peak = data.entries.length > 0 ? Math.max(...data.entries.map((e) => e.qualTotal)) : null;
-      // Best inners for AP disciplines
-      const bestInners = rawResults
-        .filter((r) => r.shooterId === shooterId && r.qualInners != null)
-        .reduce((best, r) => (r.qualInners! > (best ?? -1) ? r.qualInners! : best), null as number | null);
-      return { shooterId, ...data, forma, peak, bestInners };
-    })
-    .filter((s) => s.forma !== null)
-    .sort((a, b) => b.forma!.score - a.forma!.score);
-
-  // Shooters with results but only 1 nastup (no forma trend) — append after
-  const noForma = Array.from(shooterMap.entries())
-    .filter(([id]) => !ranking.find((r) => r.shooterId === id))
+  const allRanked = Array.from(shooterMap.entries())
     .map(([shooterId, data]) => ({
       shooterId,
       ...data,
-      forma: null,
+      forma: computeFormaScore(data.entries, maxScore),
       peak: data.entries.length > 0 ? Math.max(...data.entries.map((e) => e.qualTotal)) : null,
-      bestInners: null as number | null,
     }))
-    .sort((a, b) => (b.peak ?? 0) - (a.peak ?? 0));
+    .sort((a, b) => {
+      const fa = a.forma?.score ?? 0;
+      const fb = b.forma?.score ?? 0;
+      if (fb !== fa) return fb - fa;
+      return (b.peak ?? 0) - (a.peak ?? 0);
+    });
 
-  const allRanked = [...ranking, ...noForma].filter(
-    (s) => !activeZemlja || s.nationality === activeZemlja
-  );
-  const activeTab = TABS.find((t) => t.code === activeCode);
-  const isAP = activeCode.startsWith("AP");
-  const totalCount = [...ranking, ...noForma].length;
+  const displayed = activeZemlja
+    ? allRanked.filter((s) => s.nationality === activeZemlja)
+    : allRanked;
+
+  const activeTab = TABS.find((t) => t.code === activeCode)!;
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+
       {/* Header */}
-      <div className="mb-8 pb-6 border-b border-[var(--border)]">
+      <div className="mb-6">
         <h1
-          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase tracking-tight text-[var(--ink)]"
-          style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.02em" }}
+          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
+          style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
         >
           Rangiranje
         </h1>
-        <p className="text-sm mt-1 text-[var(--muted)]">
+        <p className="text-sm text-[var(--muted)] mt-1">
           Poredak po forma score-u — weighted average poslednjih nastupa
         </p>
       </div>
 
       {/* Discipline tabs */}
-      <div className="flex gap-1 mb-6 p-1 rounded-lg bg-[var(--surface)] w-fit">
-        {TABS.map(({ code, name }) => {
+      <div className="flex items-center gap-1 mb-4 flex-wrap">
+        {TABS.map(({ code, label }) => {
           const active = activeCode === code;
           return (
             <Link
               key={code}
-              href={`/rangiranje?disciplina=${code.toLowerCase()}`}
-              className="flex flex-col items-center px-4 py-2 rounded-md text-center transition-colors duration-150 no-underline"
-              style={{
-                background: active ? "var(--bg)" : "transparent",
-                boxShadow: active ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-              }}
+              href={`/rangiranje?disciplina=${code.toLowerCase()}${activeZemlja ? `&zemlja=${activeZemlja}` : ""}`}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors no-underline"
+              style={
+                active
+                  ? { background: "var(--ink)", color: "var(--bg)" }
+                  : { background: "var(--surface-2)", color: "var(--muted)" }
+              }
             >
-              <span
-                className="font-[family-name:var(--font-barlow-condensed)] font-bold text-base tracking-tight"
-                style={{ color: active ? "var(--brand-primary)" : "var(--muted)" }}
-              >
-                {code}
-              </span>
-              <span
-                className="text-[0.65rem] hidden sm:block leading-tight"
-                style={{ color: active ? "var(--muted)" : "var(--subtle)" }}
-              >
-                {name}
-              </span>
+              <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold">{code}</span>
+              <span className="hidden sm:inline font-normal">{label}</span>
             </Link>
           );
         })}
@@ -159,119 +188,198 @@ export default async function RangiranjeePage({ searchParams }: Props) {
 
       {/* Country filter */}
       {allNocs.length > 1 && (
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex flex-wrap items-center gap-1 mb-5">
           <Link
             href={`/rangiranje?disciplina=${activeCode.toLowerCase()}`}
-            className="rounded-full px-3 py-1 text-xs font-semibold transition-colors no-underline"
-            style={{
-              background: !activeZemlja ? "var(--brand-primary)" : "var(--surface)",
-              color: !activeZemlja ? "white" : "var(--ink)",
-            }}
+            className="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors no-underline font-[family-name:var(--font-jetbrains-mono)]"
+            style={
+              !activeZemlja
+                ? { background: "var(--ink)", color: "var(--bg)" }
+                : { background: "var(--surface-2)", color: "var(--muted)" }
+            }
           >
-            Sve ({totalCount})
+            Sve
           </Link>
           {allNocs.map((noc) => {
-            const cnt = [...ranking, ...noForma].filter((s) => s.nationality === noc).length;
+            const a2 = nocAlpha2(noc);
+            const active = activeZemlja === noc;
             return (
               <Link
                 key={noc}
                 href={`/rangiranje?disciplina=${activeCode.toLowerCase()}&zemlja=${noc}`}
-                className="rounded-full px-3 py-1 text-xs font-[family-name:var(--font-jetbrains-mono)] font-semibold transition-colors no-underline"
-                style={{
-                  background: activeZemlja === noc ? "var(--brand-accent)" : "var(--surface)",
-                  color: activeZemlja === noc ? "white" : "var(--ink)",
-                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors no-underline font-[family-name:var(--font-jetbrains-mono)]"
+                style={
+                  active
+                    ? { background: "var(--ink)", color: "var(--bg)" }
+                    : { background: "var(--surface-2)", color: "var(--muted)" }
+                }
               >
-                {noc} ({cnt})
+                {a2 && (
+                  <span
+                    className={`fi fi-${a2.toLowerCase()} shrink-0`}
+                    style={{ width: "13px", height: "9px", borderRadius: "1px", display: "inline-block" }}
+                  />
+                )}
+                {noc}
               </Link>
             );
           })}
+          <span className="text-xs text-[var(--subtle)] ml-1 font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
+            {displayed.length}
+          </span>
         </div>
       )}
 
-      {/* Table */}
-      <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-        {allRanked.length === 0 ? (
-          <div className="py-20 text-center">
-            <p className="text-sm text-[var(--muted)]">
-              Nema podataka za {activeTab?.name ?? activeCode}
-              {activeZemlja ? ` · ${activeZemlja}` : ""}.
-            </p>
-          </div>
-        ) : (
+      {/* Empty state */}
+      {displayed.length === 0 ? (
+        <div className="rounded-xl border border-[var(--border)] py-20 text-center">
+          <p className="text-sm text-[var(--muted)]">
+            Nema podataka za {activeTab.label}
+            {activeZemlja ? ` · ${activeZemlja}` : ""}.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-[var(--border)] overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                <th className="w-12 px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">#</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Strelac</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
-                <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Forma</th>
-                <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Peak</th>
+              <tr className="bg-[var(--surface-2)] border-b border-[var(--border)]">
+                <th className={`${TH} text-right w-12`}>#</th>
+                <th className={`${TH} text-left`}>Strelac</th>
+                <th className={`${TH} text-left hidden md:table-cell`}>Zemlja</th>
+                <th className={`${TH} text-left hidden lg:table-cell`}>Klub</th>
+                <th className={`${TH} text-right`}>Forma</th>
+                <th className={`${TH} text-right hidden sm:table-cell`}>Peak</th>
                 {isAP && (
-                  <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inners</th>
+                  <th className={`${TH} text-right hidden sm:table-cell`}>Inn.</th>
                 )}
-                <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Nastupa</th>
+                <th className={`${TH} text-right hidden md:table-cell`}>Nast.</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
-              {allRanked.map((s, i) => (
-                <tr key={s.shooterId} className="hover:bg-[var(--surface)] transition-colors">
-                  <td
-                    className="w-12 px-4 py-3 text-right font-[family-name:var(--font-barlow-condensed)] font-bold text-lg"
-                    style={{ color: i === 0 ? "var(--brand-primary)" : "var(--subtle)" }}
+              {displayed.map((s, i) => {
+                const rank = i + 1;
+                const isFirst = rank === 1;
+                const isTop3 = rank <= 3;
+
+                return (
+                  <tr
+                    key={s.shooterId}
+                    className="group hover:bg-[var(--surface)] transition-colors"
                   >
-                    {i + 1}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/strelci/${s.shooterId}`}
-                      className="font-semibold text-[var(--ink)] hover:underline"
-                    >
-                      {s.lastName} {s.firstName}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    {s.nationality ? (
-                      <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">
-                        {s.nationality}
+                    {/* Rank */}
+                    <td className="w-12 px-4 py-3 text-right">
+                      <span
+                        className="font-[family-name:var(--font-barlow-condensed)] font-extrabold tabular-nums leading-none"
+                        style={{
+                          fontSize: isFirst ? "1.2rem" : isTop3 ? "1rem" : "0.875rem",
+                          color: isFirst
+                            ? "var(--brand-primary)"
+                            : isTop3
+                            ? "var(--ink)"
+                            : "var(--subtle)",
+                        }}
+                      >
+                        {rank}
                       </span>
-                    ) : (
-                      <span className="text-[var(--subtle)]">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--muted)]">
-                    {s.clubName ?? <span className="text-[var(--subtle)]">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {s.forma ? (
-                      <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
-                        {s.forma.score.toFixed(1)}
-                        <span className="ml-1 text-xs" style={{ color: trendColor(s.forma.trend) }}>
-                          {trendLabel(s.forma.trend)}
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="text-xs text-[var(--subtle)]">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)]">
-                    {s.peak ?? <span className="text-[var(--subtle)]">—</span>}
-                  </td>
-                  {isAP && (
-                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
-                      {s.bestInners != null ? `${s.bestInners}x` : <span className="text-[var(--subtle)]">—</span>}
                     </td>
-                  )}
-                  <td className="px-4 py-3 text-right text-xs text-[var(--subtle)]">
-                    {s.entries.length}
-                  </td>
-                </tr>
-              ))}
+
+                    {/* Strelac */}
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/strelci/${s.shooterId}`}
+                        className="font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
+                      >
+                        {s.lastName} {s.firstName}
+                      </Link>
+                      {/* Zemlja on mobile */}
+                      {s.nationality && (
+                        <span className="flex items-center gap-1 mt-0.5 md:hidden">
+                          {(() => {
+                            const a2 = nocAlpha2(s.nationality);
+                            return a2 ? (
+                              <span
+                                className={`fi fi-${a2.toLowerCase()} shrink-0`}
+                                style={{ width: "12px", height: "8px", borderRadius: "1px", display: "inline-block" }}
+                              />
+                            ) : null;
+                          })()}
+                          <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--muted)]">
+                            {s.nationality}
+                          </span>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Zemlja */}
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      <FlagChip noc={s.nationality} />
+                    </td>
+
+                    {/* Klub */}
+                    <td className="px-4 py-3 text-[var(--muted)] hidden lg:table-cell">
+                      {s.clubName ?? <span className="text-[var(--subtle)]">—</span>}
+                    </td>
+
+                    {/* Forma — primary metric */}
+                    <td className="px-4 py-3 text-right">
+                      {s.forma ? (
+                        <span className="inline-flex items-center justify-end gap-1.5">
+                          <span
+                            className="font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]"
+                            style={{ fontSize: isTop3 ? "1rem" : "0.875rem" }}
+                          >
+                            {s.forma.score.toFixed(1)}
+                          </span>
+                          <span
+                            className="font-bold text-xs font-[family-name:var(--font-jetbrains-mono)]"
+                            style={{ color: trendColor(s.forma.trend) }}
+                          >
+                            {trendLabel(s.forma.trend)}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[var(--subtle)]">—</span>
+                      )}
+                    </td>
+
+                    {/* Peak */}
+                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm text-[var(--muted)] tabular-nums hidden sm:table-cell">
+                      {s.peak ?? <span className="text-[var(--subtle)]">—</span>}
+                    </td>
+
+                    {/* Inners (AP only) */}
+                    {isAP && (
+                      <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] tabular-nums hidden sm:table-cell">
+                        {s.bestInners != null ? (
+                          `${s.bestInners}×`
+                        ) : (
+                          <span className="text-[var(--subtle)]">—</span>
+                        )}
+                      </td>
+                    )}
+
+                    {/* Nastupa */}
+                    <td className="px-4 py-3 text-right text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] tabular-nums hidden md:table-cell">
+                      {s.entries.length}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        )}
-      </div>
+
+          {/* Footer count */}
+          <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 flex items-center justify-between">
+            <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
+              {displayed.length} strelaca · {activeTab.label}
+              {activeZemlja ? ` · ${activeZemlja}` : ""}
+            </span>
+            <span className="text-xs text-[var(--subtle)]">
+              Forma score = weighted avg poslednjih 10 nastupa
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
