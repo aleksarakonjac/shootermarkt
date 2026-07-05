@@ -1,4 +1,5 @@
 const ISSF_API = "https://api.issf-sports.org/api/v01";
+const ISSF_WEB = "https://www.issf-sports.org";
 
 export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW";
 
@@ -196,4 +197,84 @@ export function mapEventTitleToDiscipline(eventTitle: string): DisciplineCode | 
   if (t.includes("air pistol") && t.includes("men") && !t.includes("women")) return "APM";
   if (t.includes("air pistol") && t.includes("women")) return "APW";
   return null;
+}
+
+export interface ISSFQualResult {
+  rank: number;
+  issfId: string;
+  lastName: string;
+  firstName: string;
+  nationCode: string;
+  series: number[];
+  total: number;
+  inners: number | null;
+  qualified: boolean;
+}
+
+/**
+ * Scrape the ISSF results HTML page for qualification individual results.
+ * No Gemini API needed — data is in a plain HTML table.
+ *
+ * Table row format (qualification):
+ *   rank | bib | LASTNAME Firstname (link) | NOC | s1..s6 | total | Q?
+ *
+ * For Air Pistol, total is integer and inners come from "NNNx" style total cell
+ * (e.g. "594-35x"). For Air Rifle, total is decimal (636.3).
+ */
+export async function fetchQualResultsFromHtml(
+  competitionId: number,
+  resultKey: string
+): Promise<ISSFQualResult[]> {
+  const url = `${ISSF_WEB}/competitions/${competitionId}/results/${resultKey}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    next: { revalidate: 3600 },
+  });
+  if (!res.ok) throw new Error(`ISSF HTML fetch failed: ${res.status} ${url}`);
+  const html = await res.text();
+
+  const results: ISSFQualResult[] = [];
+
+  // Match each result row: starts with a rank td, has athlete link, NOC, series, total
+  const rowRe =
+    /<tr>\s*<td[^>]*>(\d+)<\/td>\s*<td[^>]*>\d+<\/td>\s*<td[^>]*><a href="\/athletes\/([^"]+)">([^<]+)<\/a><\/td>\s*<td[^>]*>([A-Z]{3})<\/td>((?:\s*<td[^>]*>[^<]*<\/td>)+)\s*<td[^>]*>([^<]*)<\/td>\s*<td[^>]*>(Q)?[^<]*<\/td>/g;
+
+  let m: RegExpExecArray | null;
+  while ((m = rowRe.exec(html)) !== null) {
+    const rank = parseInt(m[1]);
+    const issfId = m[2].trim();
+    const rawName = m[3].replace(/ /g, " ").trim(); // &nbsp; → space
+    const spaceIdx = rawName.indexOf(" ");
+    const lastName = spaceIdx > 0 ? rawName.slice(0, spaceIdx) : rawName;
+    const firstName = spaceIdx > 0 ? rawName.slice(spaceIdx + 1) : "";
+    const nationCode = m[4];
+    const seriesCells = m[5];
+    const totalCell = m[6].trim();
+    const qualified = m[7] === "Q";
+
+    // Extract series values from cells
+    const seriesRe = /<td[^>]*>([\d.]+)<\/td>/g;
+    const series: number[] = [];
+    let sm: RegExpExecArray | null;
+    while ((sm = seriesRe.exec(seriesCells)) !== null) {
+      series.push(parseFloat(sm[1]));
+    }
+
+    // Parse total — may be "594-35x" (AP) or "636.3" (AR)
+    let total: number;
+    let inners: number | null = null;
+    const innersMatch = totalCell.match(/^(\d+)-(\d+)x$/);
+    if (innersMatch) {
+      total = parseInt(innersMatch[1]);
+      inners = parseInt(innersMatch[2]);
+    } else {
+      total = parseFloat(totalCell);
+    }
+
+    if (isNaN(total)) continue;
+
+    results.push({ rank, issfId, lastName, firstName, nationCode, series, total, inners, qualified });
+  }
+
+  return results;
 }

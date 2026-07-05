@@ -3,21 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import {
   fetchCompetitionResults,
   extractMvpEvents,
-  ISSFResultPhase,
+  fetchQualResultsFromHtml,
 } from "@/lib/issf/adapter";
-import { parsePdfWithGemini } from "@/lib/pdf-import/gemini-adapter";
 import { db } from "@/lib/db";
 import { shooters, clubs } from "@/lib/db/schema";
 import type { ReviewRow } from "@/lib/pdf-import/types";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
-}
-
-async function fetchPdfBuffer(url: string): Promise<Buffer> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`PDF fetch failed: ${res.status} ${url}`);
-  return Buffer.from(await res.arrayBuffer());
 }
 
 export async function POST(req: NextRequest) {
@@ -48,99 +41,45 @@ export async function POST(req: NextRequest) {
   const [allClubs, allShooters] = await Promise.all([
     db.select().from(clubs),
     db
-      .select({
-        id: shooters.id,
-        firstName: shooters.firstName,
-        lastName: shooters.lastName,
-        nationality: shooters.nationality,
-        clubId: shooters.clubId,
-      })
+      .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality })
       .from(shooters),
   ]);
 
   const rows: ReviewRow[] = [];
 
-  for (const { disciplineCode, qualPhase, finalPhase } of mvpEvents) {
-    if (!qualPhase?.pdfResultLink) continue;
+  for (const { disciplineCode, qualPhase } of mvpEvents) {
+    if (!qualPhase?.resultKey) continue;
 
-    const pdfBuffer = await fetchPdfBuffer(qualPhase.pdfResultLink);
-    const bilten = await parsePdfWithGemini(pdfBuffer);
-
-    // Find matching event in parsed bilten
-    const event = bilten.events.find(
-      (e) => e.discipline === disciplineCode && e.stage === "qualification"
-    );
-    if (!event) continue;
-
-    let finalPhaseResults: Map<string, number> | null = null;
-    if (finalPhase?.pdfResultLink) {
-      try {
-        const finalBuffer = await fetchPdfBuffer(finalPhase.pdfResultLink);
-        const finalBilten = await parsePdfWithGemini(finalBuffer);
-        const finalEvent = finalBilten.events.find(
-          (e) => e.discipline === disciplineCode && e.stage === "final"
-        );
-        if (finalEvent) {
-          finalPhaseResults = new Map(
-            finalEvent.results.map((r) => [
-              `${r.lastName.toLowerCase()}_${r.firstName.toLowerCase()}`,
-              (r as { total: number }).total,
-            ])
-          );
-        }
-      } catch {
-        // Final PDF parsing is best-effort
-      }
+    let qualResults;
+    try {
+      qualResults = await fetchQualResultsFromHtml(competitionId, qualPhase.resultKey);
+    } catch {
+      continue;
     }
 
-    for (const result of event.results as Array<{
-      rank: number;
-      lastName: string;
-      firstName: string;
-      teamNoc: string;
-      clubName?: string;
-      series: number[];
-      total: number;
-      inners?: number | null;
-      qualified?: boolean | null;
-    }>) {
-      const key = `${result.lastName.toLowerCase()}_${result.firstName.toLowerCase()}`;
-      const finalTotal = finalPhaseResults?.get(key) ?? null;
-
+    for (const result of qualResults) {
       const matchedShooter = allShooters.find(
         (s) =>
           s.lastName.toLowerCase() === result.lastName.toLowerCase() &&
           s.firstName.toLowerCase() === result.firstName.toLowerCase() &&
-          (!s.nationality || s.nationality === result.teamNoc)
+          (!s.nationality || s.nationality === result.nationCode)
       );
 
-      const matchedClub = result.clubName
-        ? allClubs.find(
-            (c) =>
-              c.nocCode?.toLowerCase() === result.clubName?.toLowerCase() ||
-              c.name.toLowerCase().includes(result.clubName!.toLowerCase())
-          )
-        : undefined;
-
-      const row: ReviewRow = {
+      rows.push({
         shooterId: matchedShooter?.id,
         firstName: result.firstName,
         lastName: result.lastName,
-        teamNoc: result.teamNoc,
-        clubAbbr: result.clubName,
-        clubId: matchedClub?.id,
+        teamNoc: result.nationCode,
         disciplineCode,
         qualTotal: result.total,
         qualInners: result.inners,
         qualRank: result.rank,
         qualSeries: result.series,
         qualified: result.qualified,
-        finalTotal,
+        finalTotal: null,
         finalRank: null,
         warning: matchedShooter ? undefined : "Novi strelac — biće kreiran",
-      };
-
-      rows.push(row);
+      });
     }
   }
 
