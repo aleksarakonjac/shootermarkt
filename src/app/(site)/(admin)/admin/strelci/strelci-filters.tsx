@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTransition, useRef } from "react";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
+import { CustomCheckbox } from "@/components/ui/CustomCheckbox";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 
 interface NatOption {
@@ -77,27 +78,29 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
         className="w-52"
       />
 
-      <select
+      <SearchDropdown
         value={gender}
-        onChange={(e) => update("gender", e.target.value)}
-        className={SELECT_CLS}
-      >
-        <option value="">Oba pola</option>
-        <option value="M">Muški</option>
-        <option value="F">Ženski</option>
-      </select>
+        onChange={(v) => update("gender", v)}
+        options={[
+          { value: "M", label: "Muški" },
+          { value: "F", label: "Ženski" },
+        ]}
+        placeholder="Pol"
+        emptyLabel="Oba pola"
+        className="w-40"
+      />
 
-      <select
+      <SearchDropdown
         value={apparatus}
-        onChange={(e) => update("apparatus", e.target.value)}
-        className={SELECT_CLS}
-      >
-        <option value="">Sve discipline</option>
-        <option value="rifle">Puška</option>
-        <option value="pistol">Pištolj</option>
-        <option value="both">Puška + Pištolj</option>
-        <option value="shotgun">Shotgun</option>
-      </select>
+        onChange={(v) => update("apparatus", v)}
+        options={[
+          { value: "air_rifle", label: "Vazdušna puška" },
+          { value: "air_pistol", label: "Vazdušni pištolj" },
+        ]}
+        placeholder="Disciplina"
+        emptyLabel="Sve discipline"
+        className="w-48"
+      />
 
       {hasActiveFilters && (
         <button
@@ -112,15 +115,12 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
         </button>
       )}
 
-      <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-[var(--ink)]">
-        <input
-          type="checkbox"
-          checked={onlyUnverified}
-          onChange={() => update("verified", onlyUnverified ? "" : "0")}
-          className="accent-[var(--brand-primary)] w-3.5 h-3.5 cursor-pointer"
-        />
-        Samo neverifikovani
-      </label>
+      <CustomCheckbox
+        checked={onlyUnverified}
+        onChange={() => update("verified", onlyUnverified ? "" : "0")}
+        label="Samo neverifikovani"
+        className=""
+      />
     </div>
   );
 }
