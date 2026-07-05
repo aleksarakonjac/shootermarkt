@@ -64,6 +64,7 @@ export interface ReviewRow {
 }
 
 export interface CommitPayload {
+  competitionId?: number; // if set, skip upsert and use existing
   competition: {
     name: string;
     date: string; // YYYY-MM-DD

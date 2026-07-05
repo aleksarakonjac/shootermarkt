@@ -19,31 +19,33 @@ export async function POST(req: NextRequest) {
   const payload = (await req.json()) as CommitPayload;
   const { competition: comp, rows } = payload;
 
-  if (!comp.name || !comp.date || !comp.level) {
-    return NextResponse.json({ error: "Competition fields required" }, { status: 400 });
-  }
-
-  // 1. Upsert competition
-  const existingComp = await db.query.competitions.findFirst({
-    where: and(eq(competitions.name, comp.name), eq(competitions.date, comp.date)),
-  });
-
+  // 1. Resolve competition
   let competitionId: number;
-  if (existingComp) {
-    competitionId = existingComp.id;
+  if (payload.competitionId) {
+    competitionId = payload.competitionId;
   } else {
-    const [ins] = await db
-      .insert(competitions)
-      .values({
-        name: comp.name,
-        date: comp.date,
-        location: comp.location,
-        level: comp.level,
-        eventType: comp.eventType ?? "other",
-        organizer: comp.organizer ?? null,
-      })
-      .returning({ id: competitions.id });
-    competitionId = ins.id;
+    if (!comp.name || !comp.date || !comp.level) {
+      return NextResponse.json({ error: "Competition fields required" }, { status: 400 });
+    }
+    const existingComp = await db.query.competitions.findFirst({
+      where: and(eq(competitions.name, comp.name), eq(competitions.date, comp.date)),
+    });
+    if (existingComp) {
+      competitionId = existingComp.id;
+    } else {
+      const [ins] = await db
+        .insert(competitions)
+        .values({
+          name: comp.name,
+          date: comp.date,
+          location: comp.location,
+          level: comp.level,
+          eventType: comp.eventType ?? "other",
+          organizer: comp.organizer ?? null,
+        })
+        .returning({ id: competitions.id });
+      competitionId = ins.id;
+    }
   }
 
   // 2. Disciplines map
