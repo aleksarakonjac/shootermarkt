@@ -134,7 +134,7 @@ export function CompetitionsFilterBar({
             aria-haspopup="listbox"
             aria-expanded={yearOpen}
             aria-label="Filter po godini"
-            className={`${pill} ${pillOn} font-[family-name:var(--font-jetbrains-mono)] flex items-center gap-1.5`}
+            className={`${pill} bg-[var(--ink)] text-[var(--bg)] font-[family-name:var(--font-jetbrains-mono)] flex items-center gap-1.5`}
           >
             {currentYear}
             <svg
