@@ -33,8 +33,25 @@ const FALLBACK_BADGE = { background: "var(--surface-2)", color: "var(--muted)" }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const MONTHS_SR = ["jan","feb","mar","apr","maj","jun","jul","avg","sep","okt","nov","dec"];
+
+function monthLabel(key: string): string {
+  const [yr, mo] = key.split("-");
+  return `${MONTHS_SR[parseInt(mo) - 1]} ${yr}`;
+}
+
+function groupByMonth(comps: CompItem[]): Map<string, CompItem[]> {
+  const map = new Map<string, CompItem[]>();
+  for (const c of comps) {
+    const key = c.date.slice(0, 7);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(c);
+  }
+  return map;
+}
+
 function formatDate(date: string, dateEnd?: string | null): string {
-  const M = ["jan","feb","mar","apr","maj","jun","jul","avg","sep","okt","nov","dec"];
+  const M = MONTHS_SR;
   const d = new Date(date + "T00:00:00");
   const s = `${d.getDate()}. ${M[d.getMonth()]}`;
   if (!dateEnd || dateEnd === date) return s;
@@ -331,6 +348,15 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
         )[0]
       : null;
 
+  // Upcoming grouped by month (hero excluded)
+  const upcomingRest = upcoming.filter((c) => c.id !== hero?.id);
+  const upcomingByMonth = groupByMonth(upcomingRest);
+  const upcomingMonths = [...upcomingByMonth.keys()].sort();
+
+  // Recent grouped by month
+  const recentByMonth = groupByMonth(recent);
+  const recentMonths = [...recentByMonth.keys()].sort((a, b) => b.localeCompare(a));
+
   // Archive grouped by year
   const archiveByYear = new Map<string, CompItem[]>();
   for (const c of archive) {
@@ -572,14 +598,26 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
                 </Link>
               )}
 
-              {/* Rest of upcoming */}
-              {upcoming.filter((c) => c.id !== hero?.id).length > 0 && (
-                <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-                  {upcoming
-                    .filter((c) => c.id !== hero?.id)
-                    .map((c, i, arr) => (
-                      <CompRow key={c.id} comp={c} isLast={i === arr.length - 1} showCountdown />
-                    ))}
+              {/* Rest of upcoming — grouped by month */}
+              {upcomingMonths.length > 0 && (
+                <div className="space-y-5 mt-2">
+                  {upcomingMonths.map((mk) => {
+                    const comps = upcomingByMonth.get(mk)!;
+                    return (
+                      <div key={mk}>
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-sm font-semibold text-[var(--muted)] capitalize">{monthLabel(mk)}</span>
+                          <div className="flex-1 h-px bg-[var(--border)]" />
+                          <span className="text-[0.65rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">{comps.length}</span>
+                        </div>
+                        <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+                          {comps.map((c, i) => (
+                            <CompRow key={c.id} comp={c} isLast={i === comps.length - 1} showCountdown />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -594,13 +632,27 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
             </div>
           )}
 
-          {/* ── RECENTLY FINISHED ─────────────────────────────────────── */}
+          {/* ── RECENTLY FINISHED — grouped by month ──────────────────── */}
           {activeWhen === "past" && recent.length > 0 && (
             <section aria-label="Nedavno završena takmičenja">
-              <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-                {recent.map((c, i) => (
-                  <CompRow key={c.id} comp={c} isLast={i === recent.length - 1} showCountdown={false} />
-                ))}
+              <div className="space-y-5">
+                {recentMonths.map((mk) => {
+                  const comps = recentByMonth.get(mk)!;
+                  return (
+                    <div key={mk}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-sm font-semibold text-[var(--muted)] capitalize">{monthLabel(mk)}</span>
+                        <div className="flex-1 h-px bg-[var(--border)]" />
+                        <span className="text-[0.65rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">{comps.length}</span>
+                      </div>
+                      <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+                        {comps.map((c, i) => (
+                          <CompRow key={c.id} comp={c} isLast={i === comps.length - 1} showCountdown={false} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}
