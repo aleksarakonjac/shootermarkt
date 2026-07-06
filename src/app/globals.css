@@ -36,6 +36,25 @@
   --z-modal:    400;
   --z-toast:    500;
   --z-tooltip:  600;
+
+  /* Tag badge tokens */
+  --tag-sss-bg: #f0fdf4; --tag-sss-fg: #15803d;
+  --tag-issf-bg: #fef2f2; --tag-issf-fg: #b91c1c;
+  --tag-esc-bg: #eff6ff; --tag-esc-fg: #1d4ed8;
+
+  /* Level badge tokens */
+  --level-world-bg: #eff6ff;        --level-world-fg: #1d4ed8;
+  --level-continental-bg: #faf5ff;  --level-continental-fg: #7e22ce;
+  --level-international-bg: #f0f9ff;--level-international-fg: #0369a1;
+  --level-olympic-bg: #fefce8;      --level-olympic-fg: #a16207;
+  --level-national-bg: #f0fdf4;     --level-national-fg: #15803d;
+  --level-regional-bg: #fff7ed;     --level-regional-fg: #c2410c;
+  --level-club-bg: #f3f4f6;         --level-club-fg: #4b5563;
+
+  /* Live section tokens */
+  --live-dot: #ef4444;
+  --live-border: #fecaca;
+  --live-bg: rgba(254, 242, 242, 0.45);
 }
 
 /* ── Dark mode overrides (.dark class set by ThemeToggle) ──────────────────── */
@@ -57,6 +76,25 @@ html.dark {
   /* Brand stays the same, slightly lighter accent */
   --brand-accent:       #1a5fa8;
   --brand-accent-hover: #1450a0;
+
+  /* Tag badge tokens — dark */
+  --tag-sss-bg: oklch(0.22 0.04 150);  --tag-sss-fg: oklch(0.72 0.15 150);
+  --tag-issf-bg: oklch(0.22 0.04 30);  --tag-issf-fg: oklch(0.72 0.15 30);
+  --tag-esc-bg: oklch(0.22 0.04 260);  --tag-esc-fg: oklch(0.72 0.15 260);
+
+  /* Level badge tokens — dark */
+  --level-world-bg: oklch(0.22 0.04 260);        --level-world-fg: oklch(0.72 0.15 260);
+  --level-continental-bg: oklch(0.22 0.04 290);  --level-continental-fg: oklch(0.72 0.15 290);
+  --level-international-bg: oklch(0.22 0.04 240);--level-international-fg: oklch(0.72 0.15 240);
+  --level-olympic-bg: oklch(0.22 0.04 80);       --level-olympic-fg: oklch(0.72 0.15 80);
+  --level-national-bg: oklch(0.22 0.04 150);     --level-national-fg: oklch(0.72 0.15 150);
+  --level-regional-bg: oklch(0.22 0.04 50);      --level-regional-fg: oklch(0.72 0.15 50);
+  --level-club-bg: oklch(0.22 0.006 250);        --level-club-fg: oklch(0.62 0.005 250);
+
+  /* Live section tokens — dark */
+  --live-dot: oklch(0.65 0.2 30);
+  --live-border: oklch(0.35 0.08 30);
+  --live-bg: oklch(0.22 0.06 30 / 0.45);
 }
 
 

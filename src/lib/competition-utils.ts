@@ -36,15 +36,14 @@ export function getCompetitionName(
   return comp.name;
 }
 
-// Inline CSS for server components (matches Tailwind pastel classes in sync client)
 export const LEVEL_STYLE: Record<string, { background: string; color: string }> = {
-  world:         { background: "#eff6ff", color: "#1d4ed8" },
-  continental:   { background: "#faf5ff", color: "#7e22ce" },
-  international: { background: "#f0f9ff", color: "#0369a1" },
-  olympic:       { background: "#fefce8", color: "#a16207" },
-  national:      { background: "#f0fdf4", color: "#15803d" },
-  regional:      { background: "#fff7ed", color: "#c2410c" },
-  club:          { background: "#f3f4f6", color: "#4b5563" },
+  world:         { background: "var(--level-world-bg)",         color: "var(--level-world-fg)" },
+  continental:   { background: "var(--level-continental-bg)",   color: "var(--level-continental-fg)" },
+  international: { background: "var(--level-international-bg)", color: "var(--level-international-fg)" },
+  olympic:       { background: "var(--level-olympic-bg)",       color: "var(--level-olympic-fg)" },
+  national:      { background: "var(--level-national-bg)",      color: "var(--level-national-fg)" },
+  regional:      { background: "var(--level-regional-bg)",      color: "var(--level-regional-fg)" },
+  club:          { background: "var(--level-club-bg)",          color: "var(--level-club-fg)" },
 };
 
 // For color dots in filter dropdowns (text color = saturated hue)

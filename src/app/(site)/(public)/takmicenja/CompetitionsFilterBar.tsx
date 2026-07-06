@@ -16,9 +16,9 @@ const LEVELS: { value: CompetitionLevel | "all"; label: string }[] = [
 ];
 
 const TAGS: { value: string; label: string; activeBg: string; activeColor: string }[] = [
-  { value: "sss",  label: "SSS",  activeBg: "#f0fdf4", activeColor: "#15803d" },
-  { value: "issf", label: "ISSF", activeBg: "#fef2f2", activeColor: "#b91c1c" },
-  { value: "esc",  label: "ESC",  activeBg: "#eff6ff", activeColor: "#1d4ed8" },
+  { value: "sss",  label: "SSS",  activeBg: "var(--tag-sss-bg)",  activeColor: "var(--tag-sss-fg)" },
+  { value: "issf", label: "ISSF", activeBg: "var(--tag-issf-bg)", activeColor: "var(--tag-issf-fg)" },
+  { value: "esc",  label: "ESC",  activeBg: "var(--tag-esc-bg)",  activeColor: "var(--tag-esc-fg)" },
 ];
 
 interface Props {
@@ -70,7 +70,7 @@ export function CompetitionsFilterBar({
     currentTag;
 
   const pill =
-    "px-2.5 py-1 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer";
+    "px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer";
   const pillOn  = "bg-[var(--ink)] text-[var(--bg)]";
   const pillOff = "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]";
 
@@ -93,7 +93,7 @@ export function CompetitionsFilterBar({
             defaultValue={currentQ}
             onChange={(e) => onSearch(e.target.value)}
             placeholder="Pretraži…"
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] pl-8 pr-3 py-1.5 text-sm text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] pl-8 pr-3 py-1.5 text-sm text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
           />
         </div>
         <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] tabular-nums ml-auto shrink-0">
@@ -111,53 +111,59 @@ export function CompetitionsFilterBar({
 
       {/* Row 2: year pills + divider + level pills + divider + source tags */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        <button
-          onClick={() => setParam("year", "all")}
-          className={`${pill} font-[family-name:var(--font-jetbrains-mono)] ${currentYear === "all" ? pillOn : pillOff}`}
-        >
-          Sve god.
-        </button>
-        {availableYears.map((y) => (
+        <div role="group" aria-label="Filter po godini" className="contents">
           <button
-            key={y}
-            onClick={() => setParam("year", y)}
-            className={`${pill} font-[family-name:var(--font-jetbrains-mono)] ${currentYear === y ? pillOn : pillOff}`}
+            onClick={() => setParam("year", "all")}
+            className={`${pill} font-[family-name:var(--font-jetbrains-mono)] ${currentYear === "all" ? pillOn : pillOff}`}
           >
-            {y}
+            Sve god.
           </button>
-        ))}
-
-        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
-
-        {LEVELS.map((l) => (
-          <button
-            key={l.value}
-            onClick={() => setParam("level", l.value)}
-            className={`${pill} ${currentLevel === l.value || (l.value === "all" && currentLevel === "all") ? pillOn : pillOff}`}
-          >
-            {l.label}
-          </button>
-        ))}
-
-        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
-
-        {TAGS.map((t) => {
-          const active = currentTag === t.value;
-          return (
+          {availableYears.map((y) => (
             <button
-              key={t.value}
-              onClick={() => setParam("tag", active ? "" : t.value)}
-              className={`${pill} font-[family-name:var(--font-jetbrains-mono)]`}
-              style={
-                active
-                  ? { background: t.activeBg, color: t.activeColor }
-                  : { background: "var(--surface-2)", color: "var(--muted)" }
-              }
+              key={y}
+              onClick={() => setParam("year", y)}
+              className={`${pill} font-[family-name:var(--font-jetbrains-mono)] ${currentYear === y ? pillOn : pillOff}`}
             >
-              {t.label}
+              {y}
             </button>
-          );
-        })}
+          ))}
+        </div>
+
+        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
+
+        <div role="group" aria-label="Filter po nivou takmičenja" className="contents">
+          {LEVELS.map((l) => (
+            <button
+              key={l.value}
+              onClick={() => setParam("level", l.value)}
+              className={`${pill} ${currentLevel === l.value || (l.value === "all" && currentLevel === "all") ? pillOn : pillOff}`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+
+        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
+
+        <div role="group" aria-label="Filter po organizatoru" className="contents">
+          {TAGS.map((t) => {
+            const active = currentTag === t.value;
+            return (
+              <button
+                key={t.value}
+                onClick={() => setParam("tag", active ? "" : t.value)}
+                className={`${pill} font-[family-name:var(--font-jetbrains-mono)]`}
+                style={
+                  active
+                    ? { background: t.activeBg, color: t.activeColor }
+                    : { background: "var(--surface-2)", color: "var(--muted)" }
+                }
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
     </div>

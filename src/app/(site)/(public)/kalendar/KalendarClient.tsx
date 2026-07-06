@@ -185,13 +185,17 @@ export function KalendarClient({ competitions }: Props) {
           minDetail="year"
           className="shadow-sm"
         />
-        {selectedDate && (
+        {selectedDate ? (
           <button
             onClick={() => setSelectedDate(null)}
             className="mt-2.5 w-full text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors py-1.5 rounded-lg hover:bg-[var(--surface-2)]"
           >
             ← Prikaži ceo mesec
           </button>
+        ) : (
+          <p className="mt-2 text-center text-[0.65rem] text-[var(--subtle)]">
+            Klikni naziv meseca za pregled godine
+          </p>
         )}
       </div>
 
@@ -209,7 +213,7 @@ export function KalendarClient({ competitions }: Props) {
               key={tab.key}
               onClick={() => setLevelFilter(tab.key)}
               aria-pressed={levelFilter === tab.key}
-              className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+              className={`shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-colors ${
                 levelFilter === tab.key
                   ? "bg-[var(--brand-primary)] text-white"
                   : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]"

@@ -24,10 +24,12 @@ const LEVEL_PRIORITY: Record<string, number> = {
 };
 
 const TAG_STYLE: Record<string, { background: string; color: string }> = {
-  sss:  { background: "#f0fdf4", color: "#15803d" },
-  issf: { background: "#fef2f2", color: "#b91c1c" },
-  esc:  { background: "#eff6ff", color: "#1d4ed8" },
+  sss:  { background: "var(--tag-sss-bg)",  color: "var(--tag-sss-fg)" },
+  issf: { background: "var(--tag-issf-bg)", color: "var(--tag-issf-fg)" },
+  esc:  { background: "var(--tag-esc-bg)",  color: "var(--tag-esc-fg)" },
 };
+
+const FALLBACK_BADGE = { background: "var(--surface-2)", color: "var(--muted)" };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -94,7 +96,7 @@ function CompRow({
   isLast: boolean;
   showCountdown: boolean;
 }) {
-  const levelStyle = LEVEL_STYLE[comp.level] ?? { background: "#f3f4f6", color: "#4b5563" };
+  const levelStyle = LEVEL_STYLE[comp.level] ?? FALLBACK_BADGE;
   const discCodes = sortDiscs(comp.disciplineCodes ?? []);
   const hasResults = comp.resultCount > 0;
   const tags = comp.tags ?? [];
@@ -165,7 +167,7 @@ function CompRow({
       {tags.length > 0 && (
         <div className="hidden sm:flex items-center gap-1 shrink-0">
           {tags.map((t) => {
-            const ts = TAG_STYLE[t] ?? { background: "#f3f4f6", color: "#4b5563" };
+            const ts = TAG_STYLE[t] ?? FALLBACK_BADGE;
             return (
               <span
                 key={t}
@@ -215,24 +217,14 @@ function CompRow({
   );
 }
 
-// ── Section heading ───────────────────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--subtle)] font-[family-name:var(--font-barlow-condensed)] mb-3">
-      {children}
-    </p>
-  );
-}
-
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string }>;
+  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; archiveAll?: string }>;
 }
 
 export default async function TakmicenjaPage({ searchParams }: Props) {
-  const { year, level, q, tag, view } = await searchParams;
+  const { year, level, q, tag, view, archiveAll } = await searchParams;
 
   const activeYear  = year  && /^\d{4}$/.test(year)  ? year  : "all";
   const activeLevel = level && level !== "all"        ? level : "all";
@@ -346,6 +338,17 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
     archiveByYear.get(y)!.push(c);
   }
   const archiveYears = [...archiveByYear.keys()].sort((a, b) => b.localeCompare(a));
+  const showAllArchive = archiveAll === "1";
+  const visibleArchiveYears = showAllArchive ? archiveYears : archiveYears.slice(0, 2);
+
+  // Build "show more archive" URL preserving current filters
+  const archiveMoreParams = new URLSearchParams();
+  if (activeQ) archiveMoreParams.set("q", activeQ);
+  if (activeYear !== "all") archiveMoreParams.set("year", activeYear);
+  if (activeLevel !== "all") archiveMoreParams.set("level", activeLevel);
+  if (activeTag) archiveMoreParams.set("tag", activeTag);
+  archiveMoreParams.set("archiveAll", "1");
+  const archiveMoreHref = `/takmicenja?${archiveMoreParams.toString()}`;
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
@@ -414,18 +417,18 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
                 <span className="relative flex h-2 w-2 shrink-0">
                   <span
                     className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                    style={{ background: "#ef4444" }}
+                    style={{ background: "var(--live-dot)" }}
                   />
                   <span
                     className="relative inline-flex rounded-full h-2 w-2"
-                    style={{ background: "#ef4444" }}
+                    style={{ background: "var(--live-dot)" }}
                   />
                 </span>
-                <SectionLabel>Upravo teku</SectionLabel>
+                <span className="text-xs font-semibold text-[var(--muted)]">Upravo teku</span>
               </div>
               <div
                 className="rounded-xl border overflow-hidden"
-                style={{ borderColor: "#fecaca", background: "rgba(254,242,242,0.45)" }}
+                style={{ borderColor: "var(--live-border)", background: "var(--live-bg)" }}
               >
                 {live.map((c, i) => (
                   <CompRow key={c.id} comp={c} isLast={i === live.length - 1} showCountdown={false} />
@@ -437,8 +440,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
           {/* ── UPCOMING ──────────────────────────────────────────────── */}
           {upcoming.length > 0 && (
             <section aria-label="Nadolazeća takmičenja">
-              <SectionLabel>Uskoro</SectionLabel>
-
+  
               {/* Hero card */}
               {hero && (
                 <Link
@@ -452,7 +454,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
                         <div className="flex items-center gap-2 flex-wrap mb-2.5">
                           <span
                             className="inline-flex items-center px-2 py-0.5 rounded text-[0.65rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
-                            style={LEVEL_STYLE[hero.level] ?? { background: "#f3f4f6", color: "#4b5563" }}
+                            style={LEVEL_STYLE[hero.level] ?? FALLBACK_BADGE}
                           >
                             {LEVEL_LABEL[hero.level] ?? hero.level}
                           </span>
@@ -460,7 +462,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
                             {formatCountdown(daysUntil(hero.date))}
                           </span>
                           {(hero.tags ?? []).map((t) => {
-                            const ts = TAG_STYLE[t] ?? { background: "#f3f4f6", color: "#4b5563" };
+                            const ts = TAG_STYLE[t] ?? FALLBACK_BADGE;
                             return (
                               <span
                                 key={t}
@@ -538,7 +540,6 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
           {/* ── RECENTLY FINISHED ─────────────────────────────────────── */}
           {recent.length > 0 && (
             <section aria-label="Nedavno završena takmičenja">
-              <SectionLabel>Nedavno završena</SectionLabel>
               <div className="rounded-xl border border-[var(--border)] overflow-hidden">
                 {recent.map((c, i) => (
                   <CompRow key={c.id} comp={c} isLast={i === recent.length - 1} showCountdown={false} />
@@ -550,9 +551,8 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
           {/* ── ARCHIVE ───────────────────────────────────────────────── */}
           {archive.length > 0 && (
             <section aria-label="Arhiva takmičenja">
-              <SectionLabel>Arhiva</SectionLabel>
               <div className="space-y-5">
-                {archiveYears.map((yr) => {
+                {visibleArchiveYears.map((yr) => {
                   const comps = archiveByYear.get(yr)!;
                   return (
                     <div key={yr}>
@@ -576,6 +576,14 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
                     </div>
                   );
                 })}
+                {!showAllArchive && archiveYears.length > 2 && (
+                  <Link
+                    href={archiveMoreHref}
+                    className="flex items-center justify-center gap-1.5 py-3 text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors hover:underline"
+                  >
+                    Prikaži {archiveYears.length - 2} {archiveYears.length - 2 === 1 ? "stariju godinu" : "starije godine"} →
+                  </Link>
+                )}
               </div>
             </section>
           )}
