@@ -220,17 +220,18 @@ function CompRow({
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; archiveAll?: string }>;
+  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; archiveAll?: string; when?: string }>;
 }
 
 export default async function TakmicenjaPage({ searchParams }: Props) {
-  const { year, level, q, tag, view, archiveAll } = await searchParams;
+  const { year, level, q, tag, view, archiveAll, when } = await searchParams;
 
   const activeYear  = year  && /^\d{4}$/.test(year)  ? year  : "all";
   const activeLevel = level && level !== "all"        ? level : "all";
   const activeQ     = q?.trim() ?? "";
   const activeTag   = tag?.trim() ?? "";
   const activeView  = view === "cal" ? "cal" : "list";
+  const activeWhen  = when === "past" ? "past" : "upcoming";
 
   // Date boundaries
   const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -341,14 +342,19 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
   const showAllArchive = archiveAll === "1";
   const visibleArchiveYears = showAllArchive ? archiveYears : archiveYears.slice(0, 2);
 
-  // Build "show more archive" URL preserving current filters
-  const archiveMoreParams = new URLSearchParams();
-  if (activeQ) archiveMoreParams.set("q", activeQ);
-  if (activeYear !== "all") archiveMoreParams.set("year", activeYear);
-  if (activeLevel !== "all") archiveMoreParams.set("level", activeLevel);
-  if (activeTag) archiveMoreParams.set("tag", activeTag);
-  archiveMoreParams.set("archiveAll", "1");
-  const archiveMoreHref = `/takmicenja?${archiveMoreParams.toString()}`;
+  // URL builder preserving current filters
+  function filterParams(extra: Record<string, string> = {}) {
+    const p = new URLSearchParams();
+    if (activeQ) p.set("q", activeQ);
+    if (activeYear !== "all") p.set("year", activeYear);
+    if (activeLevel !== "all") p.set("level", activeLevel);
+    if (activeTag) p.set("tag", activeTag);
+    for (const [k, v] of Object.entries(extra)) if (v) p.set(k, v);
+    return `/takmicenja?${p.toString()}`;
+  }
+
+  const whenHref = (w: string) => filterParams(w === "past" ? { when: "past" } : {});
+  const archiveMoreHref = filterParams({ when: "past", archiveAll: "1" });
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
@@ -390,7 +396,37 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
         <KalendarClient competitions={calComps} />
       )}
 
-      {/* List view — empty state */}
+      {/* When toggle — list view only */}
+      {activeView === "list" && (
+        <div className="flex border-b border-[var(--border)] mb-6 -mx-4 px-4 sm:mx-0 sm:px-0" role="tablist" aria-label="Vremenski period">
+          {(["upcoming", "past"] as const).map((w) => {
+            const label = w === "upcoming" ? "Nadolazeća" : "Prošla";
+            const count = w === "upcoming" ? live.length + upcoming.length : recent.length + archive.length;
+            const active = activeWhen === w;
+            return (
+              <Link
+                key={w}
+                href={whenHref(w)}
+                role="tab"
+                aria-selected={active}
+                scroll={false}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                  active
+                    ? "border-[var(--ink)] text-[var(--ink)]"
+                    : "border-transparent text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--border-strong)]"
+                }`}
+              >
+                {label}
+                <span className={`text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] tabular-nums transition-colors ${active ? "text-[var(--muted)]" : "text-[var(--subtle)]"}`}>
+                  {count}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* List view — empty state (no SQL results) */}
       {activeView === "list" && filtered.length === 0 && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 flex flex-col items-center gap-3">
           <p className="text-sm text-[var(--muted)] text-center max-w-none">
@@ -410,8 +446,20 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
       {activeView === "list" && filtered.length > 0 && (
         <div className="space-y-10">
 
+          {/* ── UPCOMING TAB ──────────────────────────────────────────── */}
+          {activeWhen === "upcoming" && live.length === 0 && upcoming.length === 0 && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 flex flex-col items-center gap-3">
+              <p className="text-sm text-[var(--muted)] text-center max-w-none">
+                Nema nadolazećih takmičenja za izabrane filtere.
+              </p>
+              <Link href={whenHref("past")} className="text-xs text-[var(--brand-primary)] hover:underline">
+                Pogledaj prošla →
+              </Link>
+            </div>
+          )}
+
           {/* ── LIVE ──────────────────────────────────────────────────── */}
-          {live.length > 0 && (
+          {activeWhen === "upcoming" && live.length > 0 && (
             <section aria-label="Takmičenja u toku">
               <div className="flex items-center gap-2 mb-3">
                 <span className="relative flex h-2 w-2 shrink-0">
@@ -438,7 +486,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
           )}
 
           {/* ── UPCOMING ──────────────────────────────────────────────── */}
-          {upcoming.length > 0 && (
+          {activeWhen === "upcoming" && upcoming.length > 0 && (
             <section aria-label="Nadolazeća takmičenja">
   
               {/* Hero card */}
@@ -537,8 +585,17 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
             </section>
           )}
 
+          {/* ── PAST TAB empty state ──────────────────────────────────── */}
+          {activeWhen === "past" && recent.length === 0 && archive.length === 0 && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 flex flex-col items-center gap-3">
+              <p className="text-sm text-[var(--muted)] text-center max-w-none">
+                Nema prošlih takmičenja za izabrane filtere.
+              </p>
+            </div>
+          )}
+
           {/* ── RECENTLY FINISHED ─────────────────────────────────────── */}
-          {recent.length > 0 && (
+          {activeWhen === "past" && recent.length > 0 && (
             <section aria-label="Nedavno završena takmičenja">
               <div className="rounded-xl border border-[var(--border)] overflow-hidden">
                 {recent.map((c, i) => (
@@ -549,7 +606,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
           )}
 
           {/* ── ARCHIVE ───────────────────────────────────────────────── */}
-          {archive.length > 0 && (
+          {activeWhen === "past" && archive.length > 0 && (
             <section aria-label="Arhiva takmičenja">
               <div className="space-y-5">
                 {visibleArchiveYears.map((yr) => {
