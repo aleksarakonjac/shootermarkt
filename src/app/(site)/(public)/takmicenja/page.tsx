@@ -353,20 +353,12 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
   const upcomingByMonth = groupByMonth(upcomingRest);
   const upcomingMonths = [...upcomingByMonth.keys()].sort();
 
-  // Recent grouped by month
-  const recentByMonth = groupByMonth(recent);
-  const recentMonths = [...recentByMonth.keys()].sort((a, b) => b.localeCompare(a));
-
-  // Archive grouped by year
-  const archiveByYear = new Map<string, CompItem[]>();
-  for (const c of archive) {
-    const y = c.date.slice(0, 4);
-    if (!archiveByYear.has(y)) archiveByYear.set(y, []);
-    archiveByYear.get(y)!.push(c);
-  }
-  const archiveYears = [...archiveByYear.keys()].sort((a, b) => b.localeCompare(a));
+  // Past (recent + archive) unified, grouped by month, most recent first
+  const pastAll = [...recent, ...archive].sort((a, b) => b.date.localeCompare(a.date));
+  const pastByMonth = groupByMonth(pastAll);
+  const pastMonths = [...pastByMonth.keys()].sort((a, b) => b.localeCompare(a));
   const showAllArchive = archiveAll === "1";
-  const visibleArchiveYears = showAllArchive ? archiveYears : archiveYears.slice(0, 2);
+  const visiblePastMonths = showAllArchive ? pastMonths : pastMonths.slice(0, 6);
 
   // URL builder preserving current filters
   function filterParams(extra: Record<string, string> = {}) {
@@ -380,7 +372,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
   }
 
   const whenHref = (w: string) => filterParams(w === "past" ? { when: "past" } : {});
-  const archiveMoreHref = filterParams({ when: "past", archiveAll: "1" });
+  const pastMoreHref = filterParams({ when: "past", archiveAll: "1" });
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
@@ -623,8 +615,8 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
             </section>
           )}
 
-          {/* ── PAST TAB empty state ──────────────────────────────────── */}
-          {activeWhen === "past" && recent.length === 0 && archive.length === 0 && (
+          {/* ── PAST TAB — all past unified by month ─────────────────── */}
+          {activeWhen === "past" && pastAll.length === 0 && (
             <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 flex flex-col items-center gap-3">
               <p className="text-sm text-[var(--muted)] text-center max-w-none">
                 Nema prošlih takmičenja za izabrane filtere.
@@ -632,12 +624,11 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
             </div>
           )}
 
-          {/* ── RECENTLY FINISHED — grouped by month ──────────────────── */}
-          {activeWhen === "past" && recent.length > 0 && (
-            <section aria-label="Nedavno završena takmičenja">
+          {activeWhen === "past" && pastAll.length > 0 && (
+            <section aria-label="Prošla takmičenja">
               <div className="space-y-5">
-                {recentMonths.map((mk) => {
-                  const comps = recentByMonth.get(mk)!;
+                {visiblePastMonths.map((mk) => {
+                  const comps = pastByMonth.get(mk)!;
                   return (
                     <div key={mk}>
                       <div className="flex items-center gap-3 mb-2">
@@ -653,44 +644,12 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
                     </div>
                   );
                 })}
-              </div>
-            </section>
-          )}
-
-          {/* ── ARCHIVE ───────────────────────────────────────────────── */}
-          {activeWhen === "past" && archive.length > 0 && (
-            <section aria-label="Arhiva takmičenja">
-              <div className="space-y-5">
-                {visibleArchiveYears.map((yr) => {
-                  const comps = archiveByYear.get(yr)!;
-                  return (
-                    <div key={yr}>
-                      <div className="flex items-center gap-3 mb-2">
-                        <span
-                          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-[var(--muted)] leading-none select-none tabular-nums"
-                          style={{ fontSize: "clamp(1.3rem, 2.5vw, 1.55rem)", letterSpacing: "-0.03em" }}
-                        >
-                          {yr}
-                        </span>
-                        <div className="flex-1 h-px bg-[var(--border)]" />
-                        <span className="text-[0.65rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
-                          {comps.length}
-                        </span>
-                      </div>
-                      <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-                        {comps.map((c, i) => (
-                          <CompRow key={c.id} comp={c} isLast={i === comps.length - 1} showCountdown={false} />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-                {!showAllArchive && archiveYears.length > 2 && (
+                {!showAllArchive && pastMonths.length > 6 && (
                   <Link
-                    href={archiveMoreHref}
+                    href={pastMoreHref}
                     className="flex items-center justify-center gap-1.5 py-3 text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors hover:underline"
                   >
-                    Prikaži {archiveYears.length - 2} {archiveYears.length - 2 === 1 ? "stariju godinu" : "starije godine"} →
+                    Prikaži {pastMonths.length - 6} starijih meseci →
                   </Link>
                 )}
               </div>
