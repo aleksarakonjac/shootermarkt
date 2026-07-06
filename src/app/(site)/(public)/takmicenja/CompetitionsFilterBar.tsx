@@ -15,8 +15,6 @@ const LEVELS: { value: CompetitionLevel | "all"; label: string }[] = [
   { value: "club",          label: "Klubsko"      },
 ];
 
-const DISCS = ["ARM","ARW","APM","APW"] as const;
-
 const TAGS: { value: string; label: string; activeBg: string; activeColor: string }[] = [
   { value: "sss",  label: "SSS",  activeBg: "#f0fdf4", activeColor: "#15803d" },
   { value: "issf", label: "ISSF", activeBg: "#fef2f2", activeColor: "#b91c1c" },
@@ -29,7 +27,6 @@ interface Props {
   currentLevel: string;
   currentQ: string;
   currentTag: string;
-  currentDisc: string;
   totalCount: number;
 }
 
@@ -39,7 +36,6 @@ export function CompetitionsFilterBar({
   currentLevel,
   currentQ,
   currentTag,
-  currentDisc,
   totalCount,
 }: Props) {
   const router = useRouter();
@@ -71,8 +67,7 @@ export function CompetitionsFilterBar({
     currentQ ||
     currentYear !== "all" ||
     currentLevel !== "all" ||
-    currentTag ||
-    currentDisc !== "all";
+    currentTag;
 
   const pill =
     "px-2.5 py-1 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer";
@@ -114,46 +109,7 @@ export function CompetitionsFilterBar({
         )}
       </div>
 
-      {/* Row 2: discipline pills + divider + source tags */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <button
-          onClick={() => setParam("disc", "all")}
-          className={`${pill} font-[family-name:var(--font-jetbrains-mono)] ${currentDisc === "all" ? pillOn : pillOff}`}
-        >
-          Sve discipl.
-        </button>
-        {DISCS.map((d) => (
-          <button
-            key={d}
-            onClick={() => setParam("disc", d)}
-            className={`${pill} font-[family-name:var(--font-jetbrains-mono)] ${currentDisc === d ? pillOn : pillOff}`}
-          >
-            {d}
-          </button>
-        ))}
-
-        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
-
-        {TAGS.map((t) => {
-          const active = currentTag === t.value;
-          return (
-            <button
-              key={t.value}
-              onClick={() => setParam("tag", active ? "" : t.value)}
-              className={`${pill} font-[family-name:var(--font-jetbrains-mono)]`}
-              style={
-                active
-                  ? { background: t.activeBg, color: t.activeColor }
-                  : { background: "var(--surface-2)", color: "var(--muted)" }
-              }
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Row 3: year pills + divider + level pills */}
+      {/* Row 2: year pills + divider + level pills + divider + source tags */}
       <div className="flex items-center gap-1.5 flex-wrap">
         <button
           onClick={() => setParam("year", "all")}
@@ -182,6 +138,26 @@ export function CompetitionsFilterBar({
             {l.label}
           </button>
         ))}
+
+        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
+
+        {TAGS.map((t) => {
+          const active = currentTag === t.value;
+          return (
+            <button
+              key={t.value}
+              onClick={() => setParam("tag", active ? "" : t.value)}
+              className={`${pill} font-[family-name:var(--font-jetbrains-mono)]`}
+              style={
+                active
+                  ? { background: t.activeBg, color: t.activeColor }
+                  : { background: "var(--surface-2)", color: "var(--muted)" }
+              }
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
     </div>

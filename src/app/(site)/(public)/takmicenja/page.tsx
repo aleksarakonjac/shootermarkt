@@ -7,8 +7,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CompetitionsFilterBar } from "./CompetitionsFilterBar";
+import { ViewToggle } from "./ViewToggle";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
+import { KalendarClient, type CalendarComp } from "../kalendar/KalendarClient";
+import { asc } from "drizzle-orm";
 
 export const metadata: Metadata = { title: "Takmičenja" };
 
@@ -225,17 +228,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; disc?: string }>;
+  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string }>;
 }
 
 export default async function TakmicenjaPage({ searchParams }: Props) {
-  const { year, level, q, tag, disc } = await searchParams;
+  const { year, level, q, tag, view } = await searchParams;
 
   const activeYear  = year  && /^\d{4}$/.test(year)  ? year  : "all";
   const activeLevel = level && level !== "all"        ? level : "all";
   const activeQ     = q?.trim() ?? "";
   const activeTag   = tag?.trim() ?? "";
-  const activeDisc  = disc  && disc  !== "all"        ? disc  : "all";
+  const activeView  = view === "cal" ? "cal" : "list";
 
   // Date boundaries
   const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -252,7 +255,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
     activeTag   ? sql`${competitions.tags} @> ARRAY[${activeTag}]::varchar[]`       : undefined,
   ].filter(Boolean) as Parameters<typeof and>;
 
-  const [rows, yearRows] = await Promise.all([
+  const [rows, yearRows, calRows] = await Promise.all([
     db
       .select({
         id:              competitions.id,
@@ -283,16 +286,31 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
       .selectDistinct({ year: sql<string>`LEFT(${competitions.date}, 4)` })
       .from(competitions)
       .orderBy(desc(sql`LEFT(${competitions.date}, 4)`)),
+    db
+      .select({
+        id:      competitions.id,
+        name:    competitions.name,
+        date:    competitions.date,
+        dateEnd: competitions.dateEnd,
+        location: competitions.location,
+        level:   competitions.level,
+      })
+      .from(competitions)
+      .orderBy(asc(competitions.date)),
   ]);
 
   const availableYears = yearRows.map((r) => r.year).filter(Boolean) as string[];
 
-  // JS disc filter — upcoming always included (no results yet to filter on)
-  const filtered = rows.filter((c) => {
-    if (activeDisc === "all") return true;
-    if (c.date > todayStr) return true; // upcoming: always show
-    return (c.disciplineCodes ?? []).includes(activeDisc);
-  }) as CompItem[];
+  const filtered = rows as CompItem[];
+
+  const calComps: CalendarComp[] = calRows.map((r) => ({
+    id:       r.id,
+    name:     r.name,
+    date:     r.date,
+    dateEnd:  r.dateEnd ?? null,
+    location: r.location ?? null,
+    level:    r.level as CompetitionLevel,
+  }));
 
   // Temporal split
   const live = filtered.filter(
@@ -308,9 +326,11 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
     .filter((c) => c.date < recentCutoffStr)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  // Hero: highest-level upcoming, then soonest
+  const isFiltered = activeQ || activeYear !== "all" || activeLevel !== "all" || activeTag;
+
+  // Hero: only on unfiltered view
   const hero =
-    upcoming.length > 0
+    !isFiltered && upcoming.length > 0
       ? [...upcoming].sort(
           (a, b) =>
             (LEVEL_PRIORITY[a.level] ?? 9) - (LEVEL_PRIORITY[b.level] ?? 9) ||
@@ -327,47 +347,56 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
   }
   const archiveYears = [...archiveByYear.keys()].sort((a, b) => b.localeCompare(a));
 
-  const isFiltered = activeQ || activeYear !== "all" || activeLevel !== "all" || activeTag || activeDisc !== "all";
-
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
 
       {/* Header */}
-      <div className="mb-6">
-        <h1
-          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
-          style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
-        >
-          Takmičenja
-        </h1>
-        <p className="text-sm text-[var(--muted)] mt-1 max-w-[55ch]">
-          Kalendar i arhiva rezultata srpskog streljačkog sporta.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1
+            className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
+            style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
+          >
+            Takmičenja
+          </h1>
+          <p className="text-sm text-[var(--muted)] mt-1 max-w-[55ch]">
+            Kalendar i arhiva rezultata srpskog streljačkog sporta.
+          </p>
+        </div>
+        <Suspense fallback={<div className="w-[148px] h-9 rounded-lg bg-[var(--surface-2)]" />}>
+          <ViewToggle activeView={activeView} />
+        </Suspense>
       </div>
 
-      {/* Filter bar */}
-      <Suspense fallback={<div className="h-20 mb-6" />}>
-        <CompetitionsFilterBar
-          availableYears={availableYears}
-          currentYear={activeYear}
-          currentLevel={activeLevel}
-          currentQ={activeQ}
-          currentTag={activeTag}
-          currentDisc={activeDisc}
-          totalCount={filtered.length}
-        />
-      </Suspense>
+      {/* Filter bar — list view only */}
+      {activeView === "list" && (
+        <Suspense fallback={<div className="h-20 mb-6" />}>
+          <CompetitionsFilterBar
+            availableYears={availableYears}
+            currentYear={activeYear}
+            currentLevel={activeLevel}
+            currentQ={activeQ}
+            currentTag={activeTag}
+            totalCount={filtered.length}
+          />
+        </Suspense>
+      )}
 
-      {/* Empty state */}
-      {filtered.length === 0 && (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 text-center">
-          <p className="text-sm text-[var(--muted)]">
+      {/* Calendar view */}
+      {activeView === "cal" && (
+        <KalendarClient competitions={calComps} />
+      )}
+
+      {/* List view — empty state */}
+      {activeView === "list" && filtered.length === 0 && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 flex flex-col items-center gap-3">
+          <p className="text-sm text-[var(--muted)] text-center max-w-none">
             {isFiltered ? "Nema takmičenja za izabrane filtere." : "Još nema unetih takmičenja."}
           </p>
           {isFiltered && (
             <Link
               href="/takmicenja"
-              className="inline-block mt-3 text-xs text-[var(--brand-primary)] hover:underline"
+              className="text-xs text-[var(--brand-primary)] hover:underline"
             >
               Prikaži sva →
             </Link>
@@ -375,7 +404,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
         </div>
       )}
 
-      {filtered.length > 0 && (
+      {activeView === "list" && filtered.length > 0 && (
         <div className="space-y-10">
 
           {/* ── LIVE ──────────────────────────────────────────────────── */}

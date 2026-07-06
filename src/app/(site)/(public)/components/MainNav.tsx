@@ -50,7 +50,7 @@ function buildNav(t: TFn): NavGroup[] {
       label: t("competitions"),
       items: [
         { href: "/takmicenja", label: t("competitionList"),desc: t("competitionListDesc") },
-        { href: "/kalendar",   label: t("calendar"),       desc: t("calendarDesc") },
+        { href: "/takmicenja?view=cal", label: t("calendar"), desc: t("calendarDesc") },
       ],
     },
   ];

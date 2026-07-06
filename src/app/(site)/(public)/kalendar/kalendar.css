@@ -1,4 +1,4 @@
-/* Override react-calendar default styles with project design tokens */
+/* react-calendar overrides — project design tokens */
 .react-calendar {
   width: 100%;
   max-width: 420px;
@@ -10,7 +10,7 @@
   overflow: hidden;
 }
 
-/* Navigation bar */
+/* Navigation */
 .react-calendar__navigation {
   display: flex;
   align-items: center;
@@ -96,14 +96,12 @@
   justify-content: center;
   min-height: 44px;
   text-align: center;
-  aspect-ratio: auto;
 }
 
 .react-calendar__tile:hover:not(:disabled):not(.react-calendar__tile--active) {
   background: var(--surface-2);
 }
 
-/* Neighboring month days */
 .react-calendar__month-view__days__day--neighboringMonth {
   color: var(--subtle);
 }
@@ -118,32 +116,38 @@
   background: var(--border);
 }
 
-/* Selected day */
+/* Selected */
 .react-calendar__tile--active,
 .react-calendar__tile--active:hover {
   background: var(--brand-primary) !important;
   color: white !important;
 }
 
-/* Has events dot (applied via tileClassName) */
+/* ── Level-colored event dots ──────────────────────────────── */
 .tile-has-event::after {
   content: '';
   display: block;
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--brand-primary);
   position: absolute;
   bottom: 5px;
   left: 50%;
   transform: translateX(-50%);
 }
 
+.tile-level-club::after         { background: var(--subtle); }
+.tile-level-regional::after     { background: var(--brand-accent); }
+.tile-level-national::after     { background: var(--success); }
+.tile-level-intl::after         { background: oklch(0.52 0.15 220); }
+.tile-level-world::after        { background: var(--brand-primary); }
+
+/* Dot on selected tile */
 .react-calendar__tile--active.tile-has-event::after {
-  background: white;
+  background: rgba(255, 255, 255, 0.65);
 }
 
-/* Disable decade/year views — we only use month */
+/* Year/decade/century tiles */
 .react-calendar__year-view,
 .react-calendar__decade-view,
 .react-calendar__century-view {
@@ -155,4 +159,54 @@
 .react-calendar__century-view .react-calendar__tile {
   padding: 0.75rem 0.5rem;
   font-size: 0.8rem;
+}
+
+/* ── Countdown chip ────────────────────────────────────────── */
+.countdown-chip {
+  background: var(--brand-primary-light);
+  color: var(--brand-primary);
+}
+
+html.dark .countdown-chip {
+  background: oklch(0.28 0.06 28);
+  color: oklch(0.72 0.18 28);
+}
+
+/* ── List entrance animations ──────────────────────────────── */
+@keyframes kalendar-slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.kalendar-list {
+  animation: kalendar-slide-in 0.15s ease-out both;
+}
+
+.kalendar-item {
+  animation: kalendar-slide-in 0.2s ease-out both;
+  animation-delay: calc(min(var(--idx, 0), 8) * 50ms);
+}
+
+/* Don't animate past items to full opacity — keep at 0.6 */
+.kalendar-item.opacity-60 {
+  animation: kalendar-item-past 0.2s ease-out both;
+  animation-delay: calc(min(var(--idx, 0), 8) * 50ms);
+}
+
+@keyframes kalendar-item-past {
+  from { opacity: 0;   transform: translateY(8px); }
+  to   { opacity: 0.6; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kalendar-list,
+  .kalendar-item,
+  .kalendar-item.opacity-60 {
+    animation: none;
+    opacity: inherit;
+  }
+
+  .kalendar-item.opacity-60 {
+    opacity: 0.6;
+  }
 }

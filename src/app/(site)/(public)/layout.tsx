@@ -142,7 +142,7 @@ export default async function PublicLayout({
                     </Link>
                   </li>
                   <li>
-                    <Link href="/kalendar" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+                    <Link href="/takmicenja?view=cal" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
                       {t("calendar")}
                     </Link>
                   </li>
