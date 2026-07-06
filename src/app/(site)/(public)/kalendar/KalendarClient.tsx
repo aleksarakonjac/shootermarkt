@@ -19,21 +19,21 @@ interface Props {
   competitions: CalendarComp[];
 }
 
-type LevelFilter = "all" | "national" | "regional" | "international" | "club";
+type LevelFilter = "all" | "olympic" | "world" | "continental" | "international" | "national" | "regional" | "club";
 
 const FILTER_TABS: { key: LevelFilter; label: string }[] = [
-  { key: "all",           label: "Svi" },
-  { key: "national",      label: "Državno" },
-  { key: "regional",      label: "Regionalno" },
-  { key: "international", label: "Međunarodno" },
-  { key: "club",          label: "Klubsko" },
+  { key: "all",           label: "Svi"           },
+  { key: "olympic",       label: "Olimpijsko"    },
+  { key: "world",         label: "Svetsko"       },
+  { key: "continental",   label: "Kontinentalno" },
+  { key: "international", label: "Međunarodno"   },
+  { key: "national",      label: "Državno"       },
+  { key: "regional",      label: "Regionalno"    },
+  { key: "club",          label: "Klubsko"       },
 ];
-
-const INTL_LEVELS: CompetitionLevel[] = ["international", "continental", "world", "olympic"];
 
 function levelMatchesFilter(level: CompetitionLevel, filter: LevelFilter): boolean {
   if (filter === "all") return true;
-  if (filter === "international") return INTL_LEVELS.includes(level);
   return level === filter;
 }
 
@@ -151,7 +151,14 @@ export function KalendarClient({ competitions }: Props) {
       <div className="w-full lg:w-auto lg:shrink-0 lg:sticky lg:top-[88px]">
         <Calendar
           value={selectedDate}
-          onChange={(val) => setSelectedDate(val as Date | null)}
+          onChange={(val) => {
+            const clicked = val as Date | null;
+            if (clicked && selectedDate && toKey(clicked) === toKey(selectedDate)) {
+              setSelectedDate(null);
+            } else {
+              setSelectedDate(clicked);
+            }
+          }}
           activeStartDate={activeStartDate}
           onActiveStartDateChange={({ activeStartDate: d }) => {
             if (d) {
@@ -185,18 +192,9 @@ export function KalendarClient({ competitions }: Props) {
           minDetail="year"
           className="shadow-sm"
         />
-        {selectedDate ? (
-          <button
-            onClick={() => setSelectedDate(null)}
-            className="mt-2.5 w-full text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors py-1.5 rounded-lg hover:bg-[var(--surface-2)]"
-          >
-            ← Prikaži ceo mesec
-          </button>
-        ) : (
-          <p className="mt-2 text-center text-[0.65rem] text-[var(--subtle)]">
-            Klikni naziv meseca za pregled godine
-          </p>
-        )}
+        <p className="mt-2 text-center text-[0.65rem] text-[var(--subtle)]">
+          Klikni naziv meseca za pregled godine
+        </p>
       </div>
 
       {/* ── List panel ────────────────────────────────────────── */}
@@ -213,7 +211,7 @@ export function KalendarClient({ competitions }: Props) {
               key={tab.key}
               onClick={() => setLevelFilter(tab.key)}
               aria-pressed={levelFilter === tab.key}
-              className={`shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-colors ${
+              className={`shrink-0 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${
                 levelFilter === tab.key
                   ? "bg-[var(--brand-primary)] text-white"
                   : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]"
@@ -225,13 +223,26 @@ export function KalendarClient({ competitions }: Props) {
         </div>
 
         {/* Title row */}
-        <div className="flex items-baseline justify-between mb-5 gap-3">
-          <h2
-            className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
-            style={{ fontSize: "clamp(1.1rem, 2.5vw, 1.5rem)", letterSpacing: "-0.02em" }}
-          >
-            {listTitle}
-          </h2>
+        <div className="flex items-center justify-between mb-5 gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <h2
+              className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] shrink-0"
+              style={{ fontSize: "clamp(1.1rem, 2.5vw, 1.5rem)", letterSpacing: "-0.02em" }}
+            >
+              {listTitle}
+            </h2>
+            {selectedDate && (
+              <button
+                onClick={() => setSelectedDate(null)}
+                className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-[0.7rem] font-semibold bg-[var(--surface-2)] text-[var(--muted)] hover:bg-[var(--border)] hover:text-[var(--ink)] transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                  <path d="M6.5 2L3.5 5L6.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                </svg>
+                Ceo mesec
+              </button>
+            )}
+          </div>
           <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] shrink-0">
             {listComps.length} {listComps.length === 1 ? "takmičenje" : "takmičenja"}
           </span>

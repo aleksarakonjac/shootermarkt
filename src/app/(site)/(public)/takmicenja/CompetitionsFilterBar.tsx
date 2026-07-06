@@ -86,7 +86,7 @@ export function CompetitionsFilterBar({
 
   const pill =
     "px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer";
-  const pillOn  = "bg-[var(--ink)] text-[var(--bg)]";
+  const pillOn  = "bg-[var(--brand-primary)] text-white";
   const pillOff = "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]";
 
   return (
