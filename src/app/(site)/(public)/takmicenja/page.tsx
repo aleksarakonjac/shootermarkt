@@ -358,7 +358,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
   const pastByMonth = groupByMonth(pastAll);
   const pastMonths = [...pastByMonth.keys()].sort((a, b) => b.localeCompare(a));
   const showAllArchive = archiveAll === "1";
-  const visiblePastMonths = showAllArchive ? pastMonths : pastMonths.slice(0, 6);
+  const visiblePastMonths = showAllArchive ? pastMonths : pastMonths.slice(0, 12);
 
   // URL builder preserving current filters
   function filterParams(extra: Record<string, string> = {}) {
@@ -644,12 +644,12 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
                     </div>
                   );
                 })}
-                {!showAllArchive && pastMonths.length > 6 && (
+                {!showAllArchive && pastMonths.length > 12 && (
                   <Link
                     href={pastMoreHref}
                     className="flex items-center justify-center gap-1.5 py-3 text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors hover:underline"
                   >
-                    Prikaži {pastMonths.length - 6} starijih meseci →
+                    Prikaži {pastMonths.length - 12} starijih meseci →
                   </Link>
                 )}
               </div>
