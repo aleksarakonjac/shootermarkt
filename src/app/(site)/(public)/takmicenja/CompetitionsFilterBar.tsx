@@ -1,18 +1,18 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 
 const LEVELS: { value: CompetitionLevel | "all"; label: string }[] = [
-  { value: "all",           label: "Svi"          },
-  { value: "olympic",       label: "Olimpijsko"   },
-  { value: "world",         label: "Svetsko"      },
-  { value: "continental",   label: "Kontinent."   },
-  { value: "international", label: "Međunar."     },
-  { value: "national",      label: "Državno"      },
-  { value: "regional",      label: "Regionalno"   },
-  { value: "club",          label: "Klubsko"      },
+  { value: "all",           label: "Svi"           },
+  { value: "olympic",       label: "Olimpijsko"    },
+  { value: "world",         label: "Svetsko"       },
+  { value: "continental",   label: "Kontinentalno" },
+  { value: "international", label: "Međunarodno"   },
+  { value: "national",      label: "Državno"       },
+  { value: "regional",      label: "Regionalno"    },
+  { value: "club",          label: "Klubsko"       },
 ];
 
 const TAGS: { value: string; label: string; activeBg: string; activeColor: string }[] = [
@@ -41,6 +41,8 @@ export function CompetitionsFilterBar({
   const router = useRouter();
   const searchParams = useSearchParams();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [yearOpen, setYearOpen] = useState(false);
+  const yearRef = useRef<HTMLDivElement>(null);
 
   const setParam = useCallback(
     (key: string, value: string) => {
@@ -63,10 +65,24 @@ export function CompetitionsFilterBar({
     [setParam]
   );
 
-  const hasFilters =
-    currentQ ||
-    currentLevel !== "all" ||
-    currentTag;
+  // Close year dropdown on outside click or Escape
+  useEffect(() => {
+    if (!yearOpen) return;
+    function onDown(e: MouseEvent) {
+      if (yearRef.current && !yearRef.current.contains(e.target as Node)) setYearOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setYearOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [yearOpen]);
+
+  const hasFilters = currentQ || currentLevel !== "all" || currentTag;
 
   const pill =
     "px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer";
@@ -110,24 +126,49 @@ export function CompetitionsFilterBar({
 
       {/* Row 2: year dropdown + divider + level pills + divider + source tags */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        <div className="relative shrink-0">
-          <select
-            value={currentYear}
-            onChange={(e) => setParam("year", e.target.value)}
+
+        {/* Year — custom dropdown */}
+        <div ref={yearRef} className="relative shrink-0">
+          <button
+            onClick={() => setYearOpen((v) => !v)}
+            aria-haspopup="listbox"
+            aria-expanded={yearOpen}
             aria-label="Filter po godini"
-            className="appearance-none pl-2.5 pr-6 py-2 rounded-md text-xs font-semibold cursor-pointer bg-[var(--ink)] text-[var(--bg)] border-0 outline-none focus:ring-2 focus:ring-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)]"
+            className={`${pill} ${pillOn} font-[family-name:var(--font-jetbrains-mono)] flex items-center gap-1.5`}
           >
-            {availableYears.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          <svg
-            width="10" height="10" viewBox="0 0 10 10"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--bg)] opacity-70"
-            aria-hidden="true"
-          >
-            <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-          </svg>
+            {currentYear}
+            <svg
+              width="10" height="10" viewBox="0 0 10 10"
+              className={`shrink-0 transition-transform duration-150 ${yearOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            >
+              <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            </svg>
+          </button>
+
+          {yearOpen && (
+            <div
+              role="listbox"
+              aria-label="Godina"
+              className="absolute top-[calc(100%+4px)] left-0 z-[var(--z-dropdown)] min-w-[80px] rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-[0_4px_16px_oklch(0_0_0/0.12)] py-1 overflow-hidden"
+            >
+              {availableYears.map((y) => (
+                <button
+                  key={y}
+                  role="option"
+                  aria-selected={y === currentYear}
+                  onClick={() => { setParam("year", y); setYearOpen(false); }}
+                  className={`w-full text-left px-3 py-2 text-xs font-semibold font-[family-name:var(--font-jetbrains-mono)] transition-colors ${
+                    y === currentYear
+                      ? "bg-[var(--surface-2)] text-[var(--ink)]"
+                      : "text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)]"
+                  }`}
+                >
+                  {y}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
