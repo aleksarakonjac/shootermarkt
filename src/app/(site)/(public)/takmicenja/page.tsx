@@ -243,12 +243,13 @@ interface Props {
 export default async function TakmicenjaPage({ searchParams }: Props) {
   const { year, level, q, tag, view, archiveAll, when } = await searchParams;
 
-  const activeYear  = year  && /^\d{4}$/.test(year)  ? year  : "all";
-  const activeLevel = level && level !== "all"        ? level : "all";
-  const activeQ     = q?.trim() ?? "";
-  const activeTag   = tag?.trim() ?? "";
-  const activeView  = view === "cal" ? "cal" : "list";
-  const activeWhen  = when === "past" ? "past" : "upcoming";
+  const defaultYear  = new Date().getFullYear().toString();
+  const activeYear   = year && /^\d{4}$/.test(year) ? year : defaultYear;
+  const activeLevel  = level && level !== "all"     ? level : "all";
+  const activeQ      = q?.trim() ?? "";
+  const activeTag    = tag?.trim() ?? "";
+  const activeView   = view === "cal" ? "cal" : "list";
+  const activeWhen   = when === "past" ? "past" : "upcoming";
 
   // Date boundaries
   const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -336,7 +337,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
     .filter((c) => c.date < recentCutoffStr)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const isFiltered = activeQ || activeYear !== "all" || activeLevel !== "all" || activeTag;
+  const isFiltered = activeQ || activeYear !== defaultYear || activeLevel !== "all" || activeTag;
 
   // Hero: only on unfiltered view
   const hero =
@@ -364,7 +365,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
   function filterParams(extra: Record<string, string> = {}) {
     const p = new URLSearchParams();
     if (activeQ) p.set("q", activeQ);
-    if (activeYear !== "all") p.set("year", activeYear);
+    p.set("year", activeYear);
     if (activeLevel !== "all") p.set("level", activeLevel);
     if (activeTag) p.set("tag", activeTag);
     for (const [k, v] of Object.entries(extra)) if (v) p.set(k, v);

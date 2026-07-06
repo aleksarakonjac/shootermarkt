@@ -65,7 +65,6 @@ export function CompetitionsFilterBar({
 
   const hasFilters =
     currentQ ||
-    currentYear !== "all" ||
     currentLevel !== "all" ||
     currentTag;
 
@@ -109,24 +108,26 @@ export function CompetitionsFilterBar({
         )}
       </div>
 
-      {/* Row 2: year pills + divider + level pills + divider + source tags */}
+      {/* Row 2: year dropdown + divider + level pills + divider + source tags */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        <div role="group" aria-label="Filter po godini" className="contents">
-          <button
-            onClick={() => setParam("year", "all")}
-            className={`${pill} font-[family-name:var(--font-jetbrains-mono)] ${currentYear === "all" ? pillOn : pillOff}`}
+        <div className="relative shrink-0">
+          <select
+            value={currentYear}
+            onChange={(e) => setParam("year", e.target.value)}
+            aria-label="Filter po godini"
+            className="appearance-none pl-2.5 pr-6 py-2 rounded-md text-xs font-semibold cursor-pointer bg-[var(--ink)] text-[var(--bg)] border-0 outline-none focus:ring-2 focus:ring-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)]"
           >
-            Sve god.
-          </button>
-          {availableYears.map((y) => (
-            <button
-              key={y}
-              onClick={() => setParam("year", y)}
-              className={`${pill} font-[family-name:var(--font-jetbrains-mono)] ${currentYear === y ? pillOn : pillOff}`}
-            >
-              {y}
-            </button>
-          ))}
+            {availableYears.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <svg
+            width="10" height="10" viewBox="0 0 10 10"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--bg)] opacity-70"
+            aria-hidden="true"
+          >
+            <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          </svg>
         </div>
 
         <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
