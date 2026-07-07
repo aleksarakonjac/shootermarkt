@@ -18,7 +18,7 @@ const MONTHS_SR = [
   "Januar", "Februar", "Mart", "April", "Maj", "Jun",
   "Jul", "Avgust", "Septembar", "Oktobar", "Novembar", "Decembar",
 ];
-const DAYS_SR = ["Po", "Ut", "Sr", "Če", "Pe", "Su", "Ne"];
+const DAYS_SR = ["Pon", "Uto", "Sre", "Čet", "Pet", "Sub", "Ned"];
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -65,6 +65,11 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
     if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
     else setViewMonth(m => m + 1);
   };
+  // Return to the current month/year
+  const goToCurrent = () => {
+    setViewMonth(today.getMonth());
+    setViewYear(today.getFullYear());
+  };
 
   const cells: (number | null)[] = [
     ...Array(firstDay).fill(null),
@@ -76,10 +81,12 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
 
   const hoveredComps = hoveredDate ? (compsByDate.get(hoveredDate) ?? []) : [];
 
+  const isCurrent = viewMonth === today.getMonth() && viewYear === today.getFullYear();
+
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)]">
       {/* Header */}
-      <div className="bg-[var(--brand-accent)] px-4 py-3 flex items-center justify-between">
+      <div className="bg-[var(--brand-accent)] rounded-t-xl px-4 py-3 flex items-center justify-between">
         <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-white uppercase tracking-wider">
           Kalendar Takmičenja
         </h3>
@@ -101,6 +108,15 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
           >
             ›
           </button>
+          {!isCurrent && (
+            <button
+              onClick={goToCurrent}
+              className="w-9 h-9 flex items-center justify-center rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors text-2xl font-bold"
+              aria-label="Tekući mesec"
+            >
+              ⟳
+            </button>
+          )}
         </div>
       </div>
 

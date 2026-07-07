@@ -4,11 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { LevelDropdown } from "@/components/ui/LevelDropdown";
+import { TranslatedNameInput } from "@/components/ui/TranslatedNameInput";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 
 interface Competition {
   id: number;
   name: string;
+  nameSr?: string | null;
+  nameEn?: string | null;
   date: string;
   dateEnd?: string | null;
   location: string | null;
@@ -17,6 +20,10 @@ interface Competition {
 }
 
 const inputCls = "w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]";
+
+function detectLang(text: string): "sr" | "en" {
+  return /[čćšđžČĆŠĐŽ]/.test(text) ? "sr" : "en";
+}
 
 export function CompetitionEditClient({ competition }: { competition: Competition }) {
   const router = useRouter();
@@ -27,6 +34,8 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
 
   const [form, setForm] = useState({
     name: competition.name,
+    nameSr: competition.nameSr ?? "",
+    nameEn: competition.nameEn ?? "",
     date: competition.date,
     dateEnd: competition.dateEnd ?? "",
     location: competition.location ?? "",
@@ -75,6 +84,8 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
     }
   }
 
+  const detectedLang = detectLang(form.name);
+
   return (
     <div className="max-w-lg">
       <div className="mb-6">
@@ -104,6 +115,27 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
               onChange={(e) => set("name", e.target.value)}
               required
               className={inputCls}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <TranslatedNameInput
+              sourceName={form.name}
+              from={detectedLang}
+              to="sr"
+              value={form.nameSr}
+              onChange={(v) => set("nameSr", v)}
+              label="Naziv (SR)"
+              placeholder="Srpski naziv"
+            />
+            <TranslatedNameInput
+              sourceName={form.name}
+              from={detectedLang}
+              to="en"
+              value={form.nameEn}
+              onChange={(v) => set("nameEn", v)}
+              label="Naziv (EN)"
+              placeholder="English name"
             />
           </div>
 

@@ -56,6 +56,51 @@ export const Articles: CollectionConfig = {
       required: true,
     },
     {
+      name: "category",
+      type: "select",
+      admin: { position: "sidebar" },
+      options: [
+        { label: "Vest", value: "vest" },
+        { label: "Analiza", value: "analiza" },
+        { label: "Takmičenje", value: "takmicenje" },
+        { label: "Oprema", value: "oprema" },
+        { label: "Intervju", value: "intervju" },
+        { label: "Rezultati", value: "rezultati" },
+      ],
+    },
+    {
+      name: "tags",
+      type: "array",
+      admin: { description: "Tagovi za tematsko grupisanje — mogu biti slobodna tema, takmičenje iz baze ili strelac." },
+      fields: [
+        {
+          name: "type",
+          type: "select",
+          required: true,
+          defaultValue: "topic",
+          options: [
+            { label: "Tema", value: "topic" },
+            { label: "Takmičenje", value: "competition" },
+            { label: "Strelac", value: "shooter" },
+          ],
+        },
+        {
+          name: "label",
+          type: "text",
+          required: true,
+          admin: { description: "Prikazani naziv taga" },
+        },
+        {
+          name: "refId",
+          type: "number",
+          admin: {
+            description: "ID takmičenja ili strelca iz glavne baze (opciono)",
+            condition: (_, siblingData) => siblingData?.type !== "topic",
+          },
+        },
+      ],
+    },
+    {
       name: "author",
       type: "relationship",
       relationTo: "cms-users",

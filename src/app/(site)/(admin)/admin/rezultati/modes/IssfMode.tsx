@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
+import { LevelDropdown } from "@/components/ui/LevelDropdown";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
 
@@ -13,13 +14,6 @@ interface CommitResult { inserted: number; skipped: number; errors: string[]; co
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i);
 
-const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "world",       label: "Svetsko (ISSF)"    },
-  { value: "continental", label: "Kontinentalno"     },
-  { value: "national",    label: "Državno"           },
-  { value: "regional",    label: "Regionalno"        },
-  { value: "olympic",     label: "Olimpijsko"        },
-];
 
 export function IssfMode() {
   const [step, setStep] = useState<Step>("select");
@@ -114,34 +108,39 @@ export function IssfMode() {
         <>
           <div className="rounded-xl border border-[var(--border)] p-5 space-y-4">
             <h3 className="text-sm font-semibold text-[var(--ink)]">Odaberi godinu i nivo</h3>
-            <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Godina</label>
-                <select
-                  value={year}
-                  onChange={(e) => { setYear(parseInt(e.target.value)); setCompsLoaded(false); setComps([]); setSelected(null); }}
-                  className="rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-                >
-                  {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-                </select>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1.5">Godina</label>
+                <div className="flex gap-1 flex-wrap">
+                  {YEARS.map((y) => (
+                    <button
+                      key={y}
+                      onClick={() => { setYear(y); setCompsLoaded(false); setComps([]); setSelected(null); }}
+                      className="px-3 py-1 rounded text-sm font-bold transition-colors font-[family-name:var(--font-jetbrains-mono)]"
+                      style={
+                        year === y
+                          ? { background: "var(--ink)", color: "var(--bg)" }
+                          : { background: "var(--surface-2)", color: "var(--muted)" }
+                      }
+                    >
+                      {y}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Nivo u bazi</label>
-                <select
-                  value={compLevel}
-                  onChange={(e) => setCompLevel(e.target.value as CompetitionLevel)}
-                  className="rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="w-56">
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1.5">Nivo u bazi</label>
+                  <LevelDropdown value={compLevel} onChange={(v) => setCompLevel(v as CompetitionLevel)} />
+                </div>
+                <button
+                  onClick={loadComps}
+                  disabled={loading}
+                  className="rounded-md px-5 py-2 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
                 >
-                  {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                </select>
+                  {loading ? "Učitavam…" : "Učitaj takmičenja"}
+                </button>
               </div>
-              <button
-                onClick={loadComps}
-                disabled={loading}
-                className="rounded-md px-5 py-2 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
-              >
-                {loading ? "Učitavam…" : "Učitaj takmičenja"}
-              </button>
             </div>
           </div>
 

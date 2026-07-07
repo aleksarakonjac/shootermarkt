@@ -19,6 +19,7 @@ interface NavSubItem {
 interface NavGroup {
   key: string;
   label: string;
+  directHref?: string;
   items: NavSubItem[];
 }
 
@@ -52,6 +53,12 @@ function buildNav(t: TFn): NavGroup[] {
         { href: "/takmicenja", label: t("competitionList"),desc: t("competitionListDesc") },
         { href: "/takmicenja?view=cal", label: t("calendar"), desc: t("calendarDesc") },
       ],
+    },
+    {
+      key: "vesti",
+      label: "Vesti",
+      directHref: "/vesti",
+      items: [],
     },
   ];
 }
@@ -152,6 +159,26 @@ export function MainNav() {
         {NAV.map((group) => {
           const active = isGroupActive(group);
           const open = openKey === group.key;
+
+          if (group.directHref) {
+            const active = pathname.startsWith(group.directHref);
+            return (
+              <Link
+                key={group.key}
+                href={group.directHref}
+                className={`relative px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 ${
+                  active
+                    ? "text-[var(--brand-primary)]"
+                    : "text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)]"
+                }`}
+              >
+                {group.label}
+                {active && (
+                  <span className="absolute bottom-0.5 left-3 right-3 h-0.5 bg-[var(--brand-primary)] rounded-full" />
+                )}
+              </Link>
+            );
+          }
 
           return (
             <div
@@ -293,6 +320,22 @@ export function MainNav() {
         {/* Nav links */}
         <nav className="flex-1 overflow-y-auto py-2" aria-label={tCommon("mobileNav")}>
           {NAV.map((group) => {
+            if (group.directHref) {
+              const active = pathname.startsWith(group.directHref);
+              return (
+                <Link
+                  key={group.key}
+                  href={group.directHref}
+                  onClick={() => setMobileOpen(false)}
+                  className={`block px-4 py-3 text-sm font-semibold transition-colors hover:bg-[var(--surface-2)] ${
+                    active ? "text-[var(--brand-primary)]" : "text-[var(--ink)]"
+                  }`}
+                >
+                  {group.label}
+                </Link>
+              );
+            }
+
             const isExpanded = openMobileGroup === group.key;
             const active = isGroupActive(group);
 

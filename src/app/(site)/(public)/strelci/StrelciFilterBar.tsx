@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { NOC_LIST } from "@/components/ui/NocDropdown";
+import { NOC_LIST } from "@/lib/noc-list";
+import { SearchDropdown } from "@/components/ui/SearchDropdown";
 
 interface Props {
   availableNocs: string[];
   currentQ: string;
   currentZemlja: string;
   currentPol: string;
+  currentAparat: string;
   totalCount: number;
   shownCount: number;
   page: number;
@@ -21,38 +23,53 @@ const GENDER_OPTIONS = [
   ["F", "Ženski"],
 ] as const;
 
+const APARAT_OPTIONS = [
+  { value: "",       label: "Sve"     },
+  { value: "rifle",  label: "Puška"   },
+  { value: "pistol", label: "Pištolj" },
+] as const;
+
 export function StrelciFilterBar({
   availableNocs,
   currentQ,
   currentZemlja,
   currentPol,
+  currentAparat,
   totalCount,
   shownCount,
   page,
   totalPages,
 }: Props) {
-  const router = useRouter();
+  const router   = useRouter();
   const pathname = usePathname();
   const [q, setQ] = useState(currentQ);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  function buildUrl(overrides: { q?: string; zemlja?: string; pol?: string; page?: number }) {
+  function buildUrl(overrides: {
+    q?: string;
+    zemlja?: string;
+    pol?: string;
+    aparat?: string;
+    page?: number;
+  }) {
     const vals = {
       q:      overrides.q      !== undefined ? overrides.q      : q,
       zemlja: overrides.zemlja !== undefined ? overrides.zemlja : currentZemlja,
       pol:    overrides.pol    !== undefined ? overrides.pol    : currentPol,
+      aparat: overrides.aparat !== undefined ? overrides.aparat : currentAparat,
       page:   overrides.page   !== undefined ? overrides.page   : undefined,
     };
     const p = new URLSearchParams();
-    if (vals.q)      p.set("q", vals.q);
+    if (vals.q)      p.set("q",      vals.q);
     if (vals.zemlja) p.set("zemlja", vals.zemlja);
-    if (vals.pol)    p.set("pol", vals.pol);
+    if (vals.pol)    p.set("pol",    vals.pol);
+    if (vals.aparat) p.set("aparat", vals.aparat);
     if (vals.page && vals.page > 1) p.set("page", String(vals.page));
     const qs = p.toString();
     return qs ? `${pathname}?${qs}` : pathname;
   }
 
-  function push(overrides: { q?: string; zemlja?: string; pol?: string; page?: number }) {
+  function push(overrides: Parameters<typeof buildUrl>[0]) {
     router.replace(buildUrl(overrides));
   }
 
@@ -63,86 +80,108 @@ export function StrelciFilterBar({
     return () => clearTimeout(debounceRef.current);
   }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isFiltered = !!(currentQ || currentZemlja || currentPol);
+  const isFiltered = !!(currentQ || currentZemlja || currentPol || currentAparat);
 
   const nocOptions = availableNocs
     .map((noc) => {
       const entry = NOC_LIST.find((n) => n.noc === noc);
-      return { noc, label: entry ? `${entry.name} (${noc})` : noc };
+      const alpha2 = entry?.alpha2 ?? "";
+      return {
+        value: noc,
+        label: noc,
+        sublabel: entry?.name ?? noc,
+        prefix: alpha2 ? (
+          <span
+            className={`fi fi-${alpha2.toLowerCase()}`}
+            style={{ fontSize: "1em", borderRadius: "2px", flexShrink: 0 }}
+          />
+        ) : undefined,
+      };
     })
-    .sort((a, b) => a.label.localeCompare(b.label, "sr"));
+    .sort((a, b) => (a.sublabel ?? "").localeCompare(b.sublabel ?? "", "sr"));
+
+  const pill    = "px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer";
+  const pillOn  = "bg-[var(--brand-primary)] text-white";
+  const pillOff = "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]";
 
   return (
-    <div className="space-y-3 mb-6">
-      {/* Controls */}
-      <div className="flex flex-wrap gap-3 items-center">
+    <div className="space-y-2 mb-6">
 
-        {/* Search input */}
-        <div className="relative flex-1 min-w-[220px]">
+      {/* Single row: search + pills + country + reset */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+
+        {/* Search */}
+        <div className="relative min-w-[180px] flex-1 max-w-xs">
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--subtle)] pointer-events-none"
             width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"
           >
-            <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.4"/>
-            <path d="M9 9l3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M9 9l3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
           </svg>
           <input
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Ime ili prezime strelca…"
+            placeholder="Ime ili prezime…"
             aria-label="Pretraži strelce"
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] pl-9 pr-4 py-2 text-sm text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
+            className="w-full rounded-md border border-[var(--border)] bg-[var(--bg)] pl-9 pr-3 py-2 text-xs text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
           />
         </div>
 
-        {/* Country select */}
-        <select
-          value={currentZemlja}
-          onChange={(e) => push({ zemlja: e.target.value, page: 1 })}
-          aria-label="Filtriraj po zemlji"
-          className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors cursor-pointer"
-        >
-          <option value="">Sve zemlje</option>
-          {nocOptions.map(({ noc, label }) => (
-            <option key={noc} value={noc}>{label}</option>
-          ))}
-        </select>
+        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
 
-        {/* Gender pills */}
-        <div
-          className="flex rounded-lg border border-[var(--border)] overflow-hidden"
-          role="group"
-          aria-label="Pol strelca"
-        >
-          {GENDER_OPTIONS.map(([val, label]) => {
-            const active = currentPol === val;
-            return (
-              <button
-                key={val}
-                onClick={() => push({ pol: val, page: 1 })}
-                aria-pressed={active}
-                className="px-3 py-2 text-xs font-semibold transition-colors"
-                style={{
-                  background: active ? "var(--brand-primary)" : "var(--bg)",
-                  color: active ? "white" : "var(--muted)",
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
+        {/* Apparatus */}
+        <div role="group" aria-label="Filter po disciplini" className="contents">
+          {APARAT_OPTIONS.map((a) => (
+            <button
+              key={a.value}
+              onClick={() => push({ aparat: a.value, page: 1 })}
+              className={`${pill} ${currentAparat === a.value ? pillOn : pillOff}`}
+            >
+              {a.label}
+            </button>
+          ))}
         </div>
 
-        {/* Reset */}
+        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
+
+        {/* Gender */}
+        <div role="group" aria-label="Filter po polu" className="contents">
+          {GENDER_OPTIONS.map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => push({ pol: val, page: 1 })}
+              className={`${pill} ${currentPol === val ? pillOn : pillOff}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
+
+        {/* Country */}
+        <SearchDropdown
+          value={currentZemlja}
+          onChange={(v) => push({ zemlja: v, page: 1 })}
+          options={nocOptions}
+          placeholder="Sve zemlje"
+          emptyLabel="Sve zemlje"
+          searchPlaceholder="Pretraži zemlju…"
+          labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
+          className="min-w-[130px]"
+        />
+
         {isFiltered && (
           <button
             onClick={() => { setQ(""); router.replace(pathname); }}
-            className="text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] px-3 py-2 rounded-lg hover:bg-[var(--surface)] transition-colors"
+            className="shrink-0 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] px-2.5 py-2 rounded-md hover:bg-[var(--surface)] transition-colors"
           >
             Resetuj ×
           </button>
         )}
+
       </div>
 
       {/* Count + Pagination */}
@@ -191,6 +230,7 @@ export function StrelciFilterBar({
           </div>
         )}
       </div>
+
     </div>
   );
 }

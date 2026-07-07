@@ -1,21 +1,16 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { LevelDropdown } from "@/components/ui/LevelDropdown";
+
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
 
 type Step = "upload" | "review" | "done";
 
-const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "national",    label: "Državno"           },
-  { value: "regional",    label: "Regionalno"        },
-  { value: "continental", label: "Kontinentalno"     },
-  { value: "world",       label: "Svetsko"           },
-  { value: "club",        label: "Klubsko"           },
-  { value: "olympic",     label: "Olimpijsko"        },
-];
 
 interface ParseInfo { eventsCount: number; skippedDisciplines: string[] }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
@@ -28,8 +23,11 @@ export function PdfMode() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [compName, setCompName] = useState("");
-  const [compDate, setCompDate] = useState("");
+  const [compDateFrom, setCompDateFrom] = useState("");
+  const [compDateTo, setCompDateTo] = useState("");
   const [compLocation, setCompLocation] = useState("");
+  // Remove old compDate state usage; compDate will be derived later
+  // const [compDate, setCompDate] = useState("");
   const [compLevel, setCompLevel] = useState<CompetitionLevel>("national");
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
@@ -40,7 +38,7 @@ export function PdfMode() {
   async function handleParse() {
     const file = fileRef.current?.files?.[0];
     if (!file) { setError("Izaberi PDF fajl"); return; }
-    if (!compName || !compDate) { setError("Naziv i datum su obavezni"); return; }
+    if (!compName || !compDateFrom || !compDateTo) { setError("Naziv i datum su obavezni"); return; }
     setLoading(true); setError(null);
     try {
       const fd = new FormData();
@@ -130,18 +128,20 @@ export function PdfMode() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum *</label>
-                <DatePicker value={compDate} onChange={setCompDate} required />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum od *</label>
+                  <DatePicker value={compDateFrom} onChange={setCompDateFrom} required />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum do *</label>
+                  <DatePicker value={compDateTo} onChange={setCompDateTo} required />
+                </div>
+              </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo</label>
-                <select
-                  value={compLevel}
-                  onChange={(e) => setCompLevel(e.target.value as CompetitionLevel)}
-                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-                >
-                  {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                </select>
+                <LevelDropdown value={compLevel} onChange={setCompLevel} />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija</label>

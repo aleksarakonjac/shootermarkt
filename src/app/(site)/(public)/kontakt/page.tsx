@@ -81,7 +81,7 @@ export default function KontaktPage() {
             Zahtev za podatke
           </h2>
           <p className="text-xs text-[var(--muted)] mb-4 font-[family-name:var(--font-jetbrains-mono)]">
-            ZZPL · Pravo na pristup, ispravku i brisanje
+            Pravo na pristup, ispravku i brisanje
           </p>
           <div className="space-y-3 text-[0.9375rem] leading-relaxed text-[var(--ink)]">
             <p>
@@ -91,8 +91,8 @@ export default function KontaktPage() {
             <p>
               <MailLink
                 email={CONTACT_EMAIL}
-                subject="Zahtev za podatke — ZZPL"
-                label={`${CONTACT_EMAIL} · predmet: "Zahtev za podatke — ZZPL"`}
+                subject="Zahtev za podatke"
+                label={`${CONTACT_EMAIL} · predmet: "Zahtev za podatke"`}
               />
             </p>
 
@@ -119,7 +119,7 @@ export default function KontaktPage() {
             </div>
 
             <p className="text-sm text-[var(--muted)]">
-              Zakon propisuje rok odgovora od{" "}
+              Odgovaramo u roku od{" "}
               <strong className="text-[var(--ink)]">30 dana</strong> od prijema
               zahteva.
             </p>
@@ -131,15 +131,6 @@ export default function KontaktPage() {
           Više informacija o tome kako obrađujemo podatke možete pronaći u{" "}
           <a href="/privatnost" className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
             Politici privatnosti
-          </a>
-          . Pritužbu Povereniku možete podneti na{" "}
-          <a
-            href="https://www.poverenik.rs"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
-          >
-            poverenik.rs
           </a>
           .
         </p>

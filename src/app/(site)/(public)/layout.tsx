@@ -5,6 +5,7 @@ import { eq, desc, inArray, and } from "drizzle-orm";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { MainNav } from "./components/MainNav";
 import { GlobalSearch } from "./GlobalSearch";
+import HeaderHomeLink from "./components/HeaderHomeLink";
 import ThemeToggle from "./components/ThemeToggle";
 import { RegionSelector } from "./components/RegionSelector";
 import { LocaleSwitcher } from "./components/LocaleSwitcher";
@@ -58,6 +59,7 @@ export default async function PublicLayout({
                 markt
               </span>
             </Link>
+                        <HeaderHomeLink />
 
             {/* Nav groups (desktop) + hamburger (mobile, inside MainNav) */}
             <div className="flex-1 flex items-center">
@@ -92,10 +94,10 @@ export default async function PublicLayout({
             {/* Brand */}
             <div className="lg:w-[200px] shrink-0">
               <Link href="/" className="inline-flex items-baseline gap-0 no-underline mb-3 group">
-                <span className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-[1.1rem] uppercase tracking-tight text-[var(--brand-primary)] leading-none transition-opacity group-hover:opacity-80">
+                <span className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-[1.6rem] uppercase tracking-tight text-[var(--brand-primary)] leading-none transition-opacity group-hover:opacity-80">
                   Shooter
                 </span>
-                <span className="font-[family-name:var(--font-barlow-condensed)] font-semibold text-[1.1rem] uppercase tracking-tight text-[var(--ink)] leading-none transition-opacity group-hover:opacity-80">
+                <span className="font-[family-name:var(--font-barlow-condensed)] font-semibold text-[1.6rem] uppercase tracking-tight text-[var(--ink)] leading-none transition-opacity group-hover:opacity-80">
                   markt
                 </span>
               </Link>
@@ -192,9 +194,6 @@ export default async function PublicLayout({
           <div className="border-t border-[var(--border)] py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
             <p className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
               © {new Date().getFullYear()} Shootermarkt
-            </p>
-            <p className="text-xs text-[var(--subtle)]">
-              {t("rights")}
             </p>
           </div>
 

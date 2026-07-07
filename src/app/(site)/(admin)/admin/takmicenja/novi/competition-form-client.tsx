@@ -4,13 +4,27 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { LevelDropdown } from "@/components/ui/LevelDropdown";
+import { TranslatedNameInput } from "@/components/ui/TranslatedNameInput";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
+
+function detectLang(text: string): "sr" | "en" {
+  return /[čćšđžČĆŠĐŽ]/.test(text) ? "sr" : "en";
+}
 
 export function CompetitionFormClient() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", date: "", dateEnd: "", location: "", level: "national" as CompetitionLevel, issfId: "" });
+  const [form, setForm] = useState({
+    name: "",
+    nameSr: "",
+    nameEn: "",
+    date: "",
+    dateEnd: "",
+    location: "",
+    level: "national" as CompetitionLevel,
+    issfId: "",
+  });
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -37,6 +51,8 @@ export function CompetitionFormClient() {
     }
   }
 
+  const detectedLang = detectLang(form.name);
+
   return (
     <div className="max-w-lg">
       <div className="mb-6">
@@ -54,7 +70,9 @@ export function CompetitionFormClient() {
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Podaci</h2>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Naziv *</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
+              Naziv *
+            </label>
             <input
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
@@ -64,21 +82,35 @@ export function CompetitionFormClient() {
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <TranslatedNameInput
+              sourceName={form.name}
+              from={detectedLang}
+              to="sr"
+              value={form.nameSr}
+              onChange={(v) => set("nameSr", v)}
+              label="Naziv (SR)"
+              placeholder="Srpski naziv"
+            />
+            <TranslatedNameInput
+              sourceName={form.name}
+              from={detectedLang}
+              to="en"
+              value={form.nameEn}
+              onChange={(v) => set("nameEn", v)}
+              label="Naziv (EN)"
+              placeholder="English name"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum od *</label>
-              <DatePicker
-                value={form.date}
-                onChange={(value) => set("date", value)}
-                required
-              />
+              <DatePicker value={form.date} onChange={(v) => set("date", v)} required />
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum do</label>
-              <DatePicker
-                value={form.dateEnd}
-                onChange={(value) => set("dateEnd", value)}
-              />
+              <DatePicker value={form.dateEnd} onChange={(v) => set("dateEnd", v)} />
             </div>
           </div>
 
@@ -111,6 +143,8 @@ export function CompetitionFormClient() {
             <p className="text-xs text-[var(--subtle)] mt-1">Opcionalno. Sprečava dupli ISSF import.</p>
           </div>
         </div>
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="flex gap-3 pt-2">
           <button

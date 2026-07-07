@@ -235,12 +235,13 @@ export function GlobalSearch({ shooters, competitions }: Props) {
           </span>
           <input
             ref={inputRef}
-            type="text"
+            type="search"
+            name="q"
             placeholder={t("fullPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKeyDown}
-            className="flex-1 py-[1.1rem] text-sm text-[var(--ink)] placeholder:text-[var(--subtle)] bg-transparent outline-none"
+            className="flex-1 py-[1.1rem] text-sm text-[var(--ink)] placeholder:text-[var(--subtle)] bg-transparent outline-none focus:outline-none focus:ring-0 [&:focus-visible]:outline-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
             autoComplete="off"
             spellCheck={false}
           />

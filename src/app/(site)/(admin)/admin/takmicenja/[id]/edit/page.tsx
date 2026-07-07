@@ -29,6 +29,8 @@ export default async function CompetitionEditPage({
       competition={{
         id: comp.id,
         name: comp.name,
+        nameSr: comp.nameSr,
+        nameEn: comp.nameEn,
         date: comp.date,
         dateEnd: comp.dateEnd,
         location: comp.location,

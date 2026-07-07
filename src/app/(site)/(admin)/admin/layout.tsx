@@ -69,8 +69,11 @@ export default async function AdminLayout({
 
         {/* Top bar */}
         <header className="sticky top-0 z-[var(--z-sticky)] h-14 border-b border-[var(--border)] bg-[var(--bg)] flex items-center px-8 shrink-0">
-          <div className="flex-1" id="admin-breadcrumb" />
-        </header>
+  <Link href="/admin" className="text-sm font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors mr-4">
+    Home
+  </Link>
+  <div className="flex-1" id="admin-breadcrumb" />
+</header>
 
         <main className="flex-1 px-8 py-8">
           {children}

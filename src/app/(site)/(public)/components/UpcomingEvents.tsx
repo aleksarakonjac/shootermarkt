@@ -18,20 +18,22 @@ interface UpcomingEventsProps {
 function getLevelBadge(level: string): { label: string; bg: string; text: string } {
   const l = level.toLowerCase();
   if (l.includes("svetsk") || l.includes("world"))
-    return { label: "WC", bg: "var(--brand-primary)", text: "white" };
+    return { label: "Svetsko", bg: "var(--brand-primary)", text: "white" };
   if (l.includes("evropsk") || l.includes("europ"))
-    return { label: "EC", bg: "var(--brand-accent)", text: "white" };
+    return { label: "Evropsko", bg: "var(--brand-accent)", text: "white" };
   if (l.includes("državno") || l.includes("national"))
-    return { label: "DR", bg: "var(--success)", text: "white" };
-  return { label: "LK", bg: "var(--warning)", text: "white" };
+    return { label: "Nacionalno", bg: "var(--success)", text: "white" };
+  return { label: "Lokalno", bg: "var(--warning)", text: "white" };
 }
+
+
 
 function formatDateSr(iso: string) {
   const d = new Date(iso);
   return {
     day: d.getDate(),
-    month: d.toLocaleString("sr-RS", { month: "short" }).toUpperCase().replace(".", ""),
-    weekday: d.toLocaleString("sr-RS", { weekday: "short" }).toUpperCase().replace(".", ""),
+    month: d.toLocaleString("sr-Latn-RS", { month: "short" }).toUpperCase().replace(".", ""),
+    weekday: d.toLocaleString("sr-Latn-RS", { weekday: "short" }).toUpperCase().replace(".", ""),
     year: d.getFullYear(),
   };
 }

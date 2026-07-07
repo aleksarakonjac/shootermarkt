@@ -86,7 +86,6 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
           { value: "F", label: "Ženski" },
         ]}
         placeholder="Pol"
-        emptyLabel="Oba pola"
         className="w-40"
       />
 
@@ -94,11 +93,11 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
         value={apparatus}
         onChange={(v) => update("apparatus", v)}
         options={[
-          { value: "air_rifle", label: "Vazdušna puška" },
-          { value: "air_pistol", label: "Vazdušni pištolj" },
+          { value: "rifle", label: "Puška" },
+          { value: "pistol", label: "Pištolj" },
+          { value: "both", label: "Puška + Pištolj" },
         ]}
         placeholder="Disciplina"
-        emptyLabel="Sve discipline"
         className="w-48"
       />
 
@@ -116,11 +115,11 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
       )}
 
       <CustomCheckbox
-        checked={onlyUnverified}
-        onChange={() => update("verified", onlyUnverified ? "" : "0")}
-        label="Samo neverifikovani"
-        className=""
-      />
+          checked={onlyUnverified}
+          onChange={(checked) => update("verified", checked ? "0" : "")}
+          label="Samo neverifikovani"
+          className=""
+        />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { shooters, clubs, results, disciplines, competitions } from "@/lib/db/schema";
+import { shooters, clubs, results, disciplines, competitions, countries } from "@/lib/db/schema";
 import { eq, desc, asc, and, isNotNull, sql } from "drizzle-orm";
 import { computeFormaScore } from "@/lib/forma-score";
 import { TopFormaClient } from "./top-forma-client";
@@ -34,54 +34,64 @@ interface ShooterFormRow {
 export default async function HomePage() {
   const currentDate = new Date().toISOString().split("T")[0];
 
-  // Fetch competitions for the top ticker (latest 6)
+  // Ticker — two tiers: LIVE (today) + NAJAVA (future)
   const tickerComps = await db
-    .select()
+    .select({
+      id:           competitions.id,
+      name:         competitions.name,
+      date:         competitions.date,
+      level:        competitions.level,
+      location:     competitions.location,
+      countryCode2: countries.code2,
+      nocCode:      countries.nocCode,
+    })
     .from(competitions)
-    .orderBy(desc(competitions.date))
-    .limit(6);
+    .leftJoin(countries, eq(competitions.countryId, countries.id))
+    .where(sql`${competitions.date} >= ${currentDate}`)
+    .orderBy(competitions.date)
+    .limit(8);
 
-  const tickerItems: TickerItem[] = await Promise.all(
-    tickerComps.map(async (comp) => {
+  const tickerLive     = tickerComps.filter((c) => c.date === currentDate);
+  const tickerUpcoming = tickerComps.filter((c) => c.date > currentDate);
+
+  const liveItems: TickerItem[] = await Promise.all(
+    tickerLive.map(async (comp) => {
       const best = await db
         .select({
           qualTotal: results.qualTotal,
-          lastName: shooters.lastName,
-          discCode: disciplines.code,
+          lastName:  shooters.lastName,
+          discCode:  disciplines.code,
         })
         .from(results)
-        .innerJoin(shooters, eq(results.shooterId, shooters.id))
+        .innerJoin(shooters,    eq(results.shooterId,    shooters.id))
         .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
         .where(eq(results.competitionId, comp.id))
         .orderBy(desc(results.qualTotal))
         .limit(1);
 
-      const isToday = comp.date === currentDate;
-      const isFuture = comp.date > currentDate;
-
-      let status: "LIVE" | "KRAJ" | "NAJAVA" = "KRAJ";
-      if (isToday) status = "LIVE";
-      else if (isFuture) status = "NAJAVA";
-
-      let detailText = "Nema rezultata";
-      if (status === "NAJAVA") {
-        detailText = comp.location || "Srbija";
-      } else if (best[0]) {
-        const parsedScore = parseFloat(best[0].qualTotal!);
-        const formattedScore = parsedScore.toFixed(best[0].discCode.startsWith("AP") ? 0 : 1);
-        detailText = `${best[0].lastName} (${formattedScore})`;
+      let detailText = "U toku";
+      if (best[0]) {
+        const score = parseFloat(best[0].qualTotal!);
+        const fmt   = score.toFixed(best[0].discCode.startsWith("AP") ? 0 : 1);
+        detailText  = `1. ${best[0].lastName} ${fmt}`;
       }
 
       return {
-        id: comp.id,
-        name: comp.name,
-        date: comp.date,
-        level: comp.level,
-        status,
-        detailText,
+        id: comp.id, name: comp.name, date: comp.date,
+        level: comp.level, status: "LIVE" as const,
+        detailText, href: `/takmicenja/${comp.id}`,
+        nocCode:      comp.nocCode      ?? undefined,
+        countryCode2: comp.countryCode2 ?? undefined,
       };
     })
   );
+
+  const upcomingItems: TickerItem[] = tickerUpcoming.map((comp) => ({
+    id: comp.id, name: comp.name, date: comp.date,
+    level: comp.level, status: "NAJAVA" as const,
+    detailText: comp.location || "Srbija",
+    href: `/takmicenja/${comp.id}`,
+  }));
 
   // 1. Fetch all verified shooters with their club info
   const allVerified = await db
@@ -332,7 +342,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <Ticker items={tickerItems} />
+      <Ticker liveItems={liveItems} upcomingItems={upcomingItems} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
       {/* Upcoming Events Carousel – full width */}
       <UpcomingEvents competitions={upcomingComps} />

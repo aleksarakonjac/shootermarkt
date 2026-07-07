@@ -21,6 +21,9 @@ export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const [searchA, setSearchA] = useState("");
+  const [searchB, setSearchB] = useState("");
+
   const handleCompare = (a: string, b: string) => {
     if (!a || !b) {
       setResult(null);
@@ -36,19 +39,40 @@ export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
     });
   };
 
-  const onSelectA = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    setIdA(val);
-    handleCompare(val, idB);
+  const onChangeA = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchA(e.target.value);
+    setIdA("");
   };
 
-  const onSelectB = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    setIdB(val);
-    handleCompare(idA, val);
+  const onChangeB = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchB(e.target.value);
+    setIdB("");
   };
 
-  // Find common disciplines
+  const selectShooterA = (shooter: ShooterListItem) => {
+    setIdA(String(shooter.id));
+    setSearchA(`${shooter.lastName} ${shooter.firstName}`);
+    handleCompare(String(shooter.id), idB);
+  };
+
+  const selectShooterB = (shooter: ShooterListItem) => {
+    setIdB(String(shooter.id));
+    setSearchB(`${shooter.lastName} ${shooter.firstName}`);
+    handleCompare(idA, String(shooter.id));
+  };
+
+  const filteredA = shootersList
+    .filter((s) => s.id.toString() !== idB)
+    .filter((s) =>
+      `${s.lastName} ${s.firstName}`.toLowerCase().includes(searchA.toLowerCase())
+    );
+
+  const filteredB = shootersList
+    .filter((s) => s.id.toString() !== idA)
+    .filter((s) =>
+      `${s.lastName} ${s.firstName}`.toLowerCase().includes(searchB.toLowerCase())
+    );
+
   const commonDisciplines =
     result?.shooterA && result?.shooterB
       ? Object.keys(result.shooterA.disciplines).filter((code) =>
@@ -66,60 +90,78 @@ export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
       </div>
 
       <div className="p-4 flex flex-col gap-4">
-        {/* Dropdowns */}
+        {/* Shooter selectors */}
         <div className="grid grid-cols-2 gap-2">
+          {/* Shooter A */}
           <div className="flex flex-col gap-1">
             <label htmlFor="h2h-shooter-a" className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
               Strelac A
             </label>
-            <select
-              id="h2h-shooter-a"
-              value={idA}
-              onChange={onSelectA}
-              className="w-full text-xs rounded border border-[var(--border-strong)] p-1.5 bg-[var(--bg)] text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)]"
-            >
-              <option value="">Izaberi...</option>
-              {shootersList
-                .filter((s) => s.id.toString() !== idB)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.lastName} {s.firstName}
-                  </option>
-                ))}
-            </select>
+            <div className="relative">
+              <input
+                id="h2h-shooter-a"
+                value={searchA}
+                onChange={onChangeA}
+                placeholder="Pretraži..."
+                className="w-full text-xs rounded border border-[var(--border-strong)] p-1.5 bg-[var(--bg)] text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)]"
+                autoComplete="off"
+              />
+              {searchA && !idA && filteredA.length > 0 && (
+                <ul className="absolute z-10 mt-1 w-full bg-[var(--bg)] border border-[var(--border)] rounded shadow-lg max-h-48 overflow-y-auto">
+                  {filteredA.map((s) => (
+                    <li
+                      key={s.id}
+                      onClick={() => selectShooterA(s)}
+                      className="px-2 py-1 text-xs cursor-pointer hover:bg-[var(--surface)]"
+                    >
+                      {s.lastName} {s.firstName}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
+          {/* Shooter B */}
           <div className="flex flex-col gap-1">
             <label htmlFor="h2h-shooter-b" className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
               Strelac B
             </label>
-            <select
-              id="h2h-shooter-b"
-              value={idB}
-              onChange={onSelectB}
-              className="w-full text-xs rounded border border-[var(--border-strong)] p-1.5 bg-[var(--bg)] text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)]"
-            >
-              <option value="">Izaberi...</option>
-              {shootersList
-                .filter((s) => s.id.toString() !== idA)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.lastName} {s.firstName}
-                  </option>
-                ))}
-            </select>
+            <div className="relative">
+              <input
+                id="h2h-shooter-b"
+                value={searchB}
+                onChange={onChangeB}
+                placeholder="Pretraži..."
+                className="w-full text-xs rounded border border-[var(--border-strong)] p-1.5 bg-[var(--bg)] text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)]"
+                autoComplete="off"
+              />
+              {searchB && !idB && filteredB.length > 0 && (
+                <ul className="absolute z-10 mt-1 w-full bg-[var(--bg)] border border-[var(--border)] rounded shadow-lg max-h-48 overflow-y-auto">
+                  {filteredB.map((s) => (
+                    <li
+                      key={s.id}
+                      onClick={() => selectShooterB(s)}
+                      className="px-2 py-1 text-xs cursor-pointer hover:bg-[var(--surface)]"
+                    >
+                      {s.lastName} {s.firstName}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Loading state */}
         {isPending && (
           <div className="py-12 flex flex-col items-center justify-center gap-2">
-            <div className="w-6 height-6 border-2 border-[var(--brand-primary)] border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-6 h-6 border-2 border-[var(--brand-primary)] border-t-transparent rounded-full animate-spin" />
             <p className="text-xs text-[var(--muted)]">Računam statistiku...</p>
           </div>
         )}
 
-        {/* Initial Empty state */}
+        {/* Empty state */}
         {!isPending && !result && (
           <div className="py-10 text-center rounded border border-dashed border-[var(--border)] bg-[var(--surface)]">
             <p className="text-xs text-[var(--muted)]" style={{ maxWidth: "25ch", margin: "0 auto" }}>
@@ -131,7 +173,7 @@ export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
         {/* Result comparison */}
         {!isPending && result && result.shooterA && result.shooterB && (
           <div className="flex flex-col gap-4">
-            {/* Duel Scorebar (wins A vs B) */}
+            {/* Duel Scorebar */}
             <div className="flex flex-col items-center gap-1">
               <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--subtle)]">
                 Međusobni skor
@@ -145,9 +187,7 @@ export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
                   <>
                     <div
                       className="bg-[var(--brand-primary)] flex items-center justify-center"
-                      style={{
-                        width: `${Math.max(15, (result.h2hRecord.winsA / result.h2hRecord.total) * 100)}%`,
-                      }}
+                      style={{ width: `${Math.max(15, (result.h2hRecord.winsA / result.h2hRecord.total) * 100)}%` }}
                       title={`Pobede Strelca A: ${result.h2hRecord.winsA}`}
                     >
                       {result.h2hRecord.winsA}
@@ -155,9 +195,7 @@ export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
                     {result.h2hRecord.draws > 0 && (
                       <div
                         className="bg-[var(--subtle)] flex items-center justify-center"
-                        style={{
-                          width: `${Math.max(10, (result.h2hRecord.draws / result.h2hRecord.total) * 100)}%`,
-                        }}
+                        style={{ width: `${Math.max(10, (result.h2hRecord.draws / result.h2hRecord.total) * 100)}%` }}
                         title={`Nerešeno: ${result.h2hRecord.draws}`}
                       >
                         {result.h2hRecord.draws}
@@ -165,9 +203,7 @@ export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
                     )}
                     <div
                       className="bg-[var(--brand-accent)] flex items-center justify-center"
-                      style={{
-                        width: `${Math.max(15, (result.h2hRecord.winsB / result.h2hRecord.total) * 100)}%`,
-                      }}
+                      style={{ width: `${Math.max(15, (result.h2hRecord.winsB / result.h2hRecord.total) * 100)}%` }}
                       title={`Pobede Strelca B: ${result.h2hRecord.winsB}`}
                     >
                       {result.h2hRecord.winsB}
@@ -192,14 +228,12 @@ export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
                 commonDisciplines.map((code) => {
                   const statsA = result.shooterA!.disciplines[code];
                   const statsB = result.shooterB!.disciplines[code];
-
                   return (
                     <div key={code} className="border border-[var(--border)] rounded p-2 bg-[var(--surface)]">
                       <div className="text-center font-bold text-xs uppercase tracking-wider text-[var(--ink)] mb-2">
                         {code}
                       </div>
-                      
-                      {/* Forma comparison */}
+                      {/* Forma */}
                       <div className="grid grid-cols-3 items-center text-xs mb-1">
                         <div className="text-left font-mono font-bold text-[var(--ink)]">
                           {statsA.forma ? statsA.forma.toFixed(1) : "—"}
@@ -209,8 +243,7 @@ export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
                           {statsB.forma ? statsB.forma.toFixed(1) : "—"}
                         </div>
                       </div>
-
-                      {/* Peak comparison */}
+                      {/* Peak */}
                       <div className="grid grid-cols-3 items-center text-xs">
                         <div className="text-left font-mono text-[var(--muted)]">
                           {statsA.peak ? statsA.peak.toFixed(code.startsWith("AP") ? 0 : 1) : "—"}

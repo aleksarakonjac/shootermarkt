@@ -164,7 +164,7 @@ export default function PrivatnostPage() {
                 "Nacionalnost i zemlja zastupanja",
                 "Naziv kluba",
                 "Rezultati sa zvaničnih streljačkih takmičenja: disciplina, kvalifikacioni skor, rang, serije, eventualni finalni rezultat i rang",
-                "Fotografija (avatar) — isključivo ukoliko je sportista sam dostavi putem zahteva",
+                "Fotografija (avatar)",
               ]}
             />
             <P>
@@ -180,7 +180,7 @@ export default function PrivatnostPage() {
             <P>
               <strong>Svrha:</strong> Praćenje i prikaz streljačkih profila, rangiranja i
               istorije nastupa u cilju unapređenja transparentnosti i dostupnosti
-              streljačkih rezultata u Srbiji.
+              streljačkih rezultata u Srbiji i svetu.
             </P>
             <P>
               <strong>Pravni osnov:</strong> Obrada se vrši na osnovu{" "}
@@ -196,10 +196,6 @@ export default function PrivatnostPage() {
               <strong>Balansni test:</strong> obrada se ograničava na podatke koji su već
               objavljeni u zvaničnim dokumentima; ne obrađuju se osetljive kategorije
               podataka; sportisti imaju pravo prigovora i brisanja.
-            </P>
-            <P>
-              Za fotografiju osnov je <strong>pristanak</strong> lica na koje se podaci
-              odnose (čl. 12. st. 1. tač. 1) ZZPL).
             </P>
           </Section>
         </div>
@@ -245,7 +241,6 @@ export default function PrivatnostPage() {
                 "Zatražite brisanje podataka („pravo na zaborav“) kada osnov za obradu prestane da postoji ili kada uložite prigovor koji pretegne nad legitimnim interesom",
                 "Ograničite obradu dok se vaš zahtev razmatra",
                 "Uložite prigovor na obradu zasnovanu na legitimnom interesu — u tom slučaju prestaćemo sa obradom osim ako ne dokažemo da postoje uvažljivi legitimni razlozi koji pretežu nad vašim interesima",
-                "Podnesete pritužbu Povereniku za informacije od javnog značaja i zaštitu podataka o ličnosti (Bulevar kralja Aleksandra 15, Beograd; poverenik.rs)",
               ]}
             />
             <P>
