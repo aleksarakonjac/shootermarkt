@@ -205,6 +205,7 @@ export function DatePicker({
               minDate={minDate ?? undefined}
               maxDate={maxDate ?? undefined}
               locale="sr-Latn-RS"
+              calendarType="iso8601"
               next2Label={null}
               prev2Label={null}
               showNeighboringMonth={false}
