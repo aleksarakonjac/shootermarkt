@@ -36,6 +36,20 @@
       "when": 1751376003000,
       "tag": "0004_add_international_level",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783289824683,
+      "tag": "0005_add_competition_name_translations",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783900000000,
+      "tag": "0006_ticker_tables",
+      "breakpoints": true
     }
   ]
 }

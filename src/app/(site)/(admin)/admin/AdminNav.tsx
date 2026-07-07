@@ -36,6 +36,12 @@ const GROUPS: NavGroup[] = [
       { href: "/admin/rezultati", label: "Unos rezultata" },
     ],
   },
+  {
+    label: "Ticker",
+    items: [
+      { href: "/admin/ticker", label: "Ticker upravljanje" },
+    ],
+  },
 ];
 
 export function AdminNav() {

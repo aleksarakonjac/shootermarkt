@@ -476,6 +476,57 @@ export const results = pgTable(
 );
 
 
+// ── Competition Schedule ──────────────────────────────────────────────────────
+
+export const competitionSchedule = pgTable(
+  "competition_schedule",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+    disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
+    stage: varchar("stage", { length: 30 }).notNull(), // 'qual'|'qual_rapid'|'qual_precision'|'elimination'|'final'
+    startTime: timestamp("start_time").notNull(),
+    endTime: timestamp("end_time"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("competition_schedule_comp_idx").on(t.competitionId),
+    index("competition_schedule_start_idx").on(t.startTime),
+  ]
+);
+
+// ── Ticker Live Overrides ─────────────────────────────────────────────────────
+
+export const tickerLiveOverrides = pgTable(
+  "ticker_live_overrides",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").references(() => competitions.id, { onDelete: "set null" }),
+    isActive: boolean("is_active").notNull().default(true),
+    customSlides: jsonb("custom_slides").$type<Array<{ label?: string; text: string }>>(),
+    priority: integer("priority").notNull().default(0),
+    label: varchar("label", { length: 200 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("ticker_overrides_comp_idx").on(t.competitionId),
+  ]
+);
+
+// ── Ticker Custom Upcoming ────────────────────────────────────────────────────
+
+export const tickerCustomUpcoming = pgTable(
+  "ticker_custom_upcoming",
+  {
+    id: serial("id").primaryKey(),
+    text: varchar("text", { length: 300 }).notNull(),
+    date: varchar("date", { length: 10 }),
+    href: varchar("href", { length: 500 }),
+    displayUntil: varchar("display_until", { length: 10 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  }
+);
+
 // ── Relations ─────────────────────────────────────────────────────────────────
 
 export const countryRelations = relations(countries, ({ many }) => ({
@@ -490,6 +541,7 @@ export const disciplineRelations = relations(disciplines, ({ many }) => ({
   results: many(results),
   nationalTeams: many(nationalTeams),
   leagues: many(leagues),
+  scheduleSlots: many(competitionSchedule),
 }));
 
 export const disciplineVariantRelations = relations(disciplineVariants, ({ one, many }) => ({
@@ -554,6 +606,17 @@ export const competitionRelations = relations(competitions, ({ one, many }) => (
   country: one(countries, { fields: [competitions.countryId], references: [countries.id] }),
   leagueSeason: one(leagueSeasons, { fields: [competitions.leagueSeasonId], references: [leagueSeasons.id] }),
   results: many(results),
+  schedule: many(competitionSchedule),
+  liveOverrides: many(tickerLiveOverrides),
+}));
+
+export const competitionScheduleRelations = relations(competitionSchedule, ({ one }) => ({
+  competition: one(competitions, { fields: [competitionSchedule.competitionId], references: [competitions.id] }),
+  discipline: one(disciplines, { fields: [competitionSchedule.disciplineId], references: [disciplines.id] }),
+}));
+
+export const tickerLiveOverrideRelations = relations(tickerLiveOverrides, ({ one }) => ({
+  competition: one(competitions, { fields: [tickerLiveOverrides.competitionId], references: [competitions.id] }),
 }));
 
 export const resultRelations = relations(results, ({ one }) => ({
@@ -605,6 +668,15 @@ export type NewCompetition = typeof competitions.$inferInsert;
 
 export type Result = typeof results.$inferSelect;
 export type NewResult = typeof results.$inferInsert;
+
+export type CompetitionScheduleSlot = typeof competitionSchedule.$inferSelect;
+export type NewCompetitionScheduleSlot = typeof competitionSchedule.$inferInsert;
+
+export type TickerLiveOverride = typeof tickerLiveOverrides.$inferSelect;
+export type NewTickerLiveOverride = typeof tickerLiveOverrides.$inferInsert;
+
+export type TickerCustomUpcoming = typeof tickerCustomUpcoming.$inferSelect;
+export type NewTickerCustomUpcoming = typeof tickerCustomUpcoming.$inferInsert;
 
 // Convenience union types for level/eventType
 export type CompetitionLevel = typeof competitionLevelEnum.enumValues[number];

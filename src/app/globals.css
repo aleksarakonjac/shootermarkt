@@ -265,3 +265,18 @@ p, li {
 .shootermarkt-calendar .react-calendar__month-view__days__day--neighboringMonth {
   color: var(--subtle);
 }
+
+
+/* ── Ticker animations ────────────────────────────────────────────────────── */
+@keyframes ticker-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes ticker-pulse  { 0%, 100% { opacity: 1; } }
+  @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(0); } }
+}
