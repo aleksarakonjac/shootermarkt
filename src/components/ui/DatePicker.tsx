@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Calendar from "react-calendar";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface Props {
   value: string;
@@ -14,149 +14,105 @@ interface Props {
   className?: string;
 }
 
-function pad(value: number) {
-  return String(value).padStart(2, "0");
+const MONTHS = ["Januar","Februar","Mart","April","Maj","Jun","Jul","Avgust","Septembar","Oktobar","Novembar","Decembar"];
+const DAYS   = ["Po","Ut","Sr","Če","Pe","Su","Ne"];
+
+function pad(n: number) { return String(n).padStart(2, "0"); }
+
+function toIso(y: number, m: number, d: number) {
+  return `${y}-${pad(m + 1)}-${pad(d)}`;
 }
 
-function toIso(date: Date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-function parseIso(value: string) {
+function parseIso(value: string): { y: number; m: number; d: number } | null {
   if (!value) return null;
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return null;
-  const date = new Date(year, month - 1, day);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const [ys, ms, ds] = value.split("-");
+  const y = parseInt(ys, 10), m = parseInt(ms, 10) - 1, d = parseInt(ds, 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+  return { y, m, d };
 }
 
-function formatDisplay(value: string) {
-  const date = parseIso(value);
-  if (!date) return "";
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
-}
-
-function parseDisplay(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!match) return null;
-  const day = Number(match[1]);
-  const month = Number(match[2]);
-  const year = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return null;
-  }
-  return toIso(date);
-}
-
-function formatCalendarDay(date: Date) {
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
-}
-
-function isSameDay(left: Date, right: Date) {
-  return (
-    left.getFullYear() === right.getFullYear() &&
-    left.getMonth() === right.getMonth() &&
-    left.getDate() === right.getDate()
-  );
+function fmtDisplay(value: string) {
+  const p = parseIso(value);
+  if (!p) return "";
+  return `${pad(p.d)}.${pad(p.m + 1)}.${p.y}.`;
 }
 
 export function DatePicker({
-  value,
-  onChange,
-  min,
-  max,
-  required = false,
-  placeholder = "dd/mm/yyyy",
-  disabled = false,
-  className = "",
+  value, onChange, min, max, required = false, placeholder = "Izaberi datum…", disabled = false, className = "",
 }: Props) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(value ? formatDisplay(value) : "");
-  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen]   = useState(false);
+  const [rect, setRect]   = useState<DOMRect | null>(null);
+  const triggerRef        = useRef<HTMLButtonElement>(null);
+  const panelRef          = useRef<HTMLDivElement>(null);
 
-  const selectedDate = useMemo(() => parseIso(value), [value]);
-  const minDate = useMemo(() => parseIso(min ?? ""), [min]);
-  const maxDate = useMemo(() => parseIso(max ?? ""), [max]);
+  const parsed = parseIso(value);
+  const initDate = parsed ? new Date(parsed.y, parsed.m, parsed.d) : new Date();
+  const [viewYear,  setViewYear]  = useState(initDate.getFullYear());
+  const [viewMonth, setViewMonth] = useState(initDate.getMonth());
 
   useEffect(() => {
     if (!open) return;
-
-    function handlePointerDown(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
+    function handle(e: MouseEvent) {
+      if (triggerRef.current?.contains(e.target as Node)) return;
+      if (panelRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
     }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
   useEffect(() => {
-    if (!open) {
-      setDraft(value ? formatDisplay(value) : "");
-    }
-  }, [open, value]);
+    if (!open) return;
+    function update() { setRect(triggerRef.current?.getBoundingClientRect() ?? null); }
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => { window.removeEventListener("scroll", update, true); window.removeEventListener("resize", update); };
+  }, [open]);
 
-  function commit(next: string) {
-    onChange(next);
-    setDraft(next ? formatDisplay(next) : "");
+  function openPicker() {
+    if (disabled) return;
+    setRect(triggerRef.current?.getBoundingClientRect() ?? null);
+    const base = parsed ? new Date(parsed.y, parsed.m, parsed.d) : new Date();
+    setViewYear(base.getFullYear());
+    setViewMonth(base.getMonth());
+    setOpen(true);
+  }
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  }
+
+  function selectDay(d: number) {
+    onChange(toIso(viewYear, viewMonth, d));
     setOpen(false);
   }
 
-  function handleDraftChange(next: string) {
-    setDraft(next);
-    const iso = parseDisplay(next);
-    if (iso) {
-      onChange(iso);
-    } else if (next.trim() === "") {
-      onChange("");
-    }
+  const rawDow     = new Date(viewYear, viewMonth, 1).getDay();
+  const firstDow   = rawDow === 0 ? 6 : rawDow - 1;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const todayStr   = new Date().toISOString().split("T")[0];
+  const minStr     = min ?? null;
+  const maxStr     = max ?? null;
+
+  function isDisabled(d: number) {
+    const ds = toIso(viewYear, viewMonth, d);
+    return (minStr != null && ds < minStr) || (maxStr != null && ds > maxStr);
   }
 
-  function handleBlur() {
-    if (!draft.trim()) {
-      onChange("");
-      setDraft("");
-      return;
-    }
+  const panelStyle: React.CSSProperties = rect
+    ? { position: "fixed", top: rect.bottom + 4, left: rect.left, zIndex: 9999, minWidth: 264 }
+    : { display: "none" };
 
-    const iso = parseDisplay(draft);
-    if (iso) {
-      onChange(iso);
-      setDraft(formatDisplay(iso));
-    } else {
-      setDraft(value ? formatDisplay(value) : "");
-    }
-  }
-
-  function handleSelect(next: unknown) {
-    const date = next instanceof Date ? next : Array.isArray(next) ? next[0] : null;
-    if (!date) return;
-    commit(toIso(date));
-  }
-
-  const currentLabel = value ? formatDisplay(value) : placeholder;
+  const display = fmtDisplay(value);
 
   return (
-    <div className={`w-full ${className}`} ref={ref}>
+    <div className={`w-full ${className}`}>
+      {/* Mobile: native date input */}
       <input
         type="date"
         value={value}
@@ -165,77 +121,90 @@ export function DatePicker({
         required={required}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="md:hidden w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+        className="md:hidden w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-50"
       />
 
-      <div className="relative hidden md:block">
+      {/* Desktop: custom picker */}
+      <div className="hidden md:block">
         <button
+          ref={triggerRef}
           type="button"
           disabled={disabled}
-          onClick={() => setOpen((current) => !current)}
+          onClick={openPicker}
           aria-haspopup="dialog"
           aria-expanded={open}
-          className="flex w-full items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          className={`flex w-full items-center justify-between gap-3 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${display ? "text-[var(--ink)]" : "text-[var(--subtle)]"}`}
         >
-          <span className={value ? "text-[var(--ink)]" : "text-[var(--subtle)]"}>
-            {currentLabel}
-          </span>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`}>
-            <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <span>{display || placeholder}</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" className="shrink-0">
+            <rect x="1" y="2.5" width="10" height="8.5" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M1 6h10" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M4 1v3M8 1v3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
           </svg>
         </button>
 
-        {open && (
-          <div className="absolute left-0 top-full z-50 mt-1 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--border)] bg-[var(--bg)] p-2.5 shadow-lg">
-            <div className="mb-2">
-              <input
-                value={draft}
-                onChange={(e) => handleDraftChange(e.target.value)}
-                onBlur={handleBlur}
-                placeholder={placeholder}
-                inputMode="numeric"
-                autoComplete="off"
-                className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]"
-              />
+        {open && typeof window !== "undefined" && createPortal(
+          <div ref={panelRef} style={panelStyle} className="rounded-xl border border-[var(--border)] bg-[var(--bg)] shadow-lg overflow-hidden select-none">
+
+            {/* Month nav */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)]">
+              <button type="button" onClick={prevMonth}
+                className="text-[var(--muted)] hover:text-[var(--ink)] transition-colors p-1 rounded hover:bg-[var(--surface-2)]">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 3L5 6.5l3 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <span className="text-xs font-semibold text-[var(--ink)]">{MONTHS[viewMonth]} {viewYear}</span>
+              <button type="button" onClick={nextMonth}
+                className="text-[var(--muted)] hover:text-[var(--ink)] transition-colors p-1 rounded hover:bg-[var(--surface-2)]">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M5 3l3 3.5-3 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
             </div>
 
-            <Calendar
-              value={selectedDate}
-              onChange={handleSelect}
-              minDate={minDate ?? undefined}
-              maxDate={maxDate ?? undefined}
-              locale="sr-Latn-RS"
-              calendarType="iso8601"
-              next2Label={null}
-              prev2Label={null}
-              showNeighboringMonth={false}
-              className="shootermarkt-calendar"
-              formatDay={(_, date) => String(date.getDate())}
-              formatMonthYear={(_, date) => `${date.toLocaleString("sr-Latn-RS", { month: "long" })} ${date.getFullYear()}`}
-              tileClassName={({ date, view }) => {
-                if (view !== "month") return undefined;
-                if (selectedDate && isSameDay(date, selectedDate)) return "shootermarkt-calendar__tile--selected";
-                return undefined;
-              }}
-            />
+            {/* Single grid */}
+            <div className="grid grid-cols-7 gap-0.5 p-2">
+              {DAYS.map(d => (
+                <div key={d} className="text-center text-[0.6rem] font-bold uppercase text-[var(--subtle)] py-1">{d}</div>
+              ))}
+              {Array.from({ length: firstDow }).map((_, i) => <div key={`e${i}`} />)}
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const day = i + 1;
+                const ds  = toIso(viewYear, viewMonth, day);
+                const sel = value === ds;
+                const dis = isDisabled(day);
+                const tod = ds === todayStr;
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    disabled={dis}
+                    onClick={() => selectDay(day)}
+                    className={[
+                      "w-full aspect-square flex items-center justify-center rounded text-xs transition-colors",
+                      dis ? "text-[var(--border-strong)] cursor-not-allowed" : "cursor-pointer",
+                      sel ? "bg-[var(--brand-primary)] text-white font-bold" : "",
+                      tod && !sel ? "font-bold text-[var(--brand-primary)]" : "",
+                      !sel && !dis ? "hover:bg-[var(--surface-2)] text-[var(--ink)]" : "",
+                    ].join(" ")}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
 
-            <div className="mt-2 flex items-center justify-between gap-2 border-t border-[var(--border)] pt-2">
-              <button
-                type="button"
-                onClick={() => commit("")}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
-              >
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-2 border-t border-[var(--border)] px-3 py-2">
+              <button type="button" onClick={() => { onChange(""); setOpen(false); }}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface)] transition-colors">
                 Obriši
               </button>
-              <button
-                type="button"
-                onClick={() => commit(toIso(new Date()))}
-                className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--brand-primary)] hover:bg-[var(--surface)] transition-colors"
-              >
+              <button type="button" onClick={() => selectDay(new Date().getDate())}
+                className="rounded-md px-3 py-1.5 text-xs font-medium text-[var(--brand-primary)] hover:bg-[var(--surface)] transition-colors">
                 Danas
               </button>
             </div>
-          </div>
+
+          </div>,
+          document.body
         )}
       </div>
     </div>
