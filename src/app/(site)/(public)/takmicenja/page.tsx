@@ -262,8 +262,11 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
   recentCutoff.setDate(recentCutoff.getDate() - 60);
   const recentCutoffStr = recentCutoff.toISOString().split("T")[0];
 
-  // SRB scope filter: domestic + European + World/ISSF; ISSF scope = no filter
-  const scopeFilter = scope === "SRB" ? or(
+  // SRB scope: domestic + European + World/ISSF
+  // ISSF scope: only continental/world/olympic (no club/regional/national/international)
+  const scopeFilter = scope === "issf"
+    ? sql`${competitions.level} IN ('continental', 'world', 'olympic')`
+    : or(
     // Domestic Serbian (held in Serbia or organized by SSS)
     sql`${competitions.countryId} = (SELECT id FROM countries WHERE noc_code = 'SRB')`,
     sql`'sss' = ANY(${competitions.tags})`,
