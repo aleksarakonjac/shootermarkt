@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { db } from "@/lib/db";
 import { competitions, results, disciplines, countries } from "@/lib/db/schema";
-import { eq, desc, ilike, and, sql } from "drizzle-orm";
+import { eq, desc, ilike, and, sql, or } from "drizzle-orm";
+import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -243,6 +244,9 @@ interface Props {
 export default async function TakmicenjaPage({ searchParams }: Props) {
   const { year, level, q, tag, view, archiveAll, when } = await searchParams;
 
+  const cookieStore = await cookies();
+  const scope = cookieStore.get("shootermarkt_scope")?.value === "issf" ? "issf" : "SRB";
+
   const defaultYear  = new Date().getFullYear().toString();
   const activeYear   = year && /^\d{4}$/.test(year) ? year : defaultYear;
   const activeLevel  = level && level !== "all"     ? level : "all";
@@ -258,8 +262,24 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
   recentCutoff.setDate(recentCutoff.getDate() - 60);
   const recentCutoffStr = recentCutoff.toISOString().split("T")[0];
 
+  // SRB scope filter: domestic + European + World/ISSF; ISSF scope = no filter
+  const scopeFilter = scope === "SRB" ? or(
+    // Domestic Serbian (held in Serbia or organized by SSS)
+    sql`${competitions.countryId} = (SELECT id FROM countries WHERE noc_code = 'SRB')`,
+    sql`'sss' = ANY(${competitions.tags})`,
+    sql`${competitions.organizer} = 'SSS'`,
+    // European (ESC)
+    sql`'esc' = ANY(${competitions.tags})`,
+    sql`${competitions.organizer} = 'ESC'`,
+    // World / ISSF
+    sql`${competitions.level} IN ('world', 'olympic')`,
+    sql`'issf' = ANY(${competitions.tags})`,
+    sql`${competitions.organizer} = 'ISSF'`,
+  ) : undefined;
+
   // SQL filters
   const sqlFilters = [
+    scopeFilter,
     activeQ     ? ilike(competitions.name, `%${activeQ}%`)                          : undefined,
     activeYear  !== "all" ? ilike(competitions.date, `${activeYear}%`)              : undefined,
     activeLevel !== "all" ? eq(competitions.level, activeLevel as CompetitionLevel) : undefined,
@@ -296,6 +316,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
     db
       .selectDistinct({ year: sql<string>`LEFT(${competitions.date}, 4)` })
       .from(competitions)
+      .where(scopeFilter)
       .orderBy(desc(sql`LEFT(${competitions.date}, 4)`)),
     db
       .select({
@@ -307,6 +328,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
         level:   competitions.level,
       })
       .from(competitions)
+      .where(scopeFilter)
       .orderBy(asc(competitions.date)),
   ]);
 

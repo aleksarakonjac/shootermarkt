@@ -39,13 +39,11 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === "issf" || saved === "SRB") setScope(saved);
+      const s: Scope = (saved === "issf" || saved === "SRB") ? saved : "SRB";
+      setScope(s);
+      document.cookie = `shootermarkt_scope=${s}; path=/; max-age=31536000; SameSite=Lax`;
     } catch {}
   }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, scope); } catch {}
-  }, [scope]);
 
   useEffect(() => {
     function onOutside(e: MouseEvent) {
@@ -63,7 +61,14 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
     };
   }, []);
 
-  function select(s: Scope) { setScope(s); setOpen(false); }
+  function select(s: Scope) {
+    setScope(s);
+    setOpen(false);
+    try {
+      localStorage.setItem(STORAGE_KEY, s);
+      document.cookie = `shootermarkt_scope=${s}; path=/; max-age=31536000; SameSite=Lax`;
+    } catch {}
+  }
 
   return (
     <div ref={containerRef} className="relative shrink-0">
