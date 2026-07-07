@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Calendar from "react-calendar";
 
 // value format: "YYYY-MM-DDTHH:MM" or ""
@@ -35,8 +36,10 @@ function isSameDay(a: Date, b: Date) {
 }
 
 export function DateTimePicker({ value, onChange, min, max, placeholder = "Izaberi datum i vreme…", className = "" }: Props) {
-  const [open, setOpen]   = useState(false);
-  const containerRef      = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const triggerRef      = useRef<HTMLButtonElement>(null);
+  const panelRef        = useRef<HTMLDivElement>(null);
 
   const datePart = value ? value.split("T")[0] : "";
   const timePart = value ? (value.split("T")[1] ?? "00:00") : "00:00";
@@ -58,12 +61,21 @@ export function DateTimePicker({ value, onChange, min, max, placeholder = "Izabe
   useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      if (triggerRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
     document.addEventListener("mousedown", handle);
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("mousedown", handle); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function update() { setRect(triggerRef.current?.getBoundingClientRect() ?? null); }
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => { window.removeEventListener("scroll", update, true); window.removeEventListener("resize", update); };
   }, [open]);
 
   function emitChange(newDate: string, newH: string, newM: string) {
@@ -99,11 +111,16 @@ export function DateTimePicker({ value, onChange, min, max, placeholder = "Izabe
 
   const display = fmtDisplay();
 
+  const panelStyle: React.CSSProperties = rect
+    ? { position: "fixed", top: rect.bottom + 4, left: rect.left, zIndex: 9999, minWidth: 260 }
+    : { display: "none" };
+
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div className={className}>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen(v => !v)}
+        onClick={() => { setRect(triggerRef.current?.getBoundingClientRect() ?? null); setOpen(v => !v); }}
         className="block w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-xs text-left focus:outline-none focus:border-[var(--brand-primary)] transition-colors flex items-center justify-between gap-2"
       >
         <span className={display ? "text-[var(--ink)]" : "text-[var(--subtle)]"}>
@@ -116,8 +133,8 @@ export function DateTimePicker({ value, onChange, min, max, placeholder = "Izabe
         </svg>
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full z-[9999] mt-1 rounded-xl border border-[var(--border)] bg-[var(--bg)] shadow-lg overflow-hidden" style={{ minWidth: 260 }}>
+      {open && typeof window !== "undefined" && createPortal(
+        <div ref={panelRef} style={panelStyle} className="rounded-xl border border-[var(--border)] bg-[var(--bg)] shadow-lg overflow-hidden">
           {/* Time row at top */}
           <div className="px-3 py-2.5 border-b border-[var(--border)] flex items-center gap-2">
             <span className="text-[0.62rem] font-semibold uppercase tracking-wide text-[var(--subtle)] shrink-0 w-10">Vreme</span>
@@ -168,7 +185,8 @@ export function DateTimePicker({ value, onChange, min, max, placeholder = "Izabe
               }}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
