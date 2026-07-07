@@ -7,6 +7,7 @@ import { gte, lte, and, eq, asc, or } from "drizzle-orm";
 import type { Metadata } from "next";
 import { TickerAdminClient } from "./ticker-client";
 import { USKORO_LEAD_DAYS } from "@/app/(site)/(public)/ticker";
+import { getPublishedArticles } from "@/lib/cms/get-articles";
 
 export const metadata: Metadata = { title: "Admin · Ticker" };
 
@@ -16,7 +17,7 @@ export default async function AdminTickerPage() {
   // Max lead days = 5 (olympic), fetch everything up to 5 days ahead for USKORO detection
   const in5days  = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-  const [upcomingComps, allSlots, allDisciplines, overrides, customUpcoming, uskoro5days] = await Promise.all([
+  const [upcomingComps, allSlots, allDisciplines, overrides, customUpcoming, uskoro5days, recentArticles] = await Promise.all([
     // Competitions in next 30 days
     db.select({
       id: competitions.id,
@@ -76,6 +77,7 @@ export default async function AdminTickerPage() {
       .orderBy(asc(tickerCustomUpcoming.date)),
 
     // Comps in next 5 days (for USKORO auto-detection preview)
+
     db.select({
       id: competitions.id,
       name: competitions.name,
@@ -90,6 +92,9 @@ export default async function AdminTickerPage() {
       .leftJoin(countries, eq(competitions.countryId, countries.id))
       .where(and(gte(competitions.date, today), lte(competitions.date, in5days)))
       .orderBy(asc(competitions.date)),
+
+    // 10 most recent articles from Payload CMS (for article ticker picker)
+    getPublishedArticles({ limit: 10 }).catch(() => []),
   ]);
 
   const now = new Date();
@@ -143,6 +148,12 @@ export default async function AdminTickerPage() {
         customUpcoming={customUpcoming.map(c => ({ ...c, createdAt: c.createdAt.toISOString() }))}
         liveSlotIds={liveSlots.map(s => s.id)}
         uskoroCompIds={uskoroComps.map(c => c.id)}
+        recentArticles={recentArticles.map(a => ({
+          id:          a.id,
+          title:       a.title,
+          slug:        a.slug,
+          publishedAt: a.publishedAt,
+        }))}
       />
     </div>
   );

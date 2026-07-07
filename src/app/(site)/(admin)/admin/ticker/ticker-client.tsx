@@ -56,6 +56,13 @@ interface CustomUpcomingRow {
   createdAt: string;
 }
 
+interface ArticleOption {
+  id: number;
+  title: string;
+  slug: string;
+  publishedAt: string | null;
+}
+
 interface Props {
   competitions: CompetitionRow[];
   slots: SlotRow[];
@@ -64,6 +71,7 @@ interface Props {
   customUpcoming: CustomUpcomingRow[];
   liveSlotIds: number[];
   uskoroCompIds: number[];
+  recentArticles: ArticleOption[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -97,22 +105,32 @@ const TYPE_COLOR: Record<string, string> = {
 // ── CustomSelect ──────────────────────────────────────────────────────────────
 
 function CustomSelect({
-  value, onChange, options, placeholder = "Izaberi…", className,
+  value, onChange, options, placeholder = "Izaberi…", className, searchable,
 }: {
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; sublabel?: string }[];
   placeholder?: string;
   className?: string;
+  searchable?: boolean;
 }) {
   const [open, setOpen]     = useState(false);
   const [rect, setRect]     = useState<DOMRect | null>(null);
+  const [search, setSearch] = useState("");
   const triggerRef          = useRef<HTMLButtonElement>(null);
   const panelRef            = useRef<HTMLDivElement>(null);
   const selected            = options.find((o) => o.value === value);
 
+  const filtered = searchable && search
+    ? options.filter(o =>
+        o.label.toLowerCase().includes(search.toLowerCase()) ||
+        (o.sublabel ?? "").toLowerCase().includes(search.toLowerCase())
+      )
+    : options;
+
   function openDropdown() {
     setRect(triggerRef.current?.getBoundingClientRect() ?? null);
+    setSearch("");
     setOpen(true);
   }
 
@@ -159,18 +177,33 @@ function CustomSelect({
           style={panelStyle}
           className="rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-lg overflow-hidden"
         >
+          {searchable && (
+            <div className="p-1.5 border-b border-[var(--border)]">
+              <input
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Pretraži…"
+                className="w-full rounded px-2 py-1 text-xs text-[var(--ink)] bg-[var(--surface)] focus:outline-none placeholder:text-[var(--subtle)]"
+              />
+            </div>
+          )}
           <div className="max-h-48 overflow-y-auto py-1">
-            {options.map((o) => (
+            {filtered.map((o) => (
               <button
                 key={o.value}
                 type="button"
                 onClick={() => { onChange(o.value); setOpen(false); }}
-                className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface)] transition-colors"
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface)] transition-colors flex flex-col gap-0.5"
                 style={{ fontWeight: o.value === value ? 700 : 400, color: o.value === value ? "var(--brand-primary)" : "var(--ink)" }}
               >
-                {o.label}
+                <span>{o.label}</span>
+                {o.sublabel && <span className="text-[0.65rem] text-[var(--subtle)] font-normal truncate">{o.sublabel}</span>}
               </button>
             ))}
+            {filtered.length === 0 && (
+              <p className="px-3 py-2 text-xs text-[var(--subtle)]">Nema rezultata</p>
+            )}
           </div>
         </div>,
         document.body
@@ -229,6 +262,7 @@ export function TickerAdminClient({
   customUpcoming,
   liveSlotIds,
   uskoroCompIds,
+  recentArticles,
 }: Props) {
   const router                  = useRouter();
   const [, startTransition]     = useTransition();
@@ -342,6 +376,7 @@ export function TickerAdminClient({
 
           {/* Add article or custom text to upper ticker */}
           <AddUpperTickerForm
+            articles={recentArticles}
             onAdd={async (payload) => {
               await fetch("/api/admin/ticker/override", {
                 method: "POST",
@@ -518,28 +553,39 @@ function OverrideRow({ override, compName, onToggle, onDelete }: {
 
 // ── AddUpperTickerForm ────────────────────────────────────────────────────────
 
-function AddUpperTickerForm({ onAdd }: {
+function AddUpperTickerForm({ articles, onAdd }: {
+  articles: ArticleOption[];
   onAdd: (p: { type: string; label: string; href: string | null; customSlides: Array<{ text: string }> | null }) => Promise<void>;
 }) {
-  const [type, setType]   = useState<"article" | "custom">("custom");
-  const [label, setLabel] = useState("");
-  const [href, setHref]   = useState("");
-  const [text, setText]   = useState("");
-  const [loading, setLoading] = useState(false);
+  const [type, setType]           = useState<"article" | "custom">("custom");
+  const [label, setLabel]         = useState("");
+  const [href, setHref]           = useState("");
+  const [text, setText]           = useState("");
+  const [articleSlug, setArticleSlug] = useState("");
+  const [loading, setLoading]     = useState(false);
+
+  const articleOptions = articles.map((a) => ({
+    value: a.slug,
+    label: a.title,
+    sublabel: a.publishedAt ? new Date(a.publishedAt).toLocaleDateString("sr-Latn-RS", { day: "numeric", month: "short", year: "numeric" }) : undefined,
+  }));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!label.trim()) return;
+    if (type === "article" && !articleSlug) return;
     setLoading(true);
     await onAdd({
       type,
-      label:        label.trim(),
-      href:         href.trim() || null,
-      customSlides: text.trim() ? [{ text: text.trim() }] : null,
+      label: label.trim(),
+      href:  type === "article" ? `/vesti/${articleSlug}` : (href.trim() || null),
+      customSlides: type === "custom" && text.trim() ? [{ text: text.trim() }] : null,
     });
     setLoading(false);
-    setLabel(""); setHref(""); setText("");
+    setLabel(""); setHref(""); setText(""); setArticleSlug("");
   }
+
+  const canSubmit = label.trim() && (type === "custom" || articleSlug);
 
   return (
     <form onSubmit={submit} className="px-4 py-3 border-t border-dashed border-[var(--border)] flex flex-wrap items-end gap-3 bg-[var(--surface)]">
@@ -547,14 +593,27 @@ function AddUpperTickerForm({ onAdd }: {
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Tip</label>
         <CustomSelect
           value={type}
-          onChange={(v) => setType(v as "article" | "custom")}
+          onChange={(v) => { setType(v as "article" | "custom"); setArticleSlug(""); }}
           options={[{ value: "custom", label: "Custom tekst" }, { value: "article", label: "Članak / vest" }]}
         />
       </div>
 
+      {type === "article" && (
+        <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+          <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Izaberi članak</label>
+          <CustomSelect
+            value={articleSlug}
+            onChange={setArticleSlug}
+            options={articleOptions}
+            placeholder="Pretraži članke…"
+            searchable
+          />
+        </div>
+      )}
+
       <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
-          {type === "article" ? "Naslov članka" : "Label (kratak)"}
+          {type === "article" ? "Label u tickeru (može biti kraći od naslova)" : "Label (kratak)"}
         </label>
         <input
           type="text"
@@ -566,25 +625,20 @@ function AddUpperTickerForm({ onAdd }: {
         />
       </div>
 
-      <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
-        <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
-          {type === "article" ? "Link na članak" : "Tekst / opis (opciono)"}
-        </label>
-        {type === "article" ? (
-          <input type="text" value={href} onChange={(e) => setHref(e.target.value)} placeholder="/vesti/slug" className={inputCls} />
-        ) : (
-          <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Detalji koji se prikazuju..." className={inputCls} />
-        )}
-      </div>
-
       {type === "custom" && (
-        <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
-          <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Link (opciono)</label>
-          <input type="text" value={href} onChange={(e) => setHref(e.target.value)} placeholder="/takmicenja/123" className={inputCls} />
-        </div>
+        <>
+          <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
+            <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Tekst / opis (opciono)</label>
+            <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Detalji koji se prikazuju..." className={inputCls} />
+          </div>
+          <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
+            <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Link (opciono)</label>
+            <input type="text" value={href} onChange={(e) => setHref(e.target.value)} placeholder="/takmicenja/123" className={inputCls} />
+          </div>
+        </>
       )}
 
-      <button type="submit" disabled={!label.trim() || loading} className={`${btnPrimary} disabled:opacity-40 self-end`}>
+      <button type="submit" disabled={!canSubmit || loading} className={`${btnPrimary} disabled:opacity-40 self-end`}>
         + Dodaj u ticker
       </button>
     </form>
