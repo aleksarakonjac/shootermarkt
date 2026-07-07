@@ -501,11 +501,14 @@ export const tickerLiveOverrides = pgTable(
   "ticker_live_overrides",
   {
     id: serial("id").primaryKey(),
+    // type: 'live' = forced live, 'uskoro' = forced uskoro, 'article' = news article, 'custom' = free text
+    type: varchar("type", { length: 20 }).notNull().default("live"),
     competitionId: integer("competition_id").references(() => competitions.id, { onDelete: "set null" }),
     isActive: boolean("is_active").notNull().default(true),
     customSlides: jsonb("custom_slides").$type<Array<{ label?: string; text: string }>>(),
     priority: integer("priority").notNull().default(0),
     label: varchar("label", { length: 200 }),
+    href: varchar("href", { length: 500 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [

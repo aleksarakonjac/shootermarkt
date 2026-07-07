@@ -88,7 +88,7 @@ export default async function HomePage() {
 
   const upcomingItems: TickerItem[] = tickerUpcoming.map((comp) => ({
     id: comp.id, name: comp.name, date: comp.date,
-    level: comp.level, status: "NAJAVA" as const,
+    level: comp.level, status: "USKORO" as const,
     detailText: comp.location || "Srbija",
     href: `/takmicenja/${comp.id}`,
   }));

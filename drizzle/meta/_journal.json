@@ -50,6 +50,13 @@
       "when": 1783900000000,
       "tag": "0006_ticker_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783901000000,
+      "tag": "0007_ticker_overrides_ext",
+      "breakpoints": true
     }
   ]
 }

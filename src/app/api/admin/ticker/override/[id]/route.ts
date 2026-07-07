@@ -21,6 +21,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.customSlides !== undefined) updates.customSlides = body.customSlides;
   if (body.label !== undefined) updates.label = body.label;
   if (typeof body.priority === "number") updates.priority = body.priority;
+  if (body.href !== undefined) updates.href = body.href;
+  if (body.type !== undefined) updates.type = body.type;
 
   const [updated] = await db.update(tickerLiveOverrides)
     .set(updates)

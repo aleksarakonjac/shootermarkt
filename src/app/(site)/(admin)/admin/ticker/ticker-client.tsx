@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 
@@ -36,11 +37,13 @@ interface DisciplineOption {
 
 interface Override {
   id: number;
+  type: string;
   competitionId: number | null;
   isActive: boolean;
   customSlides: Array<{ label?: string; text: string }> | null;
   priority: number;
   label: string | null;
+  href: string | null;
   createdAt: string;
 }
 
@@ -60,6 +63,7 @@ interface Props {
   overrides: Override[];
   customUpcoming: CustomUpcomingRow[];
   liveSlotIds: number[];
+  uskoroCompIds: number[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -76,19 +80,112 @@ const STAGE_LABEL: Record<string, string> = Object.fromEntries(
   STAGE_OPTIONS.map((s) => [s.value, s.label])
 );
 
+const TYPE_LABEL: Record<string, string> = {
+  live:   "Live",
+  uskoro: "Uskoro",
+  article: "Članak",
+  custom: "Custom",
+};
+
+const TYPE_COLOR: Record<string, string> = {
+  live:    "bg-[var(--brand-primary)] text-white",
+  uskoro:  "bg-amber-500 text-white",
+  article: "bg-sky-600 text-white",
+  custom:  "bg-[var(--surface-2)] text-[var(--ink)]",
+};
+
+// ── CustomSelect ──────────────────────────────────────────────────────────────
+
+function CustomSelect({
+  value, onChange, options, placeholder = "Izaberi…", className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen]     = useState(false);
+  const [rect, setRect]     = useState<DOMRect | null>(null);
+  const triggerRef          = useRef<HTMLButtonElement>(null);
+  const panelRef            = useRef<HTMLDivElement>(null);
+  const selected            = options.find((o) => o.value === value);
+
+  function openDropdown() {
+    setRect(triggerRef.current?.getBoundingClientRect() ?? null);
+    setOpen(true);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    function handle(e: MouseEvent) {
+      if (triggerRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function update() { setRect(triggerRef.current?.getBoundingClientRect() ?? null); }
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => { window.removeEventListener("scroll", update, true); window.removeEventListener("resize", update); };
+  }, [open]);
+
+  const panelStyle: React.CSSProperties = rect
+    ? { position: "fixed", top: rect.bottom + 4, left: rect.left, minWidth: rect.width, zIndex: 9999 }
+    : { display: "none" };
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={openDropdown}
+        className={`${inputCls} cursor-pointer flex items-center justify-between gap-2 ${className ?? ""}`}
+      >
+        <span className={selected ? "text-[var(--ink)]" : "text-[var(--subtle)]"}>
+          {selected?.label ?? placeholder}
+        </span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0 text-[var(--muted)]" aria-hidden="true">
+          <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      {open && typeof window !== "undefined" && createPortal(
+        <div
+          ref={panelRef}
+          style={panelStyle}
+          className="rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-lg overflow-hidden"
+        >
+          <div className="max-h-48 overflow-y-auto py-1">
+            {options.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--surface)] transition-colors"
+                style={{ fontWeight: o.value === value ? 700 : 400, color: o.value === value ? "var(--brand-primary)" : "var(--ink)" }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtDatetime(iso: string): string {
-  // Treat as local time — show raw YYYY-MM-DDTHH:mm parts
-  const d = iso.slice(0, 16); // "2026-07-05T09:00"
+  const d            = iso.slice(0, 16);
   const [date, time] = d.split("T");
-  const [y, m, day] = date.split("-");
+  const [y, m, day]  = date.split("-");
   return `${day}.${m}.${y} ${time}`;
-}
-
-function toDatetimeLocal(iso: string | null): string {
-  if (!iso) return "";
-  return iso.slice(0, 16);
 }
 
 function formatDateRange(start: string, end: string | null): string {
@@ -101,21 +198,24 @@ function formatDateRange(start: string, end: string | null): string {
 
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 
-const btn = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors";
+const btn        = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors";
 const btnPrimary = `${btn} bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)]`;
-const btnGhost = `${btn} text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)]`;
-const btnDanger = `${btn} text-[var(--brand-primary)] hover:bg-red-50 dark:hover:bg-red-950`;
-const inputCls = "block w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors";
-const selectCls = `${inputCls} cursor-pointer`;
-
-// ── Live status dot ───────────────────────────────────────────────────────────
+const btnGhost   = `${btn} text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)]`;
+const btnDanger  = `${btn} text-[var(--brand-primary)] hover:bg-red-50 dark:hover:bg-red-950`;
+const inputCls   = "block w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors";
+const selectCls  = `${inputCls} cursor-pointer`;
 
 function LiveDot() {
   return (
-    <span
-      className="w-2 h-2 rounded-full bg-[var(--brand-primary)] shrink-0"
-      style={{ animation: "ticker-pulse 1.4s ease-in-out infinite" }}
-    />
+    <span className="w-2 h-2 rounded-full bg-[var(--brand-primary)] shrink-0" style={{ animation: "ticker-pulse 1.4s ease-in-out infinite" }} />
+  );
+}
+
+function TypeBadge({ type }: { type: string }) {
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide shrink-0 ${TYPE_COLOR[type] ?? TYPE_COLOR.custom}`}>
+      {TYPE_LABEL[type] ?? type}
+    </span>
   );
 }
 
@@ -128,33 +228,35 @@ export function TickerAdminClient({
   overrides,
   customUpcoming,
   liveSlotIds,
+  uskoroCompIds,
 }: Props) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
+  const router                  = useRouter();
+  const [, startTransition]     = useTransition();
+  const refresh                 = () => startTransition(() => router.refresh());
 
-  const refresh = () => startTransition(() => router.refresh());
+  const liveSlots        = slots.filter((s) => liveSlotIds.includes(s.id));
+  const activeOverrides  = overrides.filter((o) => o.isActive);
+  const isAnythingLive   = liveSlots.length > 0 || activeOverrides.some(o => o.type === "live" || o.type === "uskoro" || o.type === "article" || o.type === "custom");
 
-  const liveSlots = slots.filter((s) => liveSlotIds.includes(s.id));
-  const activeOverrides = overrides.filter((o) => o.isActive);
-
-  const isAnythingLive = liveSlots.length > 0 || activeOverrides.length > 0;
+  // Auto-detected uskoro comps (from server)
+  const uskoroAutoComps  = competitions.filter(c => uskoroCompIds.includes(c.id));
 
   return (
     <div className="space-y-10">
 
-      {/* ── Section 1: Live status ──────────────────────────────────────── */}
+      {/* ── Section 1: Live status ────────────────────────────────────────── */}
       <section>
         <SectionHeader
-          title="Live ticker"
-          subtitle="Šta se trenutno prikazuje u gornjem tickeru"
+          title="Live ticker (gornji)"
+          subtitle="Šta se trenutno prikazuje u gornjem ticker traku"
           live={isAnythingLive}
         />
 
-        {/* Auto-detected live from schedule */}
+        {/* Auto-detected LIVE from schedule */}
         {liveSlots.length > 0 && (
-          <div className="mb-4 rounded-lg border border-[var(--brand-primary)] bg-red-50 dark:bg-red-950/20 p-4">
+          <div className="mb-3 rounded-lg border border-[var(--brand-primary)] bg-red-50 dark:bg-red-950/20 p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-[var(--brand-primary)] mb-3 flex items-center gap-2">
-              <LiveDot /> Automatski detektovano (iz satnice)
+              <LiveDot /> Auto · Aktivna satnica
             </p>
             <div className="space-y-1.5">
               {liveSlots.map((s) => {
@@ -165,9 +267,7 @@ export function TickerAdminClient({
                     <span className="font-medium">{STAGE_LABEL[s.stage] ?? s.stage}</span>
                     <span className="text-[var(--muted)]">·</span>
                     <span className="truncate">{comp?.name ?? `Takmičenje #${s.competitionId}`}</span>
-                    <span className="text-[var(--subtle)] shrink-0">{fmtDatetime(s.startTime)}
-                      {s.endTime && ` → ${fmtDatetime(s.endTime)}`}
-                    </span>
+                    <span className="text-[var(--subtle)] shrink-0">{fmtDatetime(s.startTime)}{s.endTime && ` → ${fmtDatetime(s.endTime)}`}</span>
                   </div>
                 );
               })}
@@ -175,16 +275,43 @@ export function TickerAdminClient({
           </div>
         )}
 
-        {/* Admin overrides */}
+        {/* Auto-detected USKORO */}
+        {uskoroAutoComps.length > 0 && (
+          <div className="mb-3 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-950/20 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400 mb-3">
+              Auto · Uskoro (po nivou)
+            </p>
+            <div className="space-y-1.5">
+              {uskoroAutoComps.map((comp) => {
+                const levelStyle = LEVEL_STYLE[comp.level] ?? { background: "var(--surface-2)", color: "var(--muted)" };
+                return (
+                  <div key={comp.id} className="flex items-center gap-3 text-xs text-[var(--ink)]">
+                    <span
+                      className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase shrink-0"
+                      style={{ background: levelStyle.background, color: levelStyle.color }}
+                    >
+                      {LEVEL_LABEL[comp.level] ?? comp.level}
+                    </span>
+                    <span className="truncate font-medium">{comp.name}</span>
+                    <span className="text-[var(--muted)] shrink-0">{formatDateRange(comp.date, comp.dateEnd)}</span>
+                    {comp.location && <span className="text-[var(--subtle)] shrink-0">{comp.location}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* All upper ticker overrides (live, uskoro, article, custom) */}
         <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
-            <span className="text-xs font-semibold text-[var(--ink)]">Forsirana aktivacija</span>
+            <span className="text-xs font-semibold text-[var(--ink)]">Forsiran sadržaj gornjeg tickera</span>
             <span className="text-xs text-[var(--muted)]">{activeOverrides.length} aktivnih</span>
           </div>
 
           {overrides.length === 0 ? (
             <div className="px-4 py-6 text-center text-xs text-[var(--subtle)]">
-              Nema forsiranih aktivacija. Koristite "Forsirati live" na takmičenju ispod.
+              Nema forsiranog sadržaja. Dodaj ispod ili koristi "Forsirati live/uskoro" na takmičenju.
             </div>
           ) : (
             <div className="divide-y divide-[var(--border)]">
@@ -212,20 +339,32 @@ export function TickerAdminClient({
               })}
             </div>
           )}
+
+          {/* Add article or custom text to upper ticker */}
+          <AddUpperTickerForm
+            onAdd={async (payload) => {
+              await fetch("/api/admin/ticker/override", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+              refresh();
+            }}
+          />
         </div>
 
-        {!isAnythingLive && (
+        {!isAnythingLive && uskoroAutoComps.length === 0 && (
           <p className="mt-3 text-xs text-[var(--muted)] text-center">
-            Gornji ticker je trenutno skriven. Dodaj satnice ili forsir aktivaciju da se pojavi.
+            Gornji ticker je skriven. Dodaj satnice, forsir live/uskoro, ili dodaj custom sadržaj.
           </p>
         )}
       </section>
 
-      {/* ── Section 2: Competition schedule ────────────────────────────── */}
+      {/* ── Section 2: Competition schedule ──────────────────────────────── */}
       <section>
         <SectionHeader
           title="Satnica takmičenja"
-          subtitle="Kada počinju i završavaju se discipline — osnova auto live detekcije"
+          subtitle="Discipline, faze i vremena — osnova auto live/uskoro detekcije"
         />
 
         {competitions.length === 0 ? (
@@ -233,9 +372,11 @@ export function TickerAdminClient({
         ) : (
           <div className="rounded-lg border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
             {competitions.map((comp) => {
-              const compSlots = slots.filter((s) => s.competitionId === comp.id);
-              const activeOverride = overrides.find((o) => o.competitionId === comp.id && o.isActive);
-              const hasLiveSlot = compSlots.some((s) => liveSlotIds.includes(s.id));
+              const compSlots     = slots.filter((s) => s.competitionId === comp.id);
+              const liveOverride  = overrides.find((o) => o.competitionId === comp.id && o.isActive && o.type === "live");
+              const uskoroOverride = overrides.find((o) => o.competitionId === comp.id && o.isActive && o.type === "uskoro");
+              const hasLiveSlot   = compSlots.some((s) => liveSlotIds.includes(s.id));
+              const isAutoUskoro  = uskoroCompIds.includes(comp.id);
 
               return (
                 <CompetitionScheduleRow
@@ -244,18 +385,17 @@ export function TickerAdminClient({
                   slots={compSlots}
                   disciplines={disciplines}
                   liveSlotIds={liveSlotIds}
-                  activeOverride={activeOverride ?? null}
+                  activeLiveOverride={liveOverride ?? null}
+                  activeUskoroOverride={uskoroOverride ?? null}
                   isLive={hasLiveSlot}
+                  isAutoUskoro={isAutoUskoro}
                   onSlotAdd={async (payload) => {
                     const res = await fetch("/api/admin/ticker/schedule", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ ...payload, competitionId: comp.id }),
                     });
-                    if (!res.ok) {
-                      const err = await res.json();
-                      return err.error as string;
-                    }
+                    if (!res.ok) { const err = await res.json(); return err.error as string; }
                     refresh();
                     return null;
                   }}
@@ -263,9 +403,10 @@ export function TickerAdminClient({
                     await fetch(`/api/admin/ticker/schedule/${slotId}`, { method: "DELETE" });
                     refresh();
                   }}
-                  onForceToggle={async () => {
-                    if (activeOverride) {
-                      await fetch(`/api/admin/ticker/override/${activeOverride.id}`, {
+                  onForceToggle={async (type) => {
+                    const existing = type === "live" ? liveOverride : uskoroOverride;
+                    if (existing) {
+                      await fetch(`/api/admin/ticker/override/${existing.id}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ isActive: false }),
@@ -274,7 +415,7 @@ export function TickerAdminClient({
                       await fetch("/api/admin/ticker/override", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ competitionId: comp.id }),
+                        body: JSON.stringify({ competitionId: comp.id, type }),
                       });
                     }
                     refresh();
@@ -286,18 +427,18 @@ export function TickerAdminClient({
         )}
       </section>
 
-      {/* ── Section 3: Custom upcoming ──────────────────────────────────── */}
+      {/* ── Section 3: Custom upcoming (bottom bar) ───────────────────────── */}
       <section>
         <SectionHeader
-          title="Custom najave"
-          subtitle="Ručne stavke u donjem ticker traku (pored automatskih iz baze)"
+          title="Custom najave (donji ticker)"
+          subtitle="Ručne stavke u donjem traku pored automatskih iz baze"
         />
 
         <div className="rounded-lg border border-[var(--border)] overflow-hidden">
           {customUpcoming.length > 0 && (
             <div className="divide-y divide-[var(--border)]">
               {customUpcoming.map((entry) => (
-                <CustomUpcomingRow
+                <CustomUpcomingEntryRow
                   key={entry.id}
                   entry={entry}
                   onDelete={async () => {
@@ -330,27 +471,23 @@ export function TickerAdminClient({
 
 function SectionHeader({ title, subtitle, live }: { title: string; subtitle: string; live?: boolean }) {
   return (
-    <div className="mb-4 flex items-center gap-3">
-      <div>
-        <h2 className="text-base font-bold text-[var(--ink)] flex items-center gap-2">
-          {title}
-          {live && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide bg-[var(--brand-primary)] text-white">
-              <LiveDot /> Live
-            </span>
-          )}
-        </h2>
-        <p className="text-xs text-[var(--muted)]">{subtitle}</p>
-      </div>
+    <div className="mb-4">
+      <h2 className="text-base font-bold text-[var(--ink)] flex items-center gap-2">
+        {title}
+        {live && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide bg-[var(--brand-primary)] text-white">
+            <LiveDot /> Live
+          </span>
+        )}
+      </h2>
+      <p className="text-xs text-[var(--muted)]">{subtitle}</p>
     </div>
   );
 }
 
 // ── OverrideRow ───────────────────────────────────────────────────────────────
 
-function OverrideRow({
-  override, compName, onToggle, onDelete,
-}: {
+function OverrideRow({ override, compName, onToggle, onDelete }: {
   override: Override;
   compName: string;
   onToggle: () => Promise<void>;
@@ -361,73 +498,143 @@ function OverrideRow({
   return (
     <div className="px-4 py-3 flex items-center gap-3">
       <span className={`w-2 h-2 rounded-full shrink-0 ${override.isActive ? "bg-[var(--brand-primary)]" : "bg-[var(--border-strong)]"}`} />
+      <TypeBadge type={override.type} />
       <span className="flex-1 text-xs font-medium text-[var(--ink)] truncate">{compName}</span>
-      {override.label && (
-        <span className="text-xs text-[var(--muted)] shrink-0">{override.label}</span>
+      {override.href && (
+        <span className="text-[0.65rem] text-[var(--subtle)] truncate max-w-[120px] shrink-0">{override.href}</span>
       )}
       <span className={`text-xs font-semibold shrink-0 ${override.isActive ? "text-[var(--brand-primary)]" : "text-[var(--muted)]"}`}>
         {override.isActive ? "Aktivno" : "Neaktivno"}
       </span>
-      <button
-        onClick={async () => { setLoading(true); await onToggle(); setLoading(false); }}
-        disabled={loading}
-        className={btnGhost}
-      >
+      <button onClick={async () => { setLoading(true); await onToggle(); setLoading(false); }} disabled={loading} className={btnGhost}>
         {override.isActive ? "Pauziraj" : "Aktiviraj"}
       </button>
-      <button
-        onClick={async () => { setLoading(true); await onDelete(); setLoading(false); }}
-        disabled={loading}
-        className={btnDanger}
-      >
+      <button onClick={async () => { setLoading(true); await onDelete(); setLoading(false); }} disabled={loading} className={btnDanger}>
         Ukloni
       </button>
     </div>
   );
 }
 
+// ── AddUpperTickerForm ────────────────────────────────────────────────────────
+
+function AddUpperTickerForm({ onAdd }: {
+  onAdd: (p: { type: string; label: string; href: string | null; customSlides: Array<{ text: string }> | null }) => Promise<void>;
+}) {
+  const [type, setType]   = useState<"article" | "custom">("custom");
+  const [label, setLabel] = useState("");
+  const [href, setHref]   = useState("");
+  const [text, setText]   = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!label.trim()) return;
+    setLoading(true);
+    await onAdd({
+      type,
+      label:        label.trim(),
+      href:         href.trim() || null,
+      customSlides: text.trim() ? [{ text: text.trim() }] : null,
+    });
+    setLoading(false);
+    setLabel(""); setHref(""); setText("");
+  }
+
+  return (
+    <form onSubmit={submit} className="px-4 py-3 border-t border-dashed border-[var(--border)] flex flex-wrap items-end gap-3 bg-[var(--surface)]">
+      <div className="flex flex-col gap-1 w-32">
+        <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Tip</label>
+        <CustomSelect
+          value={type}
+          onChange={(v) => setType(v as "article" | "custom")}
+          options={[{ value: "custom", label: "Custom tekst" }, { value: "article", label: "Članak / vest" }]}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
+        <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
+          {type === "article" ? "Naslov članka" : "Label (kratak)"}
+        </label>
+        <input
+          type="text"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder={type === "article" ? "npr. Petrović pobedio na SP" : "npr. Obaveštenje"}
+          className={inputCls}
+          required
+        />
+      </div>
+
+      <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
+        <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
+          {type === "article" ? "Link na članak" : "Tekst / opis (opciono)"}
+        </label>
+        {type === "article" ? (
+          <input type="text" value={href} onChange={(e) => setHref(e.target.value)} placeholder="/vesti/slug" className={inputCls} />
+        ) : (
+          <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Detalji koji se prikazuju..." className={inputCls} />
+        )}
+      </div>
+
+      {type === "custom" && (
+        <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
+          <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Link (opciono)</label>
+          <input type="text" value={href} onChange={(e) => setHref(e.target.value)} placeholder="/takmicenja/123" className={inputCls} />
+        </div>
+      )}
+
+      <button type="submit" disabled={!label.trim() || loading} className={`${btnPrimary} disabled:opacity-40 self-end`}>
+        + Dodaj u ticker
+      </button>
+    </form>
+  );
+}
+
 // ── CompetitionScheduleRow ────────────────────────────────────────────────────
 
 function CompetitionScheduleRow({
-  comp, slots, disciplines, liveSlotIds, activeOverride, isLive,
+  comp, slots, disciplines, liveSlotIds,
+  activeLiveOverride, activeUskoroOverride,
+  isLive, isAutoUskoro,
   onSlotAdd, onSlotDelete, onForceToggle,
 }: {
   comp: CompetitionRow;
   slots: SlotRow[];
   disciplines: DisciplineOption[];
   liveSlotIds: number[];
-  activeOverride: Override | null;
+  activeLiveOverride: Override | null;
+  activeUskoroOverride: Override | null;
   isLive: boolean;
-  onSlotAdd: (payload: { disciplineId: number; stage: string; startTime: string; endTime: string | null }) => Promise<string | null>;
+  isAutoUskoro: boolean;
+  onSlotAdd: (p: { disciplineId: number; stage: string; startTime: string; endTime: string | null }) => Promise<string | null>;
   onSlotDelete: (slotId: number) => Promise<void>;
-  onForceToggle: () => Promise<void>;
+  onForceToggle: (type: "live" | "uskoro") => Promise<void>;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [forceLoading, setForceLoading] = useState(false);
+  const [expanded, setExpanded]       = useState(false);
+  const [forceLoading, setForceLoading] = useState<"live" | "uskoro" | null>(null);
 
   const levelStyle = LEVEL_STYLE[comp.level] ?? { background: "var(--surface-2)", color: "var(--muted)" };
+  const showLiveDot = isLive || activeLiveOverride?.isActive;
 
   return (
     <div>
-      {/* Competition header */}
       <div className="px-4 py-3 flex items-center gap-3 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors">
         <button
           onClick={() => setExpanded((v) => !v)}
           className="text-[var(--muted)] shrink-0 transition-transform duration-150"
           style={{ transform: expanded ? "rotate(90deg)" : undefined }}
-          aria-label={expanded ? "Zatvori" : "Otvori satniću"}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M4 3l4 3-4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
 
-        {/* Live dot */}
-        {(isLive || activeOverride?.isActive) && (
-          <LiveDot />
+        {showLiveDot && <LiveDot />}
+        {!showLiveDot && isAutoUskoro && (
+          <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
         )}
 
-        {/* Name */}
         <button
           onClick={() => setExpanded((v) => !v)}
           className="flex-1 text-left text-sm font-medium text-[var(--ink)] truncate hover:text-[var(--brand-primary)] transition-colors"
@@ -435,12 +642,10 @@ function CompetitionScheduleRow({
           {comp.name}
         </button>
 
-        {/* Date range */}
         <span className="text-xs text-[var(--muted)] shrink-0 hidden sm:block">
           {formatDateRange(comp.date, comp.dateEnd)}
         </span>
 
-        {/* Level badge */}
         <span
           className="shrink-0 hidden sm:inline-flex items-center rounded px-1.5 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide"
           style={{ background: levelStyle.background, color: levelStyle.color }}
@@ -448,49 +653,49 @@ function CompetitionScheduleRow({
           {LEVEL_LABEL[comp.level] ?? comp.level}
         </span>
 
-        {/* Slot count */}
-        <span className="text-xs text-[var(--subtle)] shrink-0 w-12 text-right">
+        <span className="text-xs text-[var(--subtle)] shrink-0 w-14 text-right">
           {slots.length} {slots.length === 1 ? "slot" : "slotova"}
         </span>
 
-        {/* Force live toggle */}
+        {/* Force uskoro */}
         <button
-          onClick={async () => { setForceLoading(true); await onForceToggle(); setForceLoading(false); }}
-          disabled={forceLoading}
-          className={activeOverride?.isActive ? btnDanger : btnGhost}
+          onClick={async () => { setForceLoading("uskoro"); await onForceToggle("uskoro"); setForceLoading(null); }}
+          disabled={forceLoading !== null}
+          className={activeUskoroOverride?.isActive ? `${btnGhost} text-amber-600` : btnGhost}
+          title="Forsirati USKORO prikaz"
         >
-          {activeOverride?.isActive ? (
-            <><span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-primary)] inline-block" /> Forsirano</>
-          ) : (
-            "Forsirati live"
-          )}
+          {activeUskoroOverride?.isActive ? "▲ Uskoro" : "Forsirati uskoro"}
+        </button>
+
+        {/* Force live */}
+        <button
+          onClick={async () => { setForceLoading("live"); await onForceToggle("live"); setForceLoading(null); }}
+          disabled={forceLoading !== null}
+          className={activeLiveOverride?.isActive ? btnDanger : btnGhost}
+        >
+          {activeLiveOverride?.isActive ? (
+            <><span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-primary)] inline-block" /> Forsirano live</>
+          ) : "Forsirati live"}
         </button>
       </div>
 
-      {/* Expanded: slots + add form */}
       {expanded && (
         <div className="border-t border-[var(--border)] bg-[var(--bg)]">
-          {/* Existing slots */}
           {slots.length > 0 && (
             <div className="divide-y divide-[var(--border)]">
               {slots
                 .slice()
                 .sort((a, b) => a.startTime.localeCompare(b.startTime))
-                .map((slot) => {
-                  const live = liveSlotIds.includes(slot.id);
-                  return (
-                    <SlotRow
-                      key={slot.id}
-                      slot={slot}
-                      live={live}
-                      onDelete={() => onSlotDelete(slot.id)}
-                    />
-                  );
-                })}
+                .map((slot) => (
+                  <SlotRow
+                    key={slot.id}
+                    slot={slot}
+                    live={liveSlotIds.includes(slot.id)}
+                    onDelete={() => onSlotDelete(slot.id)}
+                  />
+                ))}
             </div>
           )}
-
-          {/* Add slot form */}
           <AddSlotForm
             disciplines={disciplines}
             compDateStart={comp.date}
@@ -507,19 +712,13 @@ function CompetitionScheduleRow({
 
 function SlotRow({ slot, live, onDelete }: { slot: SlotRow; live: boolean; onDelete: () => Promise<void> }) {
   const [loading, setLoading] = useState(false);
-
   return (
     <div className={`px-6 py-2.5 flex items-center gap-4 text-xs ${live ? "bg-red-50/50 dark:bg-red-950/10" : ""}`}>
       {live && <LiveDot />}
       <span className="font-mono font-bold text-[var(--brand-primary)] w-10 shrink-0">{slot.disciplineCode}</span>
       <span className="w-40 shrink-0 text-[var(--ink)] font-medium">{STAGE_LABEL[slot.stage] ?? slot.stage}</span>
       <span className="text-[var(--muted)] shrink-0">{fmtDatetime(slot.startTime)}</span>
-      {slot.endTime && (
-        <>
-          <span className="text-[var(--border-strong)]">→</span>
-          <span className="text-[var(--muted)] shrink-0">{fmtDatetime(slot.endTime)}</span>
-        </>
-      )}
+      {slot.endTime && (<><span className="text-[var(--border-strong)]">→</span><span className="text-[var(--muted)] shrink-0">{fmtDatetime(slot.endTime)}</span></>)}
       <span className="flex-1" />
       <button
         onClick={async () => { setLoading(true); await onDelete(); setLoading(false); }}
@@ -535,124 +734,74 @@ function SlotRow({ slot, live, onDelete }: { slot: SlotRow; live: boolean; onDel
 
 // ── AddSlotForm ───────────────────────────────────────────────────────────────
 
-function AddSlotForm({
-  disciplines, compDateStart, compDateEnd, onAdd,
-}: {
+function AddSlotForm({ disciplines, compDateStart, compDateEnd, onAdd }: {
   disciplines: DisciplineOption[];
   compDateStart: string;
   compDateEnd: string;
   onAdd: (p: { disciplineId: number; stage: string; startTime: string; endTime: string | null }) => Promise<string | null>;
 }) {
   const [disciplineId, setDisciplineId] = useState("");
-  const [stage, setStage] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [stage, setStage]               = useState("");
+  const [startTime, setStartTime]       = useState("");
+  const [endTime, setEndTime]           = useState("");
+  const [error, setError]               = useState<string | null>(null);
+  const [loading, setLoading]           = useState(false);
 
   const valid = disciplineId && stage && startTime;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!valid) return;
-    setLoading(true);
-    setError(null);
-    const err = await onAdd({
-      disciplineId: parseInt(disciplineId),
-      stage,
-      startTime,
-      endTime: endTime || null,
-    });
+    setLoading(true); setError(null);
+    const err = await onAdd({ disciplineId: parseInt(disciplineId), stage, startTime, endTime: endTime || null });
     setLoading(false);
     if (err) { setError(err); return; }
-    setDisciplineId("");
-    setStage("");
-    setStartTime("");
-    setEndTime("");
+    setDisciplineId(""); setStage(""); setStartTime(""); setEndTime("");
   }
 
   return (
     <form onSubmit={submit} className="px-6 py-3 flex flex-wrap items-end gap-3 border-t border-dashed border-[var(--border)]">
       <div className="flex flex-col gap-1 w-36">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Disciplina</label>
-        <select value={disciplineId} onChange={(e) => setDisciplineId(e.target.value)} className={selectCls} required>
-          <option value="">Izaberi…</option>
-          {disciplines.map((d) => (
-            <option key={d.id} value={d.id}>{d.code}</option>
-          ))}
-        </select>
+        <CustomSelect
+          value={disciplineId}
+          onChange={setDisciplineId}
+          options={disciplines.map((d) => ({ value: String(d.id), label: d.code }))}
+        />
       </div>
-
       <div className="flex flex-col gap-1 w-44">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Faza</label>
-        <select value={stage} onChange={(e) => setStage(e.target.value)} className={selectCls} required>
-          <option value="">Izaberi…</option>
-          {STAGE_OPTIONS.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
+        <CustomSelect
+          value={stage}
+          onChange={setStage}
+          options={STAGE_OPTIONS}
+        />
       </div>
-
       <div className="flex flex-col gap-1">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Početak</label>
-        <input
-          type="datetime-local"
-          value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
-          min={`${compDateStart}T00:00`}
-          max={`${compDateEnd}T23:59`}
-          className={inputCls}
-          required
-        />
+        <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} min={`${compDateStart}T00:00`} max={`${compDateEnd}T23:59`} className={inputCls} required />
       </div>
-
       <div className="flex flex-col gap-1">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Kraj (opciono)</label>
-        <input
-          type="datetime-local"
-          value={endTime}
-          onChange={(e) => setEndTime(e.target.value)}
-          min={startTime || `${compDateStart}T00:00`}
-          max={`${compDateEnd}T23:59`}
-          className={inputCls}
-        />
+        <input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} min={startTime || `${compDateStart}T00:00`} max={`${compDateEnd}T23:59`} className={inputCls} />
       </div>
-
-      <button type="submit" disabled={!valid || loading} className={`${btnPrimary} disabled:opacity-40 self-end`}>
-        + Dodaj slot
-      </button>
-
+      <button type="submit" disabled={!valid || loading} className={`${btnPrimary} disabled:opacity-40 self-end`}>+ Dodaj slot</button>
       {error && <p className="w-full text-xs text-[var(--brand-primary)] mt-1">{error}</p>}
     </form>
   );
 }
 
-// ── CustomUpcomingRow ─────────────────────────────────────────────────────────
+// ── CustomUpcomingEntryRow ────────────────────────────────────────────────────
 
-function CustomUpcomingRow({ entry, onDelete }: { entry: CustomUpcomingRow; onDelete: () => Promise<void> }) {
+function CustomUpcomingEntryRow({ entry, onDelete }: { entry: CustomUpcomingRow; onDelete: () => Promise<void> }) {
   const [loading, setLoading] = useState(false);
-
   return (
     <div className="px-4 py-3 flex items-center gap-4 text-xs">
-      {entry.date && (
-        <span className="font-mono text-[var(--muted)] shrink-0 w-20">
-          {entry.date.split("-").reverse().join(".")}
-        </span>
-      )}
+      {entry.date && <span className="font-mono text-[var(--muted)] shrink-0 w-20">{entry.date.split("-").reverse().join(".")}</span>}
       <span className="flex-1 font-medium text-[var(--ink)] truncate">{entry.text}</span>
-      {entry.href && (
-        <span className="text-[var(--subtle)] truncate max-w-[140px] shrink-0">{entry.href}</span>
-      )}
-      {entry.displayUntil && (
-        <span className="text-[var(--subtle)] shrink-0">do {entry.displayUntil.split("-").reverse().join(".")}</span>
-      )}
-      <button
-        onClick={async () => { setLoading(true); await onDelete(); setLoading(false); }}
-        disabled={loading}
-        className={btnDanger}
-      >
-        Ukloni
-      </button>
+      {entry.href && <span className="text-[var(--subtle)] truncate max-w-[140px] shrink-0">{entry.href}</span>}
+      {entry.displayUntil && <span className="text-[var(--subtle)] shrink-0">do {entry.displayUntil.split("-").reverse().join(".")}</span>}
+      <button onClick={async () => { setLoading(true); await onDelete(); setLoading(false); }} disabled={loading} className={btnDanger}>Ukloni</button>
     </div>
   );
 }
@@ -662,22 +811,17 @@ function CustomUpcomingRow({ entry, onDelete }: { entry: CustomUpcomingRow; onDe
 function AddCustomUpcomingForm({ onAdd }: {
   onAdd: (p: { text: string; date: string | null; href: string | null; displayUntil: string | null }) => Promise<void>;
 }) {
-  const [text, setText] = useState("");
-  const [date, setDate] = useState("");
-  const [href, setHref] = useState("");
+  const [text, setText]               = useState("");
+  const [date, setDate]               = useState("");
+  const [href, setHref]               = useState("");
   const [displayUntil, setDisplayUntil] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]         = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
     setLoading(true);
-    await onAdd({
-      text: text.trim(),
-      date: date || null,
-      href: href || null,
-      displayUntil: displayUntil || null,
-    });
+    await onAdd({ text: text.trim(), date: date || null, href: href || null, displayUntil: displayUntil || null });
     setLoading(false);
     setText(""); setDate(""); setHref(""); setDisplayUntil("");
   }
@@ -686,34 +830,21 @@ function AddCustomUpcomingForm({ onAdd }: {
     <form onSubmit={submit} className="px-4 py-3 flex flex-wrap items-end gap-3 bg-[var(--surface)]">
       <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Tekst najave</label>
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="npr. Kup Srbije — Vazdušni Pištolj"
-          className={inputCls}
-          required
-        />
+        <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="npr. Kup Srbije — Vazdušni Pištolj" className={inputCls} required />
       </div>
-
       <div className="flex flex-col gap-1 w-32">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Datum</label>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
       </div>
-
       <div className="flex flex-col gap-1 w-40">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Link (opciono)</label>
         <input type="url" value={href} onChange={(e) => setHref(e.target.value)} placeholder="/takmicenja/123" className={inputCls} />
       </div>
-
       <div className="flex flex-col gap-1 w-32">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Prikazuj do</label>
         <input type="date" value={displayUntil} onChange={(e) => setDisplayUntil(e.target.value)} className={inputCls} />
       </div>
-
-      <button type="submit" disabled={!text.trim() || loading} className={`${btnPrimary} disabled:opacity-40 self-end`}>
-        + Dodaj
-      </button>
+      <button type="submit" disabled={!text.trim() || loading} className={`${btnPrimary} disabled:opacity-40 self-end`}>+ Dodaj</button>
     </form>
   );
 }

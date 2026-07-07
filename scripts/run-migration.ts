@@ -55,6 +55,11 @@ async function main() {
   `;
   console.log("✓ ticker_custom_upcoming");
 
+  // 0007: extend ticker_live_overrides with type + href
+  await sql`ALTER TABLE "ticker_live_overrides" ADD COLUMN IF NOT EXISTS "type" varchar(20) NOT NULL DEFAULT 'live'`;
+  await sql`ALTER TABLE "ticker_live_overrides" ADD COLUMN IF NOT EXISTS "href" varchar(500)`;
+  console.log("✓ ticker_live_overrides extended");
+
   await sql.end();
   console.log("Migration complete.");
 }
