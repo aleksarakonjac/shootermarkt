@@ -3,7 +3,7 @@
 -- Enum types
 DO $$ BEGIN CREATE TYPE "public"."age_category" AS ENUM('pionir','kadet','mladji_junior','junior','mladji_senior','senior','master','open'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE "public"."competition_level" AS ENUM('club','regional','national','continental','world','olympic'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "public"."discipline_code" AS ENUM('ARM','ARW','APM','APW','RFM','RFW','R3JM','R3JW','SPW','RFPM','FPM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "public"."discipline_code" AS ENUM('ARM','ARW','APM','APW','R3PM','R3PW','R3JM','R3JW','SPW','RFPM','FPM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE "public"."event_type" AS ENUM('championship','world_cup','champions_league','cup','grand_prix','league_round','friendly','other'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE "public"."result_source" AS ENUM('pdf_import','manual','issf_import','esc_import'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE "public"."scoring_type" AS ENUM('individual','team','both'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;

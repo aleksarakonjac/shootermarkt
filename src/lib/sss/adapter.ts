@@ -1,3 +1,5 @@
+import { getSssCompetitionTags, type SssCompetitionTag } from "./competition-tags";
+
 const SSS_BASE = "https://serbianshooting.rs";
 const RESULTS_PAGE = `${SSS_BASE}/rezultati.htm`;
 const CALENDAR_PAGE = `${SSS_BASE}/kalendar.htm`;
@@ -7,6 +9,7 @@ export interface SssBilten {
   filename: string;   // e.g. "PS A 10m - BILTEN.pdf"
   year: number;
   is10m: boolean;
+  tags: SssCompetitionTag[];
   isExternal: boolean; // hosted externally (ISSF, ESC, etc.)
 }
 
@@ -57,8 +60,9 @@ function parseBilteniHtml(html: string): SssBilten[] {
     const has10m = upper.includes("10M");
     const hasMk50 = upper.includes("25-50") || upper.includes("50M") || upper.includes("25M");
     const is10m = has10m && !hasMk50;
+    const tags = getSssCompetitionTags(filename);
 
-    bilteni.push({ url, filename, year, is10m, isExternal });
+    bilteni.push({ url, filename, year, is10m, tags, isExternal });
   }
 
   return bilteni;

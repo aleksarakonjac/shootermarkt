@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPublishedArticleBySlug } from "@/lib/cms/get-articles";
 import { ArticleContent } from "@/components/cms-blocks/ArticleContent";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const t = await getTranslations("news");
   const { slug } = await params;
   const article = await getPublishedArticleBySlug(slug);
-  if (!article) return { title: "Vest nije pronađena" };
+  if (!article) return { title: t("notFound") };
   return { title: article.title };
 }
 

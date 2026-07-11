@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import { compareShooters, ComparisonResult } from "./actions";
+import { useTranslations } from "next-intl";
 
 interface ShooterListItem {
   id: number;
@@ -16,6 +17,7 @@ interface QuickH2HClientProps {
 }
 
 export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
+  const t = useTranslations("home");
   const [idA, setIdA] = useState<string>("");
   const [idB, setIdB] = useState<string>("");
   const [result, setResult] = useState<ComparisonResult | null>(null);
@@ -83,9 +85,9 @@ export function QuickH2HClient({ shootersList }: QuickH2HClientProps) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
       {/* Header */}
-      <div className="bg-[var(--brand-accent)] px-4 py-3 border-b border-[var(--border)]">
+      <div className="bg-[var(--brand-primary)] px-4 py-3 border-b border-[var(--border)]">
         <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-white uppercase tracking-wider">
-          Brzi H2H Duel
+          {t("h2hTitle")}
         </h3>
       </div>
 

@@ -13,7 +13,7 @@ export default function RezultatiPage() {
           Unos rezultata
         </h1>
         <p className="text-sm text-[var(--muted)] mt-1">
-          Ručni unos ili automatski import iz PDF biltena, SSS, ISSF i SIUS sistema
+          Ručni unos ili import iz Excel šablona, PDF biltena, SSS, ISSF i SIUS sistema
         </p>
       </div>
       <RezultatiHub />

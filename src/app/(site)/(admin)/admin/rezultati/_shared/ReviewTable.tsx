@@ -1,10 +1,16 @@
 "use client";
 
-import type { ReviewRow } from "@/lib/pdf-import/types";
+import { CATEGORY_LABEL, type AgeCategory, type ReviewRow } from "@/lib/pdf-import/types";
+import { ShooterMatchCell } from "./ShooterMatchCell";
 
 const ALL_DISCIPLINES = [
-  "ARM","ARW","APM","APW","RFM","RFW","R3JM","R3JW","SPW","RFPM","FPM",
+  "ARM","ARW","APM","APW","R3PM","R3PW","SPW",
 ] as const;
+
+const CATEGORY_OPTIONS = (Object.keys(CATEGORY_LABEL) as AgeCategory[]).map((value) => ({
+  value,
+  label: CATEGORY_LABEL[value],
+}));
 
 interface Props {
   rows: ReviewRow[];
@@ -80,6 +86,7 @@ export function ReviewTable({
               <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
               <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
               <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Disc.</th>
+              <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Kat.</th>
               <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Rank</th>
               <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Total</th>
               <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inners</th>
@@ -142,6 +149,15 @@ export function ReviewTable({
                     </select>
                   </td>
                   <td className="px-3 py-2">
+                    <select
+                      value={row.category}
+                      onChange={(e) => onRowChange(trueIdx, { category: e.target.value as ReviewRow["category"] })}
+                      className="bg-transparent text-xs text-[var(--ink)] focus:outline-none cursor-pointer"
+                    >
+                      {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2">
                     <input
                       type="number"
                       value={row.qualRank ?? ""}
@@ -169,11 +185,7 @@ export function ReviewTable({
                     />
                   </td>
                   <td className="px-3 py-2">
-                    {row.shooterId ? (
-                      <span className="text-xs" style={{ color: "var(--success)" }}>✓ Pronađen</span>
-                    ) : row.warning ? (
-                      <span className="text-xs" style={{ color: "var(--warning)" }}>⚠ Novi</span>
-                    ) : null}
+                    <ShooterMatchCell row={row} onChange={(patch) => onRowChange(trueIdx, patch)} />
                   </td>
                 </tr>
               );

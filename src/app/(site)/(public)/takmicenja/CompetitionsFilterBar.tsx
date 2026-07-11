@@ -2,23 +2,22 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 
-const LEVELS: { value: CompetitionLevel | "all"; label: string }[] = [
-  { value: "all",           label: "Svi"           },
-  { value: "olympic",       label: "Olimpijsko"    },
-  { value: "world",         label: "Svetsko"       },
-  { value: "continental",   label: "Kontinentalno" },
-  { value: "international", label: "Međunarodno"   },
-  { value: "national",      label: "Državno"       },
-  { value: "regional",      label: "Regionalno"    },
-  { value: "club",          label: "Klubsko"       },
+const LEVEL_VALUES: Array<CompetitionLevel | "all"> = [
+  "all", "olympic", "world", "continental", "international", "national", "regional", "club",
 ];
 
 const TAGS: { value: string; label: string; activeBg: string; activeColor: string }[] = [
   { value: "sss",  label: "SSS",  activeBg: "var(--tag-sss-bg)",  activeColor: "var(--tag-sss-fg)" },
   { value: "issf", label: "ISSF", activeBg: "var(--tag-issf-bg)", activeColor: "var(--tag-issf-fg)" },
   { value: "esc",  label: "ESC",  activeBg: "var(--tag-esc-bg)",  activeColor: "var(--tag-esc-fg)" },
+  { value: "10m", label: "10m", activeBg: "#dbeafe", activeColor: "#1d4ed8" },
+  { value: "MK", label: "MK", activeBg: "var(--surface-2)", activeColor: "var(--ink)" },
+  { value: "50m", label: "50m", activeBg: "var(--surface-2)", activeColor: "var(--ink)" },
+  { value: "25m", label: "25m", activeBg: "var(--surface-2)", activeColor: "var(--ink)" },
+  { value: "50/25m", label: "50/25m", activeBg: "var(--surface-2)", activeColor: "var(--ink)" },
 ];
 
 interface Props {
@@ -40,6 +39,7 @@ export function CompetitionsFilterBar({
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("competition");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [yearOpen, setYearOpen] = useState(false);
   const yearRef = useRef<HTMLDivElement>(null);
@@ -65,7 +65,6 @@ export function CompetitionsFilterBar({
     [setParam]
   );
 
-  // Close year dropdown on outside click or Escape
   useEffect(() => {
     if (!yearOpen) return;
     function onDown(e: MouseEvent) {
@@ -89,6 +88,9 @@ export function CompetitionsFilterBar({
   const pillOn  = "bg-[var(--brand-primary)] text-white";
   const pillOff = "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]";
 
+  const levelLabel = (value: CompetitionLevel | "all") =>
+    value === "all" ? t("list.levelAll") : t(`levels.${value}`);
+
   return (
     <div className="mb-8 space-y-2">
 
@@ -107,7 +109,7 @@ export function CompetitionsFilterBar({
             type="search"
             defaultValue={currentQ}
             onChange={(e) => onSearch(e.target.value)}
-            placeholder="Pretraži…"
+            placeholder={t("list.search")}
             className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] pl-8 pr-3 py-1.5 text-sm text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
           />
         </div>
@@ -119,7 +121,7 @@ export function CompetitionsFilterBar({
             onClick={() => router.push("/takmicenja", { scroll: false })}
             className="shrink-0 text-xs text-[var(--muted)] hover:text-[var(--brand-primary)] transition-colors"
           >
-            Resetuj ×
+            {t("list.reset")}
           </button>
         )}
       </div>
@@ -133,7 +135,6 @@ export function CompetitionsFilterBar({
             onClick={() => setYearOpen((v) => !v)}
             aria-haspopup="listbox"
             aria-expanded={yearOpen}
-            aria-label="Filter po godini"
             className={`${pill} bg-[var(--ink)] text-[var(--bg)] font-[family-name:var(--font-jetbrains-mono)] flex items-center gap-1.5`}
           >
             {currentYear}
@@ -149,7 +150,6 @@ export function CompetitionsFilterBar({
           {yearOpen && (
             <div
               role="listbox"
-              aria-label="Godina"
               className="absolute top-[calc(100%+4px)] left-0 z-[var(--z-dropdown)] min-w-[80px] rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-[0_4px_16px_oklch(0_0_0/0.12)] py-1 overflow-hidden"
             >
               {availableYears.map((y) => (
@@ -173,35 +173,35 @@ export function CompetitionsFilterBar({
 
         <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
 
-        <div role="group" aria-label="Filter po nivou takmičenja" className="contents">
-          {LEVELS.map((l) => (
+        <div role="group" className="contents">
+          {LEVEL_VALUES.map((value) => (
             <button
-              key={l.value}
-              onClick={() => setParam("level", l.value)}
-              className={`${pill} ${currentLevel === l.value || (l.value === "all" && currentLevel === "all") ? pillOn : pillOff}`}
+              key={value}
+              onClick={() => setParam("level", value)}
+              className={`${pill} ${currentLevel === value || (value === "all" && currentLevel === "all") ? pillOn : pillOff}`}
             >
-              {l.label}
+              {levelLabel(value)}
             </button>
           ))}
         </div>
 
         <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
 
-        <div role="group" aria-label="Filter po organizatoru" className="contents">
-          {TAGS.map((t) => {
-            const active = currentTag === t.value;
+        <div role="group" className="contents">
+          {TAGS.map((tag) => {
+            const active = currentTag === tag.value;
             return (
               <button
-                key={t.value}
-                onClick={() => setParam("tag", active ? "" : t.value)}
+                key={tag.value}
+                onClick={() => setParam("tag", active ? "" : tag.value)}
                 className={`${pill} font-[family-name:var(--font-jetbrains-mono)]`}
                 style={
                   active
-                    ? { background: t.activeBg, color: t.activeColor }
+                    ? { background: tag.activeBg, color: tag.activeColor }
                     : { background: "var(--surface-2)", color: "var(--muted)" }
                 }
               >
-                {t.label}
+                {tag.label}
               </button>
             );
           })}

@@ -48,6 +48,7 @@ export default async function AdminShooterPage({ params }: Props) {
     db
       .select({
         id: results.id,
+        category: results.category,
         qualTotal: results.qualTotal,
         qualRank: results.qualRank,
         finalRank: results.finalRank,
@@ -89,6 +90,7 @@ export default async function AdminShooterPage({ params }: Props) {
         competitionName: r.competitionName,
         competitionDate: r.competitionDate,
         disciplineCode: r.disciplineCode,
+        category: r.category,
         qualTotal: r.qualTotal ? parseFloat(r.qualTotal) : null,
         qualRank: r.qualRank,
         finalRank: r.finalRank,

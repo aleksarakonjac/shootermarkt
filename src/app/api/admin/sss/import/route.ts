@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { parsePdfWithGemini } from "@/lib/pdf-import/gemini-adapter";
 import { db } from "@/lib/db";
 import { shooters, clubs } from "@/lib/db/schema";
-import type { ReviewRow } from "@/lib/pdf-import/types";
+import { DISCIPLINE_META, IMPORTED_DISCIPLINE_CODES, dedupeRowsByCategory, type ReviewRow } from "@/lib/pdf-import/types";
+import { matchShooter, foldName } from "@/lib/name-match";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -57,13 +58,12 @@ export async function POST(req: NextRequest) {
   }
 
   const mvpEvents = bilten.events.filter(
-    (e) =>
-      ["ARM", "ARW", "APM", "APW"].includes(e.discipline) && e.stage === "qualification"
+    (e) => IMPORTED_DISCIPLINE_CODES.includes(e.discipline) && e.stage === "qualification"
   );
 
   if (mvpEvents.length === 0) {
     return NextResponse.json(
-      { error: "No ARM/ARW/APM/APW qualification events found in PDF" },
+      { error: "Nema kvalifikacionih tabela za discipline koje uvozimo (ARM/ARW/APM/APW/R3PM/R3PW/SPW)" },
       { status: 422 }
     );
   }
@@ -86,17 +86,14 @@ export async function POST(req: NextRequest) {
       firstName: string;
       teamNoc: string;
       clubName?: string;
+      birthYear?: number | null;
       series: number[];
       total: number;
       inners?: number | null;
       qualified?: boolean | null;
     }>) {
-      const matchedShooter = allShooters.find(
-        (s) =>
-          s.lastName.toLowerCase() === result.lastName.toLowerCase() &&
-          s.firstName.toLowerCase() === result.firstName.toLowerCase() &&
-          (!s.nationality || s.nationality === result.teamNoc || result.teamNoc === "SRB")
-      );
+      const match = matchShooter(result.firstName, result.lastName, result.teamNoc || "SRB", allShooters);
+      const matchedShooterId = match.kind === "exact" ? match.id : undefined;
 
       const matchedClub = result.clubName
         ? allClubs.find(
@@ -106,14 +103,22 @@ export async function POST(req: NextRequest) {
           )
         : undefined;
 
+      const meta = DISCIPLINE_META[disciplineCode];
       rows.push({
-        shooterId: matchedShooter?.id,
+        shooterId: matchedShooterId,
+        isNew: !matchedShooterId,
+        suggestedShooterId: match.kind === "suggestion" ? match.id : undefined,
+        suggestedName: match.kind === "suggestion" ? match.name : undefined,
         firstName: result.firstName,
         lastName: result.lastName,
         teamNoc: result.teamNoc || "SRB",
+        birthYear: result.birthYear ?? null,
+        gender: meta?.gender,
+        apparatus: meta?.apparatus,
         clubAbbr: result.clubName,
         clubId: matchedClub?.id,
         disciplineCode,
+        category: event.category,
         qualTotal: result.total,
         qualInners: result.inners,
         qualRank: result.rank,
@@ -121,10 +126,15 @@ export async function POST(req: NextRequest) {
         qualified: result.qualified,
         finalTotal: null,
         finalRank: null,
-        warning: matchedShooter ? undefined : "Novi strelac — biće kreiran",
+        warning: matchedShooterId
+          ? undefined
+          : match.kind === "suggestion"
+          ? `Možda: ${match.name}`
+          : "Novi strelac — biće kreiran",
       });
     }
   }
 
-  return NextResponse.json({ rows, eventCount: mvpEvents.length, filename });
+  const deduped = dedupeRowsByCategory(rows, foldName);
+  return NextResponse.json({ rows: deduped, eventCount: mvpEvents.length, filename });
 }

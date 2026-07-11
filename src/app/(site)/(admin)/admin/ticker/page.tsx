@@ -42,6 +42,7 @@ export default async function AdminTickerPage() {
       disciplineCode: disciplines.code,
       disciplineName: disciplines.name,
       stage: competitionSchedule.stage,
+      category: competitionSchedule.category,
       startTime: competitionSchedule.startTime,
       endTime: competitionSchedule.endTime,
     })

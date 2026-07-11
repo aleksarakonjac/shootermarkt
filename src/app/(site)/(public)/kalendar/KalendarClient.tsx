@@ -5,6 +5,8 @@ import Calendar from "react-calendar";
 import Link from "next/link";
 import "./kalendar.css";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
+import { LEVEL_STYLE } from "@/lib/competition-utils";
+import { useTranslations, useLocale } from "next-intl";
 
 export type CalendarComp = {
   id: number;
@@ -21,50 +23,13 @@ interface Props {
 
 type LevelFilter = "all" | "olympic" | "world" | "continental" | "international" | "national" | "regional" | "club";
 
-const FILTER_TABS: { key: LevelFilter; label: string }[] = [
-  { key: "all",           label: "Svi"           },
-  { key: "olympic",       label: "Olimpijsko"    },
-  { key: "world",         label: "Svetsko"       },
-  { key: "continental",   label: "Kontinentalno" },
-  { key: "international", label: "Međunarodno"   },
-  { key: "national",      label: "Državno"       },
-  { key: "regional",      label: "Regionalno"    },
-  { key: "club",          label: "Klubsko"       },
-];
-
 function levelMatchesFilter(level: CompetitionLevel, filter: LevelFilter): boolean {
   if (filter === "all") return true;
   return level === filter;
 }
 
-const LEVEL_META: Record<CompetitionLevel, { label: string; bg: string; color: string }> = {
-  club:          { label: "Klubsko",       bg: "var(--surface-2)",      color: "var(--muted)"  },
-  regional:      { label: "Regionalno",    bg: "var(--brand-accent)",   color: "white"         },
-  national:      { label: "Državno",       bg: "var(--success)",        color: "white"         },
-  international: { label: "Međunarodno",   bg: "oklch(0.52 0.15 220)",  color: "white"         },
-  continental:   { label: "Kontinentalno", bg: "oklch(0.62 0.18 55)",   color: "white"         },
-  world:         { label: "ISSF–Svetsko",  bg: "var(--brand-primary)",  color: "white"         },
-  olympic:       { label: "Olimpijsko",    bg: "oklch(0.65 0.18 75)",   color: "white"         },
-};
-
-const MONTHS_SR = [
-  "Januar","Februar","Mart","April","Maj","Jun",
-  "Jul","Avgust","Septembar","Oktobar","Novembar","Decembar",
-];
-const DAYS_SR = ["Ned","Pon","Uto","Sre","Čet","Pet","Sub"];
-
 function toKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function formatDisplayDate(dateStr: string, dateEnd: string | null): string {
-  const MONTHS = ["jan","feb","mar","apr","maj","jun","jul","avg","sep","okt","nov","dec"];
-  const d = new Date(dateStr + "T00:00:00");
-  const s = `${d.getDate()}. ${MONTHS[d.getMonth()]}`;
-  if (!dateEnd || dateEnd === dateStr) return s;
-  const de = new Date(dateEnd + "T00:00:00");
-  if (de.getMonth() === d.getMonth()) return `${d.getDate()}–${de.getDate()}. ${MONTHS[d.getMonth()]}`;
-  return `${s} – ${de.getDate()}. ${MONTHS[de.getMonth()]}`;
 }
 
 function getDaysUntil(dateStr: string): number {
@@ -75,6 +40,47 @@ function getDaysUntil(dateStr: string): number {
 }
 
 export function KalendarClient({ competitions }: Props) {
+  const t = useTranslations("calendar");
+  const tHome = useTranslations("home");
+  const locale = useLocale();
+
+  const FILTER_TABS: { key: LevelFilter; label: string }[] = [
+    { key: "all",           label: tCommonLabel("all") },
+    { key: "olympic",       label: tHome("level.olympic") },
+    { key: "world",         label: tHome("level.world") },
+    { key: "continental",   label: tHome("level.continental") },
+    { key: "international", label: tHome("level.international") },
+    { key: "national",      label: tHome("level.national") },
+    { key: "regional",      label: tHome("level.regional") },
+    { key: "club",          label: tHome("level.club") },
+  ];
+
+  function tCommonLabel(key: string): string {
+    if (key === "all") {
+      return locale === "en" ? "All" : "Svi";
+    }
+    return "";
+  }
+
+  const LEVEL_META: Record<CompetitionLevel, { label: string; bg: string; color: string }> = {
+    club:          { label: tHome("level.club"),          bg: LEVEL_STYLE.club.background,          color: LEVEL_STYLE.club.color          },
+    regional:      { label: tHome("level.regional"),      bg: LEVEL_STYLE.regional.background,      color: LEVEL_STYLE.regional.color      },
+    national:      { label: tHome("level.national"),      bg: LEVEL_STYLE.national.background,      color: LEVEL_STYLE.national.color      },
+    international: { label: tHome("level.international"), bg: LEVEL_STYLE.international.background, color: LEVEL_STYLE.international.color },
+    continental:   { label: tHome("level.continental"),   bg: LEVEL_STYLE.continental.background,   color: LEVEL_STYLE.continental.color   },
+    world:         { label: tHome("level.world"),         bg: LEVEL_STYLE.world.background,         color: LEVEL_STYLE.world.color         },
+    olympic:       { label: tHome("level.olympic"),       bg: LEVEL_STYLE.olympic.background,       color: LEVEL_STYLE.olympic.color       },
+  };
+
+  function formatDisplayDate(dateStr: string, dateEnd: string | null): string {
+    const d = new Date(dateStr + "T00:00:00");
+    const s = `${d.getDate()}. ${t(`monthsShort.${d.getMonth()}`)}`;
+    if (!dateEnd || dateEnd === dateStr) return s;
+    const de = new Date(dateEnd + "T00:00:00");
+    if (de.getMonth() === d.getMonth()) return `${d.getDate()}–${de.getDate()}. ${t(`monthsShort.${d.getMonth()}`)}`;
+    return `${s} – ${de.getDate()}. ${t(`monthsShort.${de.getMonth()}`)}`;
+  }
+
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -137,9 +143,9 @@ export function KalendarClient({ competitions }: Props) {
     return result.sort((a, b) => a.date.localeCompare(b.date));
   }, [selectedDate, activeStartDate, filteredComps, eventMap, levelFilter]);
 
-  const activeMonthLabel = `${MONTHS_SR[activeStartDate.getMonth()]} ${activeStartDate.getFullYear()}`;
+  const activeMonthLabel = `${t(`months.${activeStartDate.getMonth()}`)} ${activeStartDate.getFullYear()}`;
   const listTitle = selectedDate
-    ? `${selectedDate.getDate()}. ${MONTHS_SR[selectedDate.getMonth()].toLowerCase()} ${selectedDate.getFullYear()}.`
+    ? `${selectedDate.getDate()}. ${t(`months.${selectedDate.getMonth()}`).toLowerCase()} ${selectedDate.getFullYear()}.`
     : activeMonthLabel;
 
   // Key change triggers remount → entrance animation replays
@@ -168,10 +174,10 @@ export function KalendarClient({ competitions }: Props) {
           }}
           formatDay={(_, date) => String(date.getDate())}
           formatMonthYear={(_, date) =>
-            `${MONTHS_SR[date.getMonth()]} ${date.getFullYear()}`
+            `${t(`months.${date.getMonth()}`)} ${date.getFullYear()}`
           }
-          formatMonth={(_, date) => MONTHS_SR[date.getMonth()]}
-          formatShortWeekday={(_, date) => DAYS_SR[date.getDay()]}
+          formatMonth={(_, date) => t(`months.${date.getMonth()}`)}
+          formatShortWeekday={(_, date) => t(`weekdays.${date.getDay()}`)}
           tileClassName={({ date, view }) => {
             if (view !== "month") return null;
             const key = toKey(date);
@@ -193,7 +199,7 @@ export function KalendarClient({ competitions }: Props) {
           className="shadow-sm"
         />
         <p className="mt-2 text-center text-[0.65rem] text-[var(--subtle)]">
-          Klikni naziv meseca za pregled godine
+          {t("clickHint")}
         </p>
       </div>
 
@@ -231,6 +237,48 @@ export function KalendarClient({ competitions }: Props) {
             >
               {listTitle}
             </h2>
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                onClick={() => {
+                  const d = new Date(activeStartDate);
+                  d.setMonth(d.getMonth() - 1);
+                  setActiveStartDate(d);
+                  setSelectedDate(null);
+                }}
+                aria-label="Prethodni mesec"
+                className="w-6 h-6 flex items-center justify-center rounded text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                  <path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                </svg>
+              </button>
+              <button
+                onClick={() => {
+                  const d = new Date(activeStartDate);
+                  d.setMonth(d.getMonth() + 1);
+                  setActiveStartDate(d);
+                  setSelectedDate(null);
+                }}
+                aria-label="Sledeći mesec"
+                className="w-6 h-6 flex items-center justify-center rounded text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+                  <path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                </svg>
+              </button>
+              {(activeStartDate.getFullYear() !== today.getFullYear() || activeStartDate.getMonth() !== today.getMonth()) && (
+                <button
+                  onClick={() => {
+                    setActiveStartDate(new Date(today.getFullYear(), today.getMonth(), 1));
+                    setSelectedDate(null);
+                  }}
+                  aria-label="Trenutni mesec"
+                  className="ml-1 px-2 h-6 flex items-center rounded text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
+                >
+                  Danas
+                </button>
+              )}
+            </div>
             {selectedDate && (
               <button
                 onClick={() => setSelectedDate(null)}
@@ -239,12 +287,12 @@ export function KalendarClient({ competitions }: Props) {
                 <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
                   <path d="M6.5 2L3.5 5L6.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
                 </svg>
-                Ceo mesec
+                {t("allMonth")}
               </button>
             )}
           </div>
           <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] shrink-0">
-            {listComps.length} {listComps.length === 1 ? "takmičenje" : "takmičenja"}
+            {t("competitionPlural", { count: listComps.length })}
           </span>
         </div>
 
@@ -254,7 +302,7 @@ export function KalendarClient({ competitions }: Props) {
             className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-14 text-center kalendar-list"
           >
             <p className="text-sm text-[var(--muted)]">
-              {selectedDate ? "Nema takmičenja ovog dana." : "Nema takmičenja ovog meseca."}
+              {selectedDate ? t("noEventsDay") : t("noEvents")}
             </p>
           </div>
         ) : (
@@ -292,7 +340,7 @@ export function KalendarClient({ competitions }: Props) {
                       {new Date(comp.date + "T00:00:00").getDate()}
                     </span>
                     <span className="text-[0.6rem] font-semibold text-[var(--muted)] uppercase mt-0.5 leading-none">
-                      {MONTHS_SR[new Date(comp.date + "T00:00:00").getMonth()].slice(0, 3)}
+                      {t(`monthsShort.${new Date(comp.date + "T00:00:00").getMonth()}`)}
                     </span>
                   </div>
 
@@ -318,10 +366,10 @@ export function KalendarClient({ competitions }: Props) {
                     {showCountdown && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[0.62rem] font-bold font-[family-name:var(--font-jetbrains-mono)] tabular-nums whitespace-nowrap countdown-chip">
                         {daysUntil === 0
-                          ? "Danas!"
+                          ? t("today")
                           : daysUntil === 1
-                          ? "Sutra"
-                          : `za ${daysUntil}d`}
+                          ? t("tomorrow")
+                          : t("daysCount", { count: daysUntil })}
                       </span>
                     )}
                     {meta && (

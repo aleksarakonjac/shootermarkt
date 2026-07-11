@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { shooters, clubs, results, competitions, disciplines } from "@/lib/db/schema";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
-import { computeFormaScore } from "@/lib/forma-score";
+import { computeFormaFromEntries, type CompetitionLevel } from "@/lib/forma";
 
 export interface ShooterCompareStats {
   id: number;
@@ -63,6 +63,7 @@ export async function compareShooters(idA: number, idB: number): Promise<Compari
       .select({
         qualTotal: results.qualTotal,
         date: competitions.date,
+        level: competitions.level,
         discCode: disciplines.code,
         maxScore: disciplines.maxQualScore,
       })
@@ -72,7 +73,7 @@ export async function compareShooters(idA: number, idB: number): Promise<Compari
       .where(and(eq(results.shooterId, id), isNotNull(results.qualTotal)));
 
     // Group results by discipline
-    const discMap: { [code: string]: { qualTotal: number; date: string }[] } = {};
+    const discMap: { [code: string]: { qualTotal: number; date: string; level: CompetitionLevel }[] } = {};
     const maxScores: { [code: string]: number } = {};
 
     for (const r of resList) {
@@ -83,6 +84,7 @@ export async function compareShooters(idA: number, idB: number): Promise<Compari
       discMap[code].push({
         qualTotal: parseFloat(r.qualTotal!),
         date: r.date,
+        level: r.level,
       });
       maxScores[code] = parseFloat(r.maxScore);
     }
@@ -90,12 +92,11 @@ export async function compareShooters(idA: number, idB: number): Promise<Compari
     const disciplinesStats: ShooterCompareStats["disciplines"] = {};
     for (const [code, entries] of Object.entries(discMap)) {
       const peak = Math.max(...entries.map((e) => e.qualTotal));
-      const maxScore = maxScores[code] || 600;
-      const forma = computeFormaScore(entries, maxScore);
+      const forma = computeFormaFromEntries(entries, { code });
 
       disciplinesStats[code] = {
         peak,
-        forma: forma ? forma.score : null,
+        forma: forma.forma,
         matchesCount: entries.length,
       };
     }

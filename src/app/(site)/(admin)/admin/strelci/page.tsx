@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { shooters, clubs, countries } from "@/lib/db/schema";
 import { eq, ilike, or, and, isNotNull, inArray, sql, asc, desc } from "drizzle-orm";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { StrelciClient } from "./strelci-client";
 import { StrelciFilters } from "./strelci-filters";
@@ -43,7 +44,7 @@ export default async function AdminStrelciPage({
       case "gender":    return [d ? desc(shooters.gender) : asc(shooters.gender), asc(shooters.lastName)];
       case "apparatus": return [d ? desc(shooters.apparatus) : asc(shooters.apparatus), asc(shooters.lastName)];
       case "birthDate": return [d ? desc(shooters.birthDate) : asc(shooters.birthDate)];
-      default:          return [d ? desc(shooters.lastName) : asc(shooters.lastName), asc(shooters.firstName)];
+      default:          return [d ? desc(shooters.lastName) : asc(shooters.lastName), d ? desc(shooters.firstName) : asc(shooters.firstName)];
     }
   })();
 
@@ -61,6 +62,7 @@ export default async function AdminStrelciPage({
         clubName: clubs.name,
         birthDate: shooters.birthDate,
         birthYear: shooters.birthYear,
+        avatarUrl: shooters.avatarUrl,
         apparatus: shooters.apparatus,
         gender: shooters.gender,
       })
@@ -99,18 +101,18 @@ export default async function AdminStrelciPage({
           <p className="text-sm text-[var(--muted)] mt-0.5">prikazano {data.length} od {total}</p>
         </div>
         <div className="flex gap-2">
-          <a
+          <Link
             href="/admin/strelci/issf"
             className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
           >
             Bulk ISSF →
-          </a>
-          <a
+          </Link>
+          <Link
             href="/admin/strelci/novi"
             className="rounded-md px-4 py-2 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors"
           >
             + Dodaj strelca
-          </a>
+          </Link>
         </div>
       </div>
 

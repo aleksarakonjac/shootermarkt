@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { competitionId, disciplineId, stage, startTime, endTime } = body;
+  const { competitionId, disciplineId, stage, category, startTime, endTime } = body;
 
   if (!competitionId || !disciplineId || !stage || !startTime) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     competitionId,
     disciplineId,
     stage,
+    category: category || "senior",
     startTime: new Date(startTime),
     endTime: endTime ? new Date(endTime) : null,
   }).returning();

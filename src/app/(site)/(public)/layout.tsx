@@ -9,14 +9,15 @@ import HeaderHomeLink from "./components/HeaderHomeLink";
 import ThemeToggle from "./components/ThemeToggle";
 import { RegionSelector } from "./components/RegionSelector";
 import { LocaleSwitcher } from "./components/LocaleSwitcher";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, getLocale } from "next-intl/server";
 
 export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [shootersList, competitionsList, t] = await Promise.all([
+  const locale = await getLocale();
+  const [shootersList, competitionsList, t, tCommon] = await Promise.all([
     db
       .select({
         id: shooters.id,
@@ -34,6 +35,8 @@ export default async function PublicLayout({
       .select({
         id: competitions.id,
         name: competitions.name,
+        nameSr: competitions.nameSr,
+        nameEn: competitions.nameEn,
         date: competitions.date,
         level: competitions.level,
       })
@@ -42,7 +45,13 @@ export default async function PublicLayout({
       .limit(500),
 
     getTranslations("footer"),
+    getTranslations("common"),
   ]);
+
+  const translatedCompetitions = competitionsList.map((comp) => ({
+    ...comp,
+    name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
+  }));
 
   return (
     <>
@@ -59,7 +68,7 @@ export default async function PublicLayout({
                 markt
               </span>
             </Link>
-                        <HeaderHomeLink />
+            <div className="hidden md:block"><HeaderHomeLink /></div>
 
             {/* Nav groups (desktop) + hamburger (mobile, inside MainNav) */}
             <div className="flex-1 flex items-center">
@@ -69,7 +78,7 @@ export default async function PublicLayout({
             {/* Global search — renders desktop pill + mobile icon */}
             <GlobalSearch
               shooters={shootersList}
-              competitions={competitionsList}
+              competitions={translatedCompetitions}
             />
 
             {/* Desktop right controls */}
@@ -120,15 +129,6 @@ export default async function PublicLayout({
                       {t("profiles")}
                     </Link>
                   </li>
-                  <li>
-                    <Link href="/rangiranje" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
-                      {t("ranking")}
-                    </Link>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <span className="text-sm text-[var(--subtle)]">{t("h2h")}</span>
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">soon</span>
-                  </li>
                 </ul>
               </div>
 
@@ -157,13 +157,23 @@ export default async function PublicLayout({
                   {t("statisticsSection")}
                 </p>
                 <ul className="space-y-2">
+                  <li>
+                    <Link href="/rangiranje" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+                      {t("ranking")}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/rangiranje?view=h2h" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+                      {t("h2h")}
+                    </Link>
+                  </li>
                   <li className="flex items-center gap-1.5">
                     <span className="text-sm text-[var(--subtle)]">{t("clubLeaderboard")}</span>
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">soon</span>
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">{tCommon("soon")}</span>
                   </li>
                   <li className="flex items-center gap-1.5">
                     <span className="text-sm text-[var(--subtle)]">{t("trendAnalysis")}</span>
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">soon</span>
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">{tCommon("soon")}</span>
                   </li>
                 </ul>
               </div>

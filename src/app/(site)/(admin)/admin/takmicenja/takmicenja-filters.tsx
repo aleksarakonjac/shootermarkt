@@ -30,6 +30,11 @@ const TAG_OPTIONS = [
   { value: "issf", label: "ISSF" },
   { value: "sss",  label: "SSS" },
   { value: "esc",  label: "ESC" },
+  { value: "10m", label: "10m" },
+  { value: "MK", label: "MK" },
+  { value: "50m", label: "50m" },
+  { value: "25m", label: "25m" },
+  { value: "50/25m", label: "50/25m" },
 ];
 
 interface Props {

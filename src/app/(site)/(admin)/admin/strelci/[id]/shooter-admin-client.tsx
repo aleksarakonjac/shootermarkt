@@ -32,10 +32,16 @@ interface Result {
   competitionName: string;
   competitionDate: string;
   disciplineCode: string;
+  category?: string | null;
   qualTotal: number | null;
   qualRank: number | null;
   finalRank: number | null;
 }
+
+const CATEGORY_SHORT: Record<string, string> = {
+  pionir: "PIO", kadet: "KAD", mladji_junior: "MJ", junior: "JR",
+  mladji_senior: "U23", senior: "SR", master: "MST", open: "OPN",
+};
 
 interface Props {
   shooter: ShooterData;
@@ -432,6 +438,11 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
                       >
                         {r.disciplineCode}
                       </span>
+                      {r.category && r.category !== "senior" && (
+                        <span className="ml-1 text-[0.6rem] font-bold px-1.5 py-0.5 rounded bg-[var(--brand-primary-light)] text-[var(--brand-primary)]">
+                          {CATEGORY_SHORT[r.category] ?? r.category}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)] tabular-nums">
                       {r.qualTotal?.toFixed(1) ?? "—"}

@@ -44,7 +44,7 @@ const { default: postgres } = await import(postgresPath);
 const sql = postgres(DB_URL, { max: 5 });
 
 // ── Apparatus inference ────────────────────────────────────────────────────────
-const RIFLE_PREFIXES   = ["AR", "R3", "RFM", "RFW"];
+const RIFLE_PREFIXES   = ["AR", "R3"];
 const PISTOL_PREFIXES  = ["AP", "FP", "SP", "CFP", "STP", "RFP"];
 const SHOTGUN_PREFIXES = ["TR", "SK", "DT", "FT"];
 

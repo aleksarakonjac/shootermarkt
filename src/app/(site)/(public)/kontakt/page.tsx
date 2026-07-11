@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
+import { getLocale, getTranslations } from "next-intl/server";
+import { KontaktForm } from "./KontaktForm";
 
-export const metadata: Metadata = {
-  title: "Kontakt",
-  description: "Kontaktirajte Shootermarkt tim ili podnesite zahtev za podatke.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("contact.metadata");
+  return {
+    title: t("title"),
+    description: t("description"),
+  };
+}
 
-const CONTACT_EMAIL = "kontakt@shootermarkt.rs";
+const CONTACT_EMAIL = "kontakt@shootermarkt.com";
 
 function MailLink({
   email,
@@ -29,7 +34,16 @@ function MailLink({
   );
 }
 
-export default function KontaktPage() {
+export default async function KontaktPage() {
+  const t = await getTranslations("contact");
+
+  const items = [
+    t("listItem1"),
+    t("listItem2"),
+    t("listItem3"),
+    t("listItem4"),
+  ];
+
   return (
     <div className="mx-auto max-w-2xl px-4 sm:px-6 py-12">
 
@@ -39,37 +53,26 @@ export default function KontaktPage() {
           className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
           style={{ fontSize: "clamp(1.75rem, 4vw, 2.25rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
         >
-          Kontakt
+          {t("title")}
         </h1>
         <p className="text-[0.9375rem] text-[var(--ink)] mt-3 leading-relaxed" style={{ textWrap: "pretty" } as React.CSSProperties}>
-          Možete nas kontaktirati za opšta pitanja, prijavu grešaka u podacima
-          ili zahteve u skladu sa Zakonom o zaštiti podataka o ličnosti.
+          {t("subtitle")}
         </p>
       </div>
 
       {/* Two sections */}
       <div className="space-y-8">
 
-        {/* General contact */}
+        {/* Contact form */}
         <div className="rounded-xl border border-[var(--border)] p-6">
           <h2
-            className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[var(--ink)] mb-4"
+            className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[var(--ink)] mb-1"
             style={{ fontSize: "1.1rem", letterSpacing: "-0.01em" }}
           >
-            Opšti kontakt
+            {t("form.sectionTitle")}
           </h2>
-          <div className="space-y-3 text-[0.9375rem] leading-relaxed text-[var(--ink)]">
-            <p>
-              Za pitanja o platformi, prijavu netačnih podataka, predloge i
-              saradnju:
-            </p>
-            <p>
-              <MailLink email={CONTACT_EMAIL} />
-            </p>
-            <p className="text-sm text-[var(--muted)]">
-              Odgovaramo u roku od nekoliko radnih dana.
-            </p>
-          </div>
+          <p className="text-sm text-[var(--muted)] mb-6">{t("generalText")}</p>
+          <KontaktForm />
         </div>
 
         {/* ZZPL data requests */}
@@ -78,36 +81,30 @@ export default function KontaktPage() {
             className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[var(--ink)] mb-1"
             style={{ fontSize: "1.1rem", letterSpacing: "-0.01em" }}
           >
-            Zahtev za podatke
+            {t("requestTitle")}
           </h2>
           <p className="text-xs text-[var(--muted)] mb-4 font-[family-name:var(--font-jetbrains-mono)]">
-            Pravo na pristup, ispravku i brisanje
+            {t("requestSubtitle")}
           </p>
           <div className="space-y-3 text-[0.9375rem] leading-relaxed text-[var(--ink)]">
             <p>
-              Ako tražite uvid, ispravku ili brisanje ličnih podataka koji se
-              odnose na vas, pošaljite zahtev na:
+              {t("requestText")}
             </p>
             <p>
               <MailLink
                 email={CONTACT_EMAIL}
-                subject="Zahtev za podatke"
-                label={`${CONTACT_EMAIL} · predmet: "Zahtev za podatke"`}
+                subject={t("requestSubject")}
+                label={`${CONTACT_EMAIL} · ${t("requestLabel")}`}
               />
             </p>
 
             {/* What to include */}
             <div className="mt-4 p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
               <p className="text-sm font-semibold text-[var(--ink)] mb-2">
-                Navedite u poruci:
+                {t("listTitle")}
               </p>
               <ol className="space-y-1.5 text-sm text-[var(--muted)]">
-                {[
-                  "Ime i prezime kako figuriše na platformi",
-                  "Vrstu zahteva: uvid / ispravka / brisanje / ograničenje",
-                  "Za ispravku: tačan podatak koji treba izmeniti i izvor (bilten, URL)",
-                  "Kontakt za povratnu informaciju",
-                ].map((item, i) => (
+                {items.map((item, i) => (
                   <li key={i} className="flex gap-2.5">
                     <span className="font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] shrink-0 w-4">
                       {i + 1}.
@@ -119,18 +116,16 @@ export default function KontaktPage() {
             </div>
 
             <p className="text-sm text-[var(--muted)]">
-              Odgovaramo u roku od{" "}
-              <strong className="text-[var(--ink)]">30 dana</strong> od prijema
-              zahteva.
+              {t("requestTime")}
             </p>
           </div>
         </div>
 
         {/* Footer note */}
         <p className="text-sm text-[var(--muted)] leading-relaxed" style={{ textWrap: "pretty" } as React.CSSProperties}>
-          Više informacija o tome kako obrađujemo podatke možete pronaći u{" "}
+          {t("footerNote")}{" "}
           <a href="/privatnost" className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
-            Politici privatnosti
+            {t("privacyPolicyLink")}
           </a>
           .
         </p>

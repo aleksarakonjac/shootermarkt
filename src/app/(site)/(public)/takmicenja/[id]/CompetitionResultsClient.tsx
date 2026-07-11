@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import type { QualDetail, FinalDetail } from "@/lib/db/schema";
+import { useState, useEffect } from "react";
+import type { QualDetail, FinalDetail, AgeCategory } from "@/lib/db/schema";
+import { CATEGORY_LABEL } from "@/lib/pdf-import/types";
 import {
   CompetitionQualTable,
   type CompResultRow,
@@ -15,22 +16,25 @@ export type DisciplineGroup = {
   code: string;
   name: string;
   apparatus: string | null;
-  results: Array<{
-    id: number;
-    shooterId: number;
-    firstName: string;
-    lastName: string;
-    nationality: string | null;
-    clubName: string | null;
-    clubNocCode: string | null;
-    qualTotal: string | null;
-    qualRank: number | null;
-    qualInners: number | null;
-    qualified: boolean | null;
-    qualDetail: QualDetail | null;
-    finalTotal: string | null;
-    finalRank: number | null;
-    finalDetail: FinalDetail | null;
+  categories: Array<{
+    category: AgeCategory;
+    results: Array<{
+      id: number;
+      shooterId: number;
+      firstName: string;
+      lastName: string;
+      nationality: string | null;
+      clubName: string | null;
+      clubNocCode: string | null;
+      qualTotal: string | null;
+      qualRank: number | null;
+      qualInners: number | null;
+      qualified: boolean | null;
+      qualDetail: QualDetail | null;
+      finalTotal: string | null;
+      finalRank: number | null;
+      finalDetail: FinalDetail | null;
+    }>;
   }>;
 };
 
@@ -42,15 +46,27 @@ export function CompetitionResultsClient({ groups }: Props) {
   const [activeDiscipline, setActiveDiscipline] = useState(
     groups[0]?.code ?? ""
   );
+  const group = groups.find((g) => g.code === activeDiscipline);
+
+  const [activeCategory, setActiveCategory] = useState<AgeCategory | undefined>(
+    group?.categories[0]?.category
+  );
   const [stage, setStage] = useState<"qual" | "final">("qual");
 
-  const group = groups.find((g) => g.code === activeDiscipline);
-  const hasFinal = group?.results.some(
+  // Reset category when discipline changes to one that doesn't have it
+  useEffect(() => {
+    if (group && !group.categories.some((c) => c.category === activeCategory)) {
+      setActiveCategory(group.categories[0]?.category);
+    }
+  }, [group, activeCategory]);
+
+  const catGroup = group?.categories.find((c) => c.category === activeCategory);
+  const hasFinal = catGroup?.results.some(
     (r) => r.finalRank != null || r.finalTotal != null
   ) ?? false;
 
   const qualRows: CompResultRow[] =
-    group?.results.map((r) => ({
+    catGroup?.results.map((r) => ({
       id: r.id,
       shooterId: r.shooterId,
       name: `${r.lastName} ${r.firstName}`,
@@ -61,11 +77,11 @@ export function CompetitionResultsClient({ groups }: Props) {
       qualInners: r.qualInners,
       qualified: r.qualified,
       qualDetail: r.qualDetail,
-      apparatus: group.apparatus,
+      apparatus: group?.apparatus ?? null,
     })) ?? [];
 
   const finalRows: FinalResultRow[] =
-    group?.results
+    catGroup?.results
       .filter((r) => r.finalRank != null || r.finalTotal != null)
       .map((r) => ({
         id: r.id,
@@ -110,11 +126,36 @@ export function CompetitionResultsClient({ groups }: Props) {
           >
             {g.code}
             <span className="ml-1.5 text-[0.65rem] font-normal opacity-70">
-              {g.results.length}
+              {g.categories.reduce((sum, c) => sum + c.results.length, 0)}
             </span>
           </button>
         ))}
       </div>
+
+      {/* ── Category tabs ────────────────────────────────────────── */}
+      {group && group.categories.length > 1 && (
+        <div className="flex items-center gap-1 flex-wrap mb-4">
+          {group.categories.map((c) => (
+            <button
+              key={c.category}
+              onClick={() => {
+                setActiveCategory(c.category);
+                setStage("qual");
+              }}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors ${
+                activeCategory === c.category
+                  ? "bg-[var(--ink)] text-[var(--bg)]"
+                  : "bg-transparent text-[var(--subtle)] border border-[var(--border)] hover:text-[var(--ink)]"
+              }`}
+            >
+              {CATEGORY_LABEL[c.category]}
+              <span className="ml-1.5 text-[0.65rem] font-normal opacity-70">
+                {c.results.length}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Stage toggle ─────────────────────────────────────────── */}
       {hasFinal && (

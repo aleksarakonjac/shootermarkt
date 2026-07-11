@@ -32,16 +32,15 @@ function buildNav(t: TFn): NavGroup[] {
     {
       key: "strelci",
       label: t("shooters"),
-      items: [
-        { href: "/strelci",    label: t("profiles"),       desc: t("profilesDesc") },
-        { href: "/h2h",        label: t("h2h"),            desc: t("h2hDesc"),            soon: true },
-      ],
+      directHref: "/strelci",
+      items: [],
     },
     {
       key: "statistike",
       label: t("statistics"),
       items: [
         { href: "/rangiranje", label: t("ranking"),        desc: t("rankingDesc") },
+        { href: "/rangiranje?view=h2h", label: t("h2h"),   desc: t("h2hDesc") },
         { href: "/klubovi",    label: t("clubLeaderboard"),desc: t("clubLeaderboardDesc"), soon: true },
         { href: "/forma",      label: t("trendAnalysis"),  desc: t("trendAnalysisDesc"),   soon: true },
       ],
@@ -56,7 +55,7 @@ function buildNav(t: TFn): NavGroup[] {
     },
     {
       key: "vesti",
-      label: "Vesti",
+      label: t("news"),
       directHref: "/vesti",
       items: [],
     },
@@ -65,10 +64,10 @@ function buildNav(t: TFn): NavGroup[] {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function SoonBadge() {
+function SoonBadge({ label }: { label: string }) {
   return (
     <span className="ml-auto shrink-0 text-[0.55rem] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--subtle)] border border-[var(--border)]">
-      Uskoro
+      {label}
     </span>
   );
 }
@@ -236,7 +235,7 @@ export function MainNav() {
                         <span className={`text-sm font-semibold leading-snug ${item.soon ? "text-[var(--muted)]" : itemActive ? "text-[var(--brand-primary)]" : "text-[var(--ink)]"}`}>
                           {item.label}
                         </span>
-                        {item.soon && <SoonBadge />}
+                        {item.soon && <SoonBadge label={tNav("soon")} />}
                       </div>
                       <p className={`text-xs mt-0.5 leading-snug ${item.soon ? "text-[var(--subtle)]" : "text-[var(--muted)]"}`}>
                         {item.desc}
@@ -378,7 +377,7 @@ export function MainNav() {
                               {item.desc}
                             </p>
                           </div>
-                          {item.soon && <SoonBadge />}
+                          {item.soon && <SoonBadge label={tNav("soon")} />}
                         </div>
                       );
                       return item.soon ? (

@@ -1,7 +1,7 @@
-import type { ParsedBilten, ParsedEvent, DisciplineCode } from "./types";
+import { parseCategory, type ParsedBilten, type ParsedEvent, type DisciplineCode } from "./types";
 
 const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
 
 const PROMPT = `Analiziraj ovaj streljački bilten i vrati JSON.
 
@@ -9,9 +9,20 @@ Razlikuj dva tipa biltena:
 - NACIONALNI: rezultati pokazuju naziv kluba (npr. "SK Pančevo 1813", "ŽSK Beograd")
 - INTERNACIONALNI/ISSF: rezultati pokazuju kod države/tima (SRB, GER, KOR, CHN, USA...)
 
+Uzimaj SAMO ove discipline (ostale potpuno ignoriši — trap, skeet, 25m rapid fire,
+50m free pistol, vazdušna puška/pištolj mix team, juniori, pioniri, veterani):
+- ARM = vazdušna puška 10m seniori (muški)
+- ARW = vazdušna puška 10m seniorke (ženske)
+- APM = vazdušni pištolj 10m seniori (muški)
+- APW = vazdušni pištolj 10m seniorke (ženske)
+- R3PM = MK puška trostav 3x40 seniori (muški) — 50m, tri stava
+- R3PW = MK puška trostav 3x40 seniorke (ženske) — 50m, tri stava
+- SPW = 25m sport pištolj seniorke (ženske)
+
 Za svaki event (tabela) u PDF-u izvuci:
-- discipline: kod discipline (ARM/ARW/APM/APW, ignoriši 50MRM, 25MP, trap, skeet itd.)
+- discipline: kod discipline (ARM/ARW/APM/APW/R3PM/R3PW/SPW)
 - stage: "qualification" ili "final"
+- category: uzrasna kategorija iz naslova tabele — "cadet" (kadet/U16), "youth_junior" (mlađi junior/U18), "junior" (junior/U21), "u23" (U23), "senior" (seniori/seniorke ili bez oznake). Default "senior".
 - is_international: true ako su prikazane države kao timovi, false ako su klubovi
 - results: lista strelaca sa poljima:
     rank — mesto (broj)
@@ -20,16 +31,19 @@ Za svaki event (tabela) u PDF-u izvuci:
     first_name — ime
     team_noc — UVEK prisutan: kod države (SRB, GER...) za internacionalna, ili kod/skraćenica države iz koje je strelac za nacionalna
     club_name — SAMO za nacionalna takmičenja: naziv ili skraćenica kluba; null za internacionalna
+    birth_year — godina rođenja strelca kao 4-cifreni broj (npr. 2004) AKO je prisutna u biltenu (kolona "God.", "Rođ.", "YOB", datum rođenja → uzmi godinu); inače null
     series — niz serija kao decimalni/celi brojevi
     total — ukupan rezultat
-    inners — broj X (samo Air Pistol, inače null)
+    inners — broj centralnih desetki ("inner tens"), zapisan kao broj pored ukupnog rezultata sa oznakom x/X (npr. "23x" → 23). Prisutan kod Air Pistol (APM/APW) I MK puške trostav (R3PM/R3PW). Ako nema, null.
     qualified — true/false/null
 
 Pravila:
 - Ignoriši TEAM, MIXED TEAM i KONTROLNI MEČ tabele
-- Za SENIOR i JUNIOR isti discipline: uzmi SENIOR tabelu kao oficijalni rezultat
+- Za istu disciplinu vrati SVE uzrasne tabele kao ODVOJENE event-ove (senior, junior, kadet...), svaki sa svojim "category". NE spajaj i NE izostavljaj juniorsku tabelu.
 - Air Rifle (ARM/ARW): decimalni skorovi u serijama (105.3), 6 serija
 - Air Pistol (APM/APW): celi brojevi, ima inners (X count), 6 serija
+- MK puška trostav (R3PM/R3PW): 50m, tri stava (klečeći/ležeći/stojeći), ukupno do 1200 (3x40); ima inner tens (npr. "1150 23x" → total 1150, inners 23); uzmi kvalifikacioni ukupan
+- Sport pištolj Ž (SPW): 25m, precizni + brzi deo, ukupno do 600
 - Finale: elimination format, kumulativni ukupan
 - Za nacionalna takmičenja: team_noc za srpske strelce je uvek "SRB"
 
@@ -39,6 +53,7 @@ Vrati SAMO JSON, bez markdown, bez teksta:
     {
       "discipline": "ARM",
       "stage": "qualification",
+      "category": "senior",
       "is_international": false,
       "results": [
         {
@@ -48,6 +63,7 @@ Vrati SAMO JSON, bez markdown, bez teksta:
           "first_name": "Marko",
           "team_noc": "SRB",
           "club_name": "SK Pančevo 1813",
+          "birth_year": 2004,
           "series": [105.3, 105.8, 103.6, 106.2, 104.3, 105.6],
           "total": 630.8,
           "inners": null,
@@ -95,18 +111,27 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${err}`);
+    let errMsg = `HTTP ${res.status}`;
+    try {
+      const errBody = await res.json() as { error?: { message?: string } };
+      if (errBody?.error?.message) errMsg = errBody.error.message;
+    } catch { /* ignore parse failure, use status code */ }
+    if (res.status === 429) throw new Error(`Gemini API: prekoračen limit zahteva (rate limit). Pokušaj ponovo za nekoliko sekundi.`);
+    if (res.status === 400) throw new Error(`Gemini API: neispravan zahtev (${errMsg}). PDF možda nije u podržanom formatu.`);
+    throw new Error(`Gemini API greška (${errMsg})`);
   }
 
   const data = (await res.json()) as GeminiResponse;
-  if (data.error) throw new Error(`Gemini error: ${data.error.message}`);
+  if (data.error) throw new Error(`Gemini API greška: ${data.error.message}`);
 
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  const parsed = JSON.parse(cleanJson(rawText)) as {
+  if (!rawText.trim()) throw new Error("Gemini nije vratio nikakav sadržaj. Provjeri da li je PDF čitljiv i nije skeniran.");
+
+  let parsed: {
     events: Array<{
       discipline: string;
       stage: string;
+      category?: string;
       is_international?: boolean;
       results: Array<{
         rank: number;
@@ -115,6 +140,7 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
         first_name: string;
         team_noc: string;
         club_name?: string | null;
+        birth_year?: number | null;
         series: number[];
         total: number;
         inners?: number | null;
@@ -122,14 +148,24 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
       }>;
     }>;
   };
+  try {
+    parsed = JSON.parse(cleanJson(rawText)) as typeof parsed;
+  } catch {
+    const preview = rawText.length > 300 ? rawText.slice(0, 300) + "…" : rawText;
+    throw new Error(`Gemini vratio neispravan JSON. Preview odgovora:\n${preview}`);
+  }
+  if (!Array.isArray(parsed?.events)) throw new Error("Gemini odgovor nema 'events' listu — format biltena možda nije prepoznat.");
 
-  const VALID_CODES = new Set(["ARM", "ARW", "APM", "APW"]);
+  const LEGACY_DISCIPLINE_CODES: Record<string, DisciplineCode> = { RFM: "R3PM", RFW: "R3PW" };
+  const VALID_CODES = new Set<DisciplineCode>(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW"]);
 
   const events: ParsedEvent[] = parsed.events
-    .filter((e) => VALID_CODES.has(e.discipline.toUpperCase()))
+    .map((e) => ({ ...e, discipline: LEGACY_DISCIPLINE_CODES[e.discipline.toUpperCase()] ?? e.discipline.toUpperCase() as DisciplineCode }))
+    .filter((e) => VALID_CODES.has(e.discipline))
     .map((e) => ({
-      discipline: e.discipline.toUpperCase() as DisciplineCode,
+      discipline: e.discipline,
       stage: e.stage === "final" ? "final" : "qualification",
+      category: parseCategory(e.category),
       isInternational: e.is_international ?? false,
       results: e.results.map((r) => ({
         rank: r.rank,
@@ -138,6 +174,7 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
         firstName: r.first_name,
         teamNoc: (r.team_noc ?? "").toUpperCase(),
         clubName: r.club_name ?? undefined,
+        birthYear: r.birth_year ?? null,
         series: r.series ?? [],
         total: r.total,
         inners: r.inners ?? null,

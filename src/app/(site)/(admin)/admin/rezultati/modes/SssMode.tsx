@@ -1,24 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
+import type { ReviewRow, CommitPayload } from "@/lib/pdf-import/types";
+import { CompetitionSearchSelect } from "@/components/ui/CompetitionSearchSelect";
+import { SSS_TAG_STYLE, type SssCompetitionTag } from "@/lib/sss/competition-tags";
 import { ReviewTable } from "../_shared/ReviewTable";
+import { NewShootersPanel } from "../_shared/NewShootersPanel";
 import { DonePanel } from "../_shared/DonePanel";
-import { DatePicker } from "@/components/ui/DatePicker";
 
 type Step = "select" | "review" | "done";
 
-interface SssBilten { url: string; filename: string; year: number; is10m: boolean; isExternal: boolean }
+interface SssBilten { url: string; filename: string; year: number; is10m: boolean; tags: SssCompetitionTag[]; isExternal: boolean }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
-
-const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "national",    label: "Državno"           },
-  { value: "regional",    label: "Regionalno"        },
-  { value: "continental", label: "Kontinentalno"     },
-  { value: "world",       label: "Svetsko"           },
-  { value: "club",        label: "Klubsko"           },
-  { value: "olympic",     label: "Olimpijsko"        },
-];
 
 export function SssMode() {
   const [step, setStep] = useState<Step>("select");
@@ -27,15 +20,12 @@ export function SssMode() {
 
   const [bilteni, setBilteni] = useState<SssBilten[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [filter10m, setFilter10m] = useState(true);
   const [filterExternal, setFilterExternal] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedBilten, setSelectedBilten] = useState<SssBilten | null>(null);
 
-  const [compName, setCompName] = useState("");
-  const [compDate, setCompDate] = useState("");
-  const [compLocation, setCompLocation] = useState("");
-  const [compLevel, setCompLevel] = useState<CompetitionLevel>("national");
+  const [selectedCompId, setSelectedCompId] = useState<number | null>(null);
+  const [selectedCompName, setSelectedCompName] = useState("");
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [eventCount, setEventCount] = useState(0);
@@ -55,8 +45,8 @@ export function SssMode() {
 
   function handleSelect(b: SssBilten) {
     setSelectedBilten(b);
-    setCompName(b.filename);
-    setCompDate(""); setCompLocation(""); setCompLevel("national");
+    setSelectedCompId(null);
+    setSelectedCompName("");
   }
 
   async function handleImport() {
@@ -76,14 +66,11 @@ export function SssMode() {
   }
 
   async function handleCommit() {
+    if (!selectedCompId) { setError("Izaberi takmičenje iz baze"); return; }
     setLoading(true); setError(null);
     const payload: CommitPayload = {
-      competition: {
-        name: compName || selectedBilten?.filename || "SSS bilten",
-        date: compDate || new Date().toISOString().split("T")[0],
-        location: compLocation,
-        level: compLevel,
-      },
+      competitionId: selectedCompId,
+      tags: ["sss", ...(selectedBilten?.tags ?? [])],
       rows,
     };
     try {
@@ -106,10 +93,10 @@ export function SssMode() {
   function reset() {
     setStep("select"); setSelectedBilten(null); setRows([]);
     setResult(null); setError(null); setNocFilter("");
+    setSelectedCompId(null); setSelectedCompName("");
   }
 
   const visible = bilteni.filter((b) => {
-    if (filter10m && !b.is10m) return false;
     if (!filterExternal && b.isExternal) return false;
     if (search && !b.filename.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -154,10 +141,6 @@ export function SssMode() {
                   className="flex-1 min-w-[200px] rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
                 />
                 <label className="flex items-center gap-2 text-sm text-[var(--muted)] cursor-pointer select-none">
-                  <input type="checkbox" checked={filter10m} onChange={(e) => setFilter10m(e.target.checked)} className="accent-[var(--brand-primary)]" />
-                  Samo 10m
-                </label>
-                <label className="flex items-center gap-2 text-sm text-[var(--muted)] cursor-pointer select-none">
                   <input type="checkbox" checked={filterExternal} onChange={(e) => setFilterExternal(e.target.checked)} className="accent-[var(--brand-primary)]" />
                   Uključi externe
                 </label>
@@ -180,9 +163,9 @@ export function SssMode() {
                           {b.isExternal && (
                             <span className="text-[0.6rem] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--subtle)]">ext</span>
                           )}
-                          {b.is10m && (
-                            <span className="text-[0.6rem] px-1.5 py-0.5 rounded" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}>10m</span>
-                          )}
+                          {b.tags.map((tag) => (
+                            <span key={tag} className="text-[0.6rem] px-1.5 py-0.5 rounded" style={SSS_TAG_STYLE[tag]}>{tag}</span>
+                          ))}
                         </div>
                       </button>
                     ))}
@@ -193,29 +176,20 @@ export function SssMode() {
               {selectedBilten && (
                 <div className="rounded-xl border border-[var(--brand-primary)] p-5 space-y-4">
                   <p className="font-semibold text-sm text-[var(--ink)]">{selectedBilten.filename}</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                      <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Naziv takmičenja</label>
-                      <input value={compName} onChange={(e) => setCompName(e.target.value)} className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Datum</label>
-                      <DatePicker value={compDate} onChange={setCompDate} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Nivo</label>
-                      <select value={compLevel} onChange={(e) => setCompLevel(e.target.value as CompetitionLevel)} className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]">
-                        {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Lokacija</label>
-                      <input value={compLocation} onChange={(e) => setCompLocation(e.target.value)} placeholder="npr. Beograd, SC Crvena zvezda" className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]" />
-                    </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Takmičenje (iz baze)</label>
+                    <CompetitionSearchSelect
+                      value={selectedCompId}
+                      onChange={(competition) => { setSelectedCompId(competition.id); setSelectedCompName(competition.nameSr || competition.name); }}
+                    />
+                    <p className="text-xs text-[var(--muted)] mt-1.5">
+                      Rezultati iz biltena vezuju se za izabrano takmičenje. Ako ga nema,
+                      prvo ga kreiraj u <a href="/admin/takmicenja" className="text-[var(--brand-primary)] hover:underline">Takmičenja</a>.
+                    </p>
                   </div>
                   <button
                     onClick={handleImport}
-                    disabled={loading}
+                    disabled={loading || !selectedCompId}
                     className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
                   >
                     {loading ? "Preuzimam i parsiram…" : "Uvezi bilten →"}
@@ -240,6 +214,15 @@ export function SssMode() {
             </div>
             <button onClick={reset} className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">← Nazad</button>
           </div>
+
+          {selectedCompName && (
+            <div className="rounded-lg bg-[var(--surface)] border border-[var(--border)] px-4 py-2.5 text-sm">
+              <span className="text-[var(--muted)]">Takmičenje: </span>
+              <span className="font-semibold text-[var(--ink)]">{selectedCompName}</span>
+            </div>
+          )}
+
+          <NewShootersPanel rows={rows} onRowChange={updateRow} />
 
           <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))} />
 

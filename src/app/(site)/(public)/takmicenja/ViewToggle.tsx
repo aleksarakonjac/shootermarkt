@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 export function ViewToggle({ activeView }: { activeView: "list" | "cal" }) {
   const sp = useSearchParams();
+  const t = useTranslations("competition.list");
 
   const makeUrl = (view: "list" | "cal") => {
     const p = new URLSearchParams(sp.toString());
@@ -25,14 +27,14 @@ export function ViewToggle({ activeView }: { activeView: "list" | "cal" }) {
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
           <path d="M1.5 3h9M1.5 6h9M1.5 9h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
-        Lista
+        {t("viewList")}
       </Link>
       <Link href={makeUrl("cal")} scroll={false} className={`${base} ${activeView === "cal" ? on : off}`}>
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
           <rect x="1" y="2" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
           <path d="M4 1v2M8 1v2M1 5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
-        Kalendar
+        {t("viewCalendar")}
       </Link>
     </div>
   );

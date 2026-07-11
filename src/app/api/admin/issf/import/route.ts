@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   const rows: ReviewRow[] = [];
 
-  for (const { disciplineCode, qualPhase } of mvpEvents) {
+  for (const { disciplineCode, category, qualPhase } of mvpEvents) {
     if (!qualPhase?.resultKey) continue;
 
     let qualResults;
@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
         lastName: result.lastName,
         teamNoc: result.nationCode,
         disciplineCode,
+        category,
         qualTotal: result.total,
         qualInners: result.inners,
         qualRank: result.rank,

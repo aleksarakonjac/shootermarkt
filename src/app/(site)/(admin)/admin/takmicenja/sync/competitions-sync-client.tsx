@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
+import { formatDateRangeSr } from "@/lib/date-utils";
 
 interface SyncEvent {
   key: string;
@@ -482,8 +483,7 @@ export function CompetitionsSyncClient() {
                           />
                         </td>
                         <td className="px-3 py-2.5 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] whitespace-nowrap">
-                          {e.dateFrom}
-                          {e.dateTo && e.dateTo !== e.dateFrom ? ` – ${e.dateTo}` : ""}
+                          {formatDateRangeSr(e.dateFrom, e.dateTo)}
                         </td>
                         <td className="px-3 py-2.5 text-[var(--muted)] text-xs">
                           {e.location ?? ""}

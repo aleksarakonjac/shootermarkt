@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useTranslations, useLocale } from "next-intl";
+import { LEVEL_DOT_COLOR } from "@/lib/competition-utils";
 
 interface Competition {
   id: number;
@@ -14,37 +16,59 @@ interface CalendarModuleProps {
   competitions: Competition[];
 }
 
-const MONTHS_SR = [
-  "Januar", "Februar", "Mart", "April", "Maj", "Jun",
-  "Jul", "Avgust", "Septembar", "Oktobar", "Novembar", "Decembar",
-];
-const DAYS_SR = ["Pon", "Uto", "Sre", "Čet", "Pet", "Sub", "Ned"];
-
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
 
 function getFirstDayOfMonth(year: number, month: number) {
-  // Monday-first: 0=Mon ... 6=Sun
   const day = new Date(year, month, 1).getDay();
   return (day + 6) % 7;
 }
 
 function getLevelColor(level: string): string {
-  const l = level.toLowerCase();
-  if (l.includes("svetsk") || l.includes("world")) return "var(--brand-primary)";
-  if (l.includes("evropsk") || l.includes("europ")) return "var(--brand-accent)";
-  if (l.includes("državno") || l.includes("national")) return "var(--success)";
-  return "var(--warning)";
+  return LEVEL_DOT_COLOR[level.toLowerCase()] ?? LEVEL_DOT_COLOR["club"];
 }
 
 export function CalendarModule({ competitions }: CalendarModuleProps) {
+  const t = useTranslations("calendar");
+  const locale = useLocale();
+
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(today.getFullYear());
+  const pickerRef = useRef<HTMLDivElement>(null);
 
-  // Map competition dates to quick lookup
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [pickerOpen]);
+
+  const openPicker = () => {
+    setPickerYear(viewYear);
+    setPickerOpen(true);
+  };
+
+  const selectMonth = (month: number) => {
+    setViewMonth(month);
+    setViewYear(pickerYear);
+    setPickerOpen(false);
+  };
+
+  const goToCurrent = () => {
+    setViewMonth(today.getMonth());
+    setViewYear(today.getFullYear());
+    setPickerOpen(false);
+  };
+
   const compsByDate = useMemo(() => {
     const map = new Map<string, Competition[]>();
     for (const c of competitions) {
@@ -65,70 +89,120 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
     if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
     else setViewMonth(m => m + 1);
   };
-  // Return to the current month/year
-  const goToCurrent = () => {
-    setViewMonth(today.getMonth());
-    setViewYear(today.getFullYear());
-  };
 
   const cells: (number | null)[] = [
     ...Array(firstDay).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
-
-  // Pad to full weeks
   while (cells.length % 7 !== 0) cells.push(null);
 
   const hoveredComps = hoveredDate ? (compsByDate.get(hoveredDate) ?? []) : [];
 
-  const isCurrent = viewMonth === today.getMonth() && viewYear === today.getFullYear();
+  const DAYS_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)]">
       {/* Header */}
-      <div className="bg-[var(--brand-accent)] rounded-t-xl px-4 py-3 flex items-center justify-between">
+      <div className="bg-[var(--brand-primary)] rounded-t-xl px-4 py-3 flex items-center justify-between relative">
         <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-white uppercase tracking-wider">
-          Kalendar Takmičenja
+          {t("title")}
         </h3>
         <div className="flex items-center gap-1">
           <button
             onClick={prevMonth}
             className="w-7 h-7 flex items-center justify-center rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-bold"
-            aria-label="Prethodni mesec"
+            aria-label={locale === "en" ? "Previous month" : "Prethodni mesec"}
           >
             ‹
           </button>
-          <span className="text-white font-semibold text-sm min-w-[110px] text-center">
-            {MONTHS_SR[viewMonth]} {viewYear}
-          </span>
+
+          {/* Month/year label — opens picker */}
+          <button
+            onClick={openPicker}
+            className="text-white font-semibold text-sm min-w-[110px] text-center px-2 py-1 rounded hover:bg-white/10 transition-colors"
+            aria-label={locale === "en" ? "Select month and year" : "Izaberi mesec i godinu"}
+          >
+            {t(`months.${viewMonth}`)} {viewYear}
+          </button>
+
           <button
             onClick={nextMonth}
             className="w-7 h-7 flex items-center justify-center rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-bold"
-            aria-label="Sledeći mesec"
+            aria-label={locale === "en" ? "Next month" : "Sledeći mesec"}
           >
             ›
           </button>
-          {!isCurrent && (
+        </div>
+
+        {/* Floating month/year picker */}
+        {pickerOpen && (
+          <div
+            ref={pickerRef}
+            className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg)] border border-[var(--border)] rounded-xl shadow-xl z-[var(--z-dropdown)] p-3 flex flex-col gap-2.5"
+          >
+            {/* Year nav */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setPickerYear(y => y - 1)}
+                className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--surface)] text-[var(--ink)] text-sm font-bold transition-colors"
+              >
+                ‹
+              </button>
+              <span className="font-[family-name:var(--font-barlow-condensed)] font-bold text-base text-[var(--ink)]">
+                {pickerYear}
+              </span>
+              <button
+                onClick={() => setPickerYear(y => y + 1)}
+                className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--surface)] text-[var(--ink)] text-sm font-bold transition-colors"
+              >
+                ›
+              </button>
+            </div>
+
+            {/* Month grid 4×3 */}
+            <div className="grid grid-cols-4 gap-1">
+              {Array.from({ length: 12 }, (_, i) => {
+                const isActive = i === viewMonth && pickerYear === viewYear;
+                const isTodayMonth = i === today.getMonth() && pickerYear === today.getFullYear();
+                return (
+                  <button
+                    key={i}
+                    onClick={() => selectMonth(i)}
+                    className={[
+                      "py-1.5 rounded text-[11px] font-semibold uppercase tracking-wide transition-colors",
+                      isActive
+                        ? "bg-[var(--brand-primary)] text-white"
+                        : isTodayMonth
+                        ? "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] font-bold"
+                        : "text-[var(--ink)] hover:bg-[var(--surface)]",
+                    ].join(" ")}
+                  >
+                    {t(`months.${i}`).slice(0, 3)}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Reset to current */}
             <button
               onClick={goToCurrent}
-              className="w-9 h-9 flex items-center justify-center rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors text-2xl font-bold"
-              aria-label="Tekući mesec"
+              className="border-t border-[var(--border)] pt-2 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline text-center transition-colors"
             >
-              ⟳
+              {locale === "en" ? "↩ Current month" : "↩ Tekući mesec"}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="p-3 flex flex-col gap-2">
         {/* Day labels */}
         <div className="grid grid-cols-7 mb-1">
-          {DAYS_SR.map((d) => (
+          {DAYS_ORDER.map((d) => (
             <div
               key={d}
               className="text-center text-[9px] font-bold uppercase tracking-wider text-[var(--muted)] py-1"
             >
-              {d}
+              {t(`weekdays.${d}`)}
             </div>
           ))}
         </div>
@@ -160,7 +234,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                     isToday
                       ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
                       : hasComp
-                      ? "bg-[var(--brand-accent)]/10 text-[var(--ink)] hover:bg-[var(--brand-accent)]/20 cursor-pointer"
+                      ? "bg-[var(--brand-primary)]/10 text-[var(--ink)] hover:bg-[var(--brand-primary)]/20 cursor-pointer"
                       : "text-[var(--ink)] hover:bg-[var(--surface)]",
                   ].join(" ")}
                 >
@@ -203,10 +277,10 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
         {/* Legend */}
         <div className="flex items-center gap-3 pt-2 border-t border-[var(--border)] flex-wrap">
           {[
-            { label: "Svetsko", color: "var(--brand-primary)" },
-            { label: "Evropsko", color: "var(--brand-accent)" },
-            { label: "Državno", color: "var(--success)" },
-            { label: "Ostalo", color: "var(--warning)" },
+            { label: t("legend.world"),       color: LEVEL_DOT_COLOR["world"] },
+            { label: t("legend.continental"), color: LEVEL_DOT_COLOR["continental"] },
+            { label: t("legend.national"),    color: LEVEL_DOT_COLOR["national"] },
+            { label: t("legend.other"),       color: LEVEL_DOT_COLOR["regional"] },
           ].map((l) => (
             <div key={l.label} className="flex items-center gap-1">
               <span

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
+import { useTranslations, useLocale } from "next-intl";
 
 export interface TickerDetailItem { label?: string; text: string; }
 
@@ -33,30 +34,6 @@ export const USKORO_LEAD_DAYS: Record<string, number> = {
   olympic:       5,
 };
 
-// ── Demo data ─────────────────────────────────────────────────────────────────
-const DEMO_LIVE: TickerItem = {
-  id: -1,
-  name: "Državno Prvnestvo — Vazdušna Puška",
-  date: new Date().toISOString().split("T")[0],
-  endDate: "2026-07-09",
-  location: "Beograd",
-  level: "national",
-  status: "LIVE",
-  detailItems: [
-    { text: "1. Petrović 634.2" },
-    { label: "2.", text: "Jovanović 632.8" },
-    { label: "Finale", text: "14:30" },
-  ],
-  nocCode: "SRB",
-  countryCode2: "rs",
-};
-
-const DEMO_UPCOMING: TickerItem[] = [
-  { id: -2, name: "Kup Srbije — Vazdušni Pištolj", date: "2026-07-12", level: "Kup", status: "USKORO", detailText: "Beograd", href: "/takmicenja" },
-  { id: -3, name: "Otvoreno Prvnestvo Vojvodine", date: "2026-07-19", level: "Regionalno", status: "USKORO", detailText: "Novi Sad", href: "/takmicenja" },
-  { id: -4, name: "Kup Vojvodine", date: "2026-08-02", level: "Kup", status: "USKORO", detailText: "Subotica", href: "/takmicenja" },
-];
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function Ticker({
@@ -66,27 +43,31 @@ export function Ticker({
   liveItems?: TickerItem[];
   upcomingItems?: TickerItem[];
 }) {
-  // Upper bar: live + uskoro + custom; fall back to demo
-  const upperItems = liveItems.length > 0 ? liveItems : [DEMO_LIVE];
-  const upcoming   = upcomingItems.length > 0 ? upcomingItems : DEMO_UPCOMING;
+  const t = useTranslations("common");
+  const locale = useLocale();
+
+  // Upper bar: live + uskoro + custom
+  const upperItems = liveItems;
+  const upcoming   = upcomingItems;
 
   return (
     <div
       className="w-full"
       style={{ borderTop: "2px solid var(--brand-primary)", borderBottom: "1px solid var(--border)" }}
     >
-      <UpperBar items={upperItems} />
-      {upcoming.length > 0 && <UpcomingBar items={upcoming} />}
+      {upperItems.length > 0 && <UpperBar items={upperItems} t={t} locale={locale} />}
+      {upcoming.length > 0 && <UpcomingBar items={upcoming} t={t} locale={locale} />}
     </div>
   );
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatDateRange(start: string, end?: string): string {
+function formatDateRange(start: string, locale: string, end?: string): string {
   const s   = new Date(start + "T00:00:00");
+  const localeStr = locale === "en" ? "en-US" : "sr-Latn-RS";
   const fmt = (d: Date, showMonth: boolean) =>
-    d.getDate() + (showMonth ? ". " + d.toLocaleDateString("sr-Latn-RS", { month: "short" }) : "");
+    d.getDate() + (showMonth ? ". " + d.toLocaleDateString(localeStr, { month: "short" }) : "");
   if (!end || end === start) return fmt(s, true) + ".";
   const e         = new Date(end + "T00:00:00");
   const sameMonth = s.getMonth() === e.getMonth() && s.getFullYear() === e.getFullYear();
@@ -134,20 +115,19 @@ function LiveDetail({ item }: { item: TickerItem }) {
 
 // ── Upper bar (cycles through live + uskoro + custom) ────────────────────────
 
-function UpperBar({ items }: { items: TickerItem[] }) {
+function UpperBar({ items, t, locale }: { items: TickerItem[]; t: any; locale: string }) {
   const [idx, setIdx]         = useState(0);
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     if (items.length <= 1) return;
-    const t = setInterval(() => {
+    const interval = setInterval(() => {
       setVisible(false);
       setTimeout(() => { setIdx((i) => (i + 1) % items.length); setVisible(true); }, 400);
     }, 6000);
-    return () => clearInterval(t);
+    return () => clearInterval(interval);
   }, [items.length]);
 
-  // Reset index if items shrink
   useEffect(() => { setIdx(0); }, [items.length]);
 
   const item = items[Math.min(idx, items.length - 1)];
@@ -164,12 +144,12 @@ function UpperBar({ items }: { items: TickerItem[] }) {
       role="status"
       aria-label={`Ticker: ${item.name}`}
     >
-      <LiveBarInner item={item} />
+      <LiveBarInner item={item} t={t} locale={locale} />
     </div>
   );
 }
 
-function LiveBarInner({ item }: { item: TickerItem }) {
+function LiveBarInner({ item, t, locale }: { item: TickerItem; t: any; locale: string }) {
   const isLive   = item.status === "LIVE";
   const isUskoro = item.status === "USKORO";
 
@@ -186,7 +166,7 @@ function LiveBarInner({ item }: { item: TickerItem }) {
             className="rounded-full shrink-0"
             style={{ width: 5, height: 5, background: "var(--brand-primary)", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }}
           />
-          UŽIVO
+          {t("live")}
         </span>
       )}
 
@@ -199,7 +179,7 @@ function LiveBarInner({ item }: { item: TickerItem }) {
             animation: "ticker-pulse 2s ease-in-out infinite",
           }}
         >
-          USKORO
+          {t("upcoming").toUpperCase()}
         </span>
       )}
 
@@ -268,7 +248,7 @@ function LiveBarInner({ item }: { item: TickerItem }) {
           )}
           {item.date && (
             <span style={{ fontSize: 11, color: "rgba(255,255,255,0.95)", fontWeight: 600 }}>
-              {formatDateRange(item.date, item.endDate)}
+              {formatDateRange(item.date, locale, item.endDate)}
             </span>
           )}
         </span>
@@ -284,7 +264,7 @@ function LiveBarInner({ item }: { item: TickerItem }) {
 
 // ── Upcoming bar ─────────────────────────────────────────────────────────────
 
-function UpcomingBar({ items }: { items: TickerItem[] }) {
+function UpcomingBar({ items, t, locale }: { items: TickerItem[]; t: any; locale: string }) {
   const [paused, setPaused] = useState(false);
   const doubled  = [...items, ...items];
   const duration = Math.max(items.length * 14, 40);
@@ -300,12 +280,12 @@ function UpcomingBar({ items }: { items: TickerItem[] }) {
     >
       <div className="mx-auto max-w-7xl px-4 h-full flex items-center gap-3">
 
-        {/* Static label — same box sizing + position as UŽIVO/USKORO above */}
+        {/* Static label */}
         <span
           className="shrink-0 font-extrabold uppercase rounded px-1.5"
           style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--muted)", height: 20, display: "inline-flex", alignItems: "center" }}
         >
-          Najava
+          {t("upcoming")}
         </span>
         <span className="shrink-0" style={{ width: 1, height: 10, background: "var(--border)", display: "inline-block" }} aria-hidden="true" />
 
@@ -314,7 +294,7 @@ function UpcomingBar({ items }: { items: TickerItem[] }) {
           <div
             className="flex items-center"
             style={{
-              animation: `ticker-scroll ${duration}s linear infinite`,
+              animation: `ticker-scroll ${doubled.length * 7}s linear infinite`,
               animationPlayState: paused ? "paused" : "running",
               width: "max-content",
             }}
@@ -322,7 +302,7 @@ function UpcomingBar({ items }: { items: TickerItem[] }) {
             {doubled.map((item, i) => (
               <div key={`${item.id}-${i}`} className="flex items-center shrink-0">
                 <span className="px-3 shrink-0" style={{ color: "var(--border)", fontSize: 13, lineHeight: 1, userSelect: "none" }} aria-hidden="true">·</span>
-                <UpcomingItem item={item} />
+                <UpcomingItem item={item} locale={locale} />
               </div>
             ))}
           </div>
@@ -333,9 +313,10 @@ function UpcomingBar({ items }: { items: TickerItem[] }) {
   );
 }
 
-function UpcomingItem({ item }: { item: TickerItem }) {
+function UpcomingItem({ item, locale }: { item: TickerItem; locale: string }) {
   const d       = new Date(item.date + "T00:00:00");
-  const dateStr = d.toLocaleDateString("sr-Latn-RS", { day: "numeric", month: "short" });
+  const localeStr = locale === "en" ? "en-US" : "sr-Latn-RS";
+  const dateStr = d.toLocaleDateString(localeStr, { day: "numeric", month: "short" });
 
   const content = (
     <span className="flex items-center gap-1.5">
@@ -353,3 +334,4 @@ function UpcomingItem({ item }: { item: TickerItem }) {
   }
   return content;
 }
+

@@ -14,39 +14,39 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { CompetitionLevel, EventType } from "@/lib/pdf-import/types";
-import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
+import { CATEGORY_RANK } from "@/lib/pdf-import/types";
+import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import {
   CompetitionResultsClient,
   type DisciplineGroup,
 } from "./CompetitionResultsClient";
+import { getLocale, getTranslations } from "next-intl/server";
 
 type Props = { params: Promise<{ id: string }> };
-
-const EVENT_TYPE_LABELS: Record<EventType, string> = {
-  championship:    "Šampionat",
-  world_cup:       "Svetski kup",
-  champions_league:"Čempionska liga",
-  cup:             "Kup",
-  grand_prix:      "Grand prix",
-  league_round:    "Kolo lige",
-  friendly:        "Prijateljsko",
-  other:           "",
-};
 
 // ── Metadata ─────────────────────────────────────────────────────────────────
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const locale = await getLocale();
   const { id } = await params;
   const comp = await db.query.competitions.findFirst({
     where: eq(competitions.id, parseInt(id)),
   });
-  if (!comp) return { title: "Takmičenje nije pronađeno" };
-  return { title: comp.name };
+  if (!comp) {
+    const t = await getTranslations("competition");
+    return { title: t("detail.notFound") };
+  }
+  const name = locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name);
+  return { title: name };
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CompetitionPage({ params }: Props) {
+  const locale = await getLocale();
+  const t = await getTranslations("competition");
+  const tCommon = await getTranslations("common");
+
   const { id } = await params;
   const compId = parseInt(id);
   if (isNaN(compId)) notFound();
@@ -72,6 +72,7 @@ export default async function CompetitionPage({ params }: Props) {
       disciplineId: disciplines.id,
       disciplineName: disciplines.name,
       apparatus: disciplines.apparatus,
+      category: results.category,
       qualTotal: results.qualTotal,
       qualRank: results.qualRank,
       qualInners: results.qualInners,
@@ -88,9 +89,11 @@ export default async function CompetitionPage({ params }: Props) {
     .where(eq(results.competitionId, compId))
     .orderBy(asc(results.qualRank));
 
-  // Group by discipline preserving order of first appearance
+  // Group by discipline, then by age category, preserving order of first appearance
   const disciplineOrder: string[] = [];
   const disciplineMap = new Map<string, DisciplineGroup>();
+  const categoryOrder = new Map<string, string[]>(); // disciplineCode -> category[]
+  const categoryMap = new Map<string, Map<string, DisciplineGroup["categories"][number]>>();
 
   for (const r of compResults) {
     if (!disciplineMap.has(r.disciplineCode)) {
@@ -99,10 +102,20 @@ export default async function CompetitionPage({ params }: Props) {
         code: r.disciplineCode,
         name: r.disciplineName,
         apparatus: r.apparatus,
-        results: [],
+        categories: [],
       });
+      categoryOrder.set(r.disciplineCode, []);
+      categoryMap.set(r.disciplineCode, new Map());
     }
-    disciplineMap.get(r.disciplineCode)!.results.push({
+
+    const catsForDiscipline = categoryOrder.get(r.disciplineCode)!;
+    const catMapForDiscipline = categoryMap.get(r.disciplineCode)!;
+    if (!catMapForDiscipline.has(r.category)) {
+      catsForDiscipline.push(r.category);
+      catMapForDiscipline.set(r.category, { category: r.category, results: [] });
+    }
+
+    catMapForDiscipline.get(r.category)!.results.push({
       id: r.id,
       shooterId: r.shooterId,
       firstName: r.firstName,
@@ -121,7 +134,14 @@ export default async function CompetitionPage({ params }: Props) {
     });
   }
 
-  const groups = disciplineOrder.map((code) => disciplineMap.get(code)!);
+  const groups = disciplineOrder.map((code) => {
+    const catMapForDiscipline = categoryMap.get(code)!;
+    const cats = categoryOrder
+      .get(code)!
+      .map((cat) => catMapForDiscipline.get(cat)!)
+      .sort((a, b) => CATEGORY_RANK[b.category] - CATEGORY_RANK[a.category]); // stariji prvo
+    return { ...disciplineMap.get(code)!, categories: cats };
+  });
 
   // ── Date display ────────────────────────────────────────────────
   const dateDisplay = comp.dateEnd && comp.dateEnd !== comp.date
@@ -129,8 +149,35 @@ export default async function CompetitionPage({ params }: Props) {
     : comp.date;
 
   const levelStyle = LEVEL_STYLE[comp.level] ?? { background: "#f3f4f6", color: "#4b5563" };
-  const levelLabel = LEVEL_LABEL[comp.level] ?? comp.level;
+  const levelLabel = getLevelLabel(comp.level, locale);
+
+  // Event type labels (localized)
+  const EVENT_TYPE_LABELS: Record<string, string> = locale === "en"
+    ? {
+        championship:     "Championship",
+        world_cup:        "World Cup",
+        champions_league: "Champions League",
+        cup:              "Cup",
+        grand_prix:       "Grand Prix",
+        league_round:     "League Round",
+        friendly:         "Friendly",
+        other:            "",
+      }
+    : {
+        championship:     "Šampionat",
+        world_cup:        "Svetski kup",
+        champions_league: "Čempionska liga",
+        cup:              "Kup",
+        grand_prix:       "Grand prix",
+        league_round:     "Kolo lige",
+        friendly:         "Prijateljsko",
+        other:            "",
+      };
+
   const eventTypeLabel = EVENT_TYPE_LABELS[comp.eventType as EventType] ?? "";
+
+  // Localized competition name
+  const compName = locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name);
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
@@ -138,15 +185,15 @@ export default async function CompetitionPage({ params }: Props) {
       {/* ── Breadcrumb ────────────────────────────────────────────── */}
       <nav className="flex items-center gap-2 text-xs text-[var(--muted)] mb-8">
         <Link href="/" className="hover:text-[var(--ink)] transition-colors">
-          Početna
+          {tCommon("home")}
         </Link>
         <span className="text-[var(--subtle)]">/</span>
         <Link href="/takmicenja" className="hover:text-[var(--ink)] transition-colors">
-          Takmičenja
+          {t("list.title")}
         </Link>
         <span className="text-[var(--subtle)]">/</span>
         <span className="text-[var(--ink)] font-medium truncate max-w-[260px]">
-          {comp.name}
+          {compName}
         </span>
       </nav>
 
@@ -181,7 +228,7 @@ export default async function CompetitionPage({ params }: Props) {
             lineHeight: 1.1,
           }}
         >
-          {comp.name}
+          {compName}
         </h1>
 
         {/* Meta row */}
@@ -235,7 +282,7 @@ export default async function CompetitionPage({ params }: Props) {
           className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase tracking-tight text-[var(--ink)] mb-5"
           style={{ fontSize: "1.25rem", letterSpacing: "-0.02em" }}
         >
-          Rezultati
+          {t("detail.results")}
         </h2>
         <CompetitionResultsClient groups={groups} />
       </div>

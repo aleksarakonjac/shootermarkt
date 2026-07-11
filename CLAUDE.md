@@ -115,22 +115,59 @@ results (
 
 ## Forma Score Algoritam
 
+Jedinstveni izvor: `src/lib/forma.ts` (`computeForma`, `rollingForma`).
+
+**Forma NIJE prosek prošlih rezultata.** Forma je **prognoza sledećeg nastupa** —
+weighted linear regression (težinski trend) projektovana jedan tipičan razmak unapred:
+
 ```
-Forma score = weighted average poslednjih nastupa
-
-Težine:
-  zadnja 3 nastupa:  50%
-  4-6 nastupa:       30%
-  7-10 nastupa:      20%
-
-+ konzistentnost bonus (niža std devijacija = stabilniji strelac)
-+ trend koeficijent (raste/pada/stabilno)
-
-Tri metrike po strelcu:
-  Peak         — best result ikad
-  Current forma — weighted average
-  Trend        — ↑ ↓ →
+level  = težinski nivo na dan poslednjeg nastupa
+trend  = nagib iz robusnih bucket-ova (novija vs starija polovina)
+forma  = level + trend·stepDays   (stepDays = tipičan razmak, ceiling-kompresovan)
 ```
+
+Tri signala u težini svakog nastupa:
+1. **time-decay** — exp opadanje po STVARNOM datumu (poluvreme 150 dana)
+2. **level-weight** — jače takmičenje = pouzdaniji signal:
+   `olympic > world > continental > international ≈ national > regional > club`
+   (international i national namerno ≈ — jako državno vs slab međunarodni nije uporedivo)
+3. nagib se shrink-uje po težini bucket-a (ne veruj trendu koji drži zanemarljiva težina)
+
+**Ceiling kompresija** — rast blizu realnog max discipline je teži, pa se uzlazna
+projekcija priguši ka plafonu (silazna se NE dira). Realni max (`REALISTIC_MAX`):
+ARM/ARW 637.9 (WR; teorijski 654.0 nedostižan), APM 594, APW 591.
+
+Zbog projekcije trenda:
+- uzlazna serija → forma IZNAD poslednjeg (pogled unapred)
+- silazna → ISPOD; stabilan → ≈ nivo
+- outlier / usamljen stari nastup → prigušen (decay + shrink)
+
+Forma ostaje **na skali rezultata** (624.3 ARM, 577 APM) → opipljivo predviđanje.
+
+**Stabilnost NE ulazi u forma broj.** Izlazi kao zasebne metrike koje govore
+KOLIKO da veruješ prognozi, ne menjaju je:
+
+| Metrika | Značenje |
+|---|---|
+| `forma` | prognozirani sledeći rezultat |
+| `level` | trenutni nivo bez projekcije |
+| `reliability` | ± raspon prognoze (težinski std oko trenda) |
+| `trend` | ↑ ↓ → |
+| `momentum` | ubrzava li se poboljšanje (novija vs starija polovina) |
+| `peak` | najbolji rezultat ikad |
+| `peakProximity` | forma / peak ∈ (0,1] |
+| `consistency` | 0–1 skor stabilnosti |
+| `sampleSize` | broj nastupa u obračunu |
+
+Prozor: poslednjih 20 nastupa (stvarni limit = time-decay + max 300 dana starosti).
+Ulaz: `FormaEntry[]` (`score`, `date`, opciono `level`),
+bilo koji redosled (sortira se interno). Za ceiling proslediti `{ code }`.
+
+**Rangiranje** (`rangiranje/page.tsx`, homepage top-forma, club leaderboard):
+- primarni ključ = **forma** (prognoza), sort DESC
+- **kvalifikacija ≥5 nastupa** (`RANKING_MIN_SAMPLE`) — nepouzdane prognoze ispadaju
+- tiebreak: peak → sampleSize
+- konzistentnost/reliability = zasebne kolone, nikad u broju
 
 ---
 

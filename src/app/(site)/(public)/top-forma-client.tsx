@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Sparkline } from "@/components/sparkline";
-import { trendLabel, trendColor } from "@/lib/forma-score";
+import { trendLabel, trendColor } from "@/lib/forma";
+import { useTranslations } from "next-intl";
 
 interface ShooterFormRow {
   shooterId: number;
@@ -36,6 +37,7 @@ const TABS = [
 
 export function TopFormaClient({ initialData }: TopFormaClientProps) {
   const [activeTab, setActiveTab] = useState<keyof typeof initialData>("ARM");
+  const t = useTranslations("home");
 
   const rows = initialData[activeTab];
   const isAP = activeTab.startsWith("AP");
@@ -43,9 +45,9 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
       {/* Widget Header with Tabs */}
-      <div className="bg-[var(--brand-accent)] px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)]">
+      <div className="bg-[var(--brand-primary)] px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)]">
         <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-white uppercase tracking-wider">
-          Top Forma Strelaca
+          {t("topForm")}
         </h3>
         
         {/* Tabs switcher */}
@@ -59,7 +61,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
                 className="px-2.5 py-1 rounded text-xs font-semibold uppercase transition-colors"
                 style={{
                   background: active ? "var(--bg)" : "transparent",
-                  color: active ? "var(--brand-accent)" : "rgba(255, 255, 255, 0.7)",
+                  color: active ? "var(--brand-primary)" : "rgba(255, 255, 255, 0.7)",
                 }}
               >
                 {tab.code}

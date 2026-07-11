@@ -5,20 +5,20 @@ import {
   getUpcomingCompetitions,
   getTopShootersByDiscipline,
 } from "@/lib/cms/get-vesti-sidebar";
+import { getLocale, getTranslations } from "next-intl/server";
+import { getLevelLabel } from "@/lib/competition-utils";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Vesti & Analize" };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("news");
+  return { title: t("title") };
+}
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const CATEGORIES = [
-  { value: "vest",       label: "Vest" },
-  { value: "analiza",    label: "Analiza" },
-  { value: "takmicenje", label: "Takmičenje" },
-  { value: "oprema",     label: "Oprema" },
-  { value: "intervju",   label: "Intervju" },
-  { value: "rezultati",  label: "Rezultati" },
-] as const;
+const CATEGORY_KEYS = ["vest", "analiza", "takmicenje", "oprema", "intervju", "rezultati"] as const;
+type CategoryKey = typeof CATEGORY_KEYS[number];
 
 const CATEGORY_COLOR: Record<string, string> = {
   vest:       "var(--brand-primary)",
@@ -29,38 +29,24 @@ const CATEGORY_COLOR: Record<string, string> = {
   rezultati:  "oklch(0.48 0.16 200)",
 };
 
-const LEVEL_LABEL: Record<string, string> = {
-  club:          "Klub",
-  regional:      "Regionalno",
-  national:      "Državno",
-  international: "Međunarodno",
-  continental:   "Kontinentalno",
-  world:         "Svetsko",
-  olympic:       "Olimpijsko",
-};
-
-const DISC_LABEL: Record<string, string> = {
-  ARM: "10m AR Muški",
-  ARW: "10m AR Žene",
-  APM: "10m AP Muški",
-  APW: "10m AP Žene",
-};
+const DISC_ORDER = ["ARM", "ARW", "APM", "APW"] as const;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatDateSr(iso: string) {
-  return new Date(iso).toLocaleDateString("sr-RS", {
+function formatDate(iso: string, locale: string) {
+  return new Date(iso).toLocaleDateString(locale === "en" ? "en-GB" : "sr-RS", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 }
 
-function formatDateShort(iso: string) {
+function formatDateShort(iso: string, locale: string) {
   const d = new Date(iso);
+  const monthLocale = locale === "en" ? "en-GB" : "sr-Latn-RS";
   return {
     day: d.getDate(),
-    month: d.toLocaleString("sr-Latn-RS", { month: "short" }).replace(".", "").toUpperCase(),
+    month: d.toLocaleString(monthLocale, { month: "short" }).replace(".", "").toUpperCase(),
   };
 }
 
@@ -68,11 +54,7 @@ function getCategoryColor(cat: string | null) {
   return cat ? (CATEGORY_COLOR[cat] ?? "var(--muted)") : "var(--muted)";
 }
 
-function getCategoryLabel(cat: string | null) {
-  return CATEGORIES.find((c) => c.value === cat)?.label ?? "Vest";
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 type Props = {
   searchParams: Promise<{ kategorija?: string }>;
@@ -81,6 +63,18 @@ type Props = {
 export default async function VestiPage({ searchParams }: Props) {
   const sp = await searchParams;
   const activeCategory = sp.kategorija ?? "";
+  const locale = await getLocale();
+  const t = await getTranslations("news");
+
+  function getCategoryLabel(cat: string | null): string {
+    if (!cat) return t("categories.vest");
+    return t(`categories.${cat}` as any) ?? cat;
+  }
+
+  const CATEGORIES = CATEGORY_KEYS.map((key) => ({
+    value: key,
+    label: getCategoryLabel(key),
+  }));
 
   const [articles, tags, upcoming, topShooters] = await Promise.all([
     getPublishedArticles(activeCategory ? { category: activeCategory } : undefined).catch(() => []),
@@ -101,11 +95,11 @@ export default async function VestiPage({ searchParams }: Props) {
           className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-2xl uppercase tracking-wider text-[var(--ink)]"
           style={{ textWrap: "balance" } as React.CSSProperties}
         >
-          Vesti &amp; Analize
+          {t("title")}
         </h1>
         {articles.length > 0 && (
           <span className="text-xs text-[var(--muted)] tabular-nums">
-            {articles.length} {articles.length === 1 ? "objava" : "objava"}
+            {t("postCount", { count: articles.length })}
           </span>
         )}
       </div>
@@ -120,7 +114,7 @@ export default async function VestiPage({ searchParams }: Props) {
               : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]"
           }`}
         >
-          Sve
+          {t("allCategories")}
         </Link>
         {CATEGORIES.map((cat) => (
           <Link
@@ -148,7 +142,11 @@ export default async function VestiPage({ searchParams }: Props) {
         <div className="min-w-0">
 
           {articles.length === 0 ? (
-            <EmptyState activeCategory={activeCategory} />
+            <EmptyState
+              activeCategory={activeCategory}
+              label={activeCategory ? getCategoryLabel(activeCategory) : ""}
+              t={t}
+            />
           ) : (
             <>
               {/* Hero */}
@@ -156,6 +154,8 @@ export default async function VestiPage({ searchParams }: Props) {
                 <HeroCard
                   article={featured}
                   accentColor={featuredColor}
+                  categoryLabel={getCategoryLabel(featured.category)}
+                  locale={locale}
                 />
               )}
 
@@ -167,6 +167,8 @@ export default async function VestiPage({ searchParams }: Props) {
                       key={article.id}
                       article={article}
                       accentColor={getCategoryColor(article.category)}
+                      categoryLabel={getCategoryLabel(article.category)}
+                      locale={locale}
                     />
                   ))}
                 </div>
@@ -175,11 +177,22 @@ export default async function VestiPage({ searchParams }: Props) {
           )}
         </div>
 
-        {/* Right: sidebar — sticky, independently scrollable when taller than viewport */}
+        {/* Right: sidebar */}
         <aside className="flex flex-col gap-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden">
-          <UpcomingWidget competitions={upcoming} />
-          <TopShootersWidget topShooters={topShooters} />
-          {tags.length > 0 && <TagsWidget tags={tags} />}
+          <UpcomingWidget
+            competitions={upcoming}
+            title={t("upcomingWidget")}
+            emptyLabel={t("upcomingEmpty")}
+            seeAllLabel={t("allCategories")}
+            locale={locale}
+            getLevelLabel={(level) => getLevelLabel(level, locale)}
+          />
+          <TopShootersWidget
+            topShooters={topShooters}
+            title={t("topFormWidget")}
+            rankingLabel={locale === "en" ? "Ranking" : "Rangiranje"}
+          />
+          {tags.length > 0 && <TagsWidget tags={tags} title={t("popularTags")} />}
         </aside>
       </div>
     </div>
@@ -191,9 +204,13 @@ export default async function VestiPage({ searchParams }: Props) {
 function HeroCard({
   article,
   accentColor,
+  categoryLabel,
+  locale,
 }: {
   article: Awaited<ReturnType<typeof getPublishedArticles>>[0];
   accentColor: string;
+  categoryLabel: string;
+  locale: string;
 }) {
   const imgUrl = article.coverImage?.url ?? null;
   return (
@@ -206,7 +223,6 @@ function HeroCard({
             : `linear-gradient(135deg, ${accentColor}22 0%, var(--surface-2) 100%)`,
         }}
       >
-        {/* Cover image */}
         {imgUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -216,7 +232,6 @@ function HeroCard({
           />
         )}
 
-        {/* Gradient overlay — always present */}
         <div
           className="absolute inset-0"
           style={{
@@ -226,19 +241,17 @@ function HeroCard({
           }}
         />
 
-        {/* Top accent strip (no-image state) */}
         {!imgUrl && (
           <div className="absolute top-0 left-0 right-0 h-1" style={{ background: accentColor }} />
         )}
 
-        {/* Content */}
         <div className="relative z-10 p-6 flex flex-col gap-2">
           <div className="flex items-center gap-2 mb-1">
             <span
               className="text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full text-white"
               style={{ background: accentColor }}
             >
-              {getCategoryLabel(article.category)}
+              {categoryLabel}
             </span>
           </div>
 
@@ -253,7 +266,7 @@ function HeroCard({
           </p>
 
           <div className={`flex items-center gap-2 mt-2 text-[11px] ${imgUrl ? "text-white/60" : "text-[var(--subtle)]"}`}>
-            {article.publishedAt && <span>{formatDateSr(article.publishedAt)}</span>}
+            {article.publishedAt && <span>{formatDate(article.publishedAt, locale)}</span>}
             {article.tags.length > 0 && (
               <>
                 <span>·</span>
@@ -274,15 +287,18 @@ function HeroCard({
 function ArticleCard({
   article,
   accentColor,
+  categoryLabel,
+  locale,
 }: {
   article: Awaited<ReturnType<typeof getPublishedArticles>>[0];
   accentColor: string;
+  categoryLabel: string;
+  locale: string;
 }) {
   const imgUrl = article.coverImage?.url ?? null;
   return (
     <Link href={`/vesti/${article.slug}`} className="group block">
       <article className="flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 hover:border-[var(--brand-primary)] transition-colors overflow-hidden">
-        {/* Thumbnail */}
         <div
           className="shrink-0 w-24 h-20 rounded-lg overflow-hidden"
           style={{
@@ -304,13 +320,12 @@ function ArticleCard({
                 className="text-[9px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded text-white"
                 style={{ background: accentColor }}
               >
-                {getCategoryLabel(article.category)}
+                {categoryLabel}
               </span>
             </div>
           )}
         </div>
 
-        {/* Text */}
         <div className="flex flex-col gap-1 min-w-0 py-0.5">
           <h3
             className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.95rem] text-[var(--ink)] leading-snug group-hover:text-[var(--brand-primary)] transition-colors line-clamp-2"
@@ -325,7 +340,7 @@ function ArticleCard({
               className="text-[10px] text-[var(--subtle)] mt-auto font-[family-name:var(--font-jetbrains-mono)]"
               dateTime={article.publishedAt}
             >
-              {formatDateSr(article.publishedAt)}
+              {formatDate(article.publishedAt, locale)}
             </time>
           )}
         </div>
@@ -336,8 +351,15 @@ function ArticleCard({
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
-function EmptyState({ activeCategory }: { activeCategory: string }) {
-  const cat = CATEGORIES.find((c) => c.value === activeCategory);
+function EmptyState({
+  activeCategory,
+  label,
+  t,
+}: {
+  activeCategory: string;
+  label: string;
+  t: any;
+}) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 flex flex-col items-center gap-3 text-center">
       <div
@@ -347,17 +369,17 @@ function EmptyState({ activeCategory }: { activeCategory: string }) {
         📰
       </div>
       <p className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg uppercase tracking-wide text-[var(--ink)]">
-        {cat ? `Nema objava u kategoriji „${cat.label}"` : "Nema objava još"}
+        {activeCategory ? t("emptyInCategory", { label }) : t("emptyTitle")}
       </p>
       <p className="text-sm text-[var(--muted)] max-w-xs">
-        Vesti i analize stižu uskoro. Prati takmičenja i rezultate u međuvremenu.
+        {t("emptySubtitle")}
       </p>
       {activeCategory && (
         <Link
           href="/vesti"
           className="mt-2 text-xs font-semibold text-[var(--brand-primary)] hover:underline"
         >
-          ← Sve kategorije
+          {t("allCategoriesLink")}
         </Link>
       )}
     </div>
@@ -386,27 +408,36 @@ function WidgetHeader({ title, linkHref, linkLabel }: { title: string; linkHref:
 
 function UpcomingWidget({
   competitions,
+  title,
+  emptyLabel,
+  seeAllLabel,
+  locale,
+  getLevelLabel,
 }: {
   competitions: Awaited<ReturnType<typeof getUpcomingCompetitions>>;
+  title: string;
+  emptyLabel: string;
+  seeAllLabel: string;
+  locale: string;
+  getLevelLabel: (level: string) => string;
 }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-      <WidgetHeader title="Naredna takmičenja" linkHref="/takmicenja" linkLabel="Sva" />
+      <WidgetHeader title={title} linkHref="/takmicenja" linkLabel={seeAllLabel} />
 
       {competitions.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-[var(--muted)]">Nema zakazanih takmičenja.</p>
+        <p className="px-4 py-3 text-sm text-[var(--muted)]">{emptyLabel}</p>
       ) : (
         <ul className="divide-y divide-[var(--border)]">
           {competitions.map((comp) => {
-            const { day, month } = formatDateShort(comp.date);
-            const displayName = comp.nameSr ?? comp.name;
+            const { day, month } = formatDateShort(comp.date, locale);
+            const displayName = locale === "en" ? (comp.nameEn ?? comp.nameSr ?? comp.name) : (comp.nameSr ?? comp.name);
             return (
               <li key={comp.id}>
                 <Link
                   href={`/takmicenja/${comp.id}`}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)] transition-colors group"
                 >
-                  {/* Date block */}
                   <div className="shrink-0 w-9 text-center">
                     <div className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-lg leading-none text-[var(--ink)]">
                       {day}
@@ -416,14 +447,13 @@ function UpcomingWidget({
                     </div>
                   </div>
 
-                  {/* Name + meta */}
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] font-semibold text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors line-clamp-1 leading-snug">
                       {displayName}
                     </div>
                     <div className="flex items-center gap-1.5 mt-1">
                       <span className="text-[11px] text-[var(--muted)]">
-                        {LEVEL_LABEL[comp.level] ?? comp.level}
+                        {getLevelLabel(comp.level)}
                       </span>
                       {comp.location && (
                         <>
@@ -445,19 +475,35 @@ function UpcomingWidget({
 
 // ── Sidebar: top shooters ─────────────────────────────────────────────────────
 
-const DISC_ORDER = ["ARM", "ARW", "APM", "APW"];
+const DISC_LABEL_SR: Record<string, string> = {
+  ARM: "10m AR Muški",
+  ARW: "10m AR Žene",
+  APM: "10m AP Muški",
+  APW: "10m AP Žene",
+};
+
+const DISC_LABEL_EN: Record<string, string> = {
+  ARM: "10m AR Men",
+  ARW: "10m AR Women",
+  APM: "10m AP Men",
+  APW: "10m AP Women",
+};
 
 function TopShootersWidget({
   topShooters,
+  title,
+  rankingLabel,
 }: {
   topShooters: Awaited<ReturnType<typeof getTopShootersByDiscipline>>;
+  title: string;
+  rankingLabel: string;
 }) {
   const hasAny = DISC_ORDER.some((code) => (topShooters[code]?.length ?? 0) > 0);
   if (!hasAny) return null;
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-      <WidgetHeader title="Top forma" linkHref="/rangiranje" linkLabel="Rangiranje" />
+      <WidgetHeader title={title} linkHref="/rangiranje" linkLabel={rankingLabel} />
 
       <div className="divide-y divide-[var(--border)]">
         {DISC_ORDER.map((code) => {
@@ -466,7 +512,7 @@ function TopShootersWidget({
           return (
             <div key={code} className="px-4 py-3">
               <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--muted)] mb-2">
-                {DISC_LABEL[code] ?? code}
+                {DISC_LABEL_SR[code] ?? code}
               </div>
               <ol className="flex flex-col gap-1.5">
                 {rows.map((row, i) => (
@@ -498,13 +544,15 @@ function TopShootersWidget({
 
 function TagsWidget({
   tags,
+  title,
 }: {
   tags: Awaited<ReturnType<typeof getAllPublishedTags>>;
+  title: string;
 }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
       <span className="block font-[family-name:var(--font-barlow-condensed)] font-bold text-sm uppercase tracking-wide text-[var(--ink)] mb-3">
-        Popularni tagovi
+        {title}
       </span>
       <div className="flex flex-wrap gap-1.5">
         {tags.slice(0, 20).map((tag, i) => (

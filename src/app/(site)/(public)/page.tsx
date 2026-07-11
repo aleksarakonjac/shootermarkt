@@ -3,18 +3,23 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions, countries } from "@/lib/db/schema";
 import { eq, desc, asc, and, isNotNull, sql } from "drizzle-orm";
-import { computeFormaScore } from "@/lib/forma-score";
+import { computeFormaFromEntries, RANKING_MIN_SAMPLE, type CompetitionLevel } from "@/lib/forma";
 import { TopFormaClient } from "./top-forma-client";
 import { QuickH2HClient } from "./quick-h2h-client";
 import { Ticker, TickerItem } from "./ticker";
 import { CalendarModule } from "./components/CalendarModule";
 import { UpcomingEvents } from "./components/UpcomingEvents";
 import { NewsSection } from "./components/NewsSection";
+import { getLocale, getTranslations } from "next-intl/server";
 import "./homepage.css";
-export const metadata = {
-  title: "Početna | Shootermarkt",
-  description: "Centralni dashboard za rezultate, formu i rangiranje srpskih strelaca",
-};
+
+export async function generateMetadata() {
+  const t = await getTranslations("home.metadata");
+  return {
+    title: t("title"),
+    description: t("description"),
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +37,11 @@ interface ShooterFormRow {
 }
 
 export default async function HomePage() {
+  const locale = await getLocale();
+  const t = await getTranslations("home");
+  const tCommon = await getTranslations("common");
+  const tComp = await getTranslations("competition");
+
   const currentDate = new Date().toISOString().split("T")[0];
 
   // Ticker — two tiers: LIVE (today) + NAJAVA (future)
@@ -39,6 +49,8 @@ export default async function HomePage() {
     .select({
       id:           competitions.id,
       name:         competitions.name,
+      nameSr:       competitions.nameSr,
+      nameEn:       competitions.nameEn,
       date:         competitions.date,
       level:        competitions.level,
       location:     competitions.location,
@@ -69,7 +81,7 @@ export default async function HomePage() {
         .orderBy(desc(results.qualTotal))
         .limit(1);
 
-      let detailText = "U toku";
+      let detailText = t("inProgress");
       if (best[0]) {
         const score = parseFloat(best[0].qualTotal!);
         const fmt   = score.toFixed(best[0].discCode.startsWith("AP") ? 0 : 1);
@@ -77,9 +89,13 @@ export default async function HomePage() {
       }
 
       return {
-        id: comp.id, name: comp.name, date: comp.date,
-        level: comp.level, status: "LIVE" as const,
-        detailText, href: `/takmicenja/${comp.id}`,
+        id: comp.id,
+        name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
+        date: comp.date,
+        level: comp.level,
+        status: "LIVE" as const,
+        detailText,
+        href: `/takmicenja/${comp.id}`,
         nocCode:      comp.nocCode      ?? undefined,
         countryCode2: comp.countryCode2 ?? undefined,
       };
@@ -87,9 +103,12 @@ export default async function HomePage() {
   );
 
   const upcomingItems: TickerItem[] = tickerUpcoming.map((comp) => ({
-    id: comp.id, name: comp.name, date: comp.date,
-    level: comp.level, status: "USKORO" as const,
-    detailText: comp.location || "Srbija",
+    id: comp.id,
+    name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
+    date: comp.date,
+    level: comp.level,
+    status: "USKORO" as const,
+    detailText: comp.location || tCommon("serbia"),
     href: `/takmicenja/${comp.id}`,
   }));
 
@@ -165,6 +184,7 @@ export default async function HomePage() {
         clubName: clubs.name,
         qualTotal: results.qualTotal,
         competitionDate: competitions.date,
+        competitionLevel: competitions.level,
       })
       .from(results)
       .innerJoin(shooters, eq(results.shooterId, shooters.id))
@@ -181,7 +201,7 @@ export default async function HomePage() {
         lastName: string;
         nationality: string | null;
         clubName: string | null;
-        entries: { qualTotal: number; date: string }[];
+        entries: { qualTotal: number; date: string; level: CompetitionLevel }[];
       }
     >();
 
@@ -198,6 +218,7 @@ export default async function HomePage() {
       shooterMap.get(r.shooterId)!.entries.push({
         qualTotal: parseFloat(r.qualTotal!),
         date: r.competitionDate,
+        level: r.competitionLevel,
       });
     }
 
@@ -205,9 +226,9 @@ export default async function HomePage() {
 
     const ranking = Array.from(shooterMap.entries())
       .map(([shooterId, data]) => {
-        const forma = computeFormaScore(data.entries, maxScore);
+        const forma = computeFormaFromEntries(data.entries, { code: disc.code });
         const peak = data.entries.length > 0 ? Math.max(...data.entries.map((e) => e.qualTotal)) : null;
-        
+
         // Dynamic sort entries desc by date to get recent scores
         const sortedScores = [...data.entries]
           .sort((a, b) => b.date.localeCompare(a.date))
@@ -219,14 +240,14 @@ export default async function HomePage() {
           lastName: data.lastName,
           clubName: data.clubName,
           nationality: data.nationality,
-          formaScore: forma ? forma.score : 0,
-          trend: forma ? forma.trend : ("stable" as const),
+          formaScore: forma.forma ?? 0,
+          trend: forma.trend,
           peak,
-          entriesCount: data.entries.length,
+          entriesCount: forma.sampleSize,
           recentScores: sortedScores,
         };
       })
-      .filter((s) => s.entriesCount >= 2) // only shooters with enough data for form score
+      .filter((s) => s.entriesCount >= RANKING_MIN_SAMPLE) // kvalifikacija: dovoljno nastupa
       .sort((a, b) => b.formaScore - a.formaScore)
       .slice(0, 5); // top 5 only
 
@@ -244,6 +265,11 @@ export default async function HomePage() {
     .orderBy(asc(competitions.date))
     .limit(10);
 
+  const translatedUpcoming = upcomingComps.map((comp) => ({
+    ...comp,
+    name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
+  }));
+
   // 4b. Fetch all competitions for calendar (current year)
   const yearStart = `${new Date().getFullYear()}-01-01`;
   const yearEnd = `${new Date().getFullYear()}-12-31`;
@@ -252,6 +278,11 @@ export default async function HomePage() {
     .from(competitions)
     .where(sql`${competitions.date} >= ${yearStart} AND ${competitions.date} <= ${yearEnd}`)
     .orderBy(asc(competitions.date));
+
+  const translatedCalendar = calendarComps.map((comp) => ({
+    ...comp,
+    name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
+  }));
 
   // 5. Club Leaderboard: Group shooters by club, calculate average form score
   const clubAvgForm = await db
@@ -285,6 +316,7 @@ export default async function HomePage() {
         shooterId: results.shooterId,
         qualTotal: results.qualTotal,
         date: competitions.date,
+        level: competitions.level,
         discMax: disciplines.maxQualScore,
         discCode: disciplines.code,
       })
@@ -298,7 +330,7 @@ export default async function HomePage() {
 
     // Calculate form score for each shooter
     const shooterFormScores: number[] = [];
-    const shooterEntries: { [id: number]: { qualTotal: number; date: string; max: number }[] } = {};
+    const shooterEntries: { [id: number]: { qualTotal: number; date: string; level: CompetitionLevel; max: number; code: string }[] } = {};
 
     for (const r of clubResults) {
       if (!shooterEntries[r.shooterId]) {
@@ -307,17 +339,19 @@ export default async function HomePage() {
       shooterEntries[r.shooterId].push({
         qualTotal: parseFloat(r.qualTotal!),
         date: r.date,
+        level: r.level,
         max: parseFloat(r.discMax),
+        code: r.discCode,
       });
     }
 
     for (const [_, entries] of Object.entries(shooterEntries)) {
-      if (entries.length < 2) continue;
+      if (entries.length < RANKING_MIN_SAMPLE) continue;
       const maxScore = entries[0].max;
-      const forma = computeFormaScore(entries, maxScore);
-      if (forma) {
+      const forma = computeFormaFromEntries(entries, { code: entries[0].code });
+      if (forma.forma !== null) {
         // Normalize score to percentage of max for fair club comparison
-        const pct = (forma.score / maxScore) * 100;
+        const pct = (forma.forma / maxScore) * 100;
         shooterFormScores.push(pct);
       }
     }
@@ -345,7 +379,7 @@ export default async function HomePage() {
       <Ticker liveItems={liveItems} upcomingItems={upcomingItems} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
       {/* Upcoming Events Carousel – full width */}
-      <UpcomingEvents competitions={upcomingComps} />
+      <UpcomingEvents competitions={translatedUpcoming} />
 
       {/* Main Dashboard Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -357,71 +391,77 @@ export default async function HomePage() {
           <section className="flex flex-col gap-4">
             <div className="flex items-baseline justify-between">
               <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-wider text-[var(--ink)]">
-                Nedavni Rezultati
+                {t("recentCompetitions")}
               </h2>
               <Link href="/takmicenja" className="text-xs font-semibold text-[var(--brand-primary)] hover:underline">
-                Sva takmičenja →
+                {t("allCompsLink")}
               </Link>
             </div>
 
             {compsWithWinners.length === 0 ? (
               <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-12 text-center">
-                <p className="text-sm text-[var(--muted)]">Nema skoro unetih rezultata.</p>
+                <p className="text-sm text-[var(--muted)]">{t("noRecentComps")}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {compsWithWinners.map((comp) => (
-                  <div
-                    key={comp.id}
-                    className="flex flex-col justify-between border border-[var(--border)] rounded-xl bg-[var(--bg)] overflow-hidden hover:shadow-md transition-shadow"
-                  >
-                    {/* Comp Header */}
-                    <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2 flex flex-col gap-0.5">
-                      <span className="text-[9px] font-bold text-[var(--muted)] uppercase tracking-wider">
-                        {comp.level}
-                      </span>
-                      <h4 className="font-semibold text-xs text-[var(--ink)] truncate" title={comp.name}>
-                        {comp.name}
-                      </h4>
-                    </div>
+                {compsWithWinners.map((comp) => {
+                  const compName = locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name);
+                  const levelKey = `levels.${comp.level.toLowerCase()}`;
+                  const levelLabel = tComp.has(levelKey) ? tComp(levelKey) : comp.level;
 
-                    {/* Comp Info */}
-                    <div className="p-4 flex flex-col gap-3">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-[var(--subtle)]">Lokacija:</span>
-                        <span className="font-medium text-[var(--ink)] truncate max-w-[120px]">{comp.location || "—"}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-[var(--subtle)]">Datum:</span>
-                        <span className="font-mono text-[var(--ink)]">{comp.date}</span>
-                      </div>
-
-                      {/* Top Result / Winner */}
-                      <div className="border-t border-[var(--border)] pt-2.5 mt-1 flex flex-col gap-1">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--subtle)]">
-                          Najbolji rezultat
+                  return (
+                    <div
+                      key={comp.id}
+                      className="flex flex-col justify-between border border-[var(--border)] rounded-xl bg-[var(--bg)] overflow-hidden hover:shadow-md transition-shadow"
+                    >
+                      {/* Comp Header */}
+                      <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2 flex flex-col gap-0.5">
+                        <span className="text-[9px] font-bold text-[var(--muted)] uppercase tracking-wider">
+                          {levelLabel}
                         </span>
-                        {comp.winner ? (
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex flex-col truncate">
-                              <span className="font-semibold text-[var(--ink)] truncate">
-                                {comp.winner.lastName} {comp.winner.firstName}
-                              </span>
-                              <span className="text-[10px] text-[var(--muted)] truncate">
-                                {comp.winner.clubName || "Bez kluba"}
+                        <h4 className="font-semibold text-xs text-[var(--ink)] truncate" title={compName}>
+                          {compName}
+                        </h4>
+                      </div>
+
+                      {/* Comp Info */}
+                      <div className="p-4 flex flex-col gap-3">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-[var(--subtle)]">{tComp("list.location")}:</span>
+                          <span className="font-medium text-[var(--ink)] truncate max-w-[120px]">{comp.location || "—"}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-[var(--subtle)]">{tComp("list.date")}:</span>
+                          <span className="font-mono text-[var(--ink)]">{comp.date.split("-").reverse().join(".")}</span>
+                        </div>
+
+                        {/* Top Result / Winner */}
+                        <div className="border-t border-[var(--border)] pt-2.5 mt-1 flex flex-col gap-1">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--subtle)]">
+                            {t("winner")}
+                          </span>
+                          {comp.winner ? (
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex flex-col truncate">
+                                <span className="font-semibold text-[var(--ink)] truncate">
+                                  {comp.winner.lastName} {comp.winner.firstName}
+                                </span>
+                                <span className="text-[10px] text-[var(--muted)] truncate">
+                                  {comp.winner.clubName || "Bez kluba"}
+                                </span>
+                              </div>
+                              <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--brand-primary)] bg-[var(--brand-primary-light)] px-1.5 py-0.5 rounded text-xs">
+                                {parseFloat(comp.winner.qualTotal!).toFixed(comp.winner.discCode.startsWith("AP") ? 0 : 1)}
                               </span>
                             </div>
-                            <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--brand-primary)] bg-[var(--brand-primary-light)] px-1.5 py-0.5 rounded text-xs">
-                              {parseFloat(comp.winner.qualTotal!).toFixed(comp.winner.discCode.startsWith("AP") ? 0 : 1)}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-[var(--muted)] font-normal italic">Nema unetih rezultata</span>
-                        )}
+                          ) : (
+                            <span className="text-xs text-[var(--muted)] font-normal italic">{tComp("detail.noResults")}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -436,19 +476,19 @@ export default async function HomePage() {
         <div className="flex flex-col gap-8">
 
           {/* Calendar Module – top of sidebar */}
-          <CalendarModule competitions={calendarComps} />
+          <CalendarModule competitions={translatedCalendar} />
 
           {/* Club Leaderboard */}
           <section className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
-            <div className="bg-[var(--brand-accent)] px-4 py-3 border-b border-[var(--border)]">
+            <div className="bg-[var(--brand-primary)] px-4 py-3 border-b border-[var(--border)]">
               <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-white uppercase tracking-wider">
-                Klupski Leaderboard
+                {t("clubLeaderboard")}
               </h3>
             </div>
 
             <div className="p-4 flex flex-col gap-3">
               {clubRankings.length === 0 ? (
-                <p className="text-xs text-[var(--muted)] text-center py-4">Nedovoljno podataka za rangiranje klubova.</p>
+                <p className="text-xs text-[var(--muted)] text-center py-4">{t("noClubData")}</p>
               ) : (
                 <div className="flex flex-col gap-2.5">
                   {clubRankings.map((c, i) => (
@@ -459,7 +499,7 @@ export default async function HomePage() {
                         </span>
                         <div className="flex flex-col">
                           <span className="font-semibold text-[var(--ink)]">{c.name}</span>
-                          <span className="text-[10px] text-[var(--muted)]">{c.city || "Srbija"}</span>
+                          <span className="text-[10px] text-[var(--muted)]">{c.city || tCommon("serbia")}</span>
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end">
@@ -467,7 +507,7 @@ export default async function HomePage() {
                           {c.avgPct.toFixed(1)}%
                         </span>
                         <span className="text-[9px] text-[var(--subtle)]">
-                          {c.activeShooters} {c.activeShooters === 1 ? "strelac" : "strelaca"}
+                          {t("activeShooters", { count: c.activeShooters })}
                         </span>
                       </div>
                     </div>

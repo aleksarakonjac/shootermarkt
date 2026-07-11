@@ -21,7 +21,7 @@ export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {
         </div>
         <div className="text-sm text-[var(--muted)]">
           {shooter.clubName ?? "Bez kluba"}
-          {shooter.forma ? ` · Forma: ${shooter.forma.score.toFixed(1)}` : ""}
+          {shooter.forma?.forma != null ? ` · Forma: ${shooter.forma.forma.toFixed(1)}` : ""}
         </div>
       </div>
     </Link>

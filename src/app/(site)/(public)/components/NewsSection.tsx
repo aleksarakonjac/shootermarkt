@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { getPublishedArticles } from "@/lib/cms/get-articles";
+import { getLocale, getTranslations } from "next-intl/server";
 
 const ACCENTS = [
   "var(--brand-primary)",
-  "var(--brand-accent)",
-  "var(--success)",
   "var(--warning)",
+  "var(--success)",
+  "var(--brand-primary)",
 ];
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("sr-RS", {
+function formatDate(iso: string, locale: string) {
+  const localeStr = locale === "en" ? "en-US" : "sr-RS";
+  return new Date(iso).toLocaleDateString(localeStr, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -17,6 +19,9 @@ function formatDate(iso: string) {
 }
 
 export async function NewsSection() {
+  const locale = await getLocale();
+  const t = await getTranslations("news");
+  const tHome = await getTranslations("home");
   const articles = await getPublishedArticles().catch(() => []);
 
   return (
@@ -24,21 +29,21 @@ export async function NewsSection() {
       {/* Section header */}
       <div className="flex items-baseline justify-between">
         <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-wider text-[var(--ink)]">
-          Vesti &amp; Analize
+          {t("title")}
         </h2>
         {articles.length > 0 && (
           <Link
             href="/vesti"
             className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"
           >
-            Sve vesti →
+            {tHome("allNewsLink")}
           </Link>
         )}
       </div>
 
       {articles.length === 0 ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center text-sm text-[var(--muted)]">
-          Uskoro — prve vesti i analize
+          {tHome("noArticles")}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -72,7 +77,7 @@ export async function NewsSection() {
                     className="self-start text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full text-white"
                     style={{ background: accent }}
                   >
-                    Vest
+                    {tHome("newsBadge")}
                   </span>
                   <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl text-[var(--ink)] leading-snug group-hover:text-[var(--brand-primary)] transition-colors">
                     {featured.title}
@@ -82,7 +87,7 @@ export async function NewsSection() {
                   </p>
                   {featured.publishedAt && (
                     <div className="mt-2 text-[10px] text-[var(--subtle)]">
-                      {formatDate(featured.publishedAt)}
+                      {formatDate(featured.publishedAt, locale)}
                     </div>
                   )}
                 </div>
@@ -109,7 +114,7 @@ export async function NewsSection() {
                       className="self-start text-[8px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded-full text-white"
                       style={{ background: accent }}
                     >
-                      Vest
+                      {tHome("newsBadge")}
                     </span>
                     <h4 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-sm text-[var(--ink)] leading-snug group-hover:text-[var(--brand-primary)] transition-colors line-clamp-2">
                       {item.title}
@@ -117,7 +122,7 @@ export async function NewsSection() {
                   </div>
                   {item.publishedAt && (
                     <div className="mt-2 text-[9px] text-[var(--subtle)]">
-                      {formatDate(item.publishedAt)}
+                      {formatDate(item.publishedAt, locale)}
                     </div>
                   )}
                 </Link>

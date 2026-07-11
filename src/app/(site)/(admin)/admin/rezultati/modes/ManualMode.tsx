@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useCallback, useState } from "react";
-import type { ReviewRow, CompetitionLevel, DisciplineCode } from "@/lib/pdf-import/types";
+import type { ReviewRow, DisciplineCode } from "@/lib/pdf-import/types";
+import { CompetitionSearchSelect, type CompetitionOption } from "@/components/ui/CompetitionSearchSelect";
 import { DonePanel } from "../_shared/DonePanel";
-import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { NocCellSelect } from "@/components/ui/NocCellSelect";
 import { CustomCheckbox } from "@/components/ui/CustomCheckbox";
 import { LEVEL_LABEL, LEVEL_STYLE } from "@/lib/competition-utils";
@@ -41,14 +41,6 @@ const DISC_LABEL: Record<DisciplineCode, string> = {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface Competition {
-  id: number;
-  name: string;
-  date: string;
-  location: string | null;
-  level: CompetitionLevel;
-}
-
 interface CommitResult {
   inserted: number;
   skipped: number;
@@ -68,6 +60,7 @@ function makeRow(disc: DisciplineCode = "ARM", prevNoc = "SRB"): ReviewRow {
     lastName: "",
     teamNoc: prevNoc,
     disciplineCode: disc,
+    category: "senior",
     qualTotal: 0,
     qualSeries: makeSeries(disc),
     qualRank: undefined,
@@ -133,26 +126,15 @@ export function ManualMode() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<CommitResult | null>(null);
 
-  const [competitions, setCompetitions] = useState<Competition[]>([]);
-  const [compsLoading, setCompsLoading] = useState(true);
   const [discipline, setDiscipline] = useState<DisciplineCode>("ARM");
   const [isFinals, setIsFinals] = useState(false);
-  const [selectedComp, setSelectedComp] = useState<Competition | null>(null);
+  const [selectedComp, setSelectedComp] = useState<CompetitionOption | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([makeRow("ARM")]);
 
   const isMultiSeries = MULTI_SERIES.has(discipline);
   const isThreePos = THREE_POS.has(discipline);
   const isSportPistol = discipline === "SPW";
   const constraints = getConstraints(discipline, isFinals);
-
-  // Fetch competitions on mount
-  useEffect(() => {
-    fetch("/api/admin/competitions")
-      .then((r) => r.json())
-      .then((data) => setCompetitions(Array.isArray(data) ? data : []))
-      .catch(() => setCompetitions([]))
-      .finally(() => setCompsLoading(false));
-  }, []);
 
   // When discipline changes: update series arrays on all rows
   useEffect(() => {
@@ -293,12 +275,6 @@ export function ManualMode() {
   }
 
   const activeCount = rows.filter((r) => !r.skip && r.firstName && r.lastName).length;
-  const compOptions = competitions.map((c) => ({
-    value: String(c.id),
-    label: c.name,
-    sublabel: c.date,
-  }));
-
   return (
     <div className="space-y-5">
 
@@ -345,17 +321,7 @@ export function ManualMode() {
               </span>
             </div>
           ) : (
-            <SearchDropdown
-              value=""
-              onChange={(id) =>
-                setSelectedComp(competitions.find((c) => String(c.id) === id) ?? null)
-              }
-              options={compOptions}
-              placeholder={compsLoading ? "Učitavam…" : "Pretraži takmičenje…"}
-              emptyLabel="— izaberi —"
-              searchPlaceholder="Pretraži naziv…"
-              disabled={compsLoading}
-            />
+            <CompetitionSearchSelect value={null} onChange={setSelectedComp} placeholder="Pretraži takmičenje…" />
           )}
         </div>
 

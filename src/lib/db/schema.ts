@@ -13,8 +13,15 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -25,8 +32,8 @@ export const disciplineCodeEnum = pgEnum("discipline_code", [
   "APM",  // Air Pistol Men
   "APW",  // Air Pistol Women
   // 50m Rifle (MK Puška)
-  "RFM",  // Rifle 3-Position Men (3x40 Senior)
-  "RFW",  // Rifle 3-Position Women (3x40 Senior)
+  "R3PM", // Rifle 3-Position Men (3x40 Senior)
+  "R3PW", // Rifle 3-Position Women (3x40 Senior)
   "R3JM", // Rifle 3-Position Junior Men (3x20)
   "R3JW", // Rifle 3-Position Junior Women (3x20)
   // Pistol
@@ -445,6 +452,9 @@ export const results = pgTable(
     clubId: integer("club_id").references(() => clubs.id),
     countryId: integer("country_id").references(() => countries.id),
 
+    // Uzrasna kategorija pod kojom je rezultat postignut (iz biltena)
+    category: ageCategoryEnum("category").notNull().default("senior"),
+
     // Qualification
     qualTotal: decimal("qual_total", { precision: 6, scale: 1 }),
     qualInners: integer("qual_inners"),
@@ -467,11 +477,37 @@ export const results = pgTable(
     index("results_shooter_id_idx").on(t.shooterId),
     index("results_competition_id_idx").on(t.competitionId),
     index("results_discipline_id_idx").on(t.disciplineId),
-    uniqueIndex("results_shooter_comp_disc_unique").on(
+    // Dozvoljava dva odvojena meča iste discipline (junior + senior) na istom
+    // takmičenju kad su različiti rezultati; isti rezultat se dedup-uje pre unosa.
+    uniqueIndex("results_shooter_comp_disc_cat_unique").on(
       t.shooterId,
       t.competitionId,
-      t.disciplineId
+      t.disciplineId,
+      t.category
     ),
+  ]
+);
+
+// ── PDF Import Jobs ──────────────────────────────────────────────────────────
+
+export const pdfImportJobs = pgTable(
+  "pdf_import_jobs",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull().references(() => competitions.id),
+    status: varchar("status", { length: 20 }).notNull().default("queued"),
+    pdfData: bytea("pdf_data").notNull(),
+    result: jsonb("result").$type<unknown>(),
+    error: text("error"),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("pdf_import_jobs_status_idx").on(t.status),
+    index("pdf_import_jobs_competition_idx").on(t.competitionId),
   ]
 );
 
@@ -485,6 +521,7 @@ export const competitionSchedule = pgTable(
     competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
     disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
     stage: varchar("stage", { length: 30 }).notNull(), // 'qual'|'qual_rapid'|'qual_precision'|'elimination'|'final'
+    category: ageCategoryEnum("category").notNull().default("senior"),
     startTime: timestamp("start_time").notNull(),
     endTime: timestamp("end_time"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

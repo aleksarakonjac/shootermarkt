@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { SearchDropdown } from "@/components/ui/SearchDropdown";
-import { DatePicker } from "@/components/ui/DatePicker";
-import { LevelDropdown } from "@/components/ui/LevelDropdown";
+import { useEffect, useState, useRef } from "react";
 
-import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
+import type { ReviewRow, CommitPayload } from "@/lib/pdf-import/types";
+import { CompetitionSearchSelect } from "@/components/ui/CompetitionSearchSelect";
 import { ReviewTable } from "../_shared/ReviewTable";
+import { NewShootersPanel } from "../_shared/NewShootersPanel";
 import { DonePanel } from "../_shared/DonePanel";
 
 type Step = "upload" | "review" | "done";
@@ -14,6 +13,7 @@ type Step = "upload" | "review" | "done";
 
 interface ParseInfo { eventsCount: number; skippedDisciplines: string[] }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
+interface PdfImportJob { id: number; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[] } | null; error: string | null }
 
 export function PdfMode() {
   const [step, setStep] = useState<Step>("upload");
@@ -22,49 +22,85 @@ export function PdfMode() {
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [compName, setCompName] = useState("");
-  const [compDateFrom, setCompDateFrom] = useState("");
-  const [compDateTo, setCompDateTo] = useState("");
-  const [compLocation, setCompLocation] = useState("");
-  // Remove old compDate state usage; compDate will be derived later
-  // const [compDate, setCompDate] = useState("");
-  const [compLevel, setCompLevel] = useState<CompetitionLevel>("national");
+  const [selectedCompId, setSelectedCompId] = useState<number | null>(null);
+  const [selectedCompName, setSelectedCompName] = useState("");
+  const [failedJobId, setFailedJobId] = useState<number | null>(null);
+  const [jobId, setJobId] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const savedJobId = Number(localStorage.getItem("pdfImportJobId"));
+    return Number.isInteger(savedJobId) && savedJobId > 0 ? savedJobId : null;
+  });
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [parseInfo, setParseInfo] = useState<ParseInfo | null>(null);
   const [nocFilter, setNocFilter] = useState("");
   const [result, setResult] = useState<CommitResult | null>(null);
 
+  useEffect(() => {
+    if (!jobId) return;
+    const poll = async () => {
+      const response = await fetch(`/api/admin/import/jobs/${jobId}`);
+      const job = await response.json() as PdfImportJob;
+      if (!response.ok) throw new Error(job.error ?? "Job nije pronađen");
+      if (job.status === "completed" && job.result) {
+        setRows(job.result.rows);
+        setParseInfo({ eventsCount: job.result.eventsCount, skippedDisciplines: job.result.skippedDisciplines });
+        localStorage.removeItem("pdfImportJobId");
+        setJobId(null);
+        setStep("review");
+      } else if (job.status === "failed") {
+        setError(job.error ?? "Parsiranje nije uspelo");
+        setFailedJobId(job.id);
+        localStorage.removeItem("pdfImportJobId");
+        setJobId(null);
+      }
+    };
+    void poll().catch((pollError) => setError(String(pollError)));
+    const interval = window.setInterval(() => void poll().catch((pollError) => setError(String(pollError))), 2500);
+    return () => window.clearInterval(interval);
+  }, [jobId]);
+
   async function handleParse() {
     const file = fileRef.current?.files?.[0];
     if (!file) { setError("Izaberi PDF fajl"); return; }
-    if (!compName || !compDateFrom || !compDateTo) { setError("Naziv i datum su obavezni"); return; }
+    if (!selectedCompId) { setError("Izaberi takmičenje iz baze"); return; }
     setLoading(true); setError(null);
     try {
       const fd = new FormData();
       fd.append("pdf", file);
-      const res = await fetch("/api/admin/import/parse", { method: "POST", body: fd });
+      fd.append("competitionId", String(selectedCompId));
+      const res = await fetch("/api/admin/import/jobs", { method: "POST", body: fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Parse error");
-      setRows(data.rows);
-      setParseInfo({ eventsCount: data.eventsCount, skippedDisciplines: data.skippedDisciplines });
-      setStep("review");
+      if (!res.ok) throw new Error(data.error ?? "Pokretanje parsiranja nije uspelo");
+      localStorage.setItem("pdfImportJobId", String(data.id));
+      setJobId(data.id);
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }
 
-  async function handleCommit() {
+  async function handleRetry() {
+    if (!failedJobId) return;
     setLoading(true);
     setError(null);
-    const payload: CommitPayload = {
-      competition: {
-        name: compName,
-        date: compDate,
-        location: compLocation || undefined,
-        level: compLevel,
-      },
-      rows,
-    };
+    try {
+      const response = await fetch(`/api/admin/import/jobs/${failedJobId}/retry`, { method: "POST" });
+      const job = await response.json() as { id?: number; error?: string };
+      if (!response.ok || !job.id) throw new Error(job.error ?? "Ponovno pokretanje nije uspelo");
+      localStorage.setItem("pdfImportJobId", String(job.id));
+      setFailedJobId(null);
+      setJobId(job.id);
+    } catch (retryError) {
+      setError(String(retryError));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCommit() {
+    if (!selectedCompId) { setError("Izaberi takmičenje iz baze"); return; }
+    setLoading(true);
+    setError(null);
+    const payload: CommitPayload = { competitionId: selectedCompId, rows };
     try {
       const res = await fetch("/api/admin/import/commit", {
         method: "POST",
@@ -94,6 +130,11 @@ export function PdfMode() {
     setError(null);
     setNocFilter("");
     setSelectedFile(null);
+    setSelectedCompId(null);
+    setSelectedCompName("");
+    setFailedJobId(null);
+    setJobId(null);
+    localStorage.removeItem("pdfImportJobId");
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -106,53 +147,36 @@ export function PdfMode() {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{error}</span>
+          {failedJobId && (
+            <button onClick={handleRetry} disabled={loading} className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold hover:bg-red-100 disabled:opacity-50">
+              {loading ? "Pokrećem..." : "Pokušaj ponovo"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {jobId && (
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)]">
+          PDF se obrađuje na serveru. Možeš slobodno da osvežiš stranicu ili pređeš na drugu stranu.
         </div>
       )}
 
       {step === "upload" && (
         <>
-          {/* Competition metadata */}
+          {/* Competition picker */}
         <div className="space-y-6">
-          <div className="rounded-xl border border-[var(--border)] p-6 space-y-4">
-            <h2 className="font-semibold text-[var(--ink)]">Podaci o takmičenju</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Naziv *</label>
-                <input
-                  value={compName}
-                  onChange={(e) => setCompName(e.target.value)}
-                  placeholder="npr. Državno prvenstvo Srbije 2025"
-                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]"
-                />
-              </div>
-              <div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum od *</label>
-                  <DatePicker value={compDateFrom} onChange={setCompDateFrom} required />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum do *</label>
-                  <DatePicker value={compDateTo} onChange={setCompDateTo} required />
-                </div>
-              </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo</label>
-                <LevelDropdown value={compLevel} onChange={setCompLevel} />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija</label>
-                <input
-                  value={compLocation}
-                  onChange={(e) => setCompLocation(e.target.value)}
-                  placeholder="npr. Beograd, SC Crvena zvezda"
-                  className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-                />
-              </div>
-            </div>
+          <div className="rounded-xl border border-[var(--border)] p-6 space-y-3">
+            <h2 className="font-semibold text-[var(--ink)]">Takmičenje</h2>
+            <CompetitionSearchSelect
+              value={selectedCompId}
+              onChange={(competition) => { setSelectedCompId(competition.id); setSelectedCompName(competition.nameSr || competition.name); }}
+            />
+            <p className="text-xs text-[var(--muted)]">
+              Rezultati iz PDF-a vezuju se za izabrano takmičenje. Ako ga nema, prvo ga
+              kreiraj u <a href="/admin/takmicenja" className="text-[var(--brand-primary)] hover:underline">Takmičenja</a>.
+            </p>
           </div>
 
           {/* File upload */}
@@ -186,10 +210,10 @@ export function PdfMode() {
 
           <button
             onClick={handleParse}
-            disabled={loading}
+            disabled={loading || !!jobId || !selectedCompId || !selectedFile}
             className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
           >
-            {loading ? "Parsiranje (Gemini)…" : "Parsiraj sa Gemini →"}
+            {loading ? "Šaljem PDF…" : jobId ? "Parsiranje u toku…" : "Parsiraj sa Gemini →"}
           </button>
         </div>
         </>
@@ -216,6 +240,15 @@ export function PdfMode() {
               ← Nazad
             </button>
           </div>
+
+          {selectedCompName && (
+            <div className="rounded-lg bg-[var(--surface)] border border-[var(--border)] px-4 py-2.5 text-sm">
+              <span className="text-[var(--muted)]">Takmičenje: </span>
+              <span className="font-semibold text-[var(--ink)]">{selectedCompName}</span>
+            </div>
+          )}
+
+          <NewShootersPanel rows={rows} onRowChange={updateRow} />
 
           <ReviewTable
             rows={rows}

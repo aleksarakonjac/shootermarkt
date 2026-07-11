@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Pagination } from "../components/Pagination";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
+import { getAvatarThumbnailUrl } from "@/lib/avatars/avatar-url";
 
 export interface ShooterRow {
   id: number;
@@ -18,6 +20,7 @@ export interface ShooterRow {
   clubName: string | null;
   birthDate: string | null;
   birthYear: number | null;
+  avatarUrl: string | null;
   apparatus: string | null;
   gender: string | null;
 }
@@ -44,6 +47,38 @@ function fmtDate(iso: string): string {
 
 type SortCol = "name" | "country" | "gender" | "birthDate" | "apparatus";
 
+function SortIcon({ col, sortCol, sortDir }: { col: SortCol; sortCol: SortCol; sortDir: string }) {
+  if (sortCol !== col) return <span className="ml-1 opacity-30">↕</span>;
+  return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
+}
+
+function ShooterThumbnail({ shooter }: { shooter: ShooterRow }) {
+  const initials = `${shooter.firstName[0] ?? "?"}${shooter.lastName[0] ?? "?"}`.toUpperCase();
+
+  if (shooter.avatarUrl) {
+    return (
+      <Image
+        src={getAvatarThumbnailUrl(shooter.avatarUrl, 80)}
+        alt=""
+        width={40}
+        height={40}
+        loading="lazy"
+        unoptimized
+        className="size-10 shrink-0 rounded-full object-cover bg-[var(--surface-2)]"
+      />
+    );
+  }
+
+  return (
+    <span
+      aria-hidden="true"
+      className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-xs font-bold text-[var(--muted)]"
+    >
+      {initials}
+    </span>
+  );
+}
+
 export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRow[]; page: number; total: number; pageSize: number }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -65,16 +100,8 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
     router.push(`${pathname}?${next.toString()}`);
   }
 
-  function SortIcon({ col }: { col: SortCol }) {
-    if (sortCol !== col) return <span className="ml-1 opacity-30">↕</span>;
-    return <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>;
-  }
   const [verifying, startVerifying] = useTransition();
   const [flash, setFlash] = useState<string | null>(null);
-  const [showCleanup, setShowCleanup] = useState(false);
-  const [cleanupNats, setCleanupNats] = useState("YUG");
-  const [cleaning, startCleaning] = useTransition();
-
   const [verifyingAll, startVerifyingAll] = useTransition();
 
   const unverified = data.filter((s) => !s.verified);
@@ -102,7 +129,8 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
   function toggle(id: number) {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -224,21 +252,22 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
                     />
                   )}
                 </th>
+                <th className="w-14 px-2 py-3" scope="col" aria-label="Profilna slika" />
                 <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("name")}>
-                  Strelac<SortIcon col="name" />
+                  Strelac<SortIcon col="name" sortCol={sortCol} sortDir={sortDir} />
                 </th>
                 <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("country")}>
-                  Zemlja<SortIcon col="country" />
+                  Zemlja<SortIcon col="country" sortCol={sortCol} sortDir={sortDir} />
                 </th>
                 <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
                 <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("gender")}>
-                  Pol<SortIcon col="gender" />
+                  Pol<SortIcon col="gender" sortCol={sortCol} sortDir={sortDir} />
                 </th>
                 <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("birthDate")}>
-                  Datum rođ.<SortIcon col="birthDate" />
+                  Datum rođ.<SortIcon col="birthDate" sortCol={sortCol} sortDir={sortDir} />
                 </th>
                 <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("apparatus")}>
-                  Disciplina<SortIcon col="apparatus" />
+                  Disciplina<SortIcon col="apparatus" sortCol={sortCol} sortDir={sortDir} />
                 </th>
                 <th className="px-4 py-3" />
               </tr>
@@ -259,6 +288,9 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
                         className="accent-[var(--brand-primary)] cursor-pointer"
                       />
                     )}
+                  </td>
+                  <td className="px-2 py-2">
+                    <ShooterThumbnail shooter={s} />
                   </td>
                   <td className="px-4 py-3 font-medium text-[var(--ink)]">
                     <a href={`/admin/strelci/${s.id}`} className="hover:text-[var(--brand-primary)] transition-colors">

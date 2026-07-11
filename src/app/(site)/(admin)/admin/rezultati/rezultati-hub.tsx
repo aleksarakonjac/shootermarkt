@@ -6,8 +6,9 @@ import { PdfMode }    from "./modes/PdfMode";
 import { SssMode }    from "./modes/SssMode";
 import { IssfMode }   from "./modes/IssfMode";
 import { SiusMode }   from "./modes/SiusMode";
+import { ExcelMode }  from "./modes/ExcelMode";
 
-type Mode = "manual" | "pdf" | "sss" | "issf" | "sius";
+type Mode = "manual" | "excel" | "pdf" | "sss" | "issf" | "sius";
 
 interface ModeConfig {
   id: Mode;
@@ -17,6 +18,17 @@ interface ModeConfig {
 }
 
 const MODES: ModeConfig[] = [
+  {
+    id: "excel",
+    label: "Excel",
+    description: "Šablon, validacija i pregled pre unosa",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <rect x="3" y="2" width="12" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M6 6h6M6 9h6M6 12h6M9 4v10" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
   {
     id: "manual",
     label: "Ručni unos",
@@ -82,7 +94,7 @@ export function RezultatiHub() {
   return (
     <div className="space-y-6">
       {/* Mode picker */}
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {MODES.map((m) => {
           const active = m.id === mode;
           return (
@@ -114,6 +126,7 @@ export function RezultatiHub() {
 
       {/* Mode content */}
       {mode === "manual" && <ManualMode />}
+      {mode === "excel"  && <ExcelMode />}
       {mode === "pdf"    && <PdfMode />}
       {mode === "sss"    && <SssMode />}
       {mode === "issf"   && <IssfMode />}

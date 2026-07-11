@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { shooters, clubs, competitions, results, disciplines } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
-import type { CommitPayload } from "@/lib/pdf-import/types";
+import { eq, and, sql } from "drizzle-orm";
+import { DISCIPLINE_META, type CommitPayload } from "@/lib/pdf-import/types";
+import { matchShooter } from "@/lib/name-match";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -18,30 +19,43 @@ export async function POST(req: NextRequest) {
 
   const payload = (await req.json()) as CommitPayload;
   const { competition: comp, rows } = payload;
+  const competitionTags = payload.tags ?? comp?.tags ?? [];
 
   // 1. Resolve competition
   let competitionId: number;
   if (payload.competitionId) {
     competitionId = payload.competitionId;
+    if (competitionTags.length) {
+      await db.update(competitions).set({
+        tags: sql`array(SELECT DISTINCT unnest(array_cat(${competitions.tags}, ${competitionTags}::varchar[])))`,
+      }).where(eq(competitions.id, competitionId));
+    }
   } else {
-    if (!comp.name || !comp.date || !comp.level) {
-      return NextResponse.json({ error: "Competition fields required" }, { status: 400 });
+    if (!comp || !comp.name || !comp.date || !comp.level) {
+      return NextResponse.json({ error: "Izaberi takmičenje ili popuni podatke" }, { status: 400 });
     }
     const existingComp = await db.query.competitions.findFirst({
       where: and(eq(competitions.name, comp.name), eq(competitions.date, comp.date)),
     });
     if (existingComp) {
       competitionId = existingComp.id;
+      if (competitionTags.length) {
+        await db.update(competitions).set({
+          tags: sql`array(SELECT DISTINCT unnest(array_cat(${competitions.tags}, ${competitionTags}::varchar[])))`,
+        }).where(eq(competitions.id, competitionId));
+      }
     } else {
       const [ins] = await db
         .insert(competitions)
         .values({
           name: comp.name,
           date: comp.date,
+          dateEnd: comp.dateEnd ?? null,
           location: comp.location,
           level: comp.level,
           eventType: comp.eventType ?? "other",
           organizer: comp.organizer ?? null,
+          tags: competitionTags,
         })
         .returning({ id: competitions.id });
       competitionId = ins.id;
@@ -51,6 +65,15 @@ export async function POST(req: NextRequest) {
   // 2. Disciplines map
   const disciplineRows = await db.select().from(disciplines);
   const disciplineMap = Object.fromEntries(disciplineRows.map((d) => [d.code, d.id]));
+
+  // Preload strelci za fold-matching (đ/dj/d + akcenti) u fallback-u
+  const allShooters = await db
+    .select({
+      id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName,
+      nationality: shooters.nationality, clubId: shooters.clubId,
+      birthYear: shooters.birthYear, apparatus: shooters.apparatus,
+    })
+    .from(shooters);
 
   let inserted = 0;
   let skipped = 0;
@@ -83,35 +106,49 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 4. Upsert shooter — match by name + nationality
+      // 4. Upsert shooter — fold-matching (rešava đ/dj/d) u fallback-u
       let shooterId = row.shooterId;
       if (!shooterId) {
-        const existing = await db.query.shooters.findFirst({
-          where: and(
-            eq(shooters.firstName, row.firstName),
-            eq(shooters.lastName, row.lastName),
-            ...(row.teamNoc ? [eq(shooters.nationality, row.teamNoc)] : [])
-          ),
-        });
+        const m = matchShooter(row.firstName, row.lastName, row.teamNoc || null, allShooters);
+        const existing = m.kind === "exact" ? allShooters.find((s) => s.id === m.id) : undefined;
         if (existing) {
           shooterId = existing.id;
-          // Update clubId if not set and we now have one
-          if (!existing.clubId && clubId) {
-            await db.update(shooters).set({ clubId }).where(eq(shooters.id, existing.id));
+          // Backfill: klub, godište, apparatus ako fale a bilten ih ima
+          const patch: Partial<typeof shooters.$inferInsert> = {};
+          if (!existing.clubId && clubId) patch.clubId = clubId;
+          if (!existing.birthYear && row.birthYear) patch.birthYear = row.birthYear;
+          if (!existing.apparatus && (row.apparatus ?? DISCIPLINE_META[row.disciplineCode]?.apparatus)) {
+            patch.apparatus = row.apparatus ?? DISCIPLINE_META[row.disciplineCode].apparatus;
+          }
+          if (Object.keys(patch).length > 0) {
+            await db.update(shooters).set(patch).where(eq(shooters.id, existing.id));
           }
         } else {
+          // Novi strelac iz biltena — apparatus/gender iz discipline (bez apparatus
+          // strelac bi bio nevidljiv u /strelci zbog MVP filtera), godište iz biltena.
+          const meta = DISCIPLINE_META[row.disciplineCode];
           const [newShooter] = await db
             .insert(shooters)
             .values({
               firstName: row.firstName,
               lastName: row.lastName,
               nationality: row.teamNoc || null,
+              birthYear: row.birthYear ?? null,
+              gender: row.gender ?? meta?.gender ?? null,
+              apparatus: row.apparatus ?? meta?.apparatus ?? null,
               clubId: clubId ?? null,
               createdBySelf: false,
               verified: false,
             })
             .returning({ id: shooters.id });
           shooterId = newShooter.id;
+          // Dodaj u fold-index da drugi red istog strelca (druga disciplina) ne pravi duplikat
+          allShooters.push({
+            id: newShooter.id, firstName: row.firstName, lastName: row.lastName,
+            nationality: row.teamNoc || null, clubId: clubId ?? null,
+            birthYear: row.birthYear ?? null,
+            apparatus: row.apparatus ?? meta?.apparatus ?? null,
+          });
         }
       }
 
@@ -128,6 +165,7 @@ export async function POST(req: NextRequest) {
           shooterId,
           competitionId,
           disciplineId,
+          category: (row.category ?? "senior") as typeof results.$inferInsert.category,
           clubId: clubId ?? null,
           qualTotal: row.qualTotal.toString(),
           qualInners: row.qualInners ?? null,
@@ -136,7 +174,7 @@ export async function POST(req: NextRequest) {
           qualified: row.qualified ?? null,
           finalTotal: row.finalTotal?.toString() ?? null,
           finalRank: row.finalRank ?? null,
-          source: "pdf_import",
+          source: payload.source ?? "pdf_import",
         })
         .onConflictDoNothing();
 

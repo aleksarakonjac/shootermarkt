@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 
@@ -17,6 +17,14 @@ interface CommitResult {
   skipped: number;
   errors: string[];
   competitionId: number;
+}
+
+interface PdfImportJob {
+  id: number;
+  competitionId: number;
+  status: "queued" | "processing" | "completed" | "failed";
+  result: ParseResponse | null;
+  error: string | null;
 }
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
@@ -44,8 +52,40 @@ export function ImportClient() {
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [parseInfo, setParseInfo] = useState<Omit<ParseResponse, "rows"> | null>(null);
   const [nocFilter, setNocFilter] = useState<string>("");
+  const [jobId, setJobId] = useState<number | null>(null);
+  const [failedJobId, setFailedJobId] = useState<number | null>(null);
+  const [competitionId, setCompetitionId] = useState<number | null>(null);
 
   const [result, setResult] = useState<CommitResult | null>(null);
+
+  useEffect(() => {
+    if (!jobId) return;
+
+    const poll = async () => {
+      const res = await fetch(`/api/admin/import/jobs/${jobId}`);
+      const job = (await res.json()) as PdfImportJob;
+      if (!res.ok) throw new Error(job.error ?? "Job nije pronađen");
+
+      if (job.status === "completed" && job.result) {
+        setRows(job.result.rows);
+        setParseInfo({
+          eventsCount: job.result.eventsCount,
+          skippedDisciplines: job.result.skippedDisciplines,
+        });
+        setCompetitionId(job.competitionId);
+        setJobId(null);
+        setStep("review");
+      } else if (job.status === "failed") {
+        setError(job.error ?? "Parsiranje nije uspelo");
+        setFailedJobId(job.id);
+        setJobId(null);
+      }
+    };
+
+    void poll().catch((pollError) => setError(String(pollError)));
+    const interval = window.setInterval(() => void poll().catch((pollError) => setError(String(pollError))), 2500);
+    return () => window.clearInterval(interval);
+  }, [jobId]);
 
   async function handleParse() {
     const file = fileRef.current?.files?.[0];
@@ -57,14 +97,35 @@ export function ImportClient() {
     try {
       const fd = new FormData();
       fd.append("pdf", file);
-      const res = await fetch("/api/admin/import/parse", { method: "POST", body: fd });
-      const data = (await res.json()) as ParseResponse;
-      if (!res.ok) throw new Error((data as { error?: string }).error ?? "Parse error");
-      setRows(data.rows);
-      setParseInfo({ eventsCount: data.eventsCount, skippedDisciplines: data.skippedDisciplines });
-      setStep("review");
+      fd.append("competitionName", compName);
+      fd.append("competitionDate", compDate);
+      fd.append("competitionLocation", compLocation);
+      fd.append("competitionLevel", compLevel);
+      fd.append("competitionEventType", "other");
+      const res = await fetch("/api/admin/import/jobs", { method: "POST", body: fd });
+      const data = (await res.json()) as { id?: number; competitionId?: number; error?: string };
+      if (!res.ok || !data.id) throw new Error(data.error ?? "Pokretanje parsiranja nije uspelo");
+      setCompetitionId(data.competitionId ?? null);
+      setJobId(data.id);
     } catch (e) {
       setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRetry() {
+    if (!failedJobId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/admin/import/jobs/${failedJobId}/retry`, { method: "POST" });
+      const job = await response.json() as { id?: number; error?: string };
+      if (!response.ok || !job.id) throw new Error(job.error ?? "Ponovno pokretanje nije uspelo");
+      setFailedJobId(null);
+      setJobId(job.id);
+    } catch (retryError) {
+      setError(String(retryError));
     } finally {
       setLoading(false);
     }
@@ -74,7 +135,8 @@ export function ImportClient() {
     setLoading(true);
     setError(null);
     const payload: CommitPayload = {
-      competition: { name: compName, date: compDate, location: compLocation || undefined, level: compLevel },
+      competitionId: competitionId ?? undefined,
+      competition: competitionId ? undefined : { name: compName, date: compDate, location: compLocation || undefined, level: compLevel },
       rows,
     };
     try {
@@ -109,6 +171,9 @@ export function ImportClient() {
     setResult(null);
     setError(null);
     setNocFilter("");
+    setJobId(null);
+    setFailedJobId(null);
+    setCompetitionId(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -132,8 +197,19 @@ export function ImportClient() {
       </div>
 
       {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{error}</span>
+          {failedJobId && (
+            <button onClick={handleRetry} disabled={loading} className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold hover:bg-red-100 disabled:opacity-50">
+              {loading ? "Pokrećem..." : "Pokušaj ponovo"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {jobId && (
+        <div className="mb-6 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)]">
+          PDF se obrađuje na serveru. Pregled će se otvoriti čim parsiranje završi.
         </div>
       )}
 
@@ -195,10 +271,10 @@ export function ImportClient() {
 
           <button
             onClick={handleParse}
-            disabled={loading}
+            disabled={loading || !!jobId}
             className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
           >
-            {loading ? "Parsiranje..." : "Parsiraj sa Gemini →"}
+            {loading ? "Šaljem PDF..." : jobId ? "Parsiranje u toku..." : "Parsiraj sa Gemini →"}
           </button>
         </div>
       )}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
+import { getSssCompetitionTags, SSS_TAG_STYLE, type SssCompetitionTag } from "@/lib/sss/competition-tags";
 
 type Step = "select" | "review" | "done";
 
@@ -11,6 +12,7 @@ interface SssBilten {
   filename: string;
   year: number;
   is10m: boolean;
+  tags: SssCompetitionTag[];
   isExternal: boolean;
 }
 
@@ -39,7 +41,6 @@ export function SssImportClient() {
 
   const [bilteni, setBilteni] = useState<SssBilten[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [filter10m, setFilter10m] = useState(true);
   const [filterExternal, setFilterExternal] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedBilten, setSelectedBilten] = useState<SssBilten | null>(null);
@@ -109,6 +110,7 @@ export function SssImportClient() {
         date: compDate || new Date().toISOString().split("T")[0],
         location: compLocation,
         level: compLevel,
+        tags: ["sss", ...getSssCompetitionTags(compName || selectedBilten?.filename || "")],
       },
       rows,
     };
@@ -147,7 +149,6 @@ export function SssImportClient() {
   }
 
   const visible = bilteni.filter((b) => {
-    if (filter10m && !b.is10m) return false;
     if (!filterExternal && b.isExternal) return false;
     if (search && !b.filename.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -220,15 +221,6 @@ export function SssImportClient() {
                 <label className="flex items-center gap-2 text-sm text-[var(--muted)] cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={filter10m}
-                    onChange={(e) => setFilter10m(e.target.checked)}
-                    className="accent-[var(--brand-primary)]"
-                  />
-                  Samo 10m
-                </label>
-                <label className="flex items-center gap-2 text-sm text-[var(--muted)] cursor-pointer">
-                  <input
-                    type="checkbox"
                     checked={filterExternal}
                     onChange={(e) => setFilterExternal(e.target.checked)}
                     className="accent-[var(--brand-primary)]"
@@ -263,11 +255,11 @@ export function SssImportClient() {
                                   ext
                                 </span>
                               )}
-                              {b.is10m && (
-                                <span className="text-[0.65rem] px-1.5 py-0.5 rounded font-semibold" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)", border: "1px solid var(--border)" }}>
-                                  10m
+                              {b.tags.map((tag) => (
+                                <span key={tag} className="text-[0.65rem] px-1.5 py-0.5 rounded font-semibold" style={{ ...SSS_TAG_STYLE[tag], border: "1px solid var(--border)" }}>
+                                  {tag}
                                 </span>
-                              )}
+                              ))}
                             </div>
                           </button>
                         );

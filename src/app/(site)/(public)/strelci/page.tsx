@@ -9,56 +9,41 @@ import { eq, asc, ilike, or, and, isNotNull, inArray, sql, desc, gte } from "dri
 import type { SQL } from "drizzle-orm";
 import { NOC_LIST } from "@/lib/noc-list";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
+import { computeFormaFromEntries, type CompetitionLevel } from "@/lib/forma";
 import { StrelciFilterBar } from "./StrelciFilterBar";
+import { getLocale, getTranslations } from "next-intl/server";
+import type { Metadata } from "next";
 
-export const metadata = { title: "Strelci" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("shooters");
+  return {
+    title: t("title"),
+    description: t("subtitle"),
+  };
+}
 
 const PAGE_SIZE = 50;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const DISC_STYLE: Record<string, { label: string }> = {
-  ARM: { label: "Puška M"   },
-  ARW: { label: "Puška Ž"   },
-  APM: { label: "Pištolj M" },
-  APW: { label: "Pištolj Ž" },
-};
-
 function getDiscCode(apparatus: string | null, gender: string | null): string | null {
-  if (apparatus === "rifle")  return gender === "F" ? "ARW" : "ARM";
-  if (apparatus === "pistol") return gender === "F" ? "APW" : "APM";
+  const isRifle  = apparatus === "rifle"  || apparatus === "air_rifle";
+  const isPistol = apparatus === "pistol" || apparatus === "air_pistol";
+  if (isRifle)  return gender === "F" ? "ARW" : "ARM";
+  if (isPistol) return gender === "F" ? "APW" : "APM";
   return null;
 }
 
-function computeFormaAndTrend(scores: number[]): {
+type FormaEntryRow = { qualTotal: number; date: string; level: CompetitionLevel | null };
+
+// computeFormaFromEntries sortira hronološki interno — redosled ulaza nebitan.
+function formaFromEntries(entries: FormaEntryRow[], code?: string): {
   forma: number | null;
   trend: "up" | "down" | "stable";
 } {
-  const s = scores.slice(0, 10);
-  if (s.length === 0) return { forma: null, trend: "stable" };
-
-  const avg = (arr: number[]) =>
-    arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
-
-  const a1 = avg(s.slice(0, 3))!;
-  const a2 = avg(s.slice(3, 6)) ?? a1;
-  const a3 = avg(s.slice(6, 10)) ?? a1;
-  const forma = a1 * 0.5 + a2 * 0.3 + a3 * 0.2;
-
-  let trend: "up" | "down" | "stable" = "stable";
-  if (s.length >= 4) {
-    const prevArr = s.slice(3, 6);
-    if (prevArr.length > 0) {
-      const delta = a1 - (avg(prevArr) ?? a1);
-      if (delta > 1.0) trend = "up";
-      else if (delta < -1.0) trend = "down";
-    }
-  }
-
-  return { forma, trend };
+  const r = computeFormaFromEntries(entries, { code });
+  return { forma: r.forma, trend: r.trend };
 }
-
-// ── Dummy data (shown until real forma scores exist) ─────────────────────────
 
 type FormaEntry = {
   id: number;
@@ -70,28 +55,16 @@ type FormaEntry = {
   trend: "up" | "down" | "stable";
 };
 
-const DUMMY_RIFLE: FormaEntry[] = [
-  { id: -1, firstName: "Marko",    lastName: "Petrović",    avatarUrl: null, clubName: "SK Pančevo 1813",   forma: 634.2, trend: "up"     },
-  { id: -2, firstName: "Stefan",   lastName: "Jović",       avatarUrl: null, clubName: "SK Crvena zvezda",  forma: 631.8, trend: "stable" },
-  { id: -3, firstName: "Nikola",   lastName: "Đorđić",      avatarUrl: null, clubName: "SK Partizan",       forma: 629.5, trend: "up"     },
-];
-
-const DUMMY_PISTOL: FormaEntry[] = [
-  { id: -4, firstName: "Ana",      lastName: "Nikolić",     avatarUrl: null, clubName: "SK Vojvodina",      forma: 577.0, trend: "up"     },
-  { id: -5, firstName: "Milena",   lastName: "Ilić",        avatarUrl: null, clubName: "SK Crvena zvezda",  forma: 575.3, trend: "down"   },
-  { id: -6, firstName: "Bojana",   lastName: "Kovačević",   avatarUrl: null, clubName: "SK Partizan",       forma: 572.1, trend: "stable" },
-];
-
 // ── Forma Leader Row ─────────────────────────────────────────────────────────
 
 function FormaLeaderRow({
   s,
   rank,
-  isDummy = false,
+  t,
 }: {
   s: FormaEntry;
   rank: number;
-  isDummy?: boolean;
+  t: any;
 }) {
   const inner = (
     <>
@@ -129,7 +102,7 @@ function FormaLeaderRow({
               s.trend === "down" ? "var(--brand-primary)"  :
                                    "var(--subtle)",
           }}
-          aria-label={s.trend === "up" ? "u porastu" : s.trend === "down" ? "u padu" : "stabilno"}
+          aria-label={s.trend === "up" ? t("trendUp") : s.trend === "down" ? t("trendDown") : t("trendStable")}
         >
           {s.trend === "up" ? "↑" : s.trend === "down" ? "↓" : "→"}
         </span>
@@ -138,10 +111,6 @@ function FormaLeaderRow({
   );
 
   const rowClass = "flex items-center gap-3 py-2.5 -mx-2 px-2 rounded-lg transition-colors group border-b border-[var(--border)] last:border-0";
-
-  if (isDummy) {
-    return <div className={rowClass}>{inner}</div>;
-  }
 
   return (
     <Link href={`/strelci/${s.id}`} className={`${rowClass} hover:bg-[var(--surface-2)]`}>
@@ -168,6 +137,17 @@ type Props = {
 };
 
 export default async function StrelciPage({ searchParams }: Props) {
+  const locale       = await getLocale();
+  const t            = await getTranslations("shooters");
+  const tProfile     = await getTranslations("shooters.profile");
+
+  const DISC_STYLE: Record<string, { label: string }> = {
+    ARM: { label: locale === "en" ? "Rifle Men" : "Puška M" },
+    ARW: { label: locale === "en" ? "Rifle Women" : "Puška Ž" },
+    APM: { label: locale === "en" ? "Pistol Men" : "Pištolj M" },
+    APW: { label: locale === "en" ? "Pistol Women" : "Pištolj Ž" },
+  };
+
   const sp           = await searchParams;
   const activeQ      = sp.q?.trim() ?? "";
   const activeZemlja = sp.zemlja ?? "";
@@ -275,7 +255,7 @@ export default async function StrelciPage({ searchParams }: Props) {
       })
       .from(shooters)
       .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-      .where(inArray(shooters.apparatus, ["rifle", "pistol"])),
+      .where(inArray(shooters.apparatus, [...MVP_APPARATUS])),
   ]);
 
   // Forma scores — paginated table + all-shooter leaders in parallel
@@ -285,66 +265,69 @@ export default async function StrelciPage({ searchParams }: Props) {
   const [recentResultsData, formaLeaderResults] = await Promise.all([
     shooterIds.length > 0
       ? db
-          .select({ shooterId: results.shooterId, qualTotal: results.qualTotal })
+          .select({ shooterId: results.shooterId, qualTotal: results.qualTotal, date: competitions.date, level: competitions.level })
           .from(results)
           .innerJoin(competitions, eq(results.competitionId, competitions.id))
           .where(and(inArray(results.shooterId, shooterIds), isNotNull(results.qualTotal)))
           .orderBy(asc(results.shooterId), desc(competitions.date))
-      : ([] as { shooterId: number; qualTotal: unknown }[]),
+      : ([] as { shooterId: number; qualTotal: unknown; date: string; level: CompetitionLevel }[]),
 
     allFormaShooterIds.length > 0
       ? db
-          .select({ shooterId: results.shooterId, qualTotal: results.qualTotal })
+          .select({ shooterId: results.shooterId, qualTotal: results.qualTotal, date: competitions.date, level: competitions.level })
           .from(results)
           .innerJoin(competitions, eq(results.competitionId, competitions.id))
           .where(and(inArray(results.shooterId, allFormaShooterIds), isNotNull(results.qualTotal)))
           .orderBy(asc(results.shooterId), desc(competitions.date))
-      : ([] as { shooterId: number; qualTotal: unknown }[]),
+      : ([] as { shooterId: number; qualTotal: unknown; date: string; level: CompetitionLevel }[]),
   ]);
 
-  // Group last 10 results per shooter and compute forma
-  const scoresByShooter: Record<number, number[]> = {};
+  // Group recent results per shooter (newest-first) and compute forma.
+  // Cap = WINDOW (computeForma ionako uzima prozor); 20 da aktivni strelci imaju dovoljno.
+  const FORMA_CAP = 20;
+  const entriesByShooter: Record<number, FormaEntryRow[]> = {};
   for (const r of recentResultsData) {
     const id = r.shooterId;
-    if (!scoresByShooter[id]) scoresByShooter[id] = [];
-    if (scoresByShooter[id].length < 10) {
-      scoresByShooter[id].push(Number(r.qualTotal));
+    if (!entriesByShooter[id]) entriesByShooter[id] = [];
+    if (entriesByShooter[id].length < FORMA_CAP) {
+      entriesByShooter[id].push({ qualTotal: Number(r.qualTotal), date: r.date, level: r.level });
     }
   }
 
   const enrichedData = data.map((s) => {
-    const scores = scoresByShooter[s.id] ?? [];
-    const { forma, trend } = computeFormaAndTrend(scores);
-    return { ...s, forma, trend, resultCount: scores.length };
+    const entries = entriesByShooter[s.id] ?? [];
+    const code = getDiscCode(s.apparatus, s.gender) ?? undefined;
+    const { forma, trend } = formaFromEntries(entries, code);
+    return { ...s, forma, trend, resultCount: entries.length };
   });
 
   // Forma leaders across all shooters
-  const allScoresByShooter: Record<number, number[]> = {};
+  const allEntriesByShooter: Record<number, FormaEntryRow[]> = {};
   for (const r of formaLeaderResults) {
     const id = r.shooterId;
-    if (!allScoresByShooter[id]) allScoresByShooter[id] = [];
-    if (allScoresByShooter[id].length < 10) {
-      allScoresByShooter[id].push(Number(r.qualTotal));
+    if (!allEntriesByShooter[id]) allEntriesByShooter[id] = [];
+    if (allEntriesByShooter[id].length < FORMA_CAP) {
+      allEntriesByShooter[id].push({ qualTotal: Number(r.qualTotal), date: r.date, level: r.level });
     }
   }
 
   type FormaLeader = typeof allFormaShooters[0] & { forma: number; trend: "up" | "down" | "stable" };
-  const rifleLeaders: FormaLeader[]  = [];
-  const pistolLeaders: FormaLeader[] = [];
+  const leadersByDisc: Record<string, FormaLeader[]> = { ARM: [], ARW: [], APM: [], APW: [] };
 
   for (const s of allFormaShooters) {
-    const scores = allScoresByShooter[s.id] ?? [];
-    if (scores.length === 0) continue;
-    const { forma, trend } = computeFormaAndTrend(scores);
+    const entries = allEntriesByShooter[s.id] ?? [];
+    if (entries.length === 0) continue;
+    const disc = getDiscCode(s.apparatus, s.gender);
+    const { forma, trend } = formaFromEntries(entries, disc ?? undefined);
     if (forma === null) continue;
-    const entry = { ...s, forma, trend };
-    if (s.apparatus === "rifle")  rifleLeaders.push(entry);
-    else if (s.apparatus === "pistol") pistolLeaders.push(entry);
+    if (disc && disc in leadersByDisc) {
+      leadersByDisc[disc].push({ ...s, forma, trend });
+    }
   }
-  rifleLeaders.sort((a, b)  => b.forma - a.forma);
-  pistolLeaders.sort((a, b) => b.forma - a.forma);
-  const top3Rifle  = rifleLeaders.slice(0, 3);
-  const top3Pistol = pistolLeaders.slice(0, 3);
+  for (const arr of Object.values(leadersByDisc)) arr.sort((a, b) => b.forma - a.forma);
+  const top3ByDisc: Record<string, FormaLeader[]> = Object.fromEntries(
+    Object.entries(leadersByDisc).map(([k, v]) => [k, v.slice(0, 3)])
+  );
 
   const totalPages    = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const availableNocs = nocRows.map((r) => r.noc).filter(Boolean) as string[];
@@ -392,10 +375,10 @@ export default async function StrelciPage({ searchParams }: Props) {
           className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
           style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
         >
-          Strelci
+          {t("title")}
         </h1>
         <p className="text-sm text-[var(--muted)] mt-1">
-          Profili strelaca sa istorijom nastupa i forma score-om.
+          {t("subtitle")}
         </p>
       </div>
 
@@ -404,82 +387,98 @@ export default async function StrelciPage({ searchParams }: Props) {
         <span>
           <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)]">
             {totalAll}
-          </span>{" "}strelaca ukupno
+          </span>{" "}{t("totalCount")}
         </span>
         <span className="text-[var(--border-strong)] hidden sm:inline" aria-hidden="true">·</span>
         <span>
           <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)]">
             {activeCount}
-          </span>{" "}aktivnih {thisYear}.
+          </span>{" "}{t("activeThisYear")} {thisYear}.
         </span>
         <span className="text-[var(--border-strong)] hidden sm:inline" aria-hidden="true">·</span>
         <span>
           <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)]">
             {puskaCount}
-          </span>{" "}puška
+          </span>{" "}{t("statRifle")}
         </span>
         <span className="text-[var(--border-strong)] hidden sm:inline" aria-hidden="true">·</span>
         <span>
           <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)]">
             {pistolijCount}
-          </span>{" "}pištolj
+          </span>{" "}{t("statPistol")}
         </span>
       </div>
 
       {/* ── Forma leaders ── */}
       {(() => {
-        const isDummy  = top3Rifle.length === 0 && top3Pistol.length === 0;
-        const showRifle  = isDummy ? DUMMY_RIFLE  : top3Rifle;
-        const showPistol = isDummy ? DUMMY_PISTOL : top3Pistol;
+        const show = top3ByDisc as Record<string, FormaEntry[]>;
+        const hasAny = ["ARM","ARW","APM","APW"].some((d) => (show[d]?.length ?? 0) > 0);
+        if (!hasAny) return null;
+
+        function DiscPanel({ code }: { code: string }) {
+          const isMen = code === "ARM" || code === "APM";
+          const rows = show[code] ?? [];
+          if (rows.length === 0) return null;
+          return (
+            <div className="p-5">
+              <div className="flex items-baseline gap-2 mb-4">
+                <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[1.05rem] tracking-tight text-[var(--ink)] leading-none">
+                  {t(isMen ? "discMen" : "discWomen")}
+                </h3>
+                <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)] shrink-0">
+                  {code}
+                </span>
+                <span className="text-[0.65rem] text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)] ml-auto shrink-0">
+                  {t("onTopForm")}
+                </span>
+              </div>
+              <div>
+                {rows.map((s, i) => (
+                  <FormaLeaderRow key={s.id} s={s} rank={i + 1} t={t} />
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        const hasRifle  = (show.ARM?.length ?? 0) > 0 || (show.ARW?.length ?? 0) > 0;
+        const hasPistol = (show.APM?.length ?? 0) > 0 || (show.APW?.length ?? 0) > 0;
+
         return (
           <section
             aria-label="Strelci na vrhu forme"
             className="mb-8 bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden"
           >
-            {isDummy && (
-              <div className="px-5 pt-3 pb-0 flex items-center gap-2">
-                <span className="text-[0.6rem] font-[family-name:var(--font-jetbrains-mono)] font-bold uppercase tracking-widest text-[var(--muted)] bg-[var(--surface-2)] px-2 py-0.5 rounded">
-                  preview · forma score uskoro
-                </span>
+            {/* Rifle row */}
+            {hasRifle && (
+              <div>
+                <div className="px-5 py-1.5 bg-[var(--surface-2)] border-b border-[var(--border)]">
+                  <span className="text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    {t("discGroupRifle")}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)]">
+                  <DiscPanel code="ARM" />
+                  <DiscPanel code="ARW" />
+                </div>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)]">
 
-              {/* Puška */}
-              <div className={isDummy ? "p-5 opacity-50 pointer-events-none select-none" : "p-5"}>
-                <div className="flex items-baseline gap-2 mb-4">
-                  <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[1.05rem] tracking-tight text-[var(--ink)] leading-none">
-                    Puška
-                  </h2>
-                  <span className="text-[0.65rem] text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)]">
-                    na vrhu forme
+            {/* Pistol row */}
+            {hasPistol && (
+              <div className={hasRifle ? "border-t border-[var(--border)]" : undefined}>
+                <div className="px-5 py-1.5 bg-[var(--surface-2)] border-b border-[var(--border)]">
+                  <span className="text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    {t("discGroupPistol")}
                   </span>
                 </div>
-                <div>
-                  {showRifle.map((s, i) => (
-                    <FormaLeaderRow key={s.id} s={s} rank={i + 1} isDummy={isDummy} />
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)]">
+                  <DiscPanel code="APM" />
+                  <DiscPanel code="APW" />
                 </div>
               </div>
+            )}
 
-              {/* Pištolj */}
-              <div className={isDummy ? "p-5 opacity-50 pointer-events-none select-none" : "p-5"}>
-                <div className="flex items-baseline gap-2 mb-4">
-                  <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[1.05rem] tracking-tight text-[var(--ink)] leading-none">
-                    Pištolj
-                  </h2>
-                  <span className="text-[0.65rem] text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)]">
-                    na vrhu forme
-                  </span>
-                </div>
-                <div>
-                  {showPistol.map((s, i) => (
-                    <FormaLeaderRow key={s.id} s={s} rank={i + 1} isDummy={isDummy} />
-                  ))}
-                </div>
-              </div>
-
-            </div>
           </section>
         );
       })()}
@@ -505,15 +504,15 @@ export default async function StrelciPage({ searchParams }: Props) {
           <div className="py-20 text-center">
             <p className="text-sm text-[var(--muted)]">
               {totalCount === 0
-                ? "Nema strelaca za izabrane filtere."
-                : "Nema rezultata na ovoj strani."}
+                ? t("noResults")
+                : t("noResultsPage")}
             </p>
             {(activeQ || activeZemlja || activePol || activeAparat) && (
               <Link
                 href="/strelci"
                 className="mt-3 inline-block text-xs font-semibold text-[var(--brand-primary)] hover:underline"
               >
-                Resetuj filtere
+                {t("resetFilters")}
               </Link>
             )}
           </div>
@@ -524,24 +523,24 @@ export default async function StrelciPage({ searchParams }: Props) {
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] w-2/5">
                     <Link href={sortUrl("name")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
-                      Strelac<SortIcon col="name" />
+                      {tProfile("shooter")}<SortIcon col="name" />
                     </Link>
                   </th>
                   <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden md:table-cell">
                     <Link href={sortUrl("godiste")} className="inline-flex items-center justify-end hover:text-[var(--ink)] transition-colors">
-                      Godište<SortIcon col="godiste" />
+                      {tProfile("birthYear")}<SortIcon col="godiste" />
                     </Link>
                   </th>
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
                     <Link href={sortUrl("disc")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
-                      Disc.<SortIcon col="disc" />
+                      {tProfile("discipline")}<SortIcon col="disc" />
                     </Link>
                   </th>
                   <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                    Forma
+                    {tProfile("form")}
                   </th>
                   <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
-                    Nastupa
+                    {tProfile("competitions")}
                   </th>
                   <th scope="col" className="px-3 py-3 w-8" />
                 </tr>
@@ -654,7 +653,7 @@ export default async function StrelciPage({ searchParams }: Props) {
                                     : "var(--subtle)",
                               }}
                               aria-label={
-                                s.trend === "up" ? "u porastu" : s.trend === "down" ? "u padu" : "stabilno"
+                                s.trend === "up" ? t("trendUp") : s.trend === "down" ? t("trendDown") : t("trendStable")
                               }
                             >
                               {s.trend === "up" ? "↑" : s.trend === "down" ? "↓" : "→"}
@@ -703,7 +702,7 @@ export default async function StrelciPage({ searchParams }: Props) {
             aria-disabled={page <= 1}
             className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${page <= 1 ? "pointer-events-none opacity-30 text-[var(--muted)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"}`}
           >
-            ← Prethodna
+            {locale === "en" ? "← Previous" : "← Prethodna"}
           </Link>
           <span className="text-xs text-[var(--muted)] px-3 font-[family-name:var(--font-jetbrains-mono)]">
             {page} / {totalPages}
@@ -713,7 +712,7 @@ export default async function StrelciPage({ searchParams }: Props) {
             aria-disabled={page >= totalPages}
             className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${page >= totalPages ? "pointer-events-none opacity-30 text-[var(--muted)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"}`}
           >
-            Sledeća →
+            {locale === "en" ? "Next →" : "Sledeća →"}
           </Link>
         </div>
       )}

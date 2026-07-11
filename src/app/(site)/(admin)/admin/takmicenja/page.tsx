@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import { Pagination } from "../components/Pagination";
 import { TakmicenjaFilters } from "./takmicenja-filters";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
+import { formatDateRangeSr } from "@/lib/date-utils";
 
 export const metadata: Metadata = { title: "Admin · Takmičenja" };
 
@@ -231,8 +232,8 @@ export default async function AdminTakmicenjaPage({
                 {data.map((c) => (
                   <tr key={c.id} className="hover:bg-[var(--surface)] transition-colors">
                     <td className="px-4 py-3 font-medium text-[var(--ink)] max-w-xs truncate">{c.name}</td>
-                    <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
-                      {c.date}{c.dateEnd && c.dateEnd !== c.date ? ` – ${c.dateEnd}` : ""}
+                    <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] whitespace-nowrap">
+                      {formatDateRangeSr(c.date, c.dateEnd)}
                     </td>
                     <td className="px-4 py-3 text-[var(--muted)]">
                       {c.location ?? <span className="text-[var(--subtle)]">—</span>}

@@ -59,7 +59,7 @@ export interface ISSFAthlete {
   achievements: ISSFAchievement[];
 }
 
-const RIFLE_PREFIXES   = ["AR", "R3", "RFM", "RFW"];
+const RIFLE_PREFIXES   = ["AR", "R3"];
 const PISTOL_PREFIXES  = ["AP", "FP", "SP", "CFP", "STP", "RFP"];
 const SHOTGUN_PREFIXES = ["TR", "SK", "DT", "FT"];
 
@@ -117,11 +117,12 @@ export async function fetchCompetitionResults(
   return res.json();
 }
 
-/** Extract MVP discipline events (ARM/ARW/APM/APW) from result groups, senior only. */
+/** Extract MVP discipline events (ARM/ARW/APM/APW) from result groups, senior + junior. */
 export function extractMvpEvents(
   groups: ISSFResultGroup[]
 ): Array<{
   disciplineCode: DisciplineCode;
+  category: "senior" | "junior";
   qualPhase: ISSFResultPhase | null;
   finalPhase: ISSFResultPhase | null;
 }> {
@@ -129,13 +130,13 @@ export function extractMvpEvents(
   for (const group of groups) {
     for (const event of group.competitionResultEvents) {
       const dc = ISSF_EVENT_MAP[event.eventCode];
-      if (!dc || event.isJunior) continue;
+      if (!dc) continue;
 
       const phases = event.competitionResultPhases;
       const qualPhase = phases.find((p) => p.title === "Qualification") ?? null;
       const finalPhase = phases.find((p) => p.title === "Final") ?? null;
 
-      out.push({ disciplineCode: dc, qualPhase, finalPhase });
+      out.push({ disciplineCode: dc, category: event.isJunior ? "junior" as const : "senior" as const, qualPhase, finalPhase });
     }
   }
   return out;
@@ -243,7 +244,7 @@ export async function fetchQualResultsFromHtml(
   while ((m = rowRe.exec(html)) !== null) {
     const rank = parseInt(m[1]);
     const issfId = m[2].trim();
-    const rawName = m[3].replace(/ /g, " ").trim(); // &nbsp; → space
+    const rawName = m[3].replace(/&nbsp;/gi, " ").replace(/ /g, " ").trim(); // literal "&nbsp;" or real NBSP → space
     const spaceIdx = rawName.indexOf(" ");
     const lastName = spaceIdx > 0 ? rawName.slice(0, spaceIdx) : rawName;
     const firstName = spaceIdx > 0 ? rawName.slice(spaceIdx + 1) : "";

@@ -42,8 +42,8 @@ async function seed() {
       { code: "APM", name: "10m Air Pistol Men",   shortName: "AP Men",   gender: "M", distance: 10, apparatus: "air_pistol", maxQualScore: "600"   },
       { code: "APW", name: "10m Air Pistol Women", shortName: "AP Women", gender: "F", distance: 10, apparatus: "air_pistol", maxQualScore: "600"   },
       // 50m Rifle (MK Puška)
-      { code: "RFM",  name: "50m Rifle 3-Position Men",          shortName: "R3P Men",      gender: "M", distance: 50, apparatus: "rifle",   maxQualScore: "1308.0" },
-      { code: "RFW",  name: "50m Rifle 3-Position Women",        shortName: "R3P Women",    gender: "F", distance: 50, apparatus: "rifle",   maxQualScore: "1308.0" },
+      { code: "R3PM", name: "50m Rifle 3-Position Men",          shortName: "R3P Men",      gender: "M", distance: 50, apparatus: "rifle",   maxQualScore: "1308.0" },
+      { code: "R3PW", name: "50m Rifle 3-Position Women",        shortName: "R3P Women",    gender: "F", distance: 50, apparatus: "rifle",   maxQualScore: "1308.0" },
       { code: "R3JM", name: "50m Rifle 3-Position Junior Men",   shortName: "R3P Jr Men",   gender: "M", distance: 50, apparatus: "rifle",   maxQualScore: "600"    },
       { code: "R3JW", name: "50m Rifle 3-Position Junior Women", shortName: "R3P Jr Women", gender: "F", distance: 50, apparatus: "rifle",   maxQualScore: "600"    },
       // Pistol
@@ -220,8 +220,8 @@ async function seed() {
       },
       // ── 50m Rifle 3x40 Senior Men ──
       {
-        disciplineId: byCode["RFM"],
-        code: "rfm-3x40",
+        disciplineId: byCode["R3PM"],
+        code: "r3pm-3x40",
         name: "MK Puška 3×40 Senior Muškarci",
         totalShots: 120,
         maxScore: "1308.0",
@@ -235,8 +235,8 @@ async function seed() {
       },
       // ── 50m Rifle 3x40 Senior Women ──
       {
-        disciplineId: byCode["RFW"],
-        code: "rfw-3x40",
+        disciplineId: byCode["R3PW"],
+        code: "r3pw-3x40",
         name: "MK Puška 3×40 Senior Žene",
         totalShots: 120,
         maxScore: "1308.0",

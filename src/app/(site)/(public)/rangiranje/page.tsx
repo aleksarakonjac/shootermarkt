@@ -6,21 +6,58 @@ import { eq, isNotNull, and, inArray, asc } from "drizzle-orm";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { computeFormaScore, trendLabel, trendColor } from "@/lib/forma-score";
+import {
+  computeFormaFromEntries,
+  trendLabel,
+  trendColor,
+  RANKING_MIN_SAMPLE,
+  type CompetitionLevel,
+  type Trend,
+} from "@/lib/forma";
+import {
+  computeAvgOfTopN,
+  computeRecentAvg,
+  computeSeasonAvg,
+  currentSeasonStartYear,
+  seasonWindow,
+  seasonLabel as formatSeasonLabel,
+  type SeasonType,
+} from "@/lib/ranking-metrics";
+import { CATEGORY_LABEL, CATEGORY_RANK, type AgeCategory } from "@/lib/pdf-import/types";
 import { NOC_LIST } from "@/lib/noc-list";
+import { getLocale, getTranslations } from "next-intl/server";
+import { HeadToHeadPanel, type H2HCandidate, type H2HLabels } from "./HeadToHeadPanel";
 
-export const metadata: Metadata = { title: "Rangiranje" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("ranking");
+  return {
+    title: t("title"),
+  };
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 type DiscCode = "ARM" | "ARW" | "APM" | "APW";
+type ViewKey = "forma" | "peak" | "best3" | "seasonavg" | "recent3" | "improved" | "h2h";
 
-const TABS: { code: DiscCode; label: string }[] = [
-  { code: "ARM", label: "10m puška M" },
-  { code: "ARW", label: "10m puška Ž" },
-  { code: "APM", label: "10m pištolj M" },
-  { code: "APW", label: "10m pištolj Ž" },
+const TABS: { code: DiscCode; label: string; labelEn: string }[] = [
+  { code: "ARM", label: "10m puška M", labelEn: "10m Air Rifle Men" },
+  { code: "ARW", label: "10m puška Ž", labelEn: "10m Air Rifle Women" },
+  { code: "APM", label: "10m pištolj M", labelEn: "10m Air Pistol Men" },
+  { code: "APW", label: "10m pištolj Ž", labelEn: "10m Air Pistol Women" },
 ];
+
+const VIEWS: { key: ViewKey; labelKey: string }[] = [
+  { key: "forma",     labelKey: "viewForma" },
+  { key: "peak",       labelKey: "viewPeak" },
+  { key: "best3",      labelKey: "viewBest3" },
+  { key: "seasonavg",  labelKey: "viewSeasonAvg" },
+  { key: "recent3",    labelKey: "viewRecent3" },
+  { key: "improved",   labelKey: "viewImproved" },
+  { key: "h2h",        labelKey: "viewH2H" },
+];
+
+const NEEDS_SEASON: ViewKey[] = ["seasonavg", "improved"];
 
 const TH =
   "px-4 py-3 text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] select-none";
@@ -54,14 +91,30 @@ function FlagChip({ noc, inline = false }: { noc: string | null; inline?: boolea
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-type Props = { searchParams: Promise<{ disciplina?: string; zemlja?: string }> };
+type Props = {
+  searchParams: Promise<{
+    disciplina?: string;
+    kategorija?: string;
+    view?: string;
+    zemlja?: string;
+    sezona?: string;
+    sezonaTip?: string;
+  }>;
+};
 
 export default async function RangiranjeePage({ searchParams }: Props) {
-  const { disciplina, zemlja } = await searchParams;
+  const locale = await getLocale();
+  const t = await getTranslations("ranking");
+  const tCommon = await getTranslations("common");
 
-  const validCode = TABS.find((t) => t.code === disciplina?.toUpperCase())?.code;
+  const { disciplina, kategorija, view, zemlja, sezona, sezonaTip } = await searchParams;
+
+  const validCode = TABS.find((tab) => tab.code === disciplina?.toUpperCase())?.code;
   const activeCode: DiscCode = validCode ?? "ARM";
   const activeZemlja = zemlja?.toUpperCase() ?? null;
+  const activeView: ViewKey = VIEWS.find((v) => v.key === view)?.key ?? "forma";
+  const seasonType: SeasonType = sezonaTip === "kalendarska" ? "kalendarska" : "vazdusna";
+  const seasonYear = sezona && !isNaN(parseInt(sezona)) ? parseInt(sezona) : currentSeasonStartYear(seasonType);
 
   const discipline = await db.query.disciplines.findFirst({
     where: eq(disciplines.code, activeCode),
@@ -75,9 +128,14 @@ export default async function RangiranjeePage({ searchParams }: Props) {
           lastName: shooters.lastName,
           nationality: shooters.nationality,
           clubName: clubs.name,
+          category: results.category,
           qualTotal: results.qualTotal,
           qualInners: results.qualInners,
+          qualRank: results.qualRank,
+          competitionId: results.competitionId,
+          competitionName: competitions.name,
           competitionDate: competitions.date,
+          competitionLevel: competitions.level,
         })
         .from(results)
         .innerJoin(shooters, eq(results.shooterId, shooters.id))
@@ -93,65 +151,202 @@ export default async function RangiranjeePage({ searchParams }: Props) {
         .orderBy(asc(competitions.date))
     : [];
 
-  const maxScore = discipline ? parseFloat(discipline.maxQualScore) : 600;
   const isAP = activeCode.startsWith("AP");
 
-  // Unique NOCs for country filter
+  // ── Category tabs available for this discipline ──────────────────────────
+  const categoriesPresent = Array.from(new Set(rawResults.map((r) => r.category))) as AgeCategory[];
+  categoriesPresent.sort((a, b) => CATEGORY_RANK[b] - CATEGORY_RANK[a]); // stariji prvo
+  const validKategorija = categoriesPresent.find((c) => c === (kategorija as AgeCategory));
+  const activeKategorija: AgeCategory | null =
+    validKategorija ?? (categoriesPresent.includes("senior") ? "senior" : categoriesPresent[0] ?? null);
+
+  const categoryRows = activeKategorija
+    ? rawResults.filter((r) => r.category === activeKategorija)
+    : [];
+
+  // Unique NOCs for country filter (within active category)
   const allNocs = Array.from(
-    new Set(rawResults.map((r) => r.nationality).filter(Boolean) as string[])
+    new Set(categoryRows.map((r) => r.nationality).filter(Boolean) as string[])
   ).sort();
 
-  // Group by shooter
+  // ── Group by shooter ──────────────────────────────────────────────────────
+  type MatchRow = {
+    competitionId: number;
+    competitionName: string;
+    date: string;
+    level: CompetitionLevel;
+    qualTotal: number;
+    qualRank: number | null;
+  };
   type ShooterEntry = {
     firstName: string;
     lastName: string;
     nationality: string | null;
     clubName: string | null;
-    entries: { qualTotal: number; date: string }[];
+    matches: MatchRow[];
     bestInners: number | null;
   };
 
   const shooterMap = new Map<number, ShooterEntry>();
 
-  for (const r of rawResults) {
+  for (const r of categoryRows) {
     if (!shooterMap.has(r.shooterId)) {
       shooterMap.set(r.shooterId, {
         firstName: r.firstName,
         lastName: r.lastName,
         nationality: r.nationality,
         clubName: r.clubName,
-        entries: [],
+        matches: [],
         bestInners: null,
       });
     }
     const entry = shooterMap.get(r.shooterId)!;
     if (r.qualTotal != null) {
-      entry.entries.push({ qualTotal: parseFloat(r.qualTotal), date: r.competitionDate });
+      entry.matches.push({
+        competitionId: r.competitionId,
+        competitionName: r.competitionName,
+        date: r.competitionDate,
+        level: r.competitionLevel,
+        qualTotal: parseFloat(r.qualTotal),
+        qualRank: r.qualRank,
+      });
     }
     if (r.qualInners != null && (entry.bestInners === null || r.qualInners > entry.bestInners)) {
       entry.bestInners = r.qualInners;
     }
   }
 
-  const allRanked = Array.from(shooterMap.entries())
-    .map(([shooterId, data]) => ({
+  const seasonWin = seasonWindow(seasonType, seasonYear);
+  const prevSeasonWin = seasonWindow(seasonType, seasonYear - 1);
+
+  const allRanked = Array.from(shooterMap.entries()).map(([shooterId, data]) => {
+    const entriesSlim = data.matches.map((m) => ({ qualTotal: m.qualTotal, date: m.date, level: m.level }));
+    const forma = computeFormaFromEntries(entriesSlim, { code: activeCode });
+    const peak = entriesSlim.length > 0 ? Math.max(...entriesSlim.map((e) => e.qualTotal)) : null;
+    const best3 = computeAvgOfTopN(entriesSlim, 3);
+    const recent3 = computeRecentAvg(entriesSlim, 3);
+    const { avg: seasonAvg, count: seasonCount } = computeSeasonAvg(entriesSlim, seasonWin);
+    const { avg: prevSeasonAvg, count: prevSeasonCount } = computeSeasonAvg(entriesSlim, prevSeasonWin);
+    const improvement =
+      seasonAvg !== null && prevSeasonAvg !== null ? seasonAvg - prevSeasonAvg : null;
+
+    return {
       shooterId,
       ...data,
-      forma: computeFormaScore(data.entries, maxScore),
-      peak: data.entries.length > 0 ? Math.max(...data.entries.map((e) => e.qualTotal)) : null,
-    }))
-    .sort((a, b) => {
-      const fa = a.forma?.score ?? 0;
-      const fb = b.forma?.score ?? 0;
-      if (fb !== fa) return fb - fa;
-      return (b.peak ?? 0) - (a.peak ?? 0);
-    });
+      forma,
+      peak,
+      best3,
+      recent3,
+      seasonAvg,
+      seasonCount,
+      prevSeasonAvg,
+      prevSeasonCount,
+      improvement,
+    };
+  });
 
-  const displayed = activeZemlja
+  const zFiltered = activeZemlja
     ? allRanked.filter((s) => s.nationality === activeZemlja)
     : allRanked;
 
-  const activeTab = TABS.find((t) => t.code === activeCode)!;
+  let displayed: typeof zFiltered = [];
+  switch (activeView) {
+    case "forma":
+      displayed = zFiltered
+        .filter((s) => s.forma.sampleSize >= RANKING_MIN_SAMPLE)
+        .sort((a, b) => {
+          const fa = a.forma.forma ?? 0;
+          const fb = b.forma.forma ?? 0;
+          if (fb !== fa) return fb - fa;
+          if ((b.peak ?? 0) !== (a.peak ?? 0)) return (b.peak ?? 0) - (a.peak ?? 0);
+          return b.forma.sampleSize - a.forma.sampleSize;
+        });
+      break;
+    case "peak":
+      displayed = zFiltered.filter((s) => s.peak !== null).sort((a, b) => b.peak! - a.peak!);
+      break;
+    case "best3":
+      displayed = zFiltered.filter((s) => s.best3 !== null).sort((a, b) => b.best3! - a.best3!);
+      break;
+    case "seasonavg":
+      displayed = zFiltered.filter((s) => s.seasonAvg !== null).sort((a, b) => b.seasonAvg! - a.seasonAvg!);
+      break;
+    case "recent3":
+      displayed = zFiltered.filter((s) => s.recent3 !== null).sort((a, b) => b.recent3! - a.recent3!);
+      break;
+    case "improved":
+      displayed = zFiltered.filter((s) => s.improvement !== null).sort((a, b) => b.improvement! - a.improvement!);
+      break;
+    case "h2h":
+      displayed = zFiltered;
+      break;
+  }
+
+  const activeTab = TABS.find((tb) => tb.code === activeCode)!;
+
+  // ── URL builder ──────────────────────────────────────────────────────────
+  function buildUrl(overrides: Partial<{ disciplina: string; kategorija: string; view: string; zemlja: string; sezona: string; sezonaTip: string }>) {
+    const p = new URLSearchParams();
+    const merged = {
+      disciplina: activeCode.toLowerCase(),
+      kategorija: activeKategorija ?? "",
+      view: activeView,
+      zemlja: activeZemlja ?? "",
+      sezona: String(seasonYear),
+      sezonaTip: seasonType,
+      ...overrides,
+    };
+    if (merged.disciplina && merged.disciplina !== "arm") p.set("disciplina", merged.disciplina);
+    if (merged.kategorija) p.set("kategorija", merged.kategorija);
+    if (merged.view && merged.view !== "forma") p.set("view", merged.view);
+    if (merged.zemlja) p.set("zemlja", merged.zemlja);
+    if (NEEDS_SEASON.includes(merged.view as ViewKey)) {
+      p.set("sezona", merged.sezona);
+      p.set("sezonaTip", merged.sezonaTip);
+    }
+    const qs = p.toString();
+    return qs ? `/rangiranje?${qs}` : "/rangiranje";
+  }
+
+  // ── H2H candidate mapping ────────────────────────────────────────────────
+  const h2hCandidates: H2HCandidate[] = zFiltered.map((s) => ({
+    shooterId: s.shooterId,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    nationality: s.nationality,
+    clubName: s.clubName,
+    category: activeKategorija ?? "senior",
+    forma: s.forma.forma,
+    trend: s.forma.forma !== null ? (s.forma.trend as Trend) : null,
+    peak: s.peak,
+    best3avg: s.best3,
+    seasonAvg: s.seasonAvg,
+    recent3avg: s.recent3,
+    appearances: s.matches.length,
+    matches: s.matches.map((m) => ({
+      competitionId: m.competitionId,
+      competitionName: m.competitionName,
+      date: m.date,
+      qualTotal: m.qualTotal,
+      qualRank: m.qualRank,
+    })),
+  }));
+
+  const seasonPeriods = [seasonYear, seasonYear - 1, seasonYear - 2, seasonYear - 3, seasonYear - 4];
+
+  const h2hLabels: H2HLabels = {
+    h2hPickPrompt: t("h2hPickPrompt"),
+    h2hSwap: t("h2hSwap"),
+    h2hPickBoth: t("h2hPickBoth"),
+    h2hCommonMeets: t("h2hCommonMeets"),
+    h2hNoCommonMeets: t("h2hNoCommonMeets"),
+    h2hStat_forma: t("h2hStat_forma"),
+    h2hStat_peak: t("h2hStat_peak"),
+    h2hStat_best3: t("h2hStat_best3"),
+    h2hStat_seasonAvg: t("h2hStat_seasonAvg"),
+    h2hStat_recent3: t("h2hStat_recent3"),
+    h2hStat_appearances: t("h2hStat_appearances"),
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
@@ -162,21 +357,22 @@ export default async function RangiranjeePage({ searchParams }: Props) {
           className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
           style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
         >
-          Rangiranje
+          {t("title")}
         </h1>
         <p className="text-sm text-[var(--muted)] mt-1">
-          Poredak po forma score-u — weighted average poslednjih nastupa
+          {t("subtitle")}
         </p>
       </div>
 
       {/* Discipline tabs */}
-      <div className="flex items-center gap-1 mb-4 flex-wrap">
-        {TABS.map(({ code, label }) => {
+      <div className="flex items-center gap-1 mb-3 flex-wrap">
+        {TABS.map(({ code, label, labelEn }) => {
           const active = activeCode === code;
+          const displayLabel = locale === "en" ? labelEn : label;
           return (
             <Link
               key={code}
-              href={`/rangiranje?disciplina=${code.toLowerCase()}${activeZemlja ? `&zemlja=${activeZemlja}` : ""}`}
+              href={buildUrl({ disciplina: code.toLowerCase(), kategorija: "" })}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors no-underline"
               style={
                 active
@@ -185,17 +381,100 @@ export default async function RangiranjeePage({ searchParams }: Props) {
               }
             >
               <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold">{code}</span>
-              <span className="hidden sm:inline font-normal">{label}</span>
+              <span className="hidden sm:inline font-normal">{displayLabel}</span>
             </Link>
           );
         })}
       </div>
 
+      {/* Category tabs */}
+      {categoriesPresent.length > 1 && (
+        <div className="flex items-center gap-1 mb-4 flex-wrap">
+          {categoriesPresent.map((cat) => {
+            const active = activeKategorija === cat;
+            return (
+              <Link
+                key={cat}
+                href={buildUrl({ kategorija: cat })}
+                className="inline-flex items-center px-2.5 py-1 rounded-md text-[0.7rem] font-semibold transition-colors no-underline"
+                style={
+                  active
+                    ? { background: "var(--brand-primary)", color: "white" }
+                    : { background: "transparent", color: "var(--subtle)", border: "1px solid var(--border)" }
+                }
+              >
+                {CATEGORY_LABEL[cat]}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* View selector */}
+      <div className="flex items-center gap-1 mb-4 flex-nowrap overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
+        {VIEWS.map(({ key, labelKey }) => {
+          const active = activeView === key;
+          return (
+            <Link
+              key={key}
+              href={buildUrl({ view: key })}
+              className="inline-flex items-center shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors no-underline border"
+              style={
+                active
+                  ? { background: "var(--brand-primary)", color: "white", borderColor: "var(--brand-primary)" }
+                  : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--border)" }
+              }
+            >
+              {t(labelKey)}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Season control (only for season-dependent views) */}
+      {NEEDS_SEASON.includes(activeView) && (
+        <div className="flex flex-wrap items-center gap-2 mb-4 p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
+          <div className="flex items-center gap-1">
+            {(["vazdusna", "kalendarska"] as SeasonType[]).map((st) => (
+              <Link
+                key={st}
+                href={buildUrl({ sezonaTip: st, sezona: String(currentSeasonStartYear(st)) })}
+                className="px-2.5 py-1 rounded-md text-[0.7rem] font-semibold transition-colors no-underline"
+                style={
+                  seasonType === st
+                    ? { background: "var(--ink)", color: "var(--bg)" }
+                    : { background: "var(--surface-2)", color: "var(--muted)" }
+                }
+              >
+                {st === "vazdusna" ? t("seasonAir") : t("seasonCalendar")}
+              </Link>
+            ))}
+          </div>
+          <span className="text-[var(--border-strong)]" aria-hidden="true">·</span>
+          <div className="flex items-center gap-1 flex-wrap">
+            {seasonPeriods.map((y) => (
+              <Link
+                key={y}
+                href={buildUrl({ sezona: String(y) })}
+                className="px-2 py-1 rounded-md text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] font-semibold transition-colors no-underline"
+                style={
+                  seasonYear === y
+                    ? { background: "var(--brand-primary)", color: "white" }
+                    : { background: "var(--surface-2)", color: "var(--muted)" }
+                }
+              >
+                {formatSeasonLabel(seasonType, y)}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Country filter */}
-      {allNocs.length > 1 && (
+      {activeView !== "h2h" && allNocs.length > 1 && (
         <div className="flex flex-wrap items-center gap-1 mb-5">
           <Link
-            href={`/rangiranje?disciplina=${activeCode.toLowerCase()}`}
+            href={buildUrl({ zemlja: "" })}
             className="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors no-underline font-[family-name:var(--font-jetbrains-mono)]"
             style={
               !activeZemlja
@@ -203,7 +482,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
                 : { background: "var(--surface-2)", color: "var(--muted)" }
             }
           >
-            Sve
+            {tCommon("all")}
           </Link>
           {allNocs.map((noc) => {
             const a2 = nocAlpha2(noc);
@@ -211,7 +490,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
             return (
               <Link
                 key={noc}
-                href={`/rangiranje?disciplina=${activeCode.toLowerCase()}&zemlja=${noc}`}
+                href={buildUrl({ zemlja: noc })}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors no-underline font-[family-name:var(--font-jetbrains-mono)]"
                 style={
                   active
@@ -235,12 +514,17 @@ export default async function RangiranjeePage({ searchParams }: Props) {
         </div>
       )}
 
-      {/* Empty state */}
-      {displayed.length === 0 ? (
+      {/* ── H2H view ─────────────────────────────────────────────────────── */}
+      {activeView === "h2h" ? (
+        <HeadToHeadPanel
+          candidates={h2hCandidates}
+          labels={h2hLabels}
+          seasonLabel={formatSeasonLabel(seasonType, seasonYear)}
+        />
+      ) : displayed.length === 0 ? (
         <div className="rounded-xl border border-[var(--border)] py-20 text-center">
           <p className="text-sm text-[var(--muted)]">
-            Nema podataka za {activeTab.label}
-            {activeZemlja ? ` · ${activeZemlja}` : ""}.
+            {t("noData")}
           </p>
         </div>
       ) : (
@@ -249,15 +533,19 @@ export default async function RangiranjeePage({ searchParams }: Props) {
             <thead>
               <tr className="bg-[var(--surface-2)] border-b border-[var(--border)]">
                 <th className={`${TH} text-right w-12`}>#</th>
-                <th className={`${TH} text-left`}>Strelac</th>
-                <th className={`${TH} text-left hidden md:table-cell`}>Zemlja</th>
-                <th className={`${TH} text-left hidden lg:table-cell`}>Klub</th>
-                <th className={`${TH} text-right`}>Forma</th>
-                <th className={`${TH} text-right hidden sm:table-cell`}>Peak</th>
+                <th className={`${TH} text-left`}>{t("shooter")}</th>
+                <th className={`${TH} text-left hidden md:table-cell`}>{t("country")}</th>
+                <th className={`${TH} text-left hidden lg:table-cell`}>{t("club")}</th>
+                <th className={`${TH} text-right`}>
+                  {activeView === "improved" ? t("improvedCol") : t(VIEWS.find((v) => v.key === activeView)!.labelKey)}
+                </th>
+                <th className={`${TH} text-right hidden sm:table-cell`}>
+                  {activeView === "seasonavg" || activeView === "improved" ? t("inSeason") : t("peak")}
+                </th>
                 {isAP && (
-                  <th className={`${TH} text-right hidden sm:table-cell`}>Inn.</th>
+                  <th className={`${TH} text-right hidden sm:table-cell`}>{t("inners")}</th>
                 )}
-                <th className={`${TH} text-right hidden md:table-cell`}>Nast.</th>
+                <th className={`${TH} text-right hidden md:table-cell`}>{t("appearances")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
@@ -325,31 +613,85 @@ export default async function RangiranjeePage({ searchParams }: Props) {
                       {s.clubName ?? <span className="text-[var(--subtle)]">—</span>}
                     </td>
 
-                    {/* Forma — primary metric */}
+                    {/* Primary metric — depends on active view */}
                     <td className="px-4 py-3 text-right">
-                      {s.forma ? (
+                      {activeView === "forma" && (
+                        s.forma.forma !== null ? (
+                          <span className="inline-flex items-center justify-end gap-1.5">
+                            <span
+                              className="font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]"
+                              style={{ fontSize: isTop3 ? "1rem" : "0.875rem" }}
+                            >
+                              {s.forma.forma.toFixed(1)}
+                            </span>
+                            <span
+                              className="font-bold text-xs font-[family-name:var(--font-jetbrains-mono)]"
+                              style={{ color: trendColor(s.forma.trend) }}
+                            >
+                              {trendLabel(s.forma.trend)}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-xs text-[var(--subtle)]">—</span>
+                        )
+                      )}
+                      {activeView === "peak" && (
+                        <span
+                          className="font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]"
+                          style={{ fontSize: isTop3 ? "1rem" : "0.875rem" }}
+                        >
+                          {s.peak!.toFixed(1)}
+                        </span>
+                      )}
+                      {activeView === "best3" && (
+                        <span
+                          className="font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]"
+                          style={{ fontSize: isTop3 ? "1rem" : "0.875rem" }}
+                        >
+                          {s.best3!.toFixed(1)}
+                        </span>
+                      )}
+                      {activeView === "seasonavg" && (
+                        <span
+                          className="font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]"
+                          style={{ fontSize: isTop3 ? "1rem" : "0.875rem" }}
+                        >
+                          {s.seasonAvg!.toFixed(1)}
+                        </span>
+                      )}
+                      {activeView === "recent3" && (
+                        <span
+                          className="font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]"
+                          style={{ fontSize: isTop3 ? "1rem" : "0.875rem" }}
+                        >
+                          {s.recent3!.toFixed(1)}
+                        </span>
+                      )}
+                      {activeView === "improved" && (
                         <span className="inline-flex items-center justify-end gap-1.5">
                           <span
-                            className="font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]"
-                            style={{ fontSize: isTop3 ? "1rem" : "0.875rem" }}
+                            className="font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums"
+                            style={{
+                              fontSize: isTop3 ? "1rem" : "0.875rem",
+                              color: s.improvement! > 0 ? "var(--success)" : s.improvement! < 0 ? "var(--brand-primary)" : "var(--ink)",
+                            }}
                           >
-                            {s.forma.score.toFixed(1)}
+                            {s.improvement! > 0 ? "+" : ""}{s.improvement!.toFixed(1)}
                           </span>
-                          <span
-                            className="font-bold text-xs font-[family-name:var(--font-jetbrains-mono)]"
-                            style={{ color: trendColor(s.forma.trend) }}
-                          >
-                            {trendLabel(s.forma.trend)}
+                          <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
+                            → {s.seasonAvg!.toFixed(1)}
                           </span>
                         </span>
-                      ) : (
-                        <span className="text-xs text-[var(--subtle)]">—</span>
                       )}
                     </td>
 
-                    {/* Peak */}
+                    {/* Secondary column */}
                     <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm text-[var(--muted)] tabular-nums hidden sm:table-cell">
-                      {s.peak ?? <span className="text-[var(--subtle)]">—</span>}
+                      {activeView === "seasonavg" || activeView === "improved" ? (
+                        s.seasonCount
+                      ) : (
+                        s.peak !== null ? s.peak.toFixed(1) : <span className="text-[var(--subtle)]">—</span>
+                      )}
                     </td>
 
                     {/* Inners (AP only) */}
@@ -365,7 +707,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
 
                     {/* Nastupa */}
                     <td className="px-4 py-3 text-right text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] tabular-nums hidden md:table-cell">
-                      {s.entries.length}
+                      {s.matches.length}
                     </td>
                   </tr>
                 );
@@ -376,11 +718,12 @@ export default async function RangiranjeePage({ searchParams }: Props) {
           {/* Footer count */}
           <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 flex items-center justify-between">
             <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
-              {displayed.length} strelaca · {activeTab.label}
+              {t("shootersCount", { count: displayed.length })} · {locale === "en" ? activeTab.labelEn : activeTab.label}
+              {activeKategorija ? ` · ${CATEGORY_LABEL[activeKategorija]}` : ""}
               {activeZemlja ? ` · ${activeZemlja}` : ""}
             </span>
             <span className="text-xs text-[var(--subtle)]">
-              Forma score = weighted avg poslednjih 10 nastupa
+              {t("footerSubtitle")}
             </span>
           </div>
         </div>

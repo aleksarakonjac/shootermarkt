@@ -5,6 +5,9 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { DateTimePicker } from "@/components/ui/DateTimePicker";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { formatDateSr } from "@/lib/date-utils";
+import { CATEGORY_LABEL, type AgeCategory } from "@/lib/pdf-import/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,6 +29,7 @@ interface SlotRow {
   disciplineCode: string;
   disciplineName: string;
   stage: string;
+  category: string;
   startTime: string;
   endTime: string | null;
 }
@@ -669,7 +673,7 @@ function CompetitionScheduleRow({
   activeUskoroOverride: Override | null;
   isLive: boolean;
   isAutoUskoro: boolean;
-  onSlotAdd: (p: { disciplineId: number; stage: string; startTime: string; endTime: string | null }) => Promise<string | null>;
+  onSlotAdd: (p: { disciplineId: number; stage: string; category: string; startTime: string; endTime: string | null }) => Promise<string | null>;
   onSlotDelete: (slotId: number) => Promise<void>;
   onForceToggle: (type: "live" | "uskoro") => Promise<void>;
 }) {
@@ -779,6 +783,9 @@ function SlotRow({ slot, live, onDelete }: { slot: SlotRow; live: boolean; onDel
       {live && <LiveDot />}
       <span className="font-mono font-bold text-[var(--brand-primary)] w-10 shrink-0">{slot.disciplineCode}</span>
       <span className="w-40 shrink-0 text-[var(--ink)] font-medium">{STAGE_LABEL[slot.stage] ?? slot.stage}</span>
+      <span className="px-2 py-0.5 rounded text-[0.65rem] font-medium bg-[var(--surface-2)] text-[var(--muted)] border border-[var(--border)] uppercase shrink-0">
+        {CATEGORY_LABEL[slot.category as AgeCategory] ?? slot.category}
+      </span>
       <span className="text-[var(--muted)] shrink-0">{fmtDatetime(slot.startTime)}</span>
       {slot.endTime && (<><span className="text-[var(--border-strong)]">→</span><span className="text-[var(--muted)] shrink-0">{fmtDatetime(slot.endTime)}</span></>)}
       <span className="flex-1" />
@@ -800,25 +807,26 @@ function AddSlotForm({ disciplines, compDateStart, compDateEnd, onAdd }: {
   disciplines: DisciplineOption[];
   compDateStart: string;
   compDateEnd: string;
-  onAdd: (p: { disciplineId: number; stage: string; startTime: string; endTime: string | null }) => Promise<string | null>;
+  onAdd: (p: { disciplineId: number; stage: string; category: string; startTime: string; endTime: string | null }) => Promise<string | null>;
 }) {
   const [disciplineId, setDisciplineId] = useState("");
   const [stage, setStage]               = useState("");
+  const [category, setCategory]         = useState("senior");
   const [startTime, setStartTime]       = useState("");
   const [endTime, setEndTime]           = useState("");
   const [error, setError]               = useState<string | null>(null);
   const [loading, setLoading]           = useState(false);
 
-  const valid = disciplineId && stage && startTime;
+  const valid = disciplineId && stage && category && startTime;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!valid) return;
     setLoading(true); setError(null);
-    const err = await onAdd({ disciplineId: parseInt(disciplineId), stage, startTime, endTime: endTime || null });
+    const err = await onAdd({ disciplineId: parseInt(disciplineId), stage, category, startTime, endTime: endTime || null });
     setLoading(false);
     if (err) { setError(err); return; }
-    setDisciplineId(""); setStage(""); setStartTime(""); setEndTime("");
+    setDisciplineId(""); setStage(""); setCategory("senior"); setStartTime(""); setEndTime("");
   }
 
   return (
@@ -837,6 +845,14 @@ function AddSlotForm({ disciplines, compDateStart, compDateEnd, onAdd }: {
           value={stage}
           onChange={setStage}
           options={STAGE_OPTIONS}
+        />
+      </div>
+      <div className="flex flex-col gap-1 w-40">
+        <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Kategorija</label>
+        <CustomSelect
+          value={category}
+          onChange={setCategory}
+          options={Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label }))}
         />
       </div>
       <div className="flex flex-col gap-1">
@@ -871,10 +887,10 @@ function CustomUpcomingEntryRow({ entry, onDelete }: { entry: CustomUpcomingRow;
   const [loading, setLoading] = useState(false);
   return (
     <div className="px-4 py-3 flex items-center gap-4 text-xs">
-      {entry.date && <span className="font-mono text-[var(--muted)] shrink-0 w-20">{entry.date.split("-").reverse().join(".")}</span>}
+      {entry.date && <span className="font-mono text-[var(--muted)] shrink-0 w-22">{formatDateSr(entry.date)}</span>}
       <span className="flex-1 font-medium text-[var(--ink)] truncate">{entry.text}</span>
       {entry.href && <span className="text-[var(--subtle)] truncate max-w-[140px] shrink-0">{entry.href}</span>}
-      {entry.displayUntil && <span className="text-[var(--subtle)] shrink-0">do {entry.displayUntil.split("-").reverse().join(".")}</span>}
+      {entry.displayUntil && <span className="text-[var(--subtle)] shrink-0">do {formatDateSr(entry.displayUntil)}</span>}
       <button onClick={async () => { setLoading(true); await onDelete(); setLoading(false); }} disabled={loading} className={btnDanger}>Ukloni</button>
     </div>
   );
@@ -906,17 +922,17 @@ function AddCustomUpcomingForm({ onAdd }: {
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Tekst najave</label>
         <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="npr. Kup Srbije — Vazdušni Pištolj" className={inputCls} required />
       </div>
-      <div className="flex flex-col gap-1 w-32">
+      <div className="flex flex-col gap-1 w-36">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Datum</label>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+        <DatePicker value={date} onChange={setDate} placeholder="Izaberi..." size="xs" />
       </div>
       <div className="flex flex-col gap-1 w-40">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Link (opciono)</label>
         <input type="url" value={href} onChange={(e) => setHref(e.target.value)} placeholder="/takmicenja/123" className={inputCls} />
       </div>
-      <div className="flex flex-col gap-1 w-32">
+      <div className="flex flex-col gap-1 w-36">
         <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Prikazuj do</label>
-        <input type="date" value={displayUntil} onChange={(e) => setDisplayUntil(e.target.value)} className={inputCls} />
+        <DatePicker value={displayUntil} onChange={setDisplayUntil} placeholder="Izaberi..." size="xs" />
       </div>
       <button type="submit" disabled={!text.trim() || loading} className={`${btnPrimary} disabled:opacity-40 self-end`}>+ Dodaj</button>
     </form>

@@ -16,11 +16,11 @@ let client: ReturnType<typeof postgres>;
 let db: ReturnType<typeof drizzle<typeof schema>>;
 
 if (process.env.NODE_ENV === "production") {
-  client = postgres(connectionString, { prepare: false });
+  client = postgres(connectionString, { prepare: false, max: 3 });
   db = drizzle(client, { schema });
 } else {
   if (!globalThis.pgClient) {
-    globalThis.pgClient = postgres(connectionString, { prepare: false });
+    globalThis.pgClient = postgres(connectionString, { prepare: false, max: 3 });
   }
   client = globalThis.pgClient;
 

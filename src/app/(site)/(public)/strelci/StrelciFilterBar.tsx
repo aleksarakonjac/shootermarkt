@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { NOC_LIST } from "@/lib/noc-list";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
+import { useTranslations, useLocale } from "next-intl";
 
 interface Props {
   availableNocs: string[];
@@ -17,18 +18,6 @@ interface Props {
   totalPages: number;
 }
 
-const GENDER_OPTIONS = [
-  ["", "Svi"],
-  ["M", "Muški"],
-  ["F", "Ženski"],
-] as const;
-
-const APARAT_OPTIONS = [
-  { value: "",       label: "Sve"     },
-  { value: "rifle",  label: "Puška"   },
-  { value: "pistol", label: "Pištolj" },
-] as const;
-
 export function StrelciFilterBar({
   availableNocs,
   currentQ,
@@ -40,6 +29,21 @@ export function StrelciFilterBar({
   page,
   totalPages,
 }: Props) {
+  const t = useTranslations("shooters");
+  const locale = useLocale();
+
+  const GENDER_OPTIONS = [
+    ["", t("genderAll")],
+    ["M", t("genderMale")],
+    ["F", t("genderFemale")],
+  ] as const;
+
+  const APARAT_OPTIONS = [
+    { value: "",       label: t("aparatAll")     },
+    { value: "rifle",  label: t("aparatRifle")   },
+    { value: "pistol", label: t("aparatPistol") },
+  ] as const;
+
   const router   = useRouter();
   const pathname = usePathname();
   const [q, setQ] = useState(currentQ);
@@ -123,7 +127,7 @@ export function StrelciFilterBar({
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Ime ili prezime…"
+            placeholder={t("search")}
             aria-label="Pretraži strelce"
             className="w-full rounded-md border border-[var(--border)] bg-[var(--bg)] pl-9 pr-3 py-2 text-xs text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
           />
@@ -166,9 +170,9 @@ export function StrelciFilterBar({
           value={currentZemlja}
           onChange={(v) => push({ zemlja: v, page: 1 })}
           options={nocOptions}
-          placeholder="Sve zemlje"
-          emptyLabel="Sve zemlje"
-          searchPlaceholder="Pretraži zemlju…"
+          placeholder={t("allCountries")}
+          emptyLabel={t("allCountries")}
+          searchPlaceholder={t("searchCountry")}
           labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
           className="min-w-[130px]"
         />
@@ -178,7 +182,7 @@ export function StrelciFilterBar({
             onClick={() => { setQ(""); router.replace(pathname); }}
             className="shrink-0 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] px-2.5 py-2 rounded-md hover:bg-[var(--surface)] transition-colors"
           >
-            Resetuj ×
+            {t("reset")}
           </button>
         )}
 
@@ -186,25 +190,25 @@ export function StrelciFilterBar({
 
       {/* Count + Pagination */}
       <div className="flex items-center justify-between gap-4">
-        <p className="text-xs text-[var(--muted)]">
+        <div className="text-xs text-[var(--muted)]">
           {totalCount === 0 ? (
-            "Nema strelaca za izabrane filtere."
+            t("noResults")
           ) : shownCount < totalCount ? (
             <>
               <span className="font-semibold text-[var(--ink)]">
-                {((page - 1) * 50 + 1).toLocaleString("sr")}–{((page - 1) * 50 + shownCount).toLocaleString("sr")}
+                {((page - 1) * 50 + 1).toLocaleString(locale)}–{((page - 1) * 50 + shownCount).toLocaleString(locale)}
               </span>
-              {" od "}
-              <span className="font-semibold text-[var(--ink)]">{totalCount.toLocaleString("sr")}</span>
-              {" strelaca"}
+              {` ${t("countOf")} `}
+              <span className="font-semibold text-[var(--ink)]">{totalCount.toLocaleString(locale)}</span>
+              {` ${t("countShooters")}`}
             </>
           ) : (
             <>
-              <span className="font-semibold text-[var(--ink)]">{totalCount.toLocaleString("sr")}</span>
-              {" strelaca"}
+              <span className="font-semibold text-[var(--ink)]">{totalCount.toLocaleString(locale)}</span>
+              {` ${t("countShooters")}`}
             </>
           )}
-        </p>
+        </div>
 
         {totalPages > 1 && (
           <div className="flex items-center gap-1">
@@ -212,7 +216,7 @@ export function StrelciFilterBar({
               onClick={() => push({ page: page - 1 })}
               disabled={page <= 1}
               className="px-2.5 py-1 rounded text-xs font-semibold text-[var(--muted)] hover:bg-[var(--surface)] disabled:opacity-30 transition-colors"
-              aria-label="Prethodna strana"
+              aria-label={t("prevPage")}
             >
               ←
             </button>
@@ -223,7 +227,7 @@ export function StrelciFilterBar({
               onClick={() => push({ page: page + 1 })}
               disabled={page >= totalPages}
               className="px-2.5 py-1 rounded text-xs font-semibold text-[var(--muted)] hover:bg-[var(--surface)] disabled:opacity-30 transition-colors"
-              aria-label="Sledeća strana"
+              aria-label={t("nextPage")}
             >
               →
             </button>

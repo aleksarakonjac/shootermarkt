@@ -5,6 +5,11 @@ import { ChevronDown } from "lucide-react";
 import type { QualDetail, FinalDetail } from "@/lib/db/schema";
 import { ResultDetailPanel } from "./ResultDetailPanel";
 
+const CATEGORY_SHORT: Record<string, string> = {
+  pionir: "PIO", kadet: "KAD", mladji_junior: "MJ", junior: "JR",
+  mladji_senior: "U23", senior: "SR", master: "MST", open: "OPN",
+};
+
 export type ResultRowData = {
   id: number;
   qualTotal: string | null;
@@ -16,13 +21,18 @@ export type ResultRowData = {
   competitionName: string;
   competitionDate: string;
   disciplineCode: string;
+  category?: string | null;
   qualDetail: QualDetail | null;
   finalDetail: FinalDetail | null;
   apparatus: string | null;
 };
 
-export function ResultsHistoryTable({ results }: { results: ResultRowData[] }) {
+export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }: { results: ResultRowData[]; allLabel?: string; locale?: string }) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [selectedDisc, setSelectedDisc] = useState<string | null>(null);
+
+  const availableDiscs = Array.from(new Set(results.map(r => r.disciplineCode))).sort();
+  const showFilter = availableDiscs.length > 1;
 
   function toggle(id: number) {
     setExpanded((prev) => {
@@ -33,51 +43,78 @@ export function ResultsHistoryTable({ results }: { results: ResultRowData[] }) {
   }
 
   const sorted = [...results].reverse();
+  const filtered = selectedDisc ? sorted.filter(r => r.disciplineCode === selectedDisc) : sorted;
 
   return (
     <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+      {/* Discipline filter */}
+      {showFilter && (
+        <div className="flex gap-1.5 px-4 py-3 border-b border-[var(--border)] bg-[var(--surface)] flex-wrap">
+          <button
+            onClick={() => setSelectedDisc(null)}
+            className={`text-[11px] font-extrabold font-[family-name:var(--font-barlow-condensed)] tracking-wider uppercase px-2.5 py-1 rounded transition-colors ${
+              selectedDisc === null
+                ? "bg-[var(--ink)] text-[var(--bg)]"
+                : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)]"
+            }`}
+          >
+            {allLabel}
+          </button>
+          {availableDiscs.map(code => (
+            <button
+              key={code}
+              onClick={() => setSelectedDisc(code)}
+              className={`text-[11px] font-extrabold font-[family-name:var(--font-barlow-condensed)] tracking-wider uppercase px-2.5 py-1 rounded transition-colors ${
+                selectedDisc === code
+                  ? "bg-[var(--ink)] text-[var(--bg)]"
+                  : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)]"
+              }`}
+            >
+              {code}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[480px]">
           <thead>
             <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
               <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Takmičenje
+                {locale === "en" ? "Competition" : "Takmičenje"}
               </th>
               <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
-                Datum
+                {locale === "en" ? "Date" : "Datum"}
               </th>
               <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Disc.
+                {locale === "en" ? "Disc." : "Disc."}
               </th>
               <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Kval.
+                {locale === "en" ? "Qual." : "Kval."}
               </th>
               <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
-                Rank
+                {locale === "en" ? "Rank" : "Rang"}
               </th>
               <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Final
+                {locale === "en" ? "Final" : "Finale"}
               </th>
               <th className="w-9" />
             </tr>
           </thead>
           <tbody>
-            {sorted.map((r) => {
+            {filtered.map((r) => {
               const isExpanded = expanded.has(r.id);
               const canExpand = r.qualDetail != null || r.finalDetail != null;
               const hasDecimals = r.apparatus === "air_rifle";
 
               return (
                 <Fragment key={r.id}>
-                  {/* Main row */}
                   <tr
                     onClick={canExpand ? () => toggle(r.id) : undefined}
                     className={`border-b border-[var(--border)] transition-colors ${
                       canExpand ? "cursor-pointer" : ""
                     } ${
-                      isExpanded
-                        ? "bg-[var(--surface)]"
-                        : "hover:bg-[var(--surface)]"
+                      isExpanded ? "bg-[var(--surface)]" : "hover:bg-[var(--surface)]"
                     }`}
                     aria-expanded={canExpand ? isExpanded : undefined}
                   >
@@ -85,11 +122,18 @@ export function ResultsHistoryTable({ results }: { results: ResultRowData[] }) {
                       {r.competitionName}
                     </td>
                     <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] hidden sm:table-cell">
-                      {r.competitionDate}
+                      {r.competitionDate.split("-").reverse().join(".")}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-block rounded px-2 py-0.5 text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] tracking-wide bg-[var(--surface-2)] text-[var(--ink)]">
-                        {r.disciplineCode}
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-block rounded px-2 py-0.5 text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] tracking-wide bg-[var(--surface-2)] text-[var(--ink)]">
+                          {r.disciplineCode}
+                        </span>
+                        {r.category && r.category !== "senior" && (
+                          <span className="inline-block rounded px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide bg-[var(--brand-primary-light)] text-[var(--brand-primary)]">
+                            {CATEGORY_SHORT[r.category] ?? r.category}
+                          </span>
+                        )}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
@@ -97,9 +141,7 @@ export function ResultsHistoryTable({ results }: { results: ResultRowData[] }) {
                         <>
                           {r.qualTotal}
                           {r.qualInners != null && (
-                            <span className="text-xs text-[var(--muted)] ml-1">
-                              {r.qualInners}×
-                            </span>
+                            <span className="text-xs text-[var(--muted)] ml-1">{r.qualInners}×</span>
                           )}
                         </>
                       ) : (
@@ -117,9 +159,7 @@ export function ResultsHistoryTable({ results }: { results: ResultRowData[] }) {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)]">
-                      {r.finalTotal ?? (
-                        <span className="text-[var(--subtle)]">—</span>
-                      )}
+                      {r.finalTotal ?? <span className="text-[var(--subtle)]">—</span>}
                     </td>
                     <td className="px-2 py-3 text-center">
                       {canExpand && (
@@ -134,7 +174,6 @@ export function ResultsHistoryTable({ results }: { results: ResultRowData[] }) {
                     </td>
                   </tr>
 
-                  {/* Expand row — always rendered, animated via grid-template-rows */}
                   <tr aria-hidden={!isExpanded}>
                     <td colSpan={7} className="p-0">
                       <div

@@ -1,18 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
-const SRB = { noc: "SRB", alpha2: "RS", name: "Srbija" };
+const SRB = { noc: "SRB", alpha2: "RS" };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 type Scope = "issf" | "SRB";
-
-function scopeLabel(scope: Scope): string {
-  return scope === "issf" ? "ISSF" : SRB.name;
-}
 
 function scopeIcon(scope: Scope): React.ReactNode {
   if (scope === "issf")
@@ -32,6 +29,8 @@ interface Props {
 }
 
 export function RegionSelector({ compact = false, placement = "bottom" }: Props) {
+  const t = useTranslations("common");
+  const srbName = t("serbia");
   const [scope, setScope] = useState<Scope>("SRB");
   const [open, setOpen]   = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -77,13 +76,13 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label={`Opseg: ${scopeLabel(scope)}`}
+        aria-label={`Opseg: ${scope === "issf" ? "ISSF" : srbName}`}
         className={`flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] transition-colors px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] ${
           open ? "border-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]" : ""
         }`}
       >
         {scopeIcon(scope)}
-        {!compact && <span className="hidden lg:block">{scopeLabel(scope)}</span>}
+        {!compact && <span className="hidden lg:block">{scope === "issf" ? "ISSF" : srbName}</span>}
         <svg
           width="9" height="9" viewBox="0 0 9 9"
           className={`shrink-0 text-[var(--muted)] transition-transform duration-150 ${open ? "rotate-180" : ""}`}
@@ -130,7 +129,7 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
           }`}
         >
           <span className="fi fi-rs shrink-0" style={{ fontSize: 15, borderRadius: 2 }} aria-hidden="true" />
-          <span className="flex-1 text-xs font-medium">{SRB.name}</span>
+          <span className="flex-1 text-xs font-medium">{srbName}</span>
           <span className="text-[0.62rem] font-bold font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] shrink-0">
             {SRB.noc}
           </span>

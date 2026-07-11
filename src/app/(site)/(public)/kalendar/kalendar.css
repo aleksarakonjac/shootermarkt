@@ -163,13 +163,13 @@
 
 /* ── Countdown chip ────────────────────────────────────────── */
 .countdown-chip {
-  background: var(--brand-primary-light);
-  color: var(--brand-primary);
+  background: var(--surface-2);
+  color: var(--muted);
 }
 
 html.dark .countdown-chip {
-  background: oklch(0.28 0.06 28);
-  color: oklch(0.72 0.18 28);
+  background: var(--surface-2);
+  color: var(--muted);
 }
 
 /* ── List entrance animations ──────────────────────────────── */

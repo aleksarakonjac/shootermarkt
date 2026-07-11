@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { shooters, results, competitions, disciplines } from "@/lib/db/schema";
-import { computeFormaScore, type FormaResult } from "@/lib/forma-score";
+import { computeFormaFromEntries, type FormaResult } from "@/lib/forma";
 
 export interface ShooterCardData {
   id: number;
@@ -24,7 +24,9 @@ export async function resolveShooter(id: number): Promise<ShooterCardData | null
     .select({
       qualTotal: results.qualTotal,
       competitionDate: competitions.date,
+      competitionLevel: competitions.level,
       disciplineId: disciplines.id,
+      disciplineCode: disciplines.code,
       maxQualScore: disciplines.maxQualScore,
     })
     .from(results)
@@ -48,12 +50,13 @@ export async function resolveShooter(id: number): Promise<ShooterCardData | null
       if (list.length > bestDisciplineRows.length) bestDisciplineRows = list;
     }
     if (bestDisciplineRows.length > 0) {
-      forma = computeFormaScore(
+      forma = computeFormaFromEntries(
         bestDisciplineRows.map((r) => ({
           qualTotal: parseFloat(r.qualTotal!),
           date: r.competitionDate,
+          level: r.competitionLevel,
         })),
-        parseFloat(bestDisciplineRows[0].maxQualScore)
+        { code: bestDisciplineRows[0].disciplineCode }
       );
     }
   }

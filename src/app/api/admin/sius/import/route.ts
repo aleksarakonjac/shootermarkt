@@ -122,6 +122,7 @@ export async function POST(req: NextRequest) {
         clubAbbr: result.clubName,
         clubId: matchedClub?.id,
         disciplineCode,
+        category: "senior",
         qualTotal: result.total,
         qualInners: result.inners,
         qualRank: result.rank,
