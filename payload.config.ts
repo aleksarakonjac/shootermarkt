@@ -31,6 +31,9 @@ export default buildConfig({
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URL!,
+      max: 1,
+      idleTimeoutMillis: 20_000,
+      connectionTimeoutMillis: 10_000,
     },
     // Without this, drizzle-kit's dev-mode schema push introspects the
     // ENTIRE shared Postgres database (all of Drizzle's ~15+ tables too)

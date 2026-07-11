@@ -3,6 +3,12 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 const connectionString = process.env.DATABASE_URL!;
+const connectionOptions = {
+  prepare: false,
+  max: 1,
+  idle_timeout: 20,
+  connect_timeout: 10,
+};
 
 // Disable prefetch for Supabase transaction mode pooler
 declare global {
@@ -12,22 +18,14 @@ declare global {
   var db: ReturnType<typeof drizzle<typeof schema>> | undefined;
 }
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle<typeof schema>>;
-
-if (process.env.NODE_ENV === "production") {
-  client = postgres(connectionString, { prepare: false, max: 3 });
-  db = drizzle(client, { schema });
-} else {
-  if (!globalThis.pgClient) {
-    globalThis.pgClient = postgres(connectionString, { prepare: false, max: 3 });
-  }
-  client = globalThis.pgClient;
-
-  if (!globalThis.db) {
-    globalThis.db = drizzle(client, { schema });
-  }
-  db = globalThis.db;
+if (!globalThis.pgClient) {
+  globalThis.pgClient = postgres(connectionString, connectionOptions);
 }
+const client = globalThis.pgClient;
+
+if (!globalThis.db) {
+  globalThis.db = drizzle(client, { schema });
+}
+const db = globalThis.db;
 
 export { db };
