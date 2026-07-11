@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AdminNav } from "./AdminNav";
 
+export const dynamic = "force-dynamic";
+
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
 export default async function AdminLayout({
