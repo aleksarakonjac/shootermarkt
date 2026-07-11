@@ -7,6 +7,7 @@ export interface UpcomingCompetition {
   id: number;
   name: string;
   nameSr: string | null;
+  nameEn: string | null;
   date: string;
   dateEnd: string | null;
   location: string | null;
@@ -29,6 +30,7 @@ export async function getUpcomingCompetitions(limit = 5): Promise<UpcomingCompet
       id: competitions.id,
       name: competitions.name,
       nameSr: competitions.nameSr,
+      nameEn: competitions.nameEn,
       date: competitions.date,
       dateEnd: competitions.dateEnd,
       location: competitions.location,

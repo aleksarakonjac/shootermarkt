@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { shooters, clubs } from "@/lib/db/schema";
-import { eq, ilike, or } from "drizzle-orm";
+import { eq, ilike, or, and } from "drizzle-orm";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -30,7 +30,14 @@ export async function GET(req: NextRequest) {
     .leftJoin(clubs, eq(shooters.clubId, clubs.id))
     .where(
       q
-        ? or(ilike(shooters.lastName, `%${q}%`), ilike(shooters.firstName, `%${q}%`))
+        ? and(
+            ...q
+              .split(/\s+/)
+              .filter(Boolean)
+              .map((word) =>
+                or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`))
+              )
+          )
         : undefined
     )
     .orderBy(shooters.lastName);

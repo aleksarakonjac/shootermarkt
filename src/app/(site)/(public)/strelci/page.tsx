@@ -161,7 +161,16 @@ export default async function StrelciPage({ searchParams }: Props) {
 
   const conditions: (SQL | undefined)[] = [
     inArray(shooters.apparatus, [...MVP_APPARATUS]),
-    activeQ      ? or(ilike(shooters.firstName, `%${activeQ}%`), ilike(shooters.lastName, `%${activeQ}%`)) : undefined,
+    activeQ
+      ? and(
+          ...activeQ
+            .split(/\s+/)
+            .filter(Boolean)
+            .map((word) =>
+              or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`))
+            )
+        )
+      : undefined,
     activeZemlja ? eq(shooters.nationality, activeZemlja) : undefined,
     activePol    ? eq(shooters.gender, activePol) : undefined,
     activeAparat ? eq(shooters.apparatus, activeAparat) : undefined,

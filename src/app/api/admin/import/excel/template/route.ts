@@ -15,7 +15,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return new NextResponse(createResultsTemplate(), {
+  const template = createResultsTemplate();
+  const body = new ArrayBuffer(template.byteLength);
+  new Uint8Array(body).set(template);
+
+  return new NextResponse(body, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": "attachment; filename=shootermarkt-rezultati-sablon.xlsx",

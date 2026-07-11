@@ -5,6 +5,7 @@
  */
 import { readFileSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
+import postgres from "postgres";
 
 const envFile = fileURLToPath(new URL("../.env.local", import.meta.url));
 const env = Object.fromEntries(
@@ -23,11 +24,6 @@ function getStringArg(name, fallback) {
 }
 const OUT = getStringArg("--out", "scripts/null-apparatus.jsonl");
 
-const postgresPath = fileURLToPath(new URL(
-  "../node_modules/.pnpm/postgres@3.4.9/node_modules/postgres/src/index.js",
-  import.meta.url
-));
-const { default: postgres } = await import(postgresPath);
 const sql = postgres(env.DATABASE_URL?.replace(":5432/", ":6543/") ?? "", { max: 1 });
 
 const rows = await sql`

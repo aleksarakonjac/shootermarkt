@@ -119,6 +119,8 @@ function sortDiscs(codes: string[]): string[] {
 interface CompItem {
   id: number;
   name: string;
+  nameSr: string | null;
+  nameEn: string | null;
   date: string;
   dateEnd: string | null;
   location: string | null;

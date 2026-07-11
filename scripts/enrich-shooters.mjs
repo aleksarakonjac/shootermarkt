@@ -7,6 +7,7 @@
  */
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
+import postgres from "postgres";
 
 // Load env
 const envFile = fileURLToPath(new URL("../.env.local", import.meta.url));
@@ -36,11 +37,6 @@ const START_OFFSET = getArg("--offset", 0);
 const FROM_FILE    = getStringArg("--from-file", null);
 
 // ── DB via postgres ────────────────────────────────────────────────────────────
-const postgresPath = fileURLToPath(new URL(
-  "../node_modules/.pnpm/postgres@3.4.9/node_modules/postgres/src/index.js",
-  import.meta.url
-));
-const { default: postgres } = await import(postgresPath);
 const sql = postgres(DB_URL, { max: 5 });
 
 // ── Apparatus inference ────────────────────────────────────────────────────────

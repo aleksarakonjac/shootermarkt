@@ -28,7 +28,16 @@ export default async function AdminStrelciPage({
 
   const conditions = [
     inArray(shooters.apparatus, [...MVP_APPARATUS]),
-    q ? or(ilike(shooters.firstName, `%${q}%`), ilike(shooters.lastName, `%${q}%`)) : undefined,
+    q
+      ? and(
+          ...q
+            .split(/\s+/)
+            .filter(Boolean)
+            .map((word) =>
+              or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`))
+            )
+        )
+      : undefined,
     nat ? eq(shooters.nationality, nat) : undefined,
     gender ? eq(shooters.gender, gender) : undefined,
     apparatus ? eq(shooters.apparatus, apparatus) : undefined,

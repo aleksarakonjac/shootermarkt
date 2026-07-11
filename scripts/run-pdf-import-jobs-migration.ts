@@ -1,9 +1,9 @@
 import { config } from "dotenv";
-import postgres from "../node_modules/.pnpm/postgres@3.4.9/node_modules/postgres/src/index.js";
+import postgres from "postgres";
 
 config({ path: ".env.local" });
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DATABASE_URL ?? "";
 if (!databaseUrl) throw new Error("DATABASE_URL nije podešen u .env.local");
 
 async function main() {
