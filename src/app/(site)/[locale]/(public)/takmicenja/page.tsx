@@ -281,8 +281,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
 
   const cookieStore = await cookies();
   const scope = cookieStore.get("shootermarkt_scope")?.value === "issf" ? "issf" : "SRB";
-  const locale = cookieStore.get("NEXT_LOCALE")?.value === "en" ? "en" : "sr";
-  const t = await getTranslations("competition");
+  const [locale, t] = await Promise.all([getLocale(), getTranslations("competition")]);
 
   const defaultYear  = new Date().getFullYear().toString();
   const activeYear   = year && /^\d{4}$/.test(year) ? year : defaultYear;
