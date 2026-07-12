@@ -1,7 +1,7 @@
 export const revalidate = 300;
 
 import { db } from "@/lib/db";
-import { shooters, results, competitions, disciplines } from "@/lib/db/schema";
+import { shooters, results, competitions, disciplines, shooterFormaCache } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -11,7 +11,6 @@ import { ResultsHistoryTable } from "@/components/result-display/ResultsHistoryT
 import { FormaChart } from "@/components/shooter/FormaChart";
 import type { ChartPoint, FormaScore } from "@/components/shooter/FormaChart";
 import { FormaScoreHeading } from "@/components/shooter/FormaScoreHeading";
-import { computeForma } from "@/lib/forma";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@/lib/pdf-import/types";
 import { NOC_LIST } from "@/lib/noc-list";
 import { getLocale, getTranslations } from "next-intl/server";
@@ -49,7 +48,7 @@ export default async function ShooterPage({ params }: Props) {
   });
   if (!shooter) notFound();
 
-  const [shooterResults] = await Promise.all([
+  const [shooterResults, cacheRows] = await Promise.all([
     db
       .select({
         id: results.id,
@@ -76,6 +75,21 @@ export default async function ShooterPage({ params }: Props) {
       .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
       .where(eq(results.shooterId, shooterId))
       .orderBy(asc(competitions.date)),
+    db
+      .select({
+        disciplineCode: shooterFormaCache.disciplineCode,
+        forma:          shooterFormaCache.forma,
+        trend:          shooterFormaCache.trend,
+        level:          shooterFormaCache.level,
+        reliability:    shooterFormaCache.reliability,
+        peakProximity:  shooterFormaCache.peakProximity,
+        consistency:    shooterFormaCache.consistency,
+        momentum:       shooterFormaCache.momentum,
+        sampleSize:     shooterFormaCache.sampleSize,
+        lowConfidence:  shooterFormaCache.lowConfidence,
+      })
+      .from(shooterFormaCache)
+      .where(eq(shooterFormaCache.shooterId, shooterId)),
   ]);
 
   const initials = `${shooter.firstName[0]}${shooter.lastName[0]}`;
@@ -125,25 +139,20 @@ export default async function ShooterPage({ params }: Props) {
     return Array.from(seen.entries()).map(([code, maxScore]) => ({ code, maxScore }));
   })();
 
-  // ── Forma scores per discipline (for chart header) ───────────────────────────
+  // ── Forma scores per discipline — from pre-computed cache ────────────────────
   const formaScores: Record<string, FormaScore | null> = Object.fromEntries(
-    chartDisciplines.map((d) => {
-      // chartPoints su hronološki (asc po datumu) — tačan ulaz za computeForma
-      const discEntries = chartPoints
-        .filter((p) => p.discipline === d.code)
-        .map((p) => ({ score: p.score, date: p.date, level: p.level }));
-      const f = computeForma(discEntries, { code: d.code });
-      if (f.forma === null || f.level === null) return [d.code, null];
-      return [d.code, {
-        score:         f.forma,
-        trend:         f.trend,
-        level:         f.level,
-        reliability:   f.reliability,
-        peakProximity: f.peakProximity,
-        consistency:   f.consistency,
-        momentum:      f.momentum,
-        sampleSize:    f.sampleSize,
-        lowConfidence: f.lowConfidence,
+    cacheRows.map((r) => {
+      if (r.forma == null || r.level == null) return [r.disciplineCode, null];
+      return [r.disciplineCode, {
+        score:         Number(r.forma),
+        trend:         r.trend ?? undefined,
+        level:         Number(r.level),
+        reliability:   r.reliability   != null ? Number(r.reliability)   : undefined,
+        peakProximity: r.peakProximity != null ? Number(r.peakProximity) : undefined,
+        consistency:   r.consistency   != null ? Number(r.consistency)   : undefined,
+        momentum:      r.momentum      != null ? Number(r.momentum)      : undefined,
+        sampleSize:    r.sampleSize,
+        lowConfidence: r.lowConfidence,
       } as FormaScore];
     })
   );
