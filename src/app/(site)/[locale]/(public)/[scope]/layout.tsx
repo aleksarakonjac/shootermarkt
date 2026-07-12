@@ -5,9 +5,7 @@ export const revalidate = 300;
 export const dynamicParams = true;
 
 export function generateStaticParams() {
-  // Scope pages query several analytics datasets. Generate them on first visit
-  // and cache with ISR instead of exceeding Vercel's per-page build timeout.
-  return [];
+  return VALID_SCOPES.map((scope) => ({ scope }));
 }
 
 export default async function ScopeLayout({
