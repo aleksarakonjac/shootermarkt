@@ -3,10 +3,10 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useTransition, Suspense } from "react";
 import { PageTransitionOverlay } from "./PageTransitionOverlay";
 
-export function LocaleSwitcher() {
+function LocaleSwitcherInner() {
   const locale = useLocale();
   const t = useTranslations("locale");
   const router = useRouter();
@@ -34,5 +34,13 @@ export function LocaleSwitcher() {
         {locale === "sr" ? "EN" : "SR"}
       </button>
     </>
+  );
+}
+
+export function LocaleSwitcher() {
+  return (
+    <Suspense fallback={null}>
+      <LocaleSwitcherInner />
+    </Suspense>
   );
 }
