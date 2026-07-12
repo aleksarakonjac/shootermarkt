@@ -9,14 +9,21 @@ import HeaderHomeLink from "./components/HeaderHomeLink";
 import ThemeToggle from "./components/ThemeToggle";
 import { RegionSelector } from "./components/RegionSelector";
 import { LocaleSwitcher } from "./components/LocaleSwitcher";
-import { getTranslations, getLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
-export default async function PublicLayout({
-  children,
-}: {
+export const revalidate = 300;
+
+type Props = {
   children: React.ReactNode;
-}) {
-  const locale = await getLocale();
+  params: Promise<{ locale: string }>;
+};
+
+export default async function PublicLayout({ children, params }: Props) {
+  const { locale } = await params;
+  // Must call before any next-intl server API — each layout runs in its own
+  // async context so the setRequestLocale from [locale]/layout.tsx doesn't carry over.
+  setRequestLocale(locale);
+
   const [shootersList, competitionsList, t, tCommon] = await Promise.all([
     db
       .select({
