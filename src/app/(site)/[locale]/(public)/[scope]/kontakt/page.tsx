@@ -2,13 +2,16 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import { KontaktForm } from "./KontaktForm";
+import type { Scope } from "@/lib/scope";
+import { ScopedLink } from "../../components/ScopedLink";
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await params;
   const [t, locale] = await Promise.all([getTranslations("contact.metadata"), getLocale()]);
   return {
     title: t("title"),
     description: t("description"),
-    alternates: buildAlternates(locale, "/kontakt"),
+    alternates: buildAlternates(locale, scope, "/kontakt"),
   };
 }
 
@@ -126,9 +129,9 @@ export default async function KontaktPage() {
         {/* Footer note */}
         <p className="text-sm text-[var(--muted)] leading-relaxed" style={{ textWrap: "pretty" } as React.CSSProperties}>
           {t("footerNote")}{" "}
-          <a href="/privatnost" className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
+          <ScopedLink href="/privatnost" className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
             {t("privacyPolicyLink")}
-          </a>
+          </ScopedLink>
           .
         </p>
 

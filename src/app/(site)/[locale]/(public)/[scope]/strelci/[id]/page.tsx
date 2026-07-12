@@ -5,7 +5,7 @@ import { shooters, results, competitions, disciplines } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Link } from "@/i18n/navigation";
+import { ScopedLink } from "../../../components/ScopedLink";
 import Image from "next/image";
 import { ResultsHistoryTable } from "@/components/result-display/ResultsHistoryTable";
 import { FormaChart } from "@/components/shooter/FormaChart";
@@ -16,16 +16,17 @@ import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@/lib/pdf-impor
 import { NOC_LIST } from "@/lib/noc-list";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
+import type { Scope } from "@/lib/scope";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = { params: Promise<{ id: string; scope: Scope }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params;
+  const { id, scope } = await params;
   const [shooter, locale] = await Promise.all([
     db.query.shooters.findFirst({ where: eq(shooters.id, parseInt(id)) }),
     getLocale(),
   ]);
-  const alternates = buildAlternates(locale, `/strelci/${id}`);
+  const alternates = buildAlternates(locale, scope, `/strelci/${id}`);
   if (!shooter) {
     const t = await getTranslations("shooters.profile");
     return { title: t("notFound"), alternates };
@@ -158,9 +159,9 @@ export default async function ShooterPage({ params }: Props) {
     <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-10">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs text-[var(--muted)] mb-8">
-        <Link href="/strelci" className="hover:text-[var(--ink)] transition-colors">
+        <ScopedLink href="/strelci" className="hover:text-[var(--ink)] transition-colors">
           {t("title")}
-        </Link>
+        </ScopedLink>
         <span className="text-[var(--subtle)]">/</span>
         <span className="text-[var(--ink)] font-medium">
           {shooter.lastName} {shooter.firstName}

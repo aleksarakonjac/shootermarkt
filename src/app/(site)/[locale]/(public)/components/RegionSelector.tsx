@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { usePathname, useRouter } from "@/i18n/navigation";
+import { DEFAULT_SCOPE, VALID_SCOPES, type Scope } from "@/lib/scope";
+import { withScope } from "@/hooks/use-scoped-href";
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
@@ -9,17 +13,11 @@ const SRB = { noc: "SRB", alpha2: "RS" };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-type Scope = "issf" | "SRB";
-
 function scopeIcon(scope: Scope): React.ReactNode {
   if (scope === "issf")
     return <img src="/logos/issf.svg" alt="" aria-hidden="true" className="h-4 w-auto max-w-[2rem] object-contain" />;
   return <span className="fi fi-rs" style={{ fontSize: 15, borderRadius: 2 }} aria-hidden="true" />;
 }
-
-// ── Storage ────────────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = "shootermarkt_scope";
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -31,18 +29,14 @@ interface Props {
 export function RegionSelector({ compact = false, placement = "bottom" }: Props) {
   const t = useTranslations("common");
   const srbName = t("serbia");
-  const [scope, setScope] = useState<Scope>("SRB");
   const [open, setOpen]   = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      const s: Scope = (saved === "issf" || saved === "SRB") ? saved : "SRB";
-      setScope(s);
-      document.cookie = `shootermarkt_scope=${s}; path=/; max-age=31536000; SameSite=Lax`;
-    } catch {}
-  }, []);
+  const params = useParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const rawScope = params.scope as string | undefined;
+  const scope = VALID_SCOPES.includes(rawScope as Scope) ? rawScope as Scope : DEFAULT_SCOPE;
+  const locale = params.locale as string | undefined;
 
   useEffect(() => {
     function onOutside(e: MouseEvent) {
@@ -60,13 +54,11 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
     };
   }, []);
 
-  function select(s: Scope) {
-    setScope(s);
+  function select(nextScope: Scope) {
     setOpen(false);
-    try {
-      localStorage.setItem(STORAGE_KEY, s);
-      document.cookie = `shootermarkt_scope=${s}; path=/; max-age=31536000; SameSite=Lax`;
-    } catch {}
+    const query = window.location.search.slice(1);
+    const target = withScope(nextScope, `${pathname}${query ? `?${query}` : ""}`);
+    router.push(target, locale ? { locale } : undefined);
   }
 
   return (
@@ -121,9 +113,9 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
 
         {/* Serbia row */}
         <button
-          onClick={() => select("SRB")}
+          onClick={() => select("srb")}
           className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
-            scope === "SRB"
+            scope === "srb"
               ? "bg-[var(--surface)] text-[var(--brand-primary)]"
               : "text-[var(--ink)] hover:bg-[var(--surface-2)]"
           }`}
@@ -133,7 +125,7 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
           <span className="text-[0.62rem] font-bold font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] shrink-0">
             {SRB.noc}
           </span>
-          {scope === "SRB" && (
+          {scope === "srb" && (
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="shrink-0 text-[var(--brand-primary)]" aria-hidden="true">
               <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>

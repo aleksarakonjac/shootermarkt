@@ -7,6 +7,7 @@ import "./kalendar.css";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 import { LEVEL_STYLE } from "@/lib/competition-utils";
 import { useTranslations, useLocale } from "next-intl";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 
 export type CalendarComp = {
   id: number;
@@ -43,6 +44,7 @@ export function KalendarClient({ competitions }: Props) {
   const t = useTranslations("calendar");
   const tHome = useTranslations("home");
   const locale = useLocale();
+  const scopedHref = useScopedHref();
 
   const FILTER_TABS: { key: LevelFilter; label: string }[] = [
     { key: "all",           label: tCommonLabel("all") },
@@ -320,7 +322,7 @@ export function KalendarClient({ competitions }: Props) {
               return (
                 <Link
                   key={comp.id}
-                  href={`/takmicenja/${comp.id}`}
+                  href={scopedHref(`/takmicenja/${comp.id}`)}
                   className={`group flex items-center gap-3 sm:gap-4 px-4 py-4 transition-colors hover:bg-[var(--surface-2)] kalendar-item ${
                     !isLast ? "border-b border-[var(--border)]" : ""
                   } ${isPast ? "opacity-60" : ""}`}

@@ -6,6 +6,7 @@ import { NOC_LIST } from "@/lib/noc-list";
 import { trendLabel, type Trend } from "@/lib/forma";
 import { CATEGORY_LABEL, type AgeCategory } from "@/lib/pdf-import/types";
 import { ShooterSearchSelect, type ShooterOption } from "@/components/ui/ShooterSearchSelect";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 
 function nocAlpha2(noc: string | null): string | null {
   if (!noc) return null;
@@ -113,7 +114,7 @@ function StatRow({
   );
 }
 
-function ShooterHeader({ c }: { c: H2HCandidate | undefined }) {
+function ShooterHeader({ c, scopedHref }: { c: H2HCandidate | undefined; scopedHref: (path: string) => string }) {
   if (!c) {
     return (
       <div className="flex flex-col items-center text-center gap-1 py-2">
@@ -125,7 +126,7 @@ function ShooterHeader({ c }: { c: H2HCandidate | undefined }) {
   const a2 = nocAlpha2(c.nationality);
   return (
     <Link
-      href={`/strelci/${c.shooterId}`}
+      href={scopedHref(`/strelci/${c.shooterId}`)}
       className="flex flex-col items-center text-center gap-1.5 py-2 group"
     >
       <div className="w-14 h-14 rounded-full bg-[var(--surface-2)] flex items-center justify-center overflow-hidden border border-[var(--border)]">
@@ -153,6 +154,7 @@ function ShooterHeader({ c }: { c: H2HCandidate | undefined }) {
 }
 
 export function HeadToHeadPanel({ candidates, labels, seasonLabel, initialP1, initialP2 }: Props) {
+  const scopedHref = useScopedHref();
   const [p1, setP1] = useState<number | null>(initialP1 ?? null);
   const [p2, setP2] = useState<number | null>(initialP2 ?? null);
 
@@ -212,8 +214,8 @@ export function HeadToHeadPanel({ candidates, labels, seasonLabel, initialP1, in
         <>
           {/* Headers */}
           <div className="grid grid-cols-2 px-5 pt-4">
-            <ShooterHeader c={c1} />
-            <ShooterHeader c={c2} />
+            <ShooterHeader c={c1} scopedHref={scopedHref} />
+            <ShooterHeader c={c2} scopedHref={scopedHref} />
           </div>
 
           {/* Stats */}

@@ -1,4 +1,4 @@
-import { Link } from "@/i18n/navigation";
+import { ScopedLink } from "./ScopedLink";
 import { getPublishedArticles } from "@/lib/cms/get-articles";
 import { getLocale, getTranslations } from "next-intl/server";
 
@@ -32,12 +32,12 @@ export async function NewsSection() {
           {t("title")}
         </h2>
         {articles.length > 0 && (
-          <Link
+          <ScopedLink
             href="/vesti"
             className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"
           >
             {tHome("allNewsLink")}
-          </Link>
+          </ScopedLink>
         )}
       </div>
 
@@ -52,7 +52,7 @@ export async function NewsSection() {
             const featured = articles[0];
             const accent = ACCENTS[0];
             return (
-              <Link
+              <ScopedLink
                 href={`/vesti/${featured.slug}`}
                 className="md:col-span-2 relative flex flex-col justify-end rounded-xl overflow-hidden border border-[var(--border)] min-h-[240px] group hover:shadow-lg transition-shadow"
                 style={{
@@ -91,7 +91,7 @@ export async function NewsSection() {
                     </div>
                   )}
                 </div>
-              </Link>
+              </ScopedLink>
             );
           })()}
 
@@ -100,7 +100,7 @@ export async function NewsSection() {
             {articles.slice(1, 4).map((item, i) => {
               const accent = ACCENTS[(i + 1) % ACCENTS.length];
               return (
-                <Link
+                <ScopedLink
                   key={item.id}
                   href={`/vesti/${item.slug}`}
                   className="relative flex flex-col justify-between rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg)] p-4 group hover:shadow-md transition-shadow flex-1"
@@ -125,7 +125,7 @@ export async function NewsSection() {
                       {formatDate(item.publishedAt, locale)}
                     </div>
                   )}
-                </Link>
+                </ScopedLink>
               );
             })}
           </div>

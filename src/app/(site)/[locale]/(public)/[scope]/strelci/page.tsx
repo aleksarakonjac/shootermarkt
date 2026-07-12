@@ -1,7 +1,7 @@
 export const revalidate = 300;
 
 import { Suspense } from "react";
-import { Link } from "@/i18n/navigation";
+import { ScopedLink } from "../../components/ScopedLink";
 import Image from "next/image";
 import { db } from "@/lib/db";
 import { shooters, clubs, results, competitions } from "@/lib/db/schema";
@@ -15,13 +15,15 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@/lib/pdf-import/types";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Metadata } from "next";
+import { buildShooterScopeFilter, type Scope } from "@/lib/scope";
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await params;
   const [t, locale] = await Promise.all([getTranslations("shooters"), getLocale()]);
   return {
     title: t("title"),
     description: t("subtitle"),
-    alternates: buildAlternates(locale, "/strelci"),
+    alternates: buildAlternates(locale, scope, "/strelci"),
   };
 }
 
@@ -116,9 +118,9 @@ function FormaLeaderRow({
   const rowClass = "flex items-center gap-3 py-2.5 -mx-2 px-2 rounded-lg transition-colors group border-b border-[var(--border)] last:border-0";
 
   return (
-    <Link href={`/strelci/${s.id}`} className={`${rowClass} hover:bg-[var(--surface-2)]`}>
+    <ScopedLink href={`/strelci/${s.id}`} className={`${rowClass} hover:bg-[var(--surface-2)]`}>
       {inner}
-    </Link>
+    </ScopedLink>
   );
 }
 
@@ -128,6 +130,7 @@ type SortCol = "name" | "godiste" | "disc";
 type SortDir = "asc" | "desc";
 
 type Props = {
+  params: Promise<{ scope: Scope }>;
   searchParams: Promise<{
     q?: string;
     zemlja?: string;
@@ -139,7 +142,8 @@ type Props = {
   }>;
 };
 
-export default async function StrelciPage({ searchParams }: Props) {
+export default async function StrelciPage({ params, searchParams }: Props) {
+  const { scope } = await params;
   const locale       = await getLocale();
   const t            = await getTranslations("shooters");
   const tProfile     = await getTranslations("shooters.profile");
@@ -161,9 +165,11 @@ export default async function StrelciPage({ searchParams }: Props) {
   const thisYear     = String(new Date().getFullYear());
   const activeSort   = (["name", "godiste", "disc"].includes(sp.sort ?? "") ? sp.sort : "name") as SortCol;
   const activeDir    = (sp.dir === "desc" ? "desc" : "asc") as SortDir;
+  const scopeFilter  = buildShooterScopeFilter(scope);
 
   const conditions: (SQL | undefined)[] = [
     inArray(shooters.apparatus, [...MVP_APPARATUS]),
+    scopeFilter,
     activeQ
       ? and(
           ...activeQ
@@ -226,7 +232,7 @@ export default async function StrelciPage({ searchParams }: Props) {
     db
       .selectDistinct({ noc: shooters.nationality })
       .from(shooters)
-      .where(isNotNull(shooters.nationality))
+      .where(and(isNotNull(shooters.nationality), scopeFilter))
       .orderBy(asc(shooters.nationality)),
 
     // Active this year = at least 1 result in current year
@@ -238,20 +244,21 @@ export default async function StrelciPage({ searchParams }: Props) {
       .where(and(
         gte(competitions.date, `${thisYear}-01-01`),
         inArray(shooters.apparatus, [...MVP_APPARATUS]),
+        scopeFilter,
       )),
 
     // Breakdown by apparatus (global, unfiltered)
     db
       .select({ apparatus: shooters.apparatus, count: sql<number>`COUNT(*)::int` })
       .from(shooters)
-      .where(inArray(shooters.apparatus, [...MVP_APPARATUS]))
+      .where(and(inArray(shooters.apparatus, [...MVP_APPARATUS]), scopeFilter))
       .groupBy(shooters.apparatus),
 
     // Total shooters in MVP scope (unfiltered)
     db
       .select({ totalAll: sql<number>`COUNT(*)::int` })
       .from(shooters)
-      .where(inArray(shooters.apparatus, [...MVP_APPARATUS])),
+      .where(and(inArray(shooters.apparatus, [...MVP_APPARATUS]), scopeFilter)),
 
     // All rifle/pistol shooters for forma leaders (unfiltered, unpaginated)
     db
@@ -267,7 +274,7 @@ export default async function StrelciPage({ searchParams }: Props) {
       })
       .from(shooters)
       .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-      .where(inArray(shooters.apparatus, [...MVP_APPARATUS])),
+      .where(and(inArray(shooters.apparatus, [...MVP_APPARATUS]), scopeFilter)),
   ]);
 
   // Forma scores — paginated table + all-shooter leaders in parallel
@@ -520,12 +527,12 @@ export default async function StrelciPage({ searchParams }: Props) {
                 : t("noResultsPage")}
             </p>
             {(activeQ || activeZemlja || activePol || activeAparat) && (
-              <Link
+              <ScopedLink
                 href="/strelci"
                 className="mt-3 inline-block text-xs font-semibold text-[var(--brand-primary)] hover:underline"
               >
                 {t("resetFilters")}
-              </Link>
+              </ScopedLink>
             )}
           </div>
         ) : (
@@ -534,19 +541,19 @@ export default async function StrelciPage({ searchParams }: Props) {
               <thead>
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] w-2/5">
-                    <Link href={sortUrl("name")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
+                    <ScopedLink href={sortUrl("name")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
                       {tProfile("shooter")}<SortIcon col="name" />
-                    </Link>
+                    </ScopedLink>
                   </th>
                   <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden md:table-cell">
-                    <Link href={sortUrl("godiste")} className="inline-flex items-center justify-end hover:text-[var(--ink)] transition-colors">
+                    <ScopedLink href={sortUrl("godiste")} className="inline-flex items-center justify-end hover:text-[var(--ink)] transition-colors">
                       {tProfile("birthYear")}<SortIcon col="godiste" />
-                    </Link>
+                    </ScopedLink>
                   </th>
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                    <Link href={sortUrl("disc")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
+                    <ScopedLink href={sortUrl("disc")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
                       {tProfile("discipline")}<SortIcon col="disc" />
-                    </Link>
+                    </ScopedLink>
                   </th>
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
                     {locale === "en" ? "Category" : "Kategorija"}
@@ -595,12 +602,12 @@ export default async function StrelciPage({ searchParams }: Props) {
                             )}
                           </div>
                         <div className="flex items-center gap-2 min-w-0">
-                          <Link
+                          <ScopedLink
                             href={`/strelci/${s.id}`}
                             className="font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors leading-snug truncate"
                           >
                             {s.lastName} {s.firstName}
-                          </Link>
+                          </ScopedLink>
                           {s.nationality && (
                             <span className="inline-flex items-center gap-1 shrink-0">
                               {alpha2 && (
@@ -722,23 +729,23 @@ export default async function StrelciPage({ searchParams }: Props) {
       {/* Bottom pagination */}
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-center gap-1">
-          <Link
+          <ScopedLink
             href={pageUrl(page - 1)}
             aria-disabled={page <= 1}
             className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${page <= 1 ? "pointer-events-none opacity-30 text-[var(--muted)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"}`}
           >
             {locale === "en" ? "← Previous" : "← Prethodna"}
-          </Link>
+          </ScopedLink>
           <span className="text-xs text-[var(--muted)] px-3 font-[family-name:var(--font-jetbrains-mono)]">
             {page} / {totalPages}
           </span>
-          <Link
+          <ScopedLink
             href={pageUrl(page + 1)}
             aria-disabled={page >= totalPages}
             className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${page >= totalPages ? "pointer-events-none opacity-30 text-[var(--muted)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"}`}
           >
             {locale === "en" ? "Next →" : "Sledeća →"}
-          </Link>
+          </ScopedLink>
         </div>
       )}
 

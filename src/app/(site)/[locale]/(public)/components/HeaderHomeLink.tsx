@@ -2,13 +2,15 @@
 
 import { Link } from "@/i18n/navigation";
 import { usePathname } from "@/i18n/navigation";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 
 export default function HeaderHomeLink() {
   const pathname = usePathname();
+  const scopedHref = useScopedHref();
   const isHome = pathname === "/" || pathname === "";
   return (
     <Link
-      href="/"
+      href={scopedHref("/")}
       className={`relative px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 select-none ${
         isHome
           ? "text-[var(--brand-primary)]"

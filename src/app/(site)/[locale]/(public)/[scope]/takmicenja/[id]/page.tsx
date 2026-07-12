@@ -12,7 +12,7 @@ import {
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Link } from "@/i18n/navigation";
+import { ScopedLink } from "../../../components/ScopedLink";
 import type { CompetitionLevel, EventType } from "@/lib/pdf-import/types";
 import { CATEGORY_RANK } from "@/lib/pdf-import/types";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
@@ -22,18 +22,19 @@ import {
 } from "./CompetitionResultsClient";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
+import type { Scope } from "@/lib/scope";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = { params: Promise<{ id: string; scope: Scope }> };
 
 // ── Metadata ─────────────────────────────────────────────────────────────────
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const locale = await getLocale();
-  const { id } = await params;
+  const { id, scope } = await params;
   const comp = await db.query.competitions.findFirst({
     where: eq(competitions.id, parseInt(id)),
   });
-  const alternates = buildAlternates(locale, `/takmicenja/${id}`);
+  const alternates = buildAlternates(locale, scope, `/takmicenja/${id}`);
   if (!comp) {
     const t = await getTranslations("competition");
     return { title: t("detail.notFound"), alternates };
@@ -186,13 +187,13 @@ export default async function CompetitionPage({ params }: Props) {
 
       {/* ── Breadcrumb ────────────────────────────────────────────── */}
       <nav className="flex items-center gap-2 text-xs text-[var(--muted)] mb-8">
-        <Link href="/" className="hover:text-[var(--ink)] transition-colors">
+        <ScopedLink href="/" className="hover:text-[var(--ink)] transition-colors">
           {tCommon("home")}
-        </Link>
+        </ScopedLink>
         <span className="text-[var(--subtle)]">/</span>
-        <Link href="/takmicenja" className="hover:text-[var(--ink)] transition-colors">
+        <ScopedLink href="/takmicenja" className="hover:text-[var(--ink)] transition-colors">
           {t("list.title")}
-        </Link>
+        </ScopedLink>
         <span className="text-[var(--subtle)]">/</span>
         <span className="text-[var(--ink)] font-medium truncate max-w-[260px]">
           {compName}

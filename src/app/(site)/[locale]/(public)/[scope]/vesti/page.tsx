@@ -1,4 +1,4 @@
-import { Link } from "@/i18n/navigation";
+import { ScopedLink } from "../../components/ScopedLink";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { getPublishedArticles, getAllPublishedTags } from "@/lib/cms/get-articles";
@@ -9,12 +9,14 @@ import {
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import { getLevelLabel } from "@/lib/competition-utils";
+import type { Scope } from "@/lib/scope";
 
 export const revalidate = 300;
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await params;
   const [t, locale] = await Promise.all([getTranslations("news"), getLocale()]);
-  return { title: t("title"), alternates: buildAlternates(locale, "/vesti") };
+  return { title: t("title"), alternates: buildAlternates(locale, scope, "/vesti") };
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -108,7 +110,7 @@ export default async function VestiPage({ searchParams }: Props) {
 
       {/* ── Category filter chips ── */}
       <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-        <Link
+        <ScopedLink
           href="/vesti"
           className={`shrink-0 px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
             !activeCategory
@@ -117,9 +119,9 @@ export default async function VestiPage({ searchParams }: Props) {
           }`}
         >
           {t("allCategories")}
-        </Link>
+        </ScopedLink>
         {CATEGORIES.map((cat) => (
-          <Link
+          <ScopedLink
             key={cat.value}
             href={`/vesti?kategorija=${cat.value}`}
             className={`shrink-0 px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
@@ -133,7 +135,7 @@ export default async function VestiPage({ searchParams }: Props) {
             }
           >
             {cat.label}
-          </Link>
+          </ScopedLink>
         ))}
       </div>
 
@@ -216,7 +218,7 @@ function HeroCard({
 }) {
   const imgUrl = article.coverImage?.url ?? null;
   return (
-    <Link href={`/vesti/${article.slug}`} className="group block">
+    <ScopedLink href={`/vesti/${article.slug}`} className="group block">
       <article
         className="relative overflow-hidden rounded-xl min-h-[360px] flex flex-col justify-end"
         style={{
@@ -281,7 +283,7 @@ function HeroCard({
           </div>
         </div>
       </article>
-    </Link>
+    </ScopedLink>
   );
 }
 
@@ -300,7 +302,7 @@ function ArticleCard({
 }) {
   const imgUrl = article.coverImage?.url ?? null;
   return (
-    <Link href={`/vesti/${article.slug}`} className="group block">
+    <ScopedLink href={`/vesti/${article.slug}`} className="group block">
       <article className="flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 hover:border-[var(--brand-primary)] transition-colors overflow-hidden">
         <div
           className="relative shrink-0 w-24 h-20 rounded-lg overflow-hidden"
@@ -349,7 +351,7 @@ function ArticleCard({
           )}
         </div>
       </article>
-    </Link>
+    </ScopedLink>
   );
 }
 
@@ -379,12 +381,12 @@ function EmptyState({
         {t("emptySubtitle")}
       </p>
       {activeCategory && (
-        <Link
+        <ScopedLink
           href="/vesti"
           className="mt-2 text-xs font-semibold text-[var(--brand-primary)] hover:underline"
         >
           {t("allCategoriesLink")}
-        </Link>
+        </ScopedLink>
       )}
     </div>
   );
@@ -398,12 +400,12 @@ function WidgetHeader({ title, linkHref, linkLabel }: { title: string; linkHref:
       <span className="font-[family-name:var(--font-barlow-condensed)] font-bold text-sm uppercase tracking-wide text-[var(--ink)]">
         {title}
       </span>
-      <Link
+      <ScopedLink
         href={linkHref}
         className="text-xs font-semibold text-[var(--brand-primary)] hover:underline shrink-0"
       >
         {linkLabel} →
-      </Link>
+      </ScopedLink>
     </div>
   );
 }
@@ -438,7 +440,7 @@ function UpcomingWidget({
             const displayName = locale === "en" ? (comp.nameEn ?? comp.nameSr ?? comp.name) : (comp.nameSr ?? comp.name);
             return (
               <li key={comp.id}>
-                <Link
+                <ScopedLink
                   href={`/takmicenja/${comp.id}`}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)] transition-colors group"
                 >
@@ -467,7 +469,7 @@ function UpcomingWidget({
                       )}
                     </div>
                   </div>
-                </Link>
+                </ScopedLink>
               </li>
             );
           })}
@@ -524,12 +526,12 @@ function TopShootersWidget({
                     <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold text-[var(--subtle)] w-4 shrink-0">
                       {i + 1}
                     </span>
-                    <Link
+                    <ScopedLink
                       href={`/strelci/${row.shooterId}`}
                       className="text-[13px] text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors truncate flex-1"
                     >
                       {row.firstName} {row.lastName}
-                    </Link>
+                    </ScopedLink>
                     <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] tabular-nums shrink-0">
                       {Number(row.bestScore).toFixed(1)}
                     </span>

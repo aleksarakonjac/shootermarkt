@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Link } from "@/i18n/navigation";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { useTranslations, useLocale } from "next-intl";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 
 export interface TickerDetailItem { label?: string; text: string; }
 
@@ -150,6 +151,7 @@ function UpperBar({ items, t, locale }: { items: TickerItem[]; t: any; locale: s
 }
 
 function LiveBarInner({ item, t, locale }: { item: TickerItem; t: any; locale: string }) {
+  const scopedHref = useScopedHref();
   const isLive   = item.status === "LIVE";
   const isUskoro = item.status === "USKORO";
 
@@ -258,7 +260,7 @@ function LiveBarInner({ item, t, locale }: { item: TickerItem; t: any; locale: s
   );
 
   return item.href ? (
-    <Link href={item.href} className="block h-full hover:opacity-90 transition-opacity">{inner}</Link>
+    <Link href={scopedHref(item.href)} className="block h-full hover:opacity-90 transition-opacity">{inner}</Link>
   ) : inner;
 }
 
@@ -314,6 +316,7 @@ function UpcomingBar({ items, t, locale }: { items: TickerItem[]; t: any; locale
 }
 
 function UpcomingItem({ item, locale }: { item: TickerItem; locale: string }) {
+  const scopedHref = useScopedHref();
   const d       = new Date(item.date + "T00:00:00");
   const localeStr = locale === "en" ? "en-US" : "sr-Latn-RS";
   const dateStr = d.toLocaleDateString(localeStr, { day: "numeric", month: "short" });
@@ -330,8 +333,7 @@ function UpcomingItem({ item, locale }: { item: TickerItem; locale: string }) {
   );
 
   if (item.href) {
-    return <Link href={item.href} className="hover:opacity-70 transition-opacity">{content}</Link>;
+    return <Link href={scopedHref(item.href)} className="hover:opacity-70 transition-opacity">{content}</Link>;
   }
   return content;
 }
-

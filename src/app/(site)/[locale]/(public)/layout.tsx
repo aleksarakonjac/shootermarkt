@@ -1,4 +1,3 @@
-import { Link } from "@/i18n/navigation";
 import { db } from "@/lib/db";
 import { shooters, clubs, competitions } from "@/lib/db/schema";
 import { eq, desc, inArray, and } from "drizzle-orm";
@@ -9,6 +8,7 @@ import HeaderHomeLink from "./components/HeaderHomeLink";
 import ThemeToggle from "./components/ThemeToggle";
 import { RegionSelector } from "./components/RegionSelector";
 import { LocaleSwitcher } from "./components/LocaleSwitcher";
+import { ScopedLink } from "./components/ScopedLink";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 export const revalidate = 300;
@@ -67,14 +67,14 @@ export default async function PublicLayout({ children, params }: Props) {
           <div className="flex h-14 items-center gap-4">
 
             {/* Logo */}
-            <Link href="/" className="flex items-baseline gap-0 shrink-0 no-underline">
+            <ScopedLink href="/" className="flex items-baseline gap-0 shrink-0 no-underline">
               <span className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-[1.35rem] uppercase tracking-tight text-[var(--brand-primary)] leading-none">
                 Shooter
               </span>
               <span className="font-[family-name:var(--font-barlow-condensed)] font-semibold text-[1.35rem] uppercase tracking-tight text-[var(--ink)] leading-none">
                 markt
               </span>
-            </Link>
+            </ScopedLink>
             <div className="hidden md:block"><HeaderHomeLink /></div>
 
             {/* Nav groups (desktop) + hamburger (mobile, inside MainNav) */}
@@ -109,14 +109,14 @@ export default async function PublicLayout({ children, params }: Props) {
 
             {/* Brand */}
             <div className="lg:w-[200px] shrink-0">
-              <Link href="/" className="inline-flex items-baseline gap-0 no-underline mb-3 group">
+              <ScopedLink href="/" className="inline-flex items-baseline gap-0 no-underline mb-3 group">
                 <span className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-[1.6rem] uppercase tracking-tight text-[var(--brand-primary)] leading-none transition-opacity group-hover:opacity-80">
                   Shooter
                 </span>
                 <span className="font-[family-name:var(--font-barlow-condensed)] font-semibold text-[1.6rem] uppercase tracking-tight text-[var(--ink)] leading-none transition-opacity group-hover:opacity-80">
                   markt
                 </span>
-              </Link>
+              </ScopedLink>
               <p className="text-[0.8125rem] text-[var(--muted)] leading-snug" style={{ textWrap: "pretty" } as React.CSSProperties}>
                 {t("tagline")}
               </p>
@@ -132,9 +132,9 @@ export default async function PublicLayout({ children, params }: Props) {
                 </p>
                 <ul className="space-y-2">
                   <li>
-                    <Link href="/strelci" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+                    <ScopedLink href="/strelci" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
                       {t("profiles")}
-                    </Link>
+                    </ScopedLink>
                   </li>
                 </ul>
               </div>
@@ -146,14 +146,14 @@ export default async function PublicLayout({ children, params }: Props) {
                 </p>
                 <ul className="space-y-2">
                   <li>
-                    <Link href="/takmicenja" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+                    <ScopedLink href="/takmicenja" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
                       {t("competitionList")}
-                    </Link>
+                    </ScopedLink>
                   </li>
                   <li>
-                    <Link href="/takmicenja?view=cal" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+                    <ScopedLink href="/takmicenja?view=cal" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
                       {t("calendar")}
-                    </Link>
+                    </ScopedLink>
                   </li>
                 </ul>
               </div>
@@ -165,14 +165,14 @@ export default async function PublicLayout({ children, params }: Props) {
                 </p>
                 <ul className="space-y-2">
                   <li>
-                    <Link href="/rangiranje" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+                    <ScopedLink href="/rangiranje" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
                       {t("ranking")}
-                    </Link>
+                    </ScopedLink>
                   </li>
                   <li>
-                    <Link href="/rangiranje?view=h2h" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+                    <ScopedLink href="/rangiranje?view=h2h" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
                       {t("h2h")}
-                    </Link>
+                    </ScopedLink>
                   </li>
                   <li className="flex items-center gap-1.5">
                     <span className="text-sm text-[var(--subtle)]">{t("clubLeaderboard")}</span>
@@ -192,14 +192,14 @@ export default async function PublicLayout({ children, params }: Props) {
                 </p>
                 <ul className="space-y-2">
                   <li>
-                    <Link href="/kontakt" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+                    <ScopedLink href="/kontakt" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
                       {t("contact")}
-                    </Link>
+                    </ScopedLink>
                   </li>
                   <li>
-                    <Link href="/privatnost" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
+                    <ScopedLink href="/privatnost" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
                       {t("privacy")}
-                    </Link>
+                    </ScopedLink>
                   </li>
                 </ul>
               </div>

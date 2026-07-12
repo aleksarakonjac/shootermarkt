@@ -6,6 +6,7 @@ import { usePathname } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import ThemeToggle from "./ThemeToggle";
 import { RegionSelector } from "./RegionSelector";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,8 @@ function SoonBadge({ label }: { label: string }) {
 
 export function MainNav() {
   const pathname = usePathname();
+  const scopedHref = useScopedHref();
+  const unscopedPathname = pathname.replace(/^\/(?:srb|issf)(?=\/|$)/, "") || "/";
   const tNav = useTranslations("nav");
   const NAV = buildNav(tNav);
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -148,7 +151,7 @@ export function MainNav() {
   }
 
   function isGroupActive(group: NavGroup): boolean {
-    return group.items.some((i) => !i.soon && pathname.startsWith(i.href));
+    return group.items.some((i) => !i.soon && unscopedPathname.startsWith(i.href));
   }
 
   return (
@@ -160,11 +163,11 @@ export function MainNav() {
           const open = openKey === group.key;
 
           if (group.directHref) {
-            const active = pathname.startsWith(group.directHref);
+            const active = unscopedPathname.startsWith(group.directHref);
             return (
               <Link
                 key={group.key}
-                href={group.directHref}
+                href={scopedHref(group.directHref)}
                 className={`relative px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 ${
                   active
                     ? "text-[var(--brand-primary)]"
@@ -227,7 +230,7 @@ export function MainNav() {
                 role="menu"
               >
                 {group.items.map((item, idx) => {
-                  const itemActive = !item.soon && pathname.startsWith(item.href);
+                  const itemActive = !item.soon && unscopedPathname.startsWith(item.href);
                   const isLast = idx === group.items.length - 1;
                   const inner = (
                     <>
@@ -254,7 +257,7 @@ export function MainNav() {
                   ) : (
                     <Link
                       key={item.href}
-                      href={item.href}
+                      href={scopedHref(item.href)}
                       onClick={() => setOpenKey(null)}
                       className={`block px-3.5 py-3 transition-colors duration-100 ${!isLast ? "border-b border-[var(--border)]" : ""} ${
                         itemActive ? "bg-[var(--surface)]" : "hover:bg-[var(--surface-2)]"
@@ -320,11 +323,11 @@ export function MainNav() {
         <nav className="flex-1 overflow-y-auto py-2" aria-label={tCommon("mobileNav")}>
           {NAV.map((group) => {
             if (group.directHref) {
-              const active = pathname.startsWith(group.directHref);
+              const active = unscopedPathname.startsWith(group.directHref);
               return (
                 <Link
                   key={group.key}
-                  href={group.directHref}
+                  href={scopedHref(group.directHref)}
                   onClick={() => setMobileOpen(false)}
                   className={`block px-4 py-3 text-sm font-semibold transition-colors hover:bg-[var(--surface-2)] ${
                     active ? "text-[var(--brand-primary)]" : "text-[var(--ink)]"
@@ -366,7 +369,7 @@ export function MainNav() {
                 >
                   <div className="overflow-hidden">
                     {group.items.map((item) => {
-                      const itemActive = !item.soon && pathname.startsWith(item.href);
+                      const itemActive = !item.soon && unscopedPathname.startsWith(item.href);
                       const inner = (
                         <div className="flex items-center justify-between gap-2 w-full">
                           <div>
@@ -387,7 +390,7 @@ export function MainNav() {
                       ) : (
                         <Link
                           key={item.href}
-                          href={item.href}
+                          href={scopedHref(item.href)}
                           className={`block pl-6 pr-4 py-2.5 transition-colors hover:bg-[var(--surface-2)] ${itemActive ? "bg-[var(--surface)]" : ""}`}
                           onClick={() => setMobileOpen(false)}
                         >

@@ -1,26 +1,25 @@
-export const dynamic = "force-dynamic";
-
 import { db } from "@/lib/db";
 import { competitions, results, disciplines, countries } from "@/lib/db/schema";
-import { eq, desc, ilike, and, sql, or } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { eq, desc, ilike, and, sql } from "drizzle-orm";
 import type { Metadata } from "next";
-import { Link } from "@/i18n/navigation";
+import { ScopedLink } from "../../components/ScopedLink";
 import { Suspense } from "react";
 import { CompetitionsFilterBar } from "./CompetitionsFilterBar";
 import { ViewToggle } from "./ViewToggle";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
-import { KalendarClient, type CalendarComp } from "../kalendar/KalendarClient";
+import { KalendarClient, type CalendarComp } from "../../kalendar/KalendarClient";
 import { asc } from "drizzle-orm";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
+import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await params;
   const [t, locale] = await Promise.all([getTranslations("competition"), getLocale()]);
   return {
     title: t("list.title"),
-    alternates: buildAlternates(locale, "/takmicenja"),
+    alternates: buildAlternates(locale, scope, "/takmicenja"),
   };
 }
 
@@ -156,7 +155,7 @@ function CompRow({
   const countdown = showCountdown ? formatCountdown(daysUntil(comp.date), locale) : null;
 
   return (
-    <Link
+    <ScopedLink
       href={`/takmicenja/${comp.id}`}
       className={`group flex items-center gap-3 sm:gap-4 px-4 py-3.5 transition-colors hover:bg-[var(--surface)] ${
         !isLast ? "border-b border-[var(--border)]" : ""
@@ -266,21 +265,20 @@ function CompRow({
           fill="none"
         />
       </svg>
-    </Link>
+    </ScopedLink>
   );
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 interface Props {
+  params: Promise<{ scope: Scope }>;
   searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; archiveAll?: string; when?: string }>;
 }
 
-export default async function TakmicenjaPage({ searchParams }: Props) {
+export default async function TakmicenjaPage({ params, searchParams }: Props) {
+  const { scope } = await params;
   const { year, level, q, tag, view, archiveAll, when } = await searchParams;
-
-  const cookieStore = await cookies();
-  const scope = cookieStore.get("shootermarkt_scope")?.value === "issf" ? "issf" : "SRB";
   const [locale, t] = await Promise.all([getLocale(), getTranslations("competition")]);
 
   const defaultYear  = new Date().getFullYear().toString();
@@ -298,20 +296,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
   recentCutoff.setDate(recentCutoff.getDate() - 60);
   const recentCutoffStr = recentCutoff.toISOString().split("T")[0];
 
-  // SRB scope: domestic + European + World/ISSF
-  // ISSF scope: only continental/world/olympic (no club/regional/national/international)
-  const scopeFilter = scope === "issf"
-    ? sql`${competitions.level} IN ('continental', 'world', 'olympic')`
-    : or(
-        sql`${competitions.countryId} = (SELECT id FROM countries WHERE noc_code = 'SRB')`,
-        sql`'sss' = ANY(${competitions.tags})`,
-        sql`${competitions.organizer} = 'SSS'`,
-        sql`'esc' = ANY(${competitions.tags})`,
-        sql`${competitions.organizer} = 'ESC'`,
-        sql`${competitions.level} IN ('world', 'olympic')`,
-        sql`'issf' = ANY(${competitions.tags})`,
-        sql`${competitions.organizer} = 'ISSF'`
-      );
+  const scopeFilter = buildCompetitionScopeFilter(scope);
 
   // SQL filters
   const sqlFilters = [
@@ -487,7 +472,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
             const count = w === "upcoming" ? live.length + upcoming.length : recent.length + archive.length;
             const active = activeWhen === w;
             return (
-              <Link
+              <ScopedLink
                 key={w}
                 href={whenHref(w)}
                 role="tab"
@@ -503,7 +488,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
                 <span className={`text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] tabular-nums transition-colors ${active ? "text-[var(--muted)]" : "text-[var(--subtle)]"}`}>
                   {count}
                 </span>
-              </Link>
+              </ScopedLink>
             );
           })}
         </div>
@@ -516,12 +501,12 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
             {isFiltered ? t("list.noResults") : (locale === "en" ? "No competitions added yet." : "Još nema unetih takmičenja.")}
           </p>
           {isFiltered && (
-            <Link
+            <ScopedLink
               href="/takmicenja"
               className="text-xs text-[var(--brand-primary)] hover:underline"
             >
               {locale === "en" ? "Show all →" : "Prikaži sva →"}
-            </Link>
+            </ScopedLink>
           )}
         </div>
       )}
@@ -536,9 +521,9 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
               <p className="text-sm text-[var(--muted)] text-center max-w-none">
                 {locale === "en" ? "No upcoming competitions for the selected filters." : "Nema nadolazećih takmičenja za izabrane filtere."}
               </p>
-              <Link href={whenHref("past")} className="text-xs text-[var(--brand-primary)] hover:underline">
+              <ScopedLink href={whenHref("past")} className="text-xs text-[var(--brand-primary)] hover:underline">
                 {locale === "en" ? "View past →" : "Pogledaj prošla →"}
-              </Link>
+              </ScopedLink>
             </div>
           )}
 
@@ -577,7 +562,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
   
               {/* Hero card */}
               {hero && (
-                <Link
+                <ScopedLink
                   href={`/takmicenja/${hero.id}`}
                   className="group block rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:shadow-sm transition-all mb-2 overflow-hidden"
                 >
@@ -655,7 +640,7 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
                       )}
                     </div>
                   </div>
-                </Link>
+                </ScopedLink>
               )}
 
               {/* Rest of upcoming — grouped by month */}
@@ -713,14 +698,14 @@ export default async function TakmicenjaPage({ searchParams }: Props) {
                   );
                 })}
                 {!showAllArchive && pastMonths.length > 12 && (
-                  <Link
+                  <ScopedLink
                     href={pastMoreHref}
                     className="flex items-center justify-center gap-1.5 py-3 text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors hover:underline"
                   >
                     {locale === "en"
                       ? `Show ${pastMonths.length - 12} older months →`
                       : `Prikaži ${pastMonths.length - 12} starijih meseci →`}
-                  </Link>
+                  </ScopedLink>
                 )}
               </div>
             </section>

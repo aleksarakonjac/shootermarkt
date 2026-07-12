@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { MapPin } from "lucide-react";
 import { LEVEL_STYLE } from "@/lib/competition-utils";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 
 interface Competition {
   id: number;
@@ -52,6 +53,7 @@ export function UpcomingEvents({ competitions }: UpcomingEventsProps) {
   const t = useTranslations("home");
   const tComp = useTranslations("competition");
   const locale = useLocale();
+  const scopedHref = useScopedHref();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -105,7 +107,7 @@ export function UpcomingEvents({ competitions }: UpcomingEventsProps) {
 
         <div className="flex items-center gap-2">
           <Link
-            href="/takmicenja"
+            href={scopedHref("/takmicenja")}
             className="text-xs font-semibold text-[var(--brand-primary)] hover:underline mr-2"
           >
             {t("all")}
@@ -159,7 +161,7 @@ export function UpcomingEvents({ competitions }: UpcomingEventsProps) {
             return (
               <Link
                 key={comp.id}
-                href={`/takmicenja/${comp.id}`}
+                href={scopedHref(`/takmicenja/${comp.id}`)}
                 className="shrink-0 w-[230px] rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-[box-shadow,transform] duration-200 flex flex-col no-underline"
               >
                 <div className="p-4 flex flex-col gap-3 flex-1">

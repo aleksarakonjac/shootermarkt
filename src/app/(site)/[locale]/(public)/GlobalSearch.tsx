@@ -7,6 +7,7 @@ import { Link } from "@/i18n/navigation";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
   const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const scopedHref = useScopedHref();
   const t = useTranslations("search");
 
   useEffect(() => setMounted(true), []);
@@ -202,10 +204,10 @@ export function GlobalSearch({ shooters, competitions }: Props) {
       e.preventDefault();
       if (total === 0) return;
       if (activeIndex < filteredShooters.length) {
-        router.push(`/strelci/${filteredShooters[activeIndex].id}`);
+        router.push(scopedHref(`/strelci/${filteredShooters[activeIndex].id}`));
       } else {
         const c = filteredComps[activeIndex - filteredShooters.length];
-        if (c) router.push(`/takmicenja/${c.id}`);
+        if (c) router.push(scopedHref(`/takmicenja/${c.id}`));
       }
       closeModal();
     }
@@ -293,7 +295,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
                     return (
                       <Link
                         key={s.id}
-                        href={`/strelci/${s.id}`}
+                        href={scopedHref(`/strelci/${s.id}`)}
                         onClick={closeModal}
                         onMouseEnter={() => setActiveIndex(i)}
                         className="flex items-center gap-3 px-4 py-2.5 transition-colors"
@@ -343,7 +345,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
                     return (
                       <Link
                         key={c.id}
-                        href={`/takmicenja/${c.id}`}
+                        href={scopedHref(`/takmicenja/${c.id}`)}
                         onClick={closeModal}
                         onMouseEnter={() => setActiveIndex(globalIdx)}
                         className="flex items-center gap-3 px-4 py-2.5 transition-colors"

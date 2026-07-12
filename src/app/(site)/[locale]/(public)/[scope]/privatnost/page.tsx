@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import { Link } from "@/i18n/navigation";
+import { ScopedLink } from "../../components/ScopedLink";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
+import type { Scope } from "@/lib/scope";
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await params;
   const [t, locale] = await Promise.all([getTranslations("privacy.metadata"), getLocale()]);
   return {
     title: t("title"),
     description: t("description"),
-    alternates: buildAlternates(locale, "/privatnost"),
+    alternates: buildAlternates(locale, scope, "/privatnost"),
   };
 }
 
@@ -339,12 +341,12 @@ export default async function PrivatnostPage() {
               </P>
               <P>
                 Or via the{" "}
-                <Link
+                <ScopedLink
                   href="/kontakt"
                   className="text-[var(--brand-primary)] hover:underline"
                 >
                   contact page
-                </Link>{" "}
+                </ScopedLink>{" "}
                 to send a structured request.
               </P>
             </Section>
@@ -545,12 +547,12 @@ export default async function PrivatnostPage() {
                 </P>
                 <P>
                   Ili putem{" "}
-                  <Link
+                  <ScopedLink
                     href="/kontakt"
                     className="text-[var(--brand-primary)] hover:underline"
                   >
                     kontakt stranice
-                  </Link>{" "}
+                  </ScopedLink>{" "}
                   za slanje strukturiranog zahteva.
                 </P>
               </Section>

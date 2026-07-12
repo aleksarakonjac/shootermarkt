@@ -1,25 +1,31 @@
 import React from "react";
-import { Link } from "@/i18n/navigation";
+import { ScopedLink } from "../components/ScopedLink";
 import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions, countries } from "@/lib/db/schema";
 import { eq, desc, asc, and, isNotNull, sql } from "drizzle-orm";
 import { computeFormaFromEntries, RANKING_MIN_SAMPLE, type CompetitionLevel } from "@/lib/forma";
 import { TopFormaClient } from "./top-forma-client";
 import { QuickH2HClient } from "./quick-h2h-client";
-import { Ticker, TickerItem } from "./ticker";
-import { CalendarModule } from "./components/CalendarModule";
-import { UpcomingEvents } from "./components/UpcomingEvents";
-import { NewsSection } from "./components/NewsSection";
+import { Ticker, TickerItem } from "../ticker";
+import { CalendarModule } from "../components/CalendarModule";
+import { UpcomingEvents } from "../components/UpcomingEvents";
+import { NewsSection } from "../components/NewsSection";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
+import {
+  buildCompetitionScopeFilter,
+  buildShooterScopeFilter,
+  type Scope,
+} from "@/lib/scope";
 import "./homepage.css";
 
-export async function generateMetadata() {
+export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }) {
+  const { scope } = await params;
   const [t, locale] = await Promise.all([getTranslations("home.metadata"), getLocale()]);
   return {
     title: t("title"),
     description: t("description"),
-    alternates: buildAlternates(locale, "/"),
+    alternates: buildAlternates(locale, scope, "/"),
   };
 }
 
@@ -38,13 +44,20 @@ interface ShooterFormRow {
   recentScores: number[];
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  params,
+}: {
+  params: Promise<{ scope: Scope }>;
+}) {
+  const { scope } = await params;
   const locale = await getLocale();
   const t = await getTranslations("home");
   const tCommon = await getTranslations("common");
   const tComp = await getTranslations("competition");
 
   const currentDate = new Date().toISOString().split("T")[0];
+  const competitionScopeFilter = buildCompetitionScopeFilter(scope);
+  const shooterScopeFilter = buildShooterScopeFilter(scope);
 
   // Ticker — two tiers: LIVE (today) + NAJAVA (future)
   const tickerComps = await db
@@ -61,7 +74,7 @@ export default async function HomePage() {
     })
     .from(competitions)
     .leftJoin(countries, eq(competitions.countryId, countries.id))
-    .where(sql`${competitions.date} >= ${currentDate}`)
+    .where(and(sql`${competitions.date} >= ${currentDate}`, competitionScopeFilter))
     .orderBy(competitions.date)
     .limit(8);
 
@@ -79,7 +92,7 @@ export default async function HomePage() {
         .from(results)
         .innerJoin(shooters,    eq(results.shooterId,    shooters.id))
         .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
-        .where(eq(results.competitionId, comp.id))
+        .where(and(eq(results.competitionId, comp.id), shooterScopeFilter))
         .orderBy(desc(results.qualTotal))
         .limit(1);
 
@@ -125,13 +138,14 @@ export default async function HomePage() {
     })
     .from(shooters)
     .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-    .where(eq(shooters.verified, true))
+    .where(and(eq(shooters.verified, true), shooterScopeFilter))
     .orderBy(shooters.lastName, shooters.firstName);
 
   // 2. Fetch recent competitions (last 3) and find the top shooter for each
   const recentComps = await db
     .select()
     .from(competitions)
+    .where(competitionScopeFilter)
     .orderBy(desc(competitions.date))
     .limit(3);
 
@@ -149,7 +163,7 @@ export default async function HomePage() {
         .innerJoin(shooters, eq(results.shooterId, shooters.id))
         .leftJoin(clubs, eq(shooters.clubId, clubs.id))
         .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
-        .where(eq(results.competitionId, comp.id))
+        .where(and(eq(results.competitionId, comp.id), shooterScopeFilter))
         .orderBy(desc(results.qualTotal))
         .limit(1);
 
@@ -192,7 +206,12 @@ export default async function HomePage() {
       .innerJoin(shooters, eq(results.shooterId, shooters.id))
       .leftJoin(clubs, eq(shooters.clubId, clubs.id))
       .innerJoin(competitions, eq(results.competitionId, competitions.id))
-      .where(and(eq(results.disciplineId, disc.id), isNotNull(results.qualTotal)))
+      .where(and(
+        eq(results.disciplineId, disc.id),
+        isNotNull(results.qualTotal),
+        competitionScopeFilter,
+        shooterScopeFilter,
+      ))
       .orderBy(asc(competitions.date));
 
     // Group by shooter
@@ -263,7 +282,7 @@ export default async function HomePage() {
   const upcomingComps = await db
     .select()
     .from(competitions)
-    .where(sql`${competitions.date} >= ${currentDate}`)
+    .where(and(sql`${competitions.date} >= ${currentDate}`, competitionScopeFilter))
     .orderBy(asc(competitions.date))
     .limit(10);
 
@@ -278,7 +297,10 @@ export default async function HomePage() {
   const calendarComps = await db
     .select()
     .from(competitions)
-    .where(sql`${competitions.date} >= ${yearStart} AND ${competitions.date} <= ${yearEnd}`)
+    .where(and(
+      sql`${competitions.date} >= ${yearStart} AND ${competitions.date} <= ${yearEnd}`,
+      competitionScopeFilter,
+    ))
     .orderBy(asc(competitions.date));
 
   const translatedCalendar = calendarComps.map((comp) => ({
@@ -296,7 +318,7 @@ export default async function HomePage() {
     })
     .from(shooters)
     .innerJoin(clubs, eq(shooters.clubId, clubs.id))
-    .where(eq(shooters.verified, true))
+    .where(and(eq(shooters.verified, true), shooterScopeFilter))
     .groupBy(shooters.clubId, clubs.name, clubs.city);
 
   // Process club rankings based on shooter form scores
@@ -307,7 +329,7 @@ export default async function HomePage() {
     const clubShooters = await db
       .select({ id: shooters.id })
       .from(shooters)
-      .where(and(eq(shooters.clubId, c.clubId), eq(shooters.verified, true)));
+      .where(and(eq(shooters.clubId, c.clubId), eq(shooters.verified, true), shooterScopeFilter));
 
     const shooterIds = clubShooters.map((s) => s.id);
     if (shooterIds.length === 0) return null;
@@ -327,7 +349,8 @@ export default async function HomePage() {
       .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
       .where(and(
         sql`${results.shooterId} IN (${sql.join(shooterIds)})`,
-        isNotNull(results.qualTotal)
+        isNotNull(results.qualTotal),
+        competitionScopeFilter,
       ));
 
     // Calculate form score for each shooter
@@ -395,9 +418,9 @@ export default async function HomePage() {
               <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-wider text-[var(--ink)]">
                 {t("recentCompetitions")}
               </h2>
-              <Link href="/takmicenja" className="text-xs font-semibold text-[var(--brand-primary)] hover:underline">
+              <ScopedLink href="/takmicenja" className="text-xs font-semibold text-[var(--brand-primary)] hover:underline">
                 {t("allCompsLink")}
-              </Link>
+              </ScopedLink>
             </div>
 
             {compsWithWinners.length === 0 ? (

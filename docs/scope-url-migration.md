@@ -329,25 +329,25 @@ Posle migracije, svaka javna stranica imaće:
 - [ ] Preseliti helper fajlove (`quick-h2h-client.tsx`, `top-forma-client.tsx`, `actions.ts`, `homepage.css`)
 
 ### Faza 3 — Scope-aware DB queriji
-- [ ] `takmicenja/page.tsx`: koristiti `buildCompetitionScopeFilter(scope)` umesto cookie
-- [ ] `strelci/page.tsx`: koristiti `buildShooterScopeFilter(scope)`
-- [ ] `rangiranje/page.tsx`: filtrirati kandidate po scopeu
-- [ ] `page.tsx` (homepage): scope-aware upcoming + top forma
-- [ ] Ukloniti sve `cookies()` scope pozive
+- [x] `takmicenja/page.tsx`: koristiti `buildCompetitionScopeFilter(scope)` umesto cookie
+- [x] `strelci/page.tsx`: koristiti `buildShooterScopeFilter(scope)`
+- [x] `rangiranje/page.tsx`: filtrirati kandidate po scopeu
+- [x] `page.tsx` (homepage): scope-aware upcoming + top forma
+- [x] Ukloniti sve `cookies()` scope pozive
 
 ### Faza 4 — Navigacija i RegionSelector
-- [ ] Repisati `RegionSelector.tsx` — URL navigacija umesto cookie
-- [ ] Ažurirati `MainNav.tsx` — scope-aware linkovi
-- [ ] Ažurirati `nav-links.tsx`
-- [ ] Ažurirati `(public)/layout.tsx` — proslediti scope u RegionSelector
-- [ ] Ažurirati `buildAlternates` u `alternates.ts` — uključiti scope
+- [x] Repisati `RegionSelector.tsx` — URL navigacija umesto cookie
+- [x] Ažurirati `MainNav.tsx` — scope-aware linkovi
+- [x] Ažurirati `nav-links.tsx`
+- [x] Ažurirati `(public)/layout.tsx` — proslediti scope u RegionSelector
+- [x] Ažurirati `buildAlternates` u `alternates.ts` — uključiti scope
 
 ### Faza 5 — Cleanup
-- [ ] Ukloniti `localStorage` i `document.cookie` iz `RegionSelector.tsx`
-- [ ] Ukloniti `force-dynamic` i `cookies()` import iz `takmicenja/page.tsx`
-- [ ] Proveriti `admin/ticker/page.tsx` import (bio je problematičan ranije)
-- [ ] Proveriti sve `Link` hrefs da nema hardcoded ruta bez scope-a
-- [ ] Verifikovati build: `next build` bez grešaka, sve stranice `●` Static ili `○` ISR
+- [x] Ukloniti `localStorage` i `document.cookie` iz `RegionSelector.tsx`
+- [x] Ukloniti `force-dynamic` i `cookies()` import iz `takmicenja/page.tsx`
+- [x] Proveriti `admin/ticker/page.tsx` import (bio je problematičan ranije)
+- [x] Proveriti sve `Link` hrefs da nema hardcoded ruta bez scope-a
+- [ ] Verifikovati Vercel build: `next build` bez grešaka, sve stranice `●` Static ili `○` ISR
 
 ---
 

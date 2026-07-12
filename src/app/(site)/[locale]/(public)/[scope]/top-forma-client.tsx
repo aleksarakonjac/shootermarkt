@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { Sparkline } from "@/components/sparkline";
 import { trendLabel, trendColor } from "@/lib/forma";
 import { useTranslations } from "next-intl";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 
 interface ShooterFormRow {
   shooterId: number;
@@ -38,6 +39,7 @@ const TABS = [
 export function TopFormaClient({ initialData }: TopFormaClientProps) {
   const [activeTab, setActiveTab] = useState<keyof typeof initialData>("ARM");
   const t = useTranslations("home");
+  const scopedHref = useScopedHref();
 
   const rows = initialData[activeTab];
   const isAP = activeTab.startsWith("AP");
@@ -98,7 +100,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
                   </td>
                   <td className="px-3 py-2.5">
                     <Link
-                      href={`/strelci/${r.shooterId}`}
+                      href={scopedHref(`/strelci/${r.shooterId}`)}
                       className="font-semibold text-[var(--ink)] hover:underline block truncate max-w-[150px] sm:max-w-none"
                     >
                       {r.lastName} {r.firstName}
@@ -133,7 +135,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
       
       <div className="bg-[var(--surface)] px-4 py-2.5 text-right border-t border-[var(--border)]">
         <Link
-          href={`/rangiranje?disciplina=${activeTab.toLowerCase()}`}
+          href={scopedHref(`/rangiranje?disciplina=${activeTab.toLowerCase()}`)}
           className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"
         >
           Pogledaj celo rangiranje ({activeTab}) →

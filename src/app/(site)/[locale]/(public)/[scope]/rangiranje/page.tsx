@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions } from "@/lib/db/schema";
 import { eq, isNotNull, and, inArray, asc } from "drizzle-orm";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
-import { Link } from "@/i18n/navigation";
+import { ScopedLink } from "../../components/ScopedLink";
 import type { Metadata } from "next";
 import {
   computeFormaFromEntries,
@@ -31,12 +31,14 @@ import { NOC_LIST } from "@/lib/noc-list";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import { HeadToHeadPanel, type H2HCandidate, type H2HLabels } from "./HeadToHeadPanel";
+import { buildShooterScopeFilter, type Scope } from "@/lib/scope";
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await params;
   const [t, locale] = await Promise.all([getTranslations("ranking"), getLocale()]);
   return {
     title: t("title"),
-    alternates: buildAlternates(locale, "/rangiranje"),
+    alternates: buildAlternates(locale, scope, "/rangiranje"),
   };
 }
 
@@ -100,6 +102,7 @@ function FlagChip({ noc, inline = false }: { noc: string | null; inline?: boolea
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 type Props = {
+  params: Promise<{ scope: Scope }>;
   searchParams: Promise<{
     disciplina?: string;
     kategorija?: string;
@@ -110,12 +113,14 @@ type Props = {
   }>;
 };
 
-export default async function RangiranjeePage({ searchParams }: Props) {
+export default async function RangiranjeePage({ params, searchParams }: Props) {
+  const { scope } = await params;
   const locale = await getLocale();
   const t = await getTranslations("ranking");
   const tCommon = await getTranslations("common");
 
   const { disciplina, kategorija, view, zemlja, sezona, sezonaTip } = await searchParams;
+  const scopeFilter = buildShooterScopeFilter(scope);
 
   const validCode = TABS.find((tab) => tab.code === disciplina?.toUpperCase())?.code;
   const activeCode: DiscCode = validCode ?? "ARM";
@@ -162,6 +167,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
             eq(results.disciplineId, discipline.id),
             isNotNull(results.qualTotal),
             inArray(shooters.apparatus, [...MVP_APPARATUS]),
+            scopeFilter,
           )
         )
         .orderBy(asc(competitions.date))
@@ -404,7 +410,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
           const active = activeCode === code;
           const displayLabel = locale === "en" ? labelEn : label;
           return (
-            <Link
+            <ScopedLink
               key={code}
               href={buildUrl({ disciplina: code.toLowerCase(), kategorija: "" })}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors no-underline"
@@ -416,7 +422,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
             >
               <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold">{code}</span>
               <span className="hidden sm:inline font-normal">{displayLabel}</span>
-            </Link>
+            </ScopedLink>
           );
         })}
       </div>
@@ -427,7 +433,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
           {categoriesPresent.map((cat) => {
             const active = activeKategorija === cat;
             return (
-              <Link
+              <ScopedLink
                 key={cat}
                 href={buildUrl({ kategorija: cat })}
                 className="inline-flex items-center px-2.5 py-1 rounded-md text-[0.7rem] font-semibold transition-colors no-underline"
@@ -438,7 +444,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
                 }
               >
                 {CATEGORY_LABEL[cat]}
-              </Link>
+              </ScopedLink>
             );
           })}
         </div>
@@ -449,7 +455,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
         {VIEWS.map(({ key, labelKey }) => {
           const active = activeView === key;
           return (
-            <Link
+            <ScopedLink
               key={key}
               href={buildUrl({ view: key })}
               className="inline-flex items-center shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors no-underline border"
@@ -460,7 +466,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
               }
             >
               {t(labelKey)}
-            </Link>
+            </ScopedLink>
           );
         })}
       </div>
@@ -474,7 +480,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
               ? (["karijera", "vazdusna", "kalendarska"] as PeriodType[])
               : (["vazdusna", "kalendarska"] as PeriodType[])
             ).map((pt) => (
-              <Link
+              <ScopedLink
                 key={pt}
                 href={buildUrl({
                   sezonaTip: pt,
@@ -488,7 +494,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
                 }
               >
                 {pt === "karijera" ? t("periodCareer") : pt === "vazdusna" ? t("seasonAir") : t("seasonCalendar")}
-              </Link>
+              </ScopedLink>
             ))}
           </div>
           {activePeriod !== "karijera" && (
@@ -496,7 +502,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
               <span className="text-[var(--border-strong)]" aria-hidden="true">·</span>
               <div className="flex items-center gap-1 flex-wrap">
                 {seasonPeriods.map((y) => (
-                  <Link
+                  <ScopedLink
                     key={y}
                     href={buildUrl({ sezona: String(y) })}
                     className="px-2 py-1 rounded-md text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] font-semibold transition-colors no-underline"
@@ -507,7 +513,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
                     }
                   >
                     {formatSeasonLabel(seasonType, y)}
-                  </Link>
+                  </ScopedLink>
                 ))}
               </div>
             </>
@@ -518,7 +524,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
       {/* Country filter */}
       {activeView !== "h2h" && allNocs.length > 1 && (
         <div className="flex flex-wrap items-center gap-1 mb-5">
-          <Link
+          <ScopedLink
             href={buildUrl({ zemlja: "" })}
             className="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors no-underline font-[family-name:var(--font-jetbrains-mono)]"
             style={
@@ -528,12 +534,12 @@ export default async function RangiranjeePage({ searchParams }: Props) {
             }
           >
             {tCommon("all")}
-          </Link>
+          </ScopedLink>
           {allNocs.map((noc) => {
             const a2 = nocAlpha2(noc);
             const active = activeZemlja === noc;
             return (
-              <Link
+              <ScopedLink
                 key={noc}
                 href={buildUrl({ zemlja: noc })}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors no-underline font-[family-name:var(--font-jetbrains-mono)]"
@@ -550,7 +556,7 @@ export default async function RangiranjeePage({ searchParams }: Props) {
                   />
                 )}
                 {noc}
-              </Link>
+              </ScopedLink>
             );
           })}
           <span className="text-xs text-[var(--subtle)] ml-1 font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
@@ -623,12 +629,12 @@ export default async function RangiranjeePage({ searchParams }: Props) {
 
                     {/* Strelac */}
                     <td className="px-4 py-3">
-                      <Link
+                      <ScopedLink
                         href={`/strelci/${s.shooterId}`}
                         className="font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
                       >
                         {s.lastName} {s.firstName}
-                      </Link>
+                      </ScopedLink>
                       {/* Zemlja on mobile */}
                       {s.nationality && (
                         <span className="flex items-center gap-1 mt-0.5 md:hidden">

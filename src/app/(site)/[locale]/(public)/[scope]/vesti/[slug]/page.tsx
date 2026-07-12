@@ -4,19 +4,20 @@ import { getPublishedArticleBySlug } from "@/lib/cms/get-articles";
 import { ArticleContent } from "@/components/cms-blocks/ArticleContent";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
+import type { Scope } from "@/lib/scope";
 
 export const revalidate = 300;
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { params: Promise<{ slug: string; scope: Scope }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug, scope } = await params;
   const [t, locale, article] = await Promise.all([
     getTranslations("news"),
     getLocale(),
     getPublishedArticleBySlug(slug),
   ]);
-  const alternates = buildAlternates(locale, `/vesti/${slug}`);
+  const alternates = buildAlternates(locale, scope, `/vesti/${slug}`);
   if (!article) return { title: t("notFound"), alternates };
   return { title: article.title, alternates };
 }
