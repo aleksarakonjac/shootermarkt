@@ -25,6 +25,7 @@ export async function resolveShooter(id: number): Promise<ShooterCardData | null
       qualTotal: results.qualTotal,
       competitionDate: competitions.date,
       competitionLevel: competitions.level,
+      category: results.category,
       disciplineId: disciplines.id,
       disciplineCode: disciplines.code,
       maxQualScore: disciplines.maxQualScore,
@@ -55,6 +56,7 @@ export async function resolveShooter(id: number): Promise<ShooterCardData | null
           qualTotal: parseFloat(r.qualTotal!),
           date: r.competitionDate,
           level: r.competitionLevel,
+          category: r.category,
         })),
         { code: bestDisciplineRows[0].disciplineCode }
       );

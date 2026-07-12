@@ -2,7 +2,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import path from "path";
 import { getPayload, type Payload } from "payload";
-import config from "../../../payload.config";
+
+const testDatabaseUrl = process.env.CMS_TEST_DATABASE_URL;
+const describeIntegration = testDatabaseUrl ? describe : describe.skip;
 
 let payload: Payload;
 let adminUserId: number;
@@ -10,6 +12,10 @@ let authorUserId: number;
 let mediaId: number;
 
 beforeAll(async () => {
+  if (!testDatabaseUrl) return;
+
+  process.env.DATABASE_URL = testDatabaseUrl;
+  const { default: config } = await import("../../../payload.config");
   payload = await getPayload({ config });
 
   const admin = await payload.create({
@@ -43,12 +49,14 @@ beforeAll(async () => {
 }, 30000);
 
 afterAll(async () => {
-  await payload.delete({ collection: "cms-users", id: adminUserId });
-  await payload.delete({ collection: "cms-users", id: authorUserId });
-  await payload.delete({ collection: "media", id: mediaId });
+  if (!payload) return;
+
+  if (adminUserId) await payload.delete({ collection: "cms-users", id: adminUserId });
+  if (authorUserId) await payload.delete({ collection: "cms-users", id: authorUserId });
+  if (mediaId) await payload.delete({ collection: "media", id: mediaId });
 });
 
-describe("Articles access control (integration)", () => {
+describeIntegration("Articles access control (integration; CMS_TEST_DATABASE_URL required)", () => {
   it("author cannot set status to published", async () => {
     const article = await payload.create({
       collection: "articles",

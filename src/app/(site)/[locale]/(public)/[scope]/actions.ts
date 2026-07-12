@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { shooters, clubs, results, competitions, disciplines } from "@/lib/db/schema";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
-import { computeFormaFromEntries, type CompetitionLevel } from "@/lib/forma";
+import { computeFormaFromEntries, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 
 export interface ShooterCompareStats {
   id: number;
@@ -64,6 +64,7 @@ export async function compareShooters(idA: number, idB: number): Promise<Compari
         qualTotal: results.qualTotal,
         date: competitions.date,
         level: competitions.level,
+        category: results.category,
         discCode: disciplines.code,
         maxScore: disciplines.maxQualScore,
       })
@@ -73,7 +74,14 @@ export async function compareShooters(idA: number, idB: number): Promise<Compari
       .where(and(eq(results.shooterId, id), isNotNull(results.qualTotal)));
 
     // Group results by discipline
-    const discMap: { [code: string]: { qualTotal: number; date: string; level: CompetitionLevel }[] } = {};
+    const discMap: {
+      [code: string]: {
+        qualTotal: number;
+        date: string;
+        level: CompetitionLevel;
+        category: ResultCategory;
+      }[];
+    } = {};
     const maxScores: { [code: string]: number } = {};
 
     for (const r of resList) {
@@ -85,6 +93,7 @@ export async function compareShooters(idA: number, idB: number): Promise<Compari
         qualTotal: parseFloat(r.qualTotal!),
         date: r.date,
         level: r.level,
+        category: r.category,
       });
       maxScores[code] = parseFloat(r.maxScore);
     }

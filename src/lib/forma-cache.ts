@@ -1,7 +1,7 @@
 import { eq, inArray, isNotNull, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { results, competitions, disciplines, shooterFormaCache } from "@/lib/db/schema";
-import { computeFormaFromEntries, type CompetitionLevel } from "@/lib/forma";
+import { computeFormaFromEntries, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 import {
   computeAvgOfTopN,
   computeRecentAvg,
@@ -22,6 +22,7 @@ export async function recomputeFormaCache(shooterIds?: number[]): Promise<void> 
       qualTotal: results.qualTotal,
       date: competitions.date,
       level: competitions.level,
+      category: results.category,
       disciplineCode: disciplines.code,
     })
     .from(results)
@@ -34,7 +35,12 @@ export async function recomputeFormaCache(shooterIds?: number[]): Promise<void> 
     );
 
   // Group by (shooterId, disciplineCode)
-  type Entry = { qualTotal: number; date: string; level: CompetitionLevel | null };
+  type Entry = {
+    qualTotal: number;
+    date: string;
+    level: CompetitionLevel | null;
+    category: ResultCategory;
+  };
   const groups = new Map<string, { shooterId: number; disciplineCode: string; entries: Entry[] }>();
 
   for (const r of rows) {
@@ -46,6 +52,7 @@ export async function recomputeFormaCache(shooterIds?: number[]): Promise<void> 
       qualTotal: Number(r.qualTotal),
       date: r.date,
       level: r.level as CompetitionLevel | null,
+      category: r.category as ResultCategory,
     });
   }
 

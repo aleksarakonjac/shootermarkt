@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
-import { rollingForma, type CompetitionLevel } from "@/lib/forma";
+import { rollingForma, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 import { FormaScoreMark } from "./FormaScoreMark";
 
 export type ChartPoint = {
@@ -13,6 +13,7 @@ export type ChartPoint = {
   competitionId: number;
   competitionName: string;
   level?: CompetitionLevel | null;
+  category?: ResultCategory | null;
 };
 
 export type FormaScore = {
@@ -48,6 +49,19 @@ function fmtShort(iso: string, locale: string) {
 function fmtFull(iso: string) {
   const d = new Date(iso + "T00:00:00");
   return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+}
+
+function subscribeToViewportWidth(onStoreChange: () => void) {
+  window.addEventListener("resize", onStoreChange);
+  return () => window.removeEventListener("resize", onStoreChange);
+}
+
+function getViewportWidth() {
+  return window.innerWidth;
+}
+
+function getServerViewportWidth() {
+  return 1200;
 }
 
 function TrendArrow({ trend }: { trend: "up"|"down"|"stable" }) {
@@ -113,7 +127,6 @@ function buildWindow(data: ChartPoint[], yValues: number[], CW: number, maxScore
 
 interface LayerProps {
   data: ChartPoint[];
-  yValues: number[];
   built: NonNullable<ReturnType<typeof buildWindow>>;
   color: string;
   locale: string;
@@ -124,8 +137,8 @@ interface LayerProps {
   onAnimationComplete?: () => void;
 }
 
-function ChartLayer({ data, yValues, built, color, locale, hoverIdx, onHover, xInitial, xAnimate, onAnimationComplete }: LayerProps) {
-  const { pts, line, area, sy, sx } = built;
+function ChartLayer({ data, built, color, locale, hoverIdx, onHover, xInitial, xAnimate, onAnimationComplete }: LayerProps) {
+  const { pts, line, area, sx } = built;
   const every = data.length > 8 ? 2 : 1;
 
   return (
@@ -191,7 +204,7 @@ export function FormaChart({
   const [disc, setDisc] = useState(available[0]?.code ?? "");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
-  const [vpW, setVpW] = useState(1200);
+  const vpW = useSyncExternalStore(subscribeToViewportWidth, getViewportWidth, getServerViewportWidth);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgW, setSvgW] = useState(800);
 
@@ -199,7 +212,7 @@ export function FormaChart({
     .filter(p => p.discipline === disc)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const [windowEnd, setWindowEnd] = useState(() => allData.length);
+  const [windowOffset, setWindowOffset] = useState(0);
 
   // Prev window kept alive during slide-out
   const [prevSlice, setPrevSlice] = useState<{ data: ChartPoint[]; yValues: number[]; xExit: number } | null>(null);
@@ -207,27 +220,12 @@ export function FormaChart({
   const isAnimating = prevSlice !== null;
 
   useEffect(() => {
-    setVpW(window.innerWidth);
-    const onResize = () => setVpW(window.innerWidth);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    setSvgW(el.getBoundingClientRect().width);
     const ro = new ResizeObserver(entries => setSvgW(entries[0].contentRect.width));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-
-  useEffect(() => {
-    setWindowEnd(allData.length);
-    setHoverIdx(null);
-    setPrevSlice(null);
-    setNavDir(null);
-  }, [disc, allData.length]);
 
   const maxScore = disciplines.find(d => d.code === disc)?.maxScore ?? 630;
   const color = DISC_COLOR[disc] ?? "#C20000";
@@ -253,24 +251,18 @@ export function FormaChart({
     lowConfidenceBadge: en ? "low data" : "malo podataka",
   };
 
-  if (allData.length < 2) {
-    return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-10 text-center text-sm text-[var(--muted)]">
-        {noDataLabel}
-      </div>
-    );
-  }
-
   const CW = svgW > 0 ? svgW - ML - MR : 600;
   const W = svgW > 0 ? svgW : 700;
-
+  const maxWindowOffset = Math.max(0, allData.length - WINDOW);
+  const effectiveWindowOffset = Math.min(windowOffset, maxWindowOffset);
+  const windowEnd = Math.max(0, allData.length - effectiveWindowOffset);
   const windowStart = Math.max(0, windowEnd - WINDOW);
   const data = allData.slice(windowStart, windowEnd);
   const canGoBack = windowStart > 0;
   const canGoForward = windowEnd < allData.length;
 
   const allFormaValues = rollingForma(
-    allData.map(p => ({ score: p.score, date: p.date, level: p.level })),
+    allData.map(p => ({ score: p.score, date: p.date, level: p.level, category: p.category })),
     { code: disc }
   );
   const yValues = allFormaValues.slice(windowStart, windowEnd);
@@ -281,10 +273,10 @@ export function FormaChart({
   function navigate(dir: "left" | "right") {
     if (isAnimating) return;
     const step = Math.floor(WINDOW / 2);
-    const newEnd = dir === "right"
-      ? Math.max(WINDOW, windowEnd - step)
-      : Math.min(allData.length, windowEnd + step);
-    if (newEnd === windowEnd) return;
+    const newOffset = dir === "right"
+      ? Math.min(maxWindowOffset, effectiveWindowOffset + step)
+      : Math.max(0, effectiveWindowOffset - step);
+    if (newOffset === effectiveWindowOffset) return;
 
     // Snapshot current slice before updating windowEnd
     const snapStart = Math.max(0, windowEnd - WINDOW);
@@ -296,10 +288,10 @@ export function FormaChart({
     setNavDir(dir);
     setHoverIdx(null);
     setTooltipPos(null);
-    setWindowEnd(newEnd);
+    setWindowOffset(newOffset);
   }
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+  function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
     if (!containerRef.current || isAnimating || !built) return;
     const rect = containerRef.current.getBoundingClientRect();
     const relX = e.clientX - rect.left;
@@ -311,7 +303,15 @@ export function FormaChart({
     });
     setHoverIdx(closest);
     setTooltipPos({ x: e.clientX, y: e.clientY });
-  }, [data, built, isAnimating]);
+  }
+
+  if (allData.length < 2) {
+    return (
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-10 text-center text-sm text-[var(--muted)]">
+        {noDataLabel}
+      </div>
+    );
+  }
 
   const hovPt = hoverIdx !== null ? data[hoverIdx] : null;
   const hovForma = hoverIdx !== null ? yValues[hoverIdx] : null;
@@ -362,7 +362,14 @@ export function FormaChart({
               available.map(d => (
                 <button
                   key={d.code}
-                  onClick={() => { setDisc(d.code); setHoverIdx(null); }}
+                  onClick={() => {
+                    setDisc(d.code);
+                    setWindowOffset(0);
+                    setHoverIdx(null);
+                    setTooltipPos(null);
+                    setPrevSlice(null);
+                    setNavDir(null);
+                  }}
                   className="text-[14px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded transition-colors font-[family-name:var(--font-barlow-condensed)]"
                   style={disc === d.code
                     ? { background: DISC_COLOR[d.code] ?? "#C20000", color: "#fff", border: "none", cursor: "pointer" }
@@ -441,7 +448,6 @@ export function FormaChart({
                   <ChartLayer
                     key="prev"
                     data={prevSlice.data}
-                    yValues={prevSlice.yValues}
                     built={prevBuilt}
                     color={color}
                     locale={locale}
@@ -456,7 +462,6 @@ export function FormaChart({
                 <ChartLayer
                   key={`${windowStart}-${windowEnd}`}
                   data={data}
-                  yValues={yValues}
                   built={built}
                   color={color}
                   locale={locale}
@@ -557,7 +562,7 @@ export function FormaChart({
                     setNavDir("left");
                     setHoverIdx(null);
                     setTooltipPos(null);
-                    setWindowEnd(allData.length);
+                    setWindowOffset(0);
                   }}
                   disabled={isAnimating}
                   className="text-[0.7rem] font-semibold text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors px-1.5 py-0.5 rounded bg-[var(--border)] hover:bg-[var(--border-strong)]"

@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
@@ -6,6 +6,9 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
+    exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],
+    // Payload uses a one-connection pool against the shared development database.
+    fileParallelism: false,
   },
   resolve: {
     alias: {

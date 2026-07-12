@@ -1,3 +1,5 @@
+import type { AgeCategory } from "@/lib/db/schema";
+
 /**
  * Forma score — jedinstveni izvor istine za sve delove aplikacije.
  *
@@ -8,7 +10,8 @@
  * Tri signala ulaze u težinu svakog nastupa:
  *   1. time-decay  — noviji nastupi vrede više (exp opadanje po STVARNOM datumu)
  *   2. level-weight — jače takmičenje = pouzdaniji signal (olimpijsko > … > klubsko)
- *   3. (implicitno) recentnost preko regresije trenda
+ *   3. category-weight — seniorska/open konkurencija je pouzdaniji signal od
+ *      mlađih i master uzrasnih kategorija za zajedničku prognozu strelca
  *
  * Ceiling kompresija: rast blizu realnog maksimuma discipline je teži, pa se
  * uzlazna projekcija priguši kako se nivo približava plafonu (npr. ARM WR 637.9).
@@ -24,10 +27,13 @@ export type CompetitionLevel =
   | "olympic" | "world" | "continental" | "international"
   | "national" | "regional" | "club";
 
+export type ResultCategory = AgeCategory;
+
 export type FormaEntry = {
   score: number;
   date: string;                 // ISO YYYY-MM-DD
   level?: CompetitionLevel | null;
+  category?: ResultCategory | null;
 };
 
 export type FormaOptions = {
@@ -91,6 +97,23 @@ const LEVEL_WEIGHT: Record<CompetitionLevel, number> = {
 const LEVEL_WEIGHT_DEFAULT = 0.60;
 
 /**
+ * Faktor pouzdanosti po uzrasnoj kategoriji. Forma ostaje zajednička za sve
+ * kategorije jednog strelca, ali rezultat iz slabije uporedive konkurencije ima
+ * manji uticaj na procenu seniorske/open forme. Ne menja se sam rezultat niti peak.
+ */
+const CATEGORY_WEIGHT: Record<ResultCategory, number> = {
+  pionir: 0.55,
+  kadet: 0.65,
+  mladji_junior: 0.75,
+  junior: 0.85,
+  mladji_senior: 0.93,
+  senior: 1.00,
+  master: 0.80,
+  open: 1.00,
+};
+const CATEGORY_WEIGHT_DEFAULT = 0.75;
+
+/**
  * Realni maksimum kvalifikacija po disciplini (blizu svetskog rekorda).
  * NIJE teorijski max — rast iznad ovoga je praktično nemoguć, pa ga koristimo
  * kao asimptotu za ceiling kompresiju.
@@ -112,6 +135,12 @@ function daysBetween(aIso: string, bIso: string): number {
 
 function levelFactor(l: CompetitionLevel | null | undefined): number {
   return l ? (LEVEL_WEIGHT[l] ?? LEVEL_WEIGHT_DEFAULT) : LEVEL_WEIGHT_DEFAULT;
+}
+
+function categoryFactor(category: ResultCategory | null | undefined): number {
+  return category
+    ? (CATEGORY_WEIGHT[category] ?? CATEGORY_WEIGHT_DEFAULT)
+    : CATEGORY_WEIGHT_DEFAULT;
 }
 
 function median(nums: number[]): number {
@@ -167,9 +196,9 @@ export function computeForma(entries: FormaEntry[], opts: FormaOptions = {}): Fo
   const t = win.map((e) => daysBetween(e.date, asOf)); // ≤ 0
   const y = win.map((e) => e.score);
 
-  // Težine: time-decay × level-weight
+  // Težine: time-decay × level-weight × category-weight
   const w = win.map((e, i) =>
-    Math.exp(t[i] / DECAY_TAU) * levelFactor(e.level)
+    Math.exp(t[i] / DECAY_TAU) * levelFactor(e.level) * categoryFactor(e.category)
   );
   const W = w.reduce((s, x) => s + x, 0);
   const meanT = w.reduce((s, x, i) => s + x * t[i], 0) / W;
@@ -272,14 +301,24 @@ export function rollingForma(entries: FormaEntry[], opts: FormaOptions = {}): nu
 export const RANKING_MIN_SAMPLE = 5;
 
 /**
- * Forma iz liste rezultata sa datumima (i opciono nivoom takmičenja).
+ * Forma iz liste rezultata sa datumima, nivoom takmičenja i uzrasnom kategorijom.
  */
 export function computeFormaFromEntries(
-  entries: { qualTotal: number; date: string; level?: CompetitionLevel | null }[],
+  entries: {
+    qualTotal: number;
+    date: string;
+    level?: CompetitionLevel | null;
+    category?: ResultCategory | null;
+  }[],
   opts: FormaOptions = {}
 ): FormaResult {
   return computeForma(
-    entries.map((e) => ({ score: e.qualTotal, date: e.date, level: e.level })),
+    entries.map((e) => ({
+      score: e.qualTotal,
+      date: e.date,
+      level: e.level,
+      category: e.category,
+    })),
     opts
   );
 }

@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
+vi.mock("@/i18n/navigation", () => ({
+  Link: ({ href, children, ...props }: React.ComponentProps<"a">) => (
+    <a href={href} {...props}>{children}</a>
+  ),
+}));
+
 vi.mock("@/lib/cms/resolve-competition", () => ({
   resolveCompetition: vi.fn(async (id: number) =>
     id === 1 ? { id: 1, name: "Prvenstvo Srbije 2026", date: "2026-05-01", dateEnd: null, location: "Beograd", level: "national" } : null
