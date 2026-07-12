@@ -35,8 +35,8 @@ export function ShooterMatchCell({ row, onChange }: Props) {
   useEffect(() => {
     if (!open) return;
     const q = query.trim() || `${row.lastName} ${row.firstName}`.trim();
-    if (q.length < 2) { setHits([]); return; }
     const handle = setTimeout(async () => {
+      if (q.length < 2) { setHits([]); return; }
       setLoading(true);
       try {
         const res = await fetch(`/api/admin/shooters?q=${encodeURIComponent(q)}`);
@@ -45,7 +45,7 @@ export function ShooterMatchCell({ row, onChange }: Props) {
       } finally {
         setLoading(false);
       }
-    }, 250);
+    }, q.length < 2 ? 0 : 250);
     return () => clearTimeout(handle);
   }, [open, query, row.lastName, row.firstName]);
 

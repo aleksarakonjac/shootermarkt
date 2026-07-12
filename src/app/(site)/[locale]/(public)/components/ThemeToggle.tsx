@@ -1,24 +1,37 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+
+// Module-level store so all ThemeToggle instances (if any) stay in sync
+// and the storage event propagates cross-tab.
+const themeListeners = new Set<() => void>();
+
+function subscribeTheme(cb: () => void) {
+  themeListeners.add(cb);
+  window.addEventListener("storage", cb);
+  return () => { themeListeners.delete(cb); window.removeEventListener("storage", cb); };
+}
+
+function getIsDark() { return localStorage.getItem("theme") === "dark"; }
 
 export default function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const isDark   = useSyncExternalStore(subscribeTheme, getIsDark, () => false);
 
+  // Sync class on initial mount and whenever isDark changes
   useEffect(() => {
-    setMounted(true);
-    setIsDark(localStorage.getItem("theme") === "dark");
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
     document.documentElement.classList.toggle("dark", isDark);
-    localStorage.setItem("theme", isDark ? "dark" : "light");
-  }, [isDark, mounted]);
+  }, [isDark]);
+
+  function toggle() {
+    const next = !isDark;
+    localStorage.setItem("theme", next ? "dark" : "light");
+    document.documentElement.classList.toggle("dark", next);
+    themeListeners.forEach((cb) => cb());
+  }
 
   return (
     <button
-      onClick={() => setIsDark((v) => !v)}
+      onClick={toggle}
       aria-label={isDark ? "Prebaci na svetli mod" : "Prebaci na tamni mod"}
       className="flex items-center justify-center w-8 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)] hover:border-[var(--border-strong)] text-[var(--muted)] hover:text-[var(--ink)] transition-colors duration-150"
     >

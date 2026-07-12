@@ -56,15 +56,18 @@ export function PdfImportJobsPanel({ refreshToken, onOpenCompleted, onRetryStart
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    void loadJobs()
-      .catch((loadError) => {
+    void (async () => {
+      if (cancelled) return;
+      setLoading(true);
+      setError(null);
+      try {
+        await loadJobs();
+      } catch (loadError) {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : String(loadError));
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
     return () => { cancelled = true; };
   }, [loadJobs, refreshToken]);
 

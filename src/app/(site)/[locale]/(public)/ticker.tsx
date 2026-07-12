@@ -56,8 +56,8 @@ export function Ticker({
       className="w-full"
       style={{ borderTop: "2px solid var(--brand-primary)", borderBottom: "1px solid var(--border)" }}
     >
-      {upperItems.length > 0 && <UpperBar items={upperItems} t={t} locale={locale} />}
-      {upcoming.length > 0 && <UpcomingBar items={upcoming} t={t} locale={locale} />}
+      {upperItems.length > 0 && <UpperBar items={upperItems} live={t("live")} upcoming={t("upcoming")} locale={locale} />}
+      {upcoming.length > 0 && <UpcomingBar items={upcoming} upcoming={t("upcoming")} locale={locale} />}
     </div>
   );
 }
@@ -116,7 +116,7 @@ function LiveDetail({ item }: { item: TickerItem }) {
 
 // ── Upper bar (cycles through live + uskoro + custom) ────────────────────────
 
-function UpperBar({ items, t, locale }: { items: TickerItem[]; t: any; locale: string }) {
+function UpperBar({ items, live, upcoming, locale }: { items: TickerItem[]; live: string; upcoming: string; locale: string }) {
   const [idx, setIdx]         = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -129,7 +129,7 @@ function UpperBar({ items, t, locale }: { items: TickerItem[]; t: any; locale: s
     return () => clearInterval(interval);
   }, [items.length]);
 
-  useEffect(() => { setIdx(0); }, [items.length]);
+  // idx is clamped in the render below — no reset effect needed
 
   const item = items[Math.min(idx, items.length - 1)];
 
@@ -145,12 +145,12 @@ function UpperBar({ items, t, locale }: { items: TickerItem[]; t: any; locale: s
       role="status"
       aria-label={`Ticker: ${item.name}`}
     >
-      <LiveBarInner item={item} t={t} locale={locale} />
+      <LiveBarInner item={item} live={live} upcoming={upcoming} locale={locale} />
     </div>
   );
 }
 
-function LiveBarInner({ item, t, locale }: { item: TickerItem; t: any; locale: string }) {
+function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live: string; upcoming: string; locale: string }) {
   const scopedHref = useScopedHref();
   const isLive   = item.status === "LIVE";
   const isUskoro = item.status === "USKORO";
@@ -168,7 +168,7 @@ function LiveBarInner({ item, t, locale }: { item: TickerItem; t: any; locale: s
             className="rounded-full shrink-0"
             style={{ width: 5, height: 5, background: "var(--brand-primary)", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }}
           />
-          {t("live")}
+          {live}
         </span>
       )}
 
@@ -181,7 +181,7 @@ function LiveBarInner({ item, t, locale }: { item: TickerItem; t: any; locale: s
             animation: "ticker-pulse 2s ease-in-out infinite",
           }}
         >
-          {t("upcoming").toUpperCase()}
+          {upcoming.toUpperCase()}
         </span>
       )}
 
@@ -266,10 +266,9 @@ function LiveBarInner({ item, t, locale }: { item: TickerItem; t: any; locale: s
 
 // ── Upcoming bar ─────────────────────────────────────────────────────────────
 
-function UpcomingBar({ items, t, locale }: { items: TickerItem[]; t: any; locale: string }) {
+function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcoming: string; locale: string }) {
   const [paused, setPaused] = useState(false);
-  const doubled  = [...items, ...items];
-  const duration = Math.max(items.length * 14, 40);
+  const doubled = [...items, ...items];
 
   return (
     <div
@@ -287,7 +286,7 @@ function UpcomingBar({ items, t, locale }: { items: TickerItem[]; t: any; locale
           className="shrink-0 font-extrabold uppercase rounded px-1.5"
           style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--muted)", height: 20, display: "inline-flex", alignItems: "center" }}
         >
-          {t("upcoming")}
+          {upcoming}
         </span>
         <span className="shrink-0" style={{ width: 1, height: 10, background: "var(--border)", display: "inline-block" }} aria-hidden="true" />
 

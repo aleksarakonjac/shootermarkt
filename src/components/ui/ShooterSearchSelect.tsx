@@ -54,7 +54,9 @@ export function ShooterSearchSelect({
   const isLocal = options !== undefined;
 
   const [remoteResults, setRemoteResults] = useState<ShooterOption[]>([]);
-  const [remoteSelected, setRemoteSelected] = useState<ShooterOption | null>(null);
+  // Tracks the last shooter explicitly picked so the display name persists
+  // after remoteResults is cleared. Set only in selectShooter (event handler).
+  const [lastPicked, setLastPicked] = useState<ShooterOption | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -87,12 +89,9 @@ export function ShooterSearchSelect({
   useEffect(() => {
     if (isLocal || !open) return;
     const q = query.trim();
-    if (q.length < 2) {
-      setRemoteResults([]);
-      return;
-    }
-    setLoading(true);
     const handle = setTimeout(async () => {
+      if (q.length < 2) { setRemoteResults([]); return; }
+      setLoading(true);
       try {
         const res = await fetch(`/api/cms/shooters-search?q=${encodeURIComponent(q)}`);
         const data = await res.json();
@@ -100,20 +99,9 @@ export function ShooterSearchSelect({
       } finally {
         setLoading(false);
       }
-    }, 250);
+    }, q.length < 2 ? 0 : 250);
     return () => clearTimeout(handle);
   }, [isLocal, open, query]);
-
-  // Remote mode: resolve current value's display data once via a targeted search
-  useEffect(() => {
-    if (isLocal || value == null) {
-      setRemoteSelected(null);
-      return;
-    }
-    if (remoteSelected?.id === value) return;
-    const existing = remoteResults.find((r) => r.id === value);
-    if (existing) setRemoteSelected(existing);
-  }, [isLocal, value, remoteResults, remoteSelected]);
 
   const pool = isLocal ? options! : remoteResults;
 
@@ -131,11 +119,14 @@ export function ShooterSearchSelect({
 
   const selected = isLocal
     ? options!.find((s) => s.id === value) ?? null
-    : remoteSelected;
+    : value == null
+      ? null
+      : remoteResults.find((r) => r.id === value) ??
+        (lastPicked?.id === value ? lastPicked : null);
 
   const selectShooter = (shooter: ShooterOption) => {
     onChange(shooter);
-    if (!isLocal) setRemoteSelected(shooter);
+    if (!isLocal) setLastPicked(shooter);
     setOpen(false);
     setQuery("");
   };
