@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 
 type Step = "select" | "review" | "done";
@@ -507,12 +508,12 @@ export function ISSFImportClient() {
             >
               Uvezi još jedno takmičenje
             </button>
-            <a
+            <Link
               href="/admin"
               className="rounded-md border border-[var(--border-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
             >
               Admin panel
-            </a>
+            </Link>
           </div>
         </div>
       )}

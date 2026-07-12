@@ -8,11 +8,10 @@ export function ArApFinalDisplay({ detail }: Props) {
   const { phase1, phase2, total } = detail;
 
   // Cumulative scores starting from phase1 subtotal
-  let running = phase1.subtotal;
-  const cumulative = phase2.shots.map((v) => {
-    running += v;
-    return running;
-  });
+  const cumulative = phase2.shots.reduce<number[]>((acc, v) => {
+    const last = acc.length > 0 ? acc[acc.length - 1]! : phase1.subtotal;
+    return [...acc, last + v];
+  }, []);
 
   const eliminatedAfterShot = phase2.eliminatedAfterShot;
 

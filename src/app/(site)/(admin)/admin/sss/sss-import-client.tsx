@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { DatePicker } from "@/components/ui/DatePicker";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 import { getSssCompetitionTags, SSS_TAG_STYLE, type SssCompetitionTag } from "@/lib/sss/competition-tags";
@@ -456,7 +457,7 @@ export function SssImportClient() {
           </div>
           <div className="flex gap-3">
             <button onClick={reset} className="rounded-md px-5 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors">Uvezi još jedan bilten</button>
-            <a href="/admin" className="rounded-md border border-[var(--border-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors">Admin panel</a>
+            <Link href="/admin" className="rounded-md border border-[var(--border-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors">Admin panel</Link>
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
@@ -120,13 +120,11 @@ export function GlobalSearch({ shooters, competitions }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const scopedHref = useScopedHref();
   const t = useTranslations("search");
-
-  useEffect(() => setMounted(true), []);
 
   const openModal = useCallback(() => {
     setIsOpen(true);
@@ -213,8 +211,6 @@ export function GlobalSearch({ shooters, competitions }: Props) {
     }
   }
 
-  useEffect(() => setActiveIndex(0), [query]);
-
   // ── Modal JSX ─────────────────────────────────────────────────────────────
 
   const modal = (
@@ -244,7 +240,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
             name="q"
             placeholder={t("fullPlaceholder")}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setActiveIndex(0); }}
             onKeyDown={onInputKeyDown}
             className="flex-1 py-[1.1rem] text-sm text-[var(--ink)] placeholder:text-[var(--subtle)] bg-transparent outline-none focus:outline-none focus:ring-0 [&:focus-visible]:outline-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
             autoComplete="off"
@@ -252,7 +248,7 @@ export function GlobalSearch({ shooters, competitions }: Props) {
           />
           {query && (
             <button
-              onClick={() => setQuery("")}
+              onClick={() => { setQuery(""); setActiveIndex(0); }}
               className="shrink-0 text-xs text-[var(--subtle)] hover:text-[var(--muted)] transition-colors px-1 py-0.5"
             >
               {t("clear")}

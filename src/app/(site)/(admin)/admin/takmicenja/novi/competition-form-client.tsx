@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { LevelDropdown } from "@/components/ui/LevelDropdown";
@@ -154,12 +155,12 @@ export function CompetitionFormClient() {
           >
             {loading ? "Snimam..." : "Snimi takmičenje"}
           </button>
-          <a
+          <Link
             href="/admin/takmicenja"
             className="rounded-md border border-[var(--border-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
           >
             Otkaži
-          </a>
+          </Link>
         </div>
       </form>
     </div>

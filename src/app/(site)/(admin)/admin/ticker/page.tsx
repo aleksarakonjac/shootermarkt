@@ -13,8 +13,10 @@ export const metadata: Metadata = { title: "Admin · Ticker" };
 
 export default async function AdminTickerPage() {
   const today    = new Date().toISOString().split("T")[0];
+  // eslint-disable-next-line react-hooks/purity
   const in30days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
   // Max lead days = 5 (olympic), fetch everything up to 5 days ahead for USKORO detection
+  // eslint-disable-next-line react-hooks/purity
   const in5days  = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   const [upcomingComps, allSlots, allDisciplines, overrides, customUpcoming, uskoro5days, recentArticles] = await Promise.all([

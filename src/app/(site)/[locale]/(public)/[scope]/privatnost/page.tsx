@@ -276,7 +276,7 @@ export default async function PrivatnostPage() {
                   >
                     {CONTACT_EMAIL}
                   </a>{" "}
-                  with subject "Data Request — GDPR". We respond within <strong>30 days</strong> of receiving the request.
+                  with subject &ldquo;Data Request — GDPR&rdquo;. We respond within <strong>30 days</strong> of receiving the request.
                 </P>
               </Section>
             </div>
@@ -337,7 +337,7 @@ export default async function PrivatnostPage() {
                 >
                   {CONTACT_EMAIL}
                 </a>{" "}
-                — subject: "Data Request — GDPR"
+                — subject: &ldquo;Data Request — GDPR&rdquo;
               </P>
               <P>
                 Or via the{" "}
@@ -401,7 +401,7 @@ export default async function PrivatnostPage() {
                 </P>
                 <P>
                   <strong>Pravni osnov:</strong> Obrada se vrši na osnovu <strong>legitimnog interesa</strong> rukovaoca (čl. 12. st. 1. tač. 6)
-                  Zakona o zaštiti podataka o ličnosti — „Sl. glasnik RS", br. 87/2018), u
+                  Zakona o zaštiti podataka o ličnosti — &ldquo;Sl. glasnik RS&rdquo;, br. 87/2018), u
                   skladu sa čl. 6. st. 1. tač. f) Opšte uredbe o zaštiti podataka (GDPR
                   2016/679). Legitimni interes se sastoji u vođenju evidencije o javno
                   objavljenim rezultatima profesionalnih i registrovanih sportista koji su,
@@ -467,7 +467,7 @@ export default async function PrivatnostPage() {
                   >
                     {CONTACT_EMAIL}
                   </a>{" "}
-                  sa oznakom „Zahtev za podatke — ZZPL". Odgovorićemo u roku od{" "}
+                  sa oznakom &ldquo;Zahtev za podatke — ZZPL&rdquo;. Odgovorićemo u roku od{" "}
                   <strong>30 dana</strong> od prijema zahteva (rok se može produžiti za još
                   60 dana u složenim slučajevima, uz obaveštenje).
                 </P>
@@ -543,7 +543,7 @@ export default async function PrivatnostPage() {
                   >
                     {CONTACT_EMAIL}
                   </a>{" "}
-                  — predmet: „Zahtev za podatke — ZZPL"
+                  — predmet: &ldquo;Zahtev za podatke — ZZPL&rdquo;
                 </P>
                 <P>
                   Ili putem{" "}

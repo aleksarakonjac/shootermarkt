@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NocDropdown } from "@/components/ui/NocDropdown";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -146,12 +147,12 @@ export function ShooterFormClient({ clubs: initialClubs }: { clubs: Club[] }) {
           >
             {loading ? "Snimam..." : "Snimi strelca"}
           </button>
-          <a
+          <Link
             href="/admin/strelci"
             className="rounded-md border border-[var(--border-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
           >
             Otkaži
-          </a>
+          </Link>
         </div>
       </form>
     </div>

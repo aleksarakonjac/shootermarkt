@@ -351,7 +351,7 @@ export function TickerAdminClient({
 
           {overrides.length === 0 ? (
             <div className="px-4 py-6 text-center text-xs text-[var(--subtle)]">
-              Nema forsiranog sadržaja. Dodaj ispod ili koristi "Forsirati live/uskoro" na takmičenju.
+              Nema forsiranog sadržaja. Dodaj ispod ili koristi &ldquo;Forsirati live/uskoro&rdquo; na takmičenju.
             </div>
           ) : (
             <div className="divide-y divide-[var(--border)]">

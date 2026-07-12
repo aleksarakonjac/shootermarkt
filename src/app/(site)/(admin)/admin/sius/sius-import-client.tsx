@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { DatePicker } from "@/components/ui/DatePicker";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 
@@ -581,12 +582,12 @@ export function SiusImportClient() {
             >
               Uvezi još jedno takmičenje
             </button>
-            <a
+            <Link
               href="/admin"
               className="rounded-md border border-[var(--border-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
             >
               Admin panel
-            </a>
+            </Link>
           </div>
         </div>
       )}

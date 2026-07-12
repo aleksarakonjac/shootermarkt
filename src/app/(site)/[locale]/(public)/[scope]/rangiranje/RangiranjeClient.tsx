@@ -176,15 +176,17 @@ export function RangiranjeClient({
   // Read initial state from URL hash (client-only, runs once on mount)
   useEffect(() => {
     const h = parseHash(window.location.hash);
-    if (h.view && VIEWS.some((v) => v.key === h.view)) setActiveView(h.view as ViewKey);
-    if (h.kategorija && categoriesPresent.includes(h.kategorija as AgeCategory)) {
-      setActiveKategorija(h.kategorija as AgeCategory);
-    }
-    if (h.zemlja) setActiveZemlja(h.zemlja);
-    if (h.period && ["karijera", "vazdusna", "kalendarska"].includes(h.period)) {
-      setActivePeriod(h.period as PeriodType);
-    }
-    if (h.sezona && !isNaN(parseInt(h.sezona))) setSeasonYear(parseInt(h.sezona));
+    void Promise.resolve().then(() => {
+      if (h.view && VIEWS.some((v) => v.key === h.view)) setActiveView(h.view as ViewKey);
+      if (h.kategorija && categoriesPresent.includes(h.kategorija as AgeCategory)) {
+        setActiveKategorija(h.kategorija as AgeCategory);
+      }
+      if (h.zemlja) setActiveZemlja(h.zemlja);
+      if (h.period && ["karijera", "vazdusna", "kalendarska"].includes(h.period)) {
+        setActivePeriod(h.period as PeriodType);
+      }
+      if (h.sezona && !isNaN(parseInt(h.sezona))) setSeasonYear(parseInt(h.sezona));
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync state → URL hash (shareable links)

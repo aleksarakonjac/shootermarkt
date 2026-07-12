@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { DatePicker } from "@/components/ui/DatePicker";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 
@@ -490,12 +491,12 @@ export function ImportClient() {
             >
               Import još jedan bilten
             </button>
-            <a
+            <Link
               href="/admin"
               className="rounded-md border border-[var(--border-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
             >
               Admin panel
-            </a>
+            </Link>
           </div>
         </div>
       )}

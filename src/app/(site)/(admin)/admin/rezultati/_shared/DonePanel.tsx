@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 interface CommitResult {
   inserted: number;
   skipped: number;
@@ -51,12 +53,12 @@ export function DonePanel({ result, onReset, resetLabel = "Unesi još" }: Props)
             Vidi takmičenje →
           </a>
         )}
-        <a
+        <Link
           href="/admin"
           className="rounded-md border border-[var(--border-strong)] px-5 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
         >
           Admin panel
-        </a>
+        </Link>
       </div>
     </div>
   );

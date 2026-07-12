@@ -78,7 +78,7 @@ export function SearchBarClient({ shootersList }: SearchBarClientProps) {
         <div className="absolute top-full left-0 right-0 mt-1.5 z-[300] bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg max-h-60 overflow-y-auto divide-y divide-[var(--border)]">
           {filtered.length === 0 ? (
             <div className="px-4 py-3 text-xs text-[var(--muted)] text-center">
-              Nema rezultata za "{query}"
+              Nema rezultata za &ldquo;{query}&rdquo;
             </div>
           ) : (
             filtered.slice(0, 8).map((s) => (

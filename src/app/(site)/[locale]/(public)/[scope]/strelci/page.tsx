@@ -51,6 +51,8 @@ type FormaEntry = {
 
 // ── Forma Leader Row ─────────────────────────────────────────────────────────
 
+type TFunc = (key: string) => string;
+
 function FormaLeaderRow({
   s,
   rank,
@@ -58,7 +60,7 @@ function FormaLeaderRow({
 }: {
   s: FormaEntry;
   rank: number;
-  t: any;
+  t: TFunc;
 }) {
   const inner = (
     <>
@@ -117,6 +119,37 @@ function FormaLeaderRow({
 
 type SortCol = "name" | "godiste" | "disc";
 type SortDir = "asc" | "desc";
+
+function SortIcon({ col, activeSort, activeDir }: { col: SortCol; activeSort: SortCol; activeDir: SortDir }) {
+  if (activeSort !== col) return <span className="ml-1 opacity-30">↕</span>;
+  return <span className="ml-1">{activeDir === "asc" ? "↑" : "↓"}</span>;
+}
+
+function DiscPanel({ code, show, t }: { code: string; show: Record<string, FormaEntry[]>; t: TFunc }) {
+  const isMen = code === "ARM" || code === "APM";
+  const rows = show[code] ?? [];
+  if (rows.length === 0) return null;
+  return (
+    <div className="p-5">
+      <div className="flex items-baseline gap-2 mb-4">
+        <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[1.05rem] tracking-tight text-[var(--ink)] leading-none">
+          {t(isMen ? "discMen" : "discWomen")}
+        </h3>
+        <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)] shrink-0">
+          {code}
+        </span>
+        <span className="text-[0.65rem] text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)] ml-auto shrink-0">
+          {t("onTopForm")}
+        </span>
+      </div>
+      <div>
+        {rows.map((s, i) => (
+          <FormaLeaderRow key={s.id} s={s} rank={i + 1} t={t} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 type Props = {
   params: Promise<{ scope: Scope }>;
@@ -357,10 +390,6 @@ export default async function StrelciPage({ params, searchParams }: Props) {
     return qs ? `/strelci?${qs}` : "/strelci";
   }
 
-  function SortIcon({ col }: { col: SortCol }) {
-    if (activeSort !== col) return <span className="ml-1 opacity-30">↕</span>;
-    return <span className="ml-1">{activeDir === "asc" ? "↑" : "↓"}</span>;
-  }
 
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
@@ -411,31 +440,6 @@ export default async function StrelciPage({ params, searchParams }: Props) {
         const hasAny = ["ARM","ARW","APM","APW"].some((d) => (show[d]?.length ?? 0) > 0);
         if (!hasAny) return null;
 
-        function DiscPanel({ code }: { code: string }) {
-          const isMen = code === "ARM" || code === "APM";
-          const rows = show[code] ?? [];
-          if (rows.length === 0) return null;
-          return (
-            <div className="p-5">
-              <div className="flex items-baseline gap-2 mb-4">
-                <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[1.05rem] tracking-tight text-[var(--ink)] leading-none">
-                  {t(isMen ? "discMen" : "discWomen")}
-                </h3>
-                <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)] shrink-0">
-                  {code}
-                </span>
-                <span className="text-[0.65rem] text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)] ml-auto shrink-0">
-                  {t("onTopForm")}
-                </span>
-              </div>
-              <div>
-                {rows.map((s, i) => (
-                  <FormaLeaderRow key={s.id} s={s} rank={i + 1} t={t} />
-                ))}
-              </div>
-            </div>
-          );
-        }
 
         const hasRifle  = (show.ARM?.length ?? 0) > 0 || (show.ARW?.length ?? 0) > 0;
         const hasPistol = (show.APM?.length ?? 0) > 0 || (show.APW?.length ?? 0) > 0;
@@ -454,8 +458,8 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)]">
-                  <DiscPanel code="ARM" />
-                  <DiscPanel code="ARW" />
+                  <DiscPanel code="ARM" show={show} t={t} />
+                  <DiscPanel code="ARW" show={show} t={t} />
                 </div>
               </div>
             )}
@@ -469,8 +473,8 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)]">
-                  <DiscPanel code="APM" />
-                  <DiscPanel code="APW" />
+                  <DiscPanel code="APM" show={show} t={t} />
+                  <DiscPanel code="APW" show={show} t={t} />
                 </div>
               </div>
             )}
@@ -519,17 +523,17 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] w-2/5">
                     <ScopedLink href={sortUrl("name")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
-                      {tProfile("shooter")}<SortIcon col="name" />
+                      {tProfile("shooter")}<SortIcon col="name" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
                   </th>
                   <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden md:table-cell">
                     <ScopedLink href={sortUrl("godiste")} className="inline-flex items-center justify-end hover:text-[var(--ink)] transition-colors">
-                      {tProfile("birthYear")}<SortIcon col="godiste" />
+                      {tProfile("birthYear")}<SortIcon col="godiste" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
                   </th>
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
                     <ScopedLink href={sortUrl("disc")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
-                      {tProfile("discipline")}<SortIcon col="disc" />
+                      {tProfile("discipline")}<SortIcon col="disc" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
                   </th>
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">

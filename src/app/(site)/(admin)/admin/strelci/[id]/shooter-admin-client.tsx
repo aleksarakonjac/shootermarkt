@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -171,9 +172,9 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
       {/* Breadcrumb + actions */}
       <div className="flex items-center justify-between mb-6 gap-4">
         <nav className="flex items-center gap-2 text-xs text-[var(--muted)]">
-          <a href="/admin/strelci" className="hover:text-[var(--ink)] transition-colors">
+          <Link href="/admin/strelci" className="hover:text-[var(--ink)] transition-colors">
             ← Strelci
-          </a>
+          </Link>
           <span className="text-[var(--subtle)]">/</span>
           <span className="text-[var(--ink)] font-semibold">
             {shooter.lastName} {shooter.firstName}

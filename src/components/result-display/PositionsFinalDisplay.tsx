@@ -13,11 +13,10 @@ const POS_LABELS = {
 export function PositionsFinalDisplay({ detail }: Props) {
   const { phase1, phase2, total } = detail;
 
-  let running = phase1.subtotal;
-  const cumulative = phase2.shots.map((v) => {
-    running += v;
-    return running;
-  });
+  const cumulative = phase2.shots.reduce<number[]>((acc, v) => {
+    const last = acc.length > 0 ? acc[acc.length - 1]! : phase1.subtotal;
+    return [...acc, last + v];
+  }, []);
 
   const hasDecimals = detail.format === "3x40_mk";
   const fmt = (v: number) =>

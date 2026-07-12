@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 
 import type { ReviewRow, CommitPayload } from "@/lib/pdf-import/types";
 import { CompetitionSearchSelect } from "@/components/ui/CompetitionSearchSelect";
@@ -219,7 +220,7 @@ export function PdfMode() {
             />
             <p className="text-xs text-[var(--muted)]">
               Rezultati iz PDF-a vezuju se za izabrano takmičenje. Ako ga nema, prvo ga
-              kreiraj u <a href="/admin/takmicenja" className="text-[var(--brand-primary)] hover:underline">Takmičenja</a>.
+              kreiraj u <Link href="/admin/takmicenja" className="text-[var(--brand-primary)] hover:underline">Takmičenja</Link>.
             </p>
           </div>
 

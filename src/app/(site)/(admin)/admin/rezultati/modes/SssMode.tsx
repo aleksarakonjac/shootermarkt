@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { ReviewRow, CommitPayload } from "@/lib/pdf-import/types";
 import { CompetitionSearchSelect } from "@/components/ui/CompetitionSearchSelect";
 import { SSS_TAG_STYLE, type SssCompetitionTag } from "@/lib/sss/competition-tags";
@@ -192,7 +193,7 @@ export function SssMode() {
                     />
                     <p className="text-xs text-[var(--muted)] mt-1.5">
                       Rezultati iz biltena vezuju se za izabrano takmičenje. Ako ga nema,
-                      prvo ga kreiraj u <a href="/admin/takmicenja" className="text-[var(--brand-primary)] hover:underline">Takmičenja</a>.
+                      prvo ga kreiraj u <Link href="/admin/takmicenja" className="text-[var(--brand-primary)] hover:underline">Takmičenja</Link>.
                     </p>
                   </div>
                   <button

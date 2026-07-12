@@ -72,7 +72,8 @@ export default async function VestiPage({ searchParams }: Props) {
 
   function getCategoryLabel(cat: string | null): string {
     if (!cat) return t("categories.vest");
-    return t(`categories.${cat}` as any) ?? cat;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (t as any)(`categories.${cat}`) ?? cat;
   }
 
   const CATEGORIES = CATEGORY_KEYS.map((key) => ({
@@ -364,7 +365,7 @@ function EmptyState({
 }: {
   activeCategory: string;
   label: string;
-  t: any;
+  t: (key: string) => string;
 }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 flex flex-col items-center gap-3 text-center">
