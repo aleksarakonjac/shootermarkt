@@ -373,7 +373,7 @@ export function SssImportClient() {
 
           {/* Table */}
           <div className="rounded-xl border border-[var(--border)] overflow-auto">
-            <table className="w-full text-sm min-w-[800px]">
+            <table className="w-full text-sm min-w-[1200px]">
               <thead>
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                   <th className="px-3 py-2.5 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
@@ -382,16 +382,21 @@ export function SssImportClient() {
                   <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
                   <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Disc.</th>
                   <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Rank</th>
-                  <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Total</th>
-                  <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inners</th>
-                  <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Status</th>
+                  {[1,2,3,4,5,6].map((n) => (
+                    <th key={n} className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">S{n}</th>
+                  ))}
+                  <th className="sticky right-[176px] bg-[var(--surface)] px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] border-l border-[var(--border)]">Total</th>
+                  <th className="sticky right-[80px] bg-[var(--surface)] px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inners</th>
+                  <th className="sticky right-0 bg-[var(--surface)] px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {filteredRows.map((row, visIdx) => {
                   const trueIdx = rows.indexOf(row);
+                  const series = row.qualSeries ?? [];
+                  const stickyBg = row.skip ? "bg-[var(--bg)]" : "bg-[var(--bg)] group-hover:bg-[var(--surface)]";
                   return (
-                    <tr key={visIdx} className={`transition-colors ${row.skip ? "opacity-40" : "hover:bg-[var(--surface)]"}`}>
+                    <tr key={visIdx} className={`group transition-colors ${row.skip ? "opacity-40" : "hover:bg-[var(--surface)]"}`}>
                       <td className="px-3 py-2 text-center">
                         <input type="checkbox" checked={!!row.skip} onChange={(e) => updateRow(trueIdx, { skip: e.target.checked })} className="accent-[var(--brand-primary)]" />
                       </td>
@@ -408,11 +413,16 @@ export function SssImportClient() {
                         </select>
                       </td>
                       <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs">{row.qualRank != null ? `#${row.qualRank}` : "—"}</td>
-                      <td className="px-3 py-2 text-right">
+                      {[0,1,2,3,4,5].map((i) => (
+                        <td key={i} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs tabular-nums">
+                          {series[i] != null ? series[i] : "—"}
+                        </td>
+                      ))}
+                      <td className={`sticky right-[176px] ${stickyBg} px-3 py-2 text-right border-l border-[var(--border)]`}>
                         <input type="number" value={row.qualTotal} onChange={(e) => updateRow(trueIdx, { qualTotal: parseFloat(e.target.value) })} step="0.1" className="w-16 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] text-sm py-0.5" />
                       </td>
-                      <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs">{row.qualInners != null ? `${row.qualInners}x` : "—"}</td>
-                      <td className="px-3 py-2">
+                      <td className={`sticky right-[80px] ${stickyBg} px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs`}>{row.qualInners != null ? `${row.qualInners}x` : "—"}</td>
+                      <td className={`sticky right-0 ${stickyBg} px-3 py-2`}>
                         {row.shooterId ? <span className="text-xs" style={{ color: "var(--success)" }}>✓ Pronađen</span>
                           : row.warning ? <span className="text-xs" style={{ color: "var(--warning)" }}>⚠ Novi</span> : null}
                       </td>

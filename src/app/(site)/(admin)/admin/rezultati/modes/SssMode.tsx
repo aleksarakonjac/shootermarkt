@@ -29,6 +29,8 @@ export function SssMode() {
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [eventCount, setEventCount] = useState(0);
+  const [matchedFinals, setMatchedFinals] = useState(0);
+  const [unmatchedFinals, setUnmatchedFinals] = useState(0);
   const [nocFilter, setNocFilter] = useState("");
   const [result, setResult] = useState<CommitResult | null>(null);
 
@@ -56,11 +58,17 @@ export function SssMode() {
       const res = await fetch("/api/admin/sss/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: selectedBilten.url, filename: selectedBilten.filename }),
+        body: JSON.stringify({
+          url: selectedBilten.url,
+          filename: selectedBilten.filename,
+          competitionId: selectedCompId,
+          tags: selectedBilten.tags,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Import failed");
-      setRows(data.rows); setEventCount(data.eventCount); setStep("review");
+      if (!res.ok || !data.id) throw new Error(data.error ?? "Pokretanje importa nije uspelo");
+      localStorage.setItem("pdfImportJobId", String(data.id));
+      window.location.assign("/admin/rezultati?mode=pdf");
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }
@@ -92,7 +100,7 @@ export function SssMode() {
 
   function reset() {
     setStep("select"); setSelectedBilten(null); setRows([]);
-    setResult(null); setError(null); setNocFilter("");
+    setResult(null); setError(null); setNocFilter(""); setMatchedFinals(0); setUnmatchedFinals(0);
     setSelectedCompId(null); setSelectedCompName("");
   }
 
@@ -192,7 +200,7 @@ export function SssMode() {
                     disabled={loading || !selectedCompId}
                     className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
                   >
-                    {loading ? "Preuzimam i parsiram…" : "Uvezi bilten →"}
+                    {loading ? "Zakazujem import…" : "Uvezi bilten →"}
                   </button>
                 </div>
               )}
@@ -208,6 +216,8 @@ export function SssMode() {
               <span><span className="font-semibold text-[var(--ink)]">{eventCount}</span> discipline</span>
               <span><span className="font-semibold text-[var(--ink)]">{activeCount}</span> za unos</span>
               <span><span className="font-semibold text-[var(--ink)]">{rows.filter(r => r.skip).length}</span> preskočeno</span>
+              {matchedFinals > 0 && <span><span className="font-semibold text-[var(--ink)]">{matchedFinals}</span> finala povezano</span>}
+              {unmatchedFinals > 0 && <span style={{ color: "var(--warning)" }}>{unmatchedFinals} finala bez kvalifikacionog reda</span>}
               {rows.filter(r => r.warning).length > 0 && (
                 <span style={{ color: "var(--warning)" }}>⚠ {rows.filter(r => r.warning).length} novih strelaca</span>
               )}

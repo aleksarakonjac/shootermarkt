@@ -12,9 +12,9 @@ import { PdfImportJobsPanel, type PdfImportJobSummary } from "./PdfImportJobsPan
 type Step = "upload" | "review" | "done";
 
 
-interface ParseInfo { eventsCount: number; skippedDisciplines: string[] }
+interface ParseInfo { eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
-interface PdfImportJob { id: number; competitionId: number; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[] } | null; error: string | null }
+interface PdfImportJob { id: number; competitionId: number; tags: string[]; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number } | null; error: string | null }
 
 export function PdfMode() {
   const [step, setStep] = useState<Step>("upload");
@@ -25,6 +25,7 @@ export function PdfMode() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedCompId, setSelectedCompId] = useState<number | null>(null);
   const [selectedCompName, setSelectedCompName] = useState("");
+  const [importTags, setImportTags] = useState<string[]>([]);
   const [failedJobId, setFailedJobId] = useState<number | null>(null);
   const [jobsRefreshToken, setJobsRefreshToken] = useState(0);
   const [jobId, setJobId] = useState<number | null>(() => {
@@ -46,8 +47,14 @@ export function PdfMode() {
       if (!response.ok) throw new Error(job.error ?? "Job nije pronađen");
       if (job.status === "completed" && job.result) {
         setRows(job.result.rows);
-        setParseInfo({ eventsCount: job.result.eventsCount, skippedDisciplines: job.result.skippedDisciplines });
+        setParseInfo({
+          eventsCount: job.result.eventsCount,
+          skippedDisciplines: job.result.skippedDisciplines,
+          matchedFinals: job.result.matchedFinals,
+          unmatchedFinals: job.result.unmatchedFinals,
+        });
         setSelectedCompId(job.competitionId);
+        setImportTags(job.tags);
         localStorage.removeItem("pdfImportJobId");
         setJobId(null);
         setJobsRefreshToken((token) => token + 1);
@@ -103,7 +110,7 @@ export function PdfMode() {
     if (!selectedCompId) { setError("Izaberi takmičenje iz baze"); return; }
     setLoading(true);
     setError(null);
-    const payload: CommitPayload = { competitionId: selectedCompId, rows };
+    const payload: CommitPayload = { competitionId: selectedCompId, tags: importTags, rows };
     try {
       const res = await fetch("/api/admin/import/commit", {
         method: "POST",
@@ -140,9 +147,15 @@ export function PdfMode() {
       if (!response.ok) throw new Error(job.error ?? "Job nije pronađen");
       if (job.status !== "completed" || !job.result) throw new Error("Rezultat ovog posla još nije dostupan");
       setRows(job.result.rows);
-      setParseInfo({ eventsCount: job.result.eventsCount, skippedDisciplines: job.result.skippedDisciplines });
+      setParseInfo({
+        eventsCount: job.result.eventsCount,
+        skippedDisciplines: job.result.skippedDisciplines,
+        matchedFinals: job.result.matchedFinals,
+        unmatchedFinals: job.result.unmatchedFinals,
+      });
       setSelectedCompId(job.competitionId);
       setSelectedCompName(jobSummary.competitionName);
+      setImportTags(job.tags);
       setFailedJobId(null);
       setStep("review");
     } catch (openError) {
@@ -162,6 +175,7 @@ export function PdfMode() {
     setSelectedFile(null);
     setSelectedCompId(null);
     setSelectedCompName("");
+    setImportTags([]);
     setFailedJobId(null);
     setJobId(null);
     localStorage.removeItem("pdfImportJobId");
@@ -259,6 +273,8 @@ export function PdfMode() {
               )}
               <span><span className="font-semibold text-[var(--ink)]">{activeCount}</span> za unos</span>
               <span><span className="font-semibold text-[var(--ink)]">{rows.filter(r => r.skip).length}</span> preskočeno</span>
+              {(parseInfo?.matchedFinals ?? 0) > 0 && <span><span className="font-semibold text-[var(--ink)]">{parseInfo?.matchedFinals}</span> finala povezano</span>}
+              {(parseInfo?.unmatchedFinals ?? 0) > 0 && <span style={{ color: "var(--warning)" }}>{parseInfo?.unmatchedFinals} finala bez kvalifikacionog reda</span>}
               {rows.filter(r => r.warning).length > 0 && (
                 <span style={{ color: "var(--warning)" }}>⚠ {rows.filter(r => r.warning).length} novih strelaca</span>
               )}

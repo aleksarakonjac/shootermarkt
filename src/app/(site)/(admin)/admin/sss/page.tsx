@@ -1,7 +1,7 @@
-import { SssImportClient } from "./sss-import-client";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Admin · SSS Bilteni" };
 
 export default function SssImportPage() {
-  return <SssImportClient />;
+  redirect("/admin/rezultati?mode=sss");
 }

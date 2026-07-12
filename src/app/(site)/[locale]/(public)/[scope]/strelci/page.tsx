@@ -1,15 +1,15 @@
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 import { Suspense } from "react";
 import { ScopedLink } from "../../components/ScopedLink";
 import Image from "next/image";
 import { db } from "@/lib/db";
-import { shooters, clubs, results, competitions } from "@/lib/db/schema";
+import { shooters, clubs, results, competitions, shooterFormaCache } from "@/lib/db/schema";
 import { eq, asc, ilike, or, and, isNotNull, inArray, sql, desc, gte } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { NOC_LIST } from "@/lib/noc-list";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
-import { computeFormaFromEntries, type CompetitionLevel } from "@/lib/forma";
+import { RANKING_MIN_SAMPLE } from "@/lib/forma";
 import { StrelciFilterBar } from "./StrelciFilterBar";
 import { getLocale, getTranslations } from "next-intl/server";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@/lib/pdf-import/types";
@@ -37,17 +37,6 @@ function getDiscCode(apparatus: string | null, gender: string | null): string | 
   if (isRifle)  return gender === "F" ? "ARW" : "ARM";
   if (isPistol) return gender === "F" ? "APW" : "APM";
   return null;
-}
-
-type FormaEntryRow = { qualTotal: number; date: string; level: CompetitionLevel | null };
-
-// computeFormaFromEntries sortira hronološki interno — redosled ulaza nebitan.
-function formaFromEntries(entries: FormaEntryRow[], code?: string): {
-  forma: number | null;
-  trend: "up" | "down" | "stable";
-} {
-  const r = computeFormaFromEntries(entries, { code });
-  return { forma: r.forma, trend: r.trend };
 }
 
 type FormaEntry = {
@@ -194,7 +183,6 @@ export default async function StrelciPage({ params, searchParams }: Props) {
     statsActiveRows,
     statsApparatus,
     [{ totalAll }],
-    allFormaShooters,
   ] = await Promise.all([
     db
       .select({
@@ -260,93 +248,82 @@ export default async function StrelciPage({ params, searchParams }: Props) {
       .from(shooters)
       .where(and(inArray(shooters.apparatus, [...MVP_APPARATUS]), scopeFilter)),
 
-    // All rifle/pistol shooters for forma leaders (unfiltered, unpaginated)
-    db
-      .select({
-        id:          shooters.id,
-        firstName:   shooters.firstName,
-        lastName:    shooters.lastName,
-        apparatus:   shooters.apparatus,
-        gender:      shooters.gender,
-        avatarUrl:   shooters.avatarUrl,
-        nationality: shooters.nationality,
-        clubName:    clubs.name,
-      })
-      .from(shooters)
-      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-      .where(and(inArray(shooters.apparatus, [...MVP_APPARATUS]), scopeFilter)),
   ]);
 
-  // Forma scores — paginated table + all-shooter leaders in parallel
-  const shooterIds           = data.map((s) => s.id);
-  const allFormaShooterIds   = allFormaShooters.map((s) => s.id);
+  const shooterIds = data.map((s) => s.id);
+  // Build disc-code map so we can match each shooter to their cache entry
+  const shooterDiscMap = new Map(data.map((s) => [s.id, getDiscCode(s.apparatus, s.gender)]));
 
-  const [recentResultsData, formaLeaderResults] = await Promise.all([
+  const [pageCacheRows, leaderCacheRows] = await Promise.all([
     shooterIds.length > 0
       ? db
-          .select({ shooterId: results.shooterId, qualTotal: results.qualTotal, date: competitions.date, level: competitions.level })
-          .from(results)
-          .innerJoin(competitions, eq(results.competitionId, competitions.id))
-          .where(and(inArray(results.shooterId, shooterIds), isNotNull(results.qualTotal)))
-          .orderBy(asc(results.shooterId), desc(competitions.date))
-      : ([] as { shooterId: number; qualTotal: unknown; date: string; level: CompetitionLevel }[]),
+          .select({
+            shooterId:      shooterFormaCache.shooterId,
+            disciplineCode: shooterFormaCache.disciplineCode,
+            forma:          shooterFormaCache.forma,
+            trend:          shooterFormaCache.trend,
+            sampleSize:     shooterFormaCache.sampleSize,
+          })
+          .from(shooterFormaCache)
+          .where(inArray(shooterFormaCache.shooterId, shooterIds))
+      : Promise.resolve([] as { shooterId: number; disciplineCode: string; forma: string | null; trend: string | null; sampleSize: number }[]),
 
-    allFormaShooterIds.length > 0
-      ? db
-          .select({ shooterId: results.shooterId, qualTotal: results.qualTotal, date: competitions.date, level: competitions.level })
-          .from(results)
-          .innerJoin(competitions, eq(results.competitionId, competitions.id))
-          .where(and(inArray(results.shooterId, allFormaShooterIds), isNotNull(results.qualTotal)))
-          .orderBy(asc(results.shooterId), desc(competitions.date))
-      : ([] as { shooterId: number; qualTotal: unknown; date: string; level: CompetitionLevel }[]),
+    db
+      .select({
+        shooterId:      shooterFormaCache.shooterId,
+        disciplineCode: shooterFormaCache.disciplineCode,
+        forma:          shooterFormaCache.forma,
+        trend:          shooterFormaCache.trend,
+        firstName:      shooters.firstName,
+        lastName:       shooters.lastName,
+        avatarUrl:      shooters.avatarUrl,
+        clubName:       clubs.name,
+      })
+      .from(shooterFormaCache)
+      .innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id))
+      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
+      .where(and(
+        inArray(shooterFormaCache.disciplineCode, ["ARM", "ARW", "APM", "APW"]),
+        isNotNull(shooterFormaCache.forma),
+        gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE),
+        scopeFilter,
+      ))
+      .orderBy(asc(shooterFormaCache.disciplineCode), desc(shooterFormaCache.forma)),
   ]);
 
-  // Group recent results per shooter (newest-first) and compute forma.
-  // Cap = WINDOW (computeForma ionako uzima prozor); 20 da aktivni strelci imaju dovoljno.
-  const FORMA_CAP = 20;
-  const entriesByShooter: Record<number, FormaEntryRow[]> = {};
-  for (const r of recentResultsData) {
-    const id = r.shooterId;
-    if (!entriesByShooter[id]) entriesByShooter[id] = [];
-    if (entriesByShooter[id].length < FORMA_CAP) {
-      entriesByShooter[id].push({ qualTotal: Number(r.qualTotal), date: r.date, level: r.level });
+  // Map page shooters to their cached forma (matching by discipline code)
+  const pageCacheMap = new Map<number, { forma: number | null; trend: "up"|"down"|"stable"; sampleSize: number }>();
+  for (const r of pageCacheRows) {
+    if (shooterDiscMap.get(r.shooterId) === r.disciplineCode) {
+      pageCacheMap.set(r.shooterId, {
+        forma:      r.forma != null ? Number(r.forma) : null,
+        trend:      (r.trend ?? "stable") as "up"|"down"|"stable",
+        sampleSize: r.sampleSize,
+      });
     }
   }
 
   const enrichedData = data.map((s) => {
-    const entries = entriesByShooter[s.id] ?? [];
-    const code = getDiscCode(s.apparatus, s.gender) ?? undefined;
-    const { forma, trend } = formaFromEntries(entries, code);
-    return { ...s, forma, trend, resultCount: entries.length };
+    const cached = pageCacheMap.get(s.id);
+    return { ...s, forma: cached?.forma ?? null, trend: (cached?.trend ?? "stable") as "up"|"down"|"stable", resultCount: cached?.sampleSize ?? 0 };
   });
 
-  // Forma leaders across all shooters
-  const allEntriesByShooter: Record<number, FormaEntryRow[]> = {};
-  for (const r of formaLeaderResults) {
-    const id = r.shooterId;
-    if (!allEntriesByShooter[id]) allEntriesByShooter[id] = [];
-    if (allEntriesByShooter[id].length < FORMA_CAP) {
-      allEntriesByShooter[id].push({ qualTotal: Number(r.qualTotal), date: r.date, level: r.level });
+  // Forma leaders — cache already ordered by (disc, forma desc), slice top 3 per disc
+  const top3ByDisc: Record<string, FormaEntry[]> = { ARM: [], ARW: [], APM: [], APW: [] };
+  for (const r of leaderCacheRows) {
+    const disc = r.disciplineCode;
+    if (disc in top3ByDisc && top3ByDisc[disc].length < 3) {
+      top3ByDisc[disc].push({
+        id:        r.shooterId,
+        firstName: r.firstName,
+        lastName:  r.lastName,
+        avatarUrl: r.avatarUrl,
+        clubName:  r.clubName,
+        forma:     Number(r.forma),
+        trend:     (r.trend ?? "stable") as "up"|"down"|"stable",
+      });
     }
   }
-
-  type FormaLeader = typeof allFormaShooters[0] & { forma: number; trend: "up" | "down" | "stable" };
-  const leadersByDisc: Record<string, FormaLeader[]> = { ARM: [], ARW: [], APM: [], APW: [] };
-
-  for (const s of allFormaShooters) {
-    const entries = allEntriesByShooter[s.id] ?? [];
-    if (entries.length === 0) continue;
-    const disc = getDiscCode(s.apparatus, s.gender);
-    const { forma, trend } = formaFromEntries(entries, disc ?? undefined);
-    if (forma === null) continue;
-    if (disc && disc in leadersByDisc) {
-      leadersByDisc[disc].push({ ...s, forma, trend });
-    }
-  }
-  for (const arr of Object.values(leadersByDisc)) arr.sort((a, b) => b.forma - a.forma);
-  const top3ByDisc: Record<string, FormaLeader[]> = Object.fromEntries(
-    Object.entries(leadersByDisc).map(([k, v]) => [k, v.slice(0, 3)])
-  );
 
   const totalPages    = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const availableNocs = nocRows.map((r) => r.noc).filter(Boolean) as string[];

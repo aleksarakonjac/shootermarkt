@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { clubs, shooters } from "@/lib/db/schema";
 import { matchShooter, foldName } from "@/lib/name-match";
 import { parsePdfWithGemini } from "./gemini-adapter";
-import { DISCIPLINE_META, IMPORTED_DISCIPLINE_CODES, dedupeRowsByCategory, type ParsedShooterResult, type ReviewRow } from "./types";
+import { DISCIPLINE_META, IMPORTED_DISCIPLINE_CODES, dedupeRowsByCategory, mergeFinalsIntoRows, type ParsedShooterResult, type ReviewRow } from "./types";
 
 export async function parsePdfImport(pdfBuffer: Buffer) {
   const [bilten, allClubs, allShooters] = await Promise.all([
@@ -53,5 +53,13 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
     }
   }
 
-  return { rows: dedupeRowsByCategory(rows, foldName), eventsCount: bilten.events.length, skippedDisciplines: Array.from(skippedDisciplines) };
+  const dedupedRows = dedupeRowsByCategory(rows, foldName);
+  const finals = mergeFinalsIntoRows(dedupedRows, bilten.events, foldName);
+  return {
+    rows: finals.rows,
+    eventsCount: bilten.events.length,
+    skippedDisciplines: Array.from(skippedDisciplines),
+    matchedFinals: finals.matchedFinals,
+    unmatchedFinals: finals.unmatchedFinals,
+  };
 }

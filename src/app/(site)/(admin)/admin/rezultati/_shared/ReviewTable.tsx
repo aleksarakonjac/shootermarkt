@@ -77,7 +77,7 @@ export function ReviewTable({
 
       {/* Table */}
       <div className="rounded-xl border border-[var(--border)] overflow-auto">
-        <table className="w-full text-sm min-w-[860px]">
+        <table className="w-full text-sm min-w-[1340px]">
           <thead>
             <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
               <th className="px-3 py-2.5 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
@@ -87,15 +87,21 @@ export function ReviewTable({
               <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
               <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Disc.</th>
               <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Kat.</th>
-              <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Rank</th>
-              <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Total</th>
+              <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Kval. rank</th>
+              {[1, 2, 3, 4, 5, 6].map((series) => (
+                <th key={series} className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">S{series}</th>
+              ))}
+              <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Kval. total</th>
               <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inners</th>
+              <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Final rank</th>
+              <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Final total</th>
               <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
             {filtered.map((row) => {
               const trueIdx = rows.indexOf(row);
+              const series = row.qualSeries ?? [];
               return (
                 <tr
                   key={trueIdx}
@@ -166,6 +172,11 @@ export function ReviewTable({
                       placeholder="—"
                     />
                   </td>
+                  {[0, 1, 2, 3, 4, 5].map((seriesIndex) => (
+                    <td key={seriesIndex} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">
+                      {series[seriesIndex] ?? "—"}
+                    </td>
+                  ))}
                   <td className="px-3 py-2">
                     <input
                       type="number"
@@ -181,6 +192,25 @@ export function ReviewTable({
                       value={row.qualInners ?? ""}
                       onChange={(e) => onRowChange(trueIdx, { qualInners: e.target.value ? parseInt(e.target.value) : null })}
                       className="w-12 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs py-0.5"
+                      placeholder="—"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      value={row.finalRank ?? ""}
+                      onChange={(e) => onRowChange(trueIdx, { finalRank: e.target.value ? parseInt(e.target.value) : null })}
+                      className="w-12 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs py-0.5"
+                      placeholder="—"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      type="number"
+                      value={row.finalTotal ?? ""}
+                      onChange={(e) => onRowChange(trueIdx, { finalTotal: e.target.value ? parseFloat(e.target.value) : null })}
+                      step="0.1"
+                      className="w-16 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] text-sm py-0.5"
                       placeholder="—"
                     />
                   </td>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { competitions, pdfImportJobs } from "@/lib/db/schema";
-import { inngest } from "@/lib/inngest/client";
+import { queuePdfImportJob } from "@/lib/pdf-import/jobs";
 import { removePdfImports, uploadPdfImport } from "@/lib/pdf-import/storage";
 import { and, desc, eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -82,17 +82,10 @@ export async function POST(req: NextRequest) {
   const pdfData = Buffer.from(await file.arrayBuffer());
   await uploadPdfImport(pdfStoragePath, pdfData);
 
-  const job = await (async () => {
-    try {
-      const [created] = await db.insert(pdfImportJobs)
-        .values({ competitionId, pdfStoragePath })
-        .returning({ id: pdfImportJobs.id, competitionId: pdfImportJobs.competitionId, status: pdfImportJobs.status });
-      return created;
-    } catch (error) {
+  const job = await queuePdfImportJob({ competitionId, pdfStoragePath })
+    .catch(async (error) => {
       await removePdfImports([pdfStoragePath]).catch(() => undefined);
       throw error;
-    }
-  })();
-  await inngest.send({ name: "pdf-import/queued", data: { jobId: job.id } });
+    });
   return NextResponse.json(job, { status: 202 });
 }

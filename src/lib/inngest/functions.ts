@@ -2,8 +2,9 @@ import { and, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { pdfImportJobs } from "@/lib/db/schema";
 import { parsePdfImport } from "@/lib/pdf-import/parse-import";
-import { downloadPdfImport, removePdfImports } from "@/lib/pdf-import/storage";
+import { downloadPdfImport, removePdfImports, uploadPdfImport } from "@/lib/pdf-import/storage";
 import { inngest } from "./client";
+import { randomUUID } from "crypto";
 
 const PDF_RETENTION_DAYS = 30;
 
@@ -26,7 +27,7 @@ export const processPdfImport = inngest.createFunction(
         .where(and(eq(pdfImportJobs.id, jobId), eq(pdfImportJobs.status, "processing")));
     },
   },
-  async ({ event, attempt }) => {
+  async ({ event, attempt, step }) => {
     const jobId = event.data.jobId;
     const status = attempt === 0 ? "queued" : "processing";
     const update = {
@@ -38,11 +39,39 @@ export const processPdfImport = inngest.createFunction(
     const [job] = await db.update(pdfImportJobs)
       .set(update)
       .where(and(eq(pdfImportJobs.id, jobId), eq(pdfImportJobs.status, status)))
-      .returning({ id: pdfImportJobs.id, pdfData: pdfImportJobs.pdfData, pdfStoragePath: pdfImportJobs.pdfStoragePath });
+      .returning({
+        id: pdfImportJobs.id,
+        pdfData: pdfImportJobs.pdfData,
+        pdfStoragePath: pdfImportJobs.pdfStoragePath,
+        sourceUrl: pdfImportJobs.sourceUrl,
+      });
     if (!job) return { skipped: true };
 
-    const pdfData = job.pdfStoragePath
-      ? await downloadPdfImport(job.pdfStoragePath)
+    const pdfStoragePath = job.pdfStoragePath ?? await step.run("download-source-pdf", async () => {
+      if (job.pdfData) return null;
+      if (!job.sourceUrl) throw new Error("Originalni PDF više nije dostupan");
+
+      const response = await fetch(job.sourceUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
+      if (!response.ok) throw new Error(`Preuzimanje izvornog PDF-a nije uspelo: HTTP ${response.status}`);
+      const contentLength = Number(response.headers.get("content-length") ?? "0");
+      if (contentLength > 20 * 1024 * 1024) throw new Error("Izvorni PDF je veći od 20 MB");
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (buffer.byteLength < 100 || buffer.byteLength > 20 * 1024 * 1024) throw new Error("Izvorni PDF je neispravan ili veći od 20 MB");
+
+      const path = `imports/${new Date().toISOString().slice(0, 10)}/${randomUUID()}.pdf`;
+      await uploadPdfImport(path, buffer);
+      try {
+        await db.update(pdfImportJobs)
+          .set({ pdfStoragePath: path, updatedAt: new Date() })
+          .where(eq(pdfImportJobs.id, job.id));
+      } catch (error) {
+        await removePdfImports([path]).catch(() => undefined);
+        throw error;
+      }
+      return path;
+    });
+    const pdfData = pdfStoragePath
+      ? await downloadPdfImport(pdfStoragePath)
       : job.pdfData;
     if (!pdfData) throw new Error("Originalni PDF više nije dostupan");
 

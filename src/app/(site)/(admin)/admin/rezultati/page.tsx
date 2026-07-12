@@ -4,7 +4,7 @@ export const metadata = { title: "Unos rezultata — Admin" };
 
 export default async function RezultatiPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
   const { mode } = await searchParams;
-  const initialMode = mode === "pdf" ? "pdf" : "manual";
+  const initialMode = mode === "pdf" || mode === "sss" ? mode : "manual";
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <div>

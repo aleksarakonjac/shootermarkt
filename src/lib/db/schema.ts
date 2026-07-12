@@ -500,6 +500,9 @@ export const pdfImportJobs = pgTable(
     pdfData: bytea("pdf_data"),
     pdfStoragePath: varchar("pdf_storage_path", { length: 500 }),
     pdfDeletedAt: timestamp("pdf_deleted_at"),
+    sourceUrl: varchar("source_url", { length: 1000 }),
+    sourceLabel: varchar("source_label", { length: 500 }),
+    tags: varchar("tags", { length: 20 }).array().notNull().default([]),
     result: jsonb("result").$type<unknown>(),
     error: text("error"),
     attempts: integer("attempts").notNull().default(0),
@@ -568,6 +571,43 @@ export const tickerCustomUpcoming = pgTable(
     displayUntil: varchar("display_until", { length: 10 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   }
+);
+
+// ── Forma Cache ───────────────────────────────────────────────────────────────
+// Pre-computed per (shooter, discipline_code). Refreshed on every result commit.
+
+export const shooterFormaCache = pgTable(
+  "shooter_forma_cache",
+  {
+    id: serial("id").primaryKey(),
+    shooterId: integer("shooter_id").notNull().references(() => shooters.id, { onDelete: "cascade" }),
+    disciplineCode: varchar("discipline_code", { length: 10 }).notNull(),
+    forma: decimal("forma", { precision: 6, scale: 1 }),
+    level: decimal("level", { precision: 6, scale: 1 }),
+    reliability: decimal("reliability", { precision: 6, scale: 1 }),
+    trend: varchar("trend", { length: 10 }),
+    momentum: decimal("momentum", { precision: 10, scale: 6 }),
+    peak: decimal("peak", { precision: 6, scale: 1 }),
+    peakProximity: decimal("peak_proximity", { precision: 7, scale: 6 }),
+    consistency: decimal("consistency", { precision: 7, scale: 6 }),
+    sampleSize: integer("sample_size").notNull().default(0),
+    lowConfidence: boolean("low_confidence").notNull().default(true),
+    // Career stats (deterministic, period-independent)
+    peakCareer: decimal("peak_career", { precision: 6, scale: 1 }),
+    best3Career: decimal("best3_career", { precision: 6, scale: 1 }),
+    recent3Career: decimal("recent3_career", { precision: 6, scale: 1 }),
+    seasonAvg: decimal("season_avg", { precision: 6, scale: 1 }),
+    prevSeasonAvg: decimal("prev_season_avg", { precision: 6, scale: 1 }),
+    improvement: decimal("improvement", { precision: 5, scale: 1 }),
+    seasonCount: integer("season_count").notNull().default(0),
+    careerCount: integer("career_count").notNull().default(0),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("shooter_forma_cache_shooter_disc_unique").on(t.shooterId, t.disciplineCode),
+    index("shooter_forma_cache_discipline_idx").on(t.disciplineCode),
+    index("shooter_forma_cache_forma_idx").on(t.disciplineCode, t.forma),
+  ]
 );
 
 // ── Relations ─────────────────────────────────────────────────────────────────
@@ -660,6 +700,10 @@ export const competitionScheduleRelations = relations(competitionSchedule, ({ on
 
 export const tickerLiveOverrideRelations = relations(tickerLiveOverrides, ({ one }) => ({
   competition: one(competitions, { fields: [tickerLiveOverrides.competitionId], references: [competitions.id] }),
+}));
+
+export const shooterFormaCacheRelations = relations(shooterFormaCache, ({ one }) => ({
+  shooter: one(shooters, { fields: [shooterFormaCache.shooterId], references: [shooters.id] }),
 }));
 
 export const resultRelations = relations(results, ({ one }) => ({

@@ -174,6 +174,49 @@ export function dedupeRowsByCategory(rows: ReviewRow[], foldName: (s: string) =>
   return out;
 }
 
+/**
+ * Finale je isti nastup kao kvalifikacija: čuva se na istom rezultatu, ali u
+ * odvojenim finalTotal/finalRank poljima. Kategorija finala ume da se razlikuje
+ * od kvalifikacione tabele, zato se prvo pokušava precizno poklapanje, a zatim
+ * isti strelac i disciplina.
+ */
+export function mergeFinalsIntoRows(
+  rows: ReviewRow[],
+  events: ParsedEvent[],
+  foldName: (name: string) => string,
+): { rows: ReviewRow[]; matchedFinals: number; unmatchedFinals: number } {
+  const finalEvents = events.filter((event) => event.stage === "final");
+  let matchedFinals = 0;
+  let unmatchedFinals = 0;
+
+  for (const event of finalEvents) {
+    for (const rawResult of event.results as ParsedFinalResult[]) {
+      const teamNoc = rawResult.teamNoc.toUpperCase();
+      const candidates = rows.filter((row) => (
+        row.disciplineCode === event.discipline
+        && row.teamNoc.toUpperCase() === teamNoc
+        && foldName(row.firstName) === foldName(rawResult.firstName)
+        && foldName(row.lastName) === foldName(rawResult.lastName)
+      ));
+      const row = candidates.find((candidate) => candidate.category === event.category)
+        ?? candidates.find((candidate) => candidate.qualified)
+        ?? candidates[0];
+
+      if (!row) {
+        unmatchedFinals++;
+        continue;
+      }
+
+      row.finalTotal = rawResult.total;
+      row.finalRank = rawResult.rank;
+      row.qualified = true;
+      matchedFinals++;
+    }
+  }
+
+  return { rows, matchedFinals, unmatchedFinals };
+}
+
 export interface CommitPayload {
   /** Excel i ručni unos su administrativni unosi; PDF/ISSF tokovi čuvaju svoj izvor. */
   source?: "manual" | "pdf_import" | "issf_import" | "esc_import";

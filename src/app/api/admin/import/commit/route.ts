@@ -5,6 +5,7 @@ import { shooters, clubs, competitions, results, disciplines } from "@/lib/db/sc
 import { eq, and, sql } from "drizzle-orm";
 import { DISCIPLINE_META, type CommitPayload } from "@/lib/pdf-import/types";
 import { matchShooter } from "@/lib/name-match";
+import { recomputeFormaCache } from "@/lib/forma-cache";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
   let inserted = 0;
   let skipped = 0;
   const errors: string[] = [];
+  const affectedShooterIds = new Set<number>();
 
   for (const row of rows) {
     if (row.skip) { skipped++; continue; }
@@ -152,6 +154,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      if (shooterId) affectedShooterIds.add(shooterId);
+
       const disciplineId = disciplineMap[row.disciplineCode];
       if (!disciplineId) {
         errors.push(`Unknown discipline: ${row.disciplineCode}`);
@@ -181,6 +185,17 @@ export async function POST(req: NextRequest) {
       inserted++;
     } catch (err) {
       errors.push(`${row.lastName} ${row.firstName} (${row.teamNoc}): ${String(err)}`);
+    }
+  }
+
+  // Recompute forma cache for all affected shooters
+  const affectedIds = [...affectedShooterIds];
+  if (affectedIds.length > 0) {
+    try {
+      await recomputeFormaCache(affectedIds);
+    } catch (e) {
+      // Non-fatal — cache miss is fine, pages fall back to on-the-fly computation
+      errors.push(`[forma-cache] ${String(e)}`);
     }
   }
 

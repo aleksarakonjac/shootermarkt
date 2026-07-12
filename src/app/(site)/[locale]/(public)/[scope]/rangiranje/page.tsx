@@ -1,4 +1,4 @@
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions } from "@/lib/db/schema";

@@ -11,7 +11,7 @@ import { buildAlternates } from "@/i18n/alternates";
 import { getLevelLabel } from "@/lib/competition-utils";
 import type { Scope } from "@/lib/scope";
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
   const { scope } = await params;
