@@ -496,7 +496,10 @@ export const pdfImportJobs = pgTable(
     id: serial("id").primaryKey(),
     competitionId: integer("competition_id").notNull().references(() => competitions.id),
     status: varchar("status", { length: 20 }).notNull().default("queued"),
-    pdfData: bytea("pdf_data").notNull(),
+    // Legacy fallback for imports created before PDFs moved to Storage.
+    pdfData: bytea("pdf_data"),
+    pdfStoragePath: varchar("pdf_storage_path", { length: 500 }),
+    pdfDeletedAt: timestamp("pdf_deleted_at"),
     result: jsonb("result").$type<unknown>(),
     error: text("error"),
     attempts: integer("attempts").notNull().default(0),

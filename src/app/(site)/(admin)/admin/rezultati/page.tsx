@@ -2,7 +2,9 @@ import { RezultatiHub } from "./rezultati-hub";
 
 export const metadata = { title: "Unos rezultata — Admin" };
 
-export default function RezultatiPage() {
+export default async function RezultatiPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+  const { mode } = await searchParams;
+  const initialMode = mode === "pdf" ? "pdf" : "manual";
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <div>
@@ -16,7 +18,7 @@ export default function RezultatiPage() {
           Ručni unos ili import iz Excel šablona, PDF biltena, SSS, ISSF i SIUS sistema
         </p>
       </div>
-      <RezultatiHub />
+      <RezultatiHub initialMode={initialMode} />
     </div>
   );
 }

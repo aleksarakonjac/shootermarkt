@@ -1,7 +1,7 @@
-import { ImportClient } from "./import-client";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Import PDF biltena" };
 
 export default function ImportPage() {
-  return <ImportClient />;
+  redirect("/admin/rezultati?mode=pdf");
 }

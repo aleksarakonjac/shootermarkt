@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { pdfImportJobs } from "@/lib/db/schema";
 import { inngest } from "@/lib/inngest/client";
@@ -19,9 +19,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const [job] = await db.update(pdfImportJobs)
     .set({ status: "queued", error: null, startedAt: null, completedAt: null, updatedAt: new Date() })
-    .where(and(eq(pdfImportJobs.id, id), eq(pdfImportJobs.status, "failed")))
+    .where(and(eq(pdfImportJobs.id, id), eq(pdfImportJobs.status, "failed"), isNull(pdfImportJobs.pdfDeletedAt)))
     .returning({ id: pdfImportJobs.id, status: pdfImportJobs.status });
-  if (!job) return NextResponse.json({ error: "Samo neuspešan job može ponovo da se pokrene" }, { status: 409 });
+  if (!job) return NextResponse.json({ error: "Samo neuspešan job sa sačuvanim PDF-om može ponovo da se pokrene" }, { status: 409 });
 
   try {
     await inngest.send({ name: "pdf-import/queued", data: { jobId: job.id } });

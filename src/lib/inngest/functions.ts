@@ -1,8 +1,11 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { pdfImportJobs } from "@/lib/db/schema";
 import { parsePdfImport } from "@/lib/pdf-import/parse-import";
+import { downloadPdfImport, removePdfImports } from "@/lib/pdf-import/storage";
 import { inngest } from "./client";
+
+const PDF_RETENTION_DAYS = 30;
 
 export const processPdfImport = inngest.createFunction(
   {
@@ -17,6 +20,7 @@ export const processPdfImport = inngest.createFunction(
         .set({
           status: "failed",
           error: error.message,
+          completedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(and(eq(pdfImportJobs.id, jobId), eq(pdfImportJobs.status, "processing")));
@@ -34,13 +38,49 @@ export const processPdfImport = inngest.createFunction(
     const [job] = await db.update(pdfImportJobs)
       .set(update)
       .where(and(eq(pdfImportJobs.id, jobId), eq(pdfImportJobs.status, status)))
-      .returning({ id: pdfImportJobs.id, pdfData: pdfImportJobs.pdfData });
+      .returning({ id: pdfImportJobs.id, pdfData: pdfImportJobs.pdfData, pdfStoragePath: pdfImportJobs.pdfStoragePath });
     if (!job) return { skipped: true };
 
-    const result = await parsePdfImport(job.pdfData);
+    const pdfData = job.pdfStoragePath
+      ? await downloadPdfImport(job.pdfStoragePath)
+      : job.pdfData;
+    if (!pdfData) throw new Error("Originalni PDF više nije dostupan");
+
+    const result = await parsePdfImport(pdfData);
     await db.update(pdfImportJobs)
       .set({ status: "completed", result, completedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(pdfImportJobs.id, job.id), eq(pdfImportJobs.status, "processing")));
     return { jobId: job.id, rows: result.rows.length };
+  }
+);
+
+export const cleanupExpiredPdfImports = inngest.createFunction(
+  {
+    id: "cleanup-expired-pdf-imports",
+    triggers: [{ cron: "0 3 * * *" }],
+  },
+  async () => {
+    const expiresBefore = new Date(Date.now() - PDF_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const jobs = await db
+      .select({ id: pdfImportJobs.id, pdfStoragePath: pdfImportJobs.pdfStoragePath })
+      .from(pdfImportJobs)
+      .where(and(
+        inArray(pdfImportJobs.status, ["completed", "failed"]),
+        isNull(pdfImportJobs.pdfDeletedAt),
+        lt(pdfImportJobs.completedAt, expiresBefore),
+        or(isNotNull(pdfImportJobs.pdfStoragePath), isNotNull(pdfImportJobs.pdfData)),
+      ))
+      .limit(100);
+
+    const paths = jobs.flatMap((job) => job.pdfStoragePath ? [job.pdfStoragePath] : []);
+    await removePdfImports(paths);
+
+    if (jobs.length > 0) {
+      await db.update(pdfImportJobs)
+        .set({ pdfData: null, pdfDeletedAt: new Date(), updatedAt: new Date() })
+        .where(inArray(pdfImportJobs.id, jobs.map((job) => job.id)));
+    }
+
+    return { deleted: jobs.length };
   }
 );

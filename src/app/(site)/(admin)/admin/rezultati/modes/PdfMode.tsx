@@ -7,13 +7,14 @@ import { CompetitionSearchSelect } from "@/components/ui/CompetitionSearchSelect
 import { ReviewTable } from "../_shared/ReviewTable";
 import { NewShootersPanel } from "../_shared/NewShootersPanel";
 import { DonePanel } from "../_shared/DonePanel";
+import { PdfImportJobsPanel, type PdfImportJobSummary } from "./PdfImportJobsPanel";
 
 type Step = "upload" | "review" | "done";
 
 
 interface ParseInfo { eventsCount: number; skippedDisciplines: string[] }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
-interface PdfImportJob { id: number; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[] } | null; error: string | null }
+interface PdfImportJob { id: number; competitionId: number; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[] } | null; error: string | null }
 
 export function PdfMode() {
   const [step, setStep] = useState<Step>("upload");
@@ -25,6 +26,7 @@ export function PdfMode() {
   const [selectedCompId, setSelectedCompId] = useState<number | null>(null);
   const [selectedCompName, setSelectedCompName] = useState("");
   const [failedJobId, setFailedJobId] = useState<number | null>(null);
+  const [jobsRefreshToken, setJobsRefreshToken] = useState(0);
   const [jobId, setJobId] = useState<number | null>(() => {
     if (typeof window === "undefined") return null;
     const savedJobId = Number(localStorage.getItem("pdfImportJobId"));
@@ -45,14 +47,17 @@ export function PdfMode() {
       if (job.status === "completed" && job.result) {
         setRows(job.result.rows);
         setParseInfo({ eventsCount: job.result.eventsCount, skippedDisciplines: job.result.skippedDisciplines });
+        setSelectedCompId(job.competitionId);
         localStorage.removeItem("pdfImportJobId");
         setJobId(null);
+        setJobsRefreshToken((token) => token + 1);
         setStep("review");
       } else if (job.status === "failed") {
         setError(job.error ?? "Parsiranje nije uspelo");
         setFailedJobId(job.id);
         localStorage.removeItem("pdfImportJobId");
         setJobId(null);
+        setJobsRefreshToken((token) => token + 1);
       }
     };
     void poll().catch((pollError) => setError(String(pollError)));
@@ -72,8 +77,7 @@ export function PdfMode() {
       const res = await fetch("/api/admin/import/jobs", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Pokretanje parsiranja nije uspelo");
-      localStorage.setItem("pdfImportJobId", String(data.id));
-      setJobId(data.id);
+      startTrackingJob(data.id);
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }
@@ -86,9 +90,8 @@ export function PdfMode() {
       const response = await fetch(`/api/admin/import/jobs/${failedJobId}/retry`, { method: "POST" });
       const job = await response.json() as { id?: number; error?: string };
       if (!response.ok || !job.id) throw new Error(job.error ?? "Ponovno pokretanje nije uspelo");
-      localStorage.setItem("pdfImportJobId", String(job.id));
       setFailedJobId(null);
-      setJobId(job.id);
+      startTrackingJob(job.id);
     } catch (retryError) {
       setError(String(retryError));
     } finally {
@@ -120,6 +123,33 @@ export function PdfMode() {
 
   function updateRow(idx: number, patch: Partial<ReviewRow>) {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  }
+
+  function startTrackingJob(nextJobId: number) {
+    localStorage.setItem("pdfImportJobId", String(nextJobId));
+    setJobId(nextJobId);
+    setJobsRefreshToken((token) => token + 1);
+  }
+
+  async function openCompletedJob(jobSummary: PdfImportJobSummary) {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/admin/import/jobs/${jobSummary.id}`);
+      const job = await response.json() as PdfImportJob;
+      if (!response.ok) throw new Error(job.error ?? "Job nije pronađen");
+      if (job.status !== "completed" || !job.result) throw new Error("Rezultat ovog posla još nije dostupan");
+      setRows(job.result.rows);
+      setParseInfo({ eventsCount: job.result.eventsCount, skippedDisciplines: job.result.skippedDisciplines });
+      setSelectedCompId(job.competitionId);
+      setSelectedCompName(jobSummary.competitionName);
+      setFailedJobId(null);
+      setStep("review");
+    } catch (openError) {
+      setError(openError instanceof Error ? openError.message : String(openError));
+    } finally {
+      setLoading(false);
+    }
   }
 
   function reset() {
@@ -275,6 +305,12 @@ export function PdfMode() {
           </div>
         </>
       )}
+
+      <PdfImportJobsPanel
+        refreshToken={jobsRefreshToken}
+        onOpenCompleted={(job) => void openCompletedJob(job)}
+        onRetryStarted={startTrackingJob}
+      />
     </div>
   );
 }

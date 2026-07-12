@@ -87,8 +87,8 @@ const MODES: ModeConfig[] = [
   },
 ];
 
-export function RezultatiHub() {
-  const [mode, setMode] = useState<Mode>("manual");
+export function RezultatiHub({ initialMode = "manual" }: { initialMode?: Mode }) {
+  const [mode, setMode] = useState<Mode>(initialMode);
   const current = MODES.find((m) => m.id === mode)!;
 
   return (
