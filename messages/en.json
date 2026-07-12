@@ -194,7 +194,12 @@
       "formHistory": "Form History",
       "formHistorySuffix": "history",
       "noChartData": "Not enough data for chart",
-      "allDisciplines": "All"
+      "allDisciplines": "All",
+      "statsCareer": "Career Statistics",
+      "statBest3": "Best-3",
+      "statSezonaProsek": "This season",
+      "statNapredak": "vs. prior",
+      "statUkupnoNastupa": "Appearances"
     }
   },
   "common": {

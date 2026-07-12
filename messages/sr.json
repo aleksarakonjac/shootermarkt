@@ -194,7 +194,12 @@
       "formHistory": "Istorija forme",
       "formHistorySuffix": "istorija",
       "noChartData": "Nema dovoljno podataka za grafik",
-      "allDisciplines": "Sve"
+      "allDisciplines": "Sve",
+      "statsCareer": "Statistike karijere",
+      "statBest3": "Best-3",
+      "statSezonaProsek": "Ova sezona",
+      "statNapredak": "vs. prošla",
+      "statUkupnoNastupa": "Nastupa"
     }
   },
   "common": {
