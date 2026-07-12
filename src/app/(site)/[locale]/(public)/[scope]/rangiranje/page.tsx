@@ -12,7 +12,6 @@ import { type AgeCategory, CATEGORY_RANK } from "@/lib/pdf-import/types";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import { buildShooterScopeFilter, type Scope } from "@/lib/scope";
-import type { H2HLabels } from "./HeadToHeadPanel";
 import { RangiranjeClient, type RangiranjeShooter, type RangiranjeLabels } from "./RangiranjeClient";
 
 export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
@@ -211,24 +210,9 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
     viewSeasonAvg:    t("viewSeasonAvg"),
     viewRecent3:      t("viewRecent3"),
     viewImproved:     t("viewImproved"),
-    viewH2H:          t("viewH2H"),
     activeTabLabel,
     categoryLabels:   {},
     all:              tCommon("all"),
-  };
-
-  const h2hLabels: H2HLabels = {
-    h2hPickPrompt:      t("h2hPickPrompt"),
-    h2hSwap:            t("h2hSwap"),
-    h2hPickBoth:        t("h2hPickBoth"),
-    h2hCommonMeets:     t("h2hCommonMeets"),
-    h2hNoCommonMeets:   t("h2hNoCommonMeets"),
-    h2hStat_forma:      t("h2hStat_forma"),
-    h2hStat_peak:       t("h2hStat_peak"),
-    h2hStat_best3:      t("h2hStat_best3"),
-    h2hStat_seasonAvg:  t("h2hStat_seasonAvg"),
-    h2hStat_recent3:    t("h2hStat_recent3"),
-    h2hStat_appearances: t("h2hStat_appearances"),
   };
 
   return (
@@ -277,7 +261,6 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
         shooters={shooterData}
         categoriesPresent={categoriesPresent}
         labels={labels}
-        h2hLabels={h2hLabels}
         locale={locale}
       />
     </div>

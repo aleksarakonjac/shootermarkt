@@ -25,12 +25,11 @@ import {
   type MetricEntry,
 } from "@/lib/ranking-metrics";
 import { CATEGORY_LABEL, type AgeCategory } from "@/lib/pdf-import/types";
-import { HeadToHeadPanel, type H2HCandidate, type H2HLabels } from "./HeadToHeadPanel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type DiscCode = "ARM" | "ARW" | "APM" | "APW";
-type ViewKey = "forma" | "peak" | "best3" | "seasonavg" | "recent3" | "improved" | "h2h";
+type ViewKey = "forma" | "peak" | "best3" | "seasonavg" | "recent3" | "improved";
 
 export type RangiranjeShooter = {
   shooterId: number;
@@ -81,7 +80,6 @@ export type RangiranjeLabels = {
   viewSeasonAvg: string;
   viewRecent3: string;
   viewImproved: string;
-  viewH2H: string;
   activeTabLabel: string;
   categoryLabels: Record<string, string>;
   all: string;
@@ -93,7 +91,6 @@ type Props = {
   shooters: RangiranjeShooter[];
   categoriesPresent: AgeCategory[];
   labels: RangiranjeLabels;
-  h2hLabels: H2HLabels;
   locale: string;
 };
 
@@ -106,7 +103,6 @@ const VIEWS: { key: ViewKey; labelKey: keyof RangiranjeLabels }[] = [
   { key: "seasonavg", labelKey: "viewSeasonAvg" },
   { key: "recent3",  labelKey: "viewRecent3" },
   { key: "improved", labelKey: "viewImproved" },
-  { key: "h2h",      labelKey: "viewH2H" },
 ];
 
 const PERIOD_VIEWS: ViewKey[] = ["peak", "best3", "seasonavg", "recent3"];
@@ -162,7 +158,6 @@ export function RangiranjeClient({
   shooters,
   categoriesPresent,
   labels,
-  h2hLabels,
   locale,
 }: Props) {
   const t = useTranslations("ranking");
@@ -205,7 +200,6 @@ export function RangiranjeClient({
   }, [activeView, activeKategorija, activeZemlja, activePeriod, seasonYear, defaultKategorija]);
 
   const seasonType: SeasonType = activePeriod === "karijera" ? "vazdusna" : activePeriod;
-  const airSeasonYear = currentSeasonStartYear("vazdusna");
   const seasonPeriods = [seasonYear, seasonYear - 1, seasonYear - 2, seasonYear - 3, seasonYear - 4];
 
   // ── Computed data ────────────────────────────────────────────────────────────
@@ -282,8 +276,6 @@ export function RangiranjeClient({
         return [...zFiltered].filter((s) => s.recent3Active !== null).sort((a, b) => b.recent3Active! - a.recent3Active!);
       case "improved":
         return [...zFiltered].filter((s) => s.improvement !== null).sort((a, b) => b.improvement! - a.improvement!);
-      case "h2h":
-        return zFiltered;
     }
   }, [zFiltered, activeView]);
 
@@ -295,32 +287,6 @@ export function RangiranjeClient({
       setSeasonYear(currentSeasonStartYear(effectivePeriod as SeasonType));
     }
   }, [activeView]);
-
-  const h2hCandidates: H2HCandidate[] = useMemo(() =>
-    zFiltered.map((s) => ({
-      shooterId:   s.shooterId,
-      firstName:   s.firstName,
-      lastName:    s.lastName,
-      nationality: s.nationality,
-      clubName:    s.clubName,
-      category:    activeKategorija ?? "senior",
-      forma:       s.forma,
-      trend:       s.forma !== null ? s.formaTrend : null,
-      peak:        s.peakCareer,
-      best3avg:    s.best3Career,
-      seasonAvg:   s.seasonAvgCache,
-      recent3avg:  s.recent3Career,
-      appearances: s.matches.length,
-      matches:     s.matches.map((m) => ({
-        competitionId:   m.competitionId,
-        competitionName: m.competitionName,
-        date:            m.date,
-        qualTotal:       m.qualTotal,
-        qualRank:        m.qualRank,
-      })),
-    })),
-    [zFiltered, activeKategorija]
-  );
 
   const showPeriodControl = PERIOD_VIEWS.includes(activeView) || IMPROVED_VIEWS.includes(activeView);
 
@@ -430,7 +396,7 @@ export function RangiranjeClient({
       )}
 
       {/* Country filter */}
-      {activeView !== "h2h" && allNocs.length > 1 && (
+      {allNocs.length > 1 && (
         <div className="flex flex-wrap items-center gap-1 mb-5">
           <button
             onClick={() => setActiveZemlja(null)}
@@ -473,14 +439,7 @@ export function RangiranjeClient({
         </div>
       )}
 
-      {/* H2H view */}
-      {activeView === "h2h" ? (
-        <HeadToHeadPanel
-          candidates={h2hCandidates}
-          labels={h2hLabels}
-          seasonLabel={formatSeasonLabel("vazdusna", airSeasonYear)}
-        />
-      ) : displayed.length === 0 ? (
+      {displayed.length === 0 ? (
         <div className="rounded-xl border border-[var(--border)] py-20 text-center">
           <p className="text-sm text-[var(--muted)]">{labels.noData}</p>
         </div>
@@ -663,6 +622,16 @@ export function RangiranjeClient({
           </div>
         </div>
       )}
+
+      {/* H2H link */}
+      <div className="mt-3 flex justify-end">
+        <ScopedLink
+          href={`/head-to-head?disc=${activeCode.toLowerCase()}`}
+          className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors font-[family-name:var(--font-jetbrains-mono)]"
+        >
+          {locale === "en" ? "Head-to-head comparison" : "Head-to-head poređenje"} →
+        </ScopedLink>
+      </div>
     </>
   );
 }
