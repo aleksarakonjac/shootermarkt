@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Barlow_Condensed, JetBrains_Mono } from "next/font/google";
-import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getMessages } from "next-intl/server";
+import { routing } from "@/i18n/routing";
 import "../globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -35,23 +34,23 @@ export const metadata: Metadata = {
   description: "Platforma za praćenje rezultata i profila srpskih strelaca",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const locale = await getLocale();
-  const messages = await getMessages();
-
+  // No locale API calls here on purpose: this layout wraps both /admin (no locale
+  // concept) and /[locale]/* (public). Reading locale this high in the tree forces
+  // every page dynamic, since [locale]/layout.tsx hasn't resolved requestLocale yet
+  // by the time this renders. The actual <html lang> is patched client-side inside
+  // [locale]/layout.tsx once the real locale is known.
   return (
     <html
-      lang={locale}
+      lang={routing.defaultLocale}
       className={`${plusJakarta.variable} ${barlowCondensed.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-dvh flex flex-col bg-[var(--bg)] text-[var(--ink)]">
-        <NextIntlClientProvider messages={messages} locale={locale}>
-          {children}
-        </NextIntlClientProvider>
+        {children}
       </body>
     </html>
   );
