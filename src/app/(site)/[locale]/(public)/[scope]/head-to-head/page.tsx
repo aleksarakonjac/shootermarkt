@@ -3,7 +3,7 @@ export const dynamicParams = true;
 
 import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions, shooterFormaCache } from "@/lib/db/schema";
-import { eq, isNotNull, and, inArray, asc, desc } from "drizzle-orm";
+import { eq, isNotNull, and, inArray, asc } from "drizzle-orm";
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";

@@ -127,7 +127,6 @@ function stripTags(html: string): string {
 function parseEscHtml(html: string): CalendarEvent[] {
   // Columns: DATE | COMPETITION | EVENT | COUNTRY | CITY | RESULTS
   const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
   const events: CalendarEvent[] = [];
   let row;
 

@@ -3,7 +3,7 @@ import {
   competitions, competitionSchedule, disciplines,
   tickerLiveOverrides, tickerCustomUpcoming, countries,
 } from "@/lib/db/schema";
-import { gte, lte, and, eq, asc, or } from "drizzle-orm";
+import { gte, lte, and, eq, asc } from "drizzle-orm";
 import type { Metadata } from "next";
 import { TickerAdminClient } from "./ticker-client";
 import { USKORO_LEAD_DAYS } from "@/app/(site)/[locale]/(public)/ticker";

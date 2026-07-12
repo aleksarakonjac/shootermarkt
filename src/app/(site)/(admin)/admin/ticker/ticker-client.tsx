@@ -242,7 +242,6 @@ const btnPrimary = `${btn} bg-[var(--brand-primary)] text-white hover:bg-[var(--
 const btnGhost   = `${btn} text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)]`;
 const btnDanger  = `${btn} text-[var(--brand-primary)] hover:bg-red-50 dark:hover:bg-red-950`;
 const inputCls   = "block w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-xs text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors";
-const selectCls  = `${inputCls} cursor-pointer`;
 
 function LiveDot() {
   return (

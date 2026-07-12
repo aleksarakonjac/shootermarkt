@@ -70,7 +70,6 @@ export function UpcomingEvents({ competitions }: UpcomingEventsProps) {
 
   useEffect(() => {
     checkBounds();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competitions]);
 
   const handleMouseDown = (e: React.MouseEvent) => {

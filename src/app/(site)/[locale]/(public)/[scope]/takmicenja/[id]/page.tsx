@@ -7,13 +7,12 @@ import {
   shooters,
   clubs,
   disciplines,
-  countries,
 } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ScopedLink } from "../../../components/ScopedLink";
-import type { CompetitionLevel, EventType } from "@/lib/pdf-import/types";
+import type { EventType } from "@/lib/pdf-import/types";
 import { CATEGORY_RANK } from "@/lib/pdf-import/types";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import {

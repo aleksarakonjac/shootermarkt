@@ -137,7 +137,7 @@ export function CompetitionsSyncClient() {
   function toggleSource(s: Source) {
     setActiveSources((prev) => {
       const next = new Set(prev);
-      next.has(s) ? next.delete(s) : next.add(s);
+      if (next.has(s)) { next.delete(s); } else { next.add(s); }
       return next;
     });
     setLoaded(false);
@@ -199,7 +199,7 @@ export function CompetitionsSyncClient() {
   function toggle(key: string) {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) { next.delete(key); } else { next.add(key); }
       return next;
     });
   }

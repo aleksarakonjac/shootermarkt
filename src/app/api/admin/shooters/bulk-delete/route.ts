@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { shooters, results } from "@/lib/db/schema";
 import { createClient } from "@/lib/supabase/server";
-import { inArray, notInArray, eq, and, isNull, sql } from "drizzle-orm";
+import { inArray, eq, and } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();

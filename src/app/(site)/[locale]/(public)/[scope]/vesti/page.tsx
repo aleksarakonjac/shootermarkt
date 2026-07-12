@@ -22,7 +22,6 @@ export async function generateMetadata({ params }: { params: Promise<{ scope: Sc
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const CATEGORY_KEYS = ["vest", "analiza", "takmicenje", "oprema", "intervju", "rezultati"] as const;
-type CategoryKey = typeof CATEGORY_KEYS[number];
 
 const CATEGORY_COLOR: Record<string, string> = {
   vest:       "var(--brand-primary)",
@@ -489,12 +488,6 @@ const DISC_LABEL_SR: Record<string, string> = {
   APW: "10m AP Žene",
 };
 
-const DISC_LABEL_EN: Record<string, string> = {
-  ARM: "10m AR Men",
-  ARW: "10m AR Women",
-  APM: "10m AP Men",
-  APW: "10m AP Women",
-};
 
 function TopShootersWidget({
   topShooters,

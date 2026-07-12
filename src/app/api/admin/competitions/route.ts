@@ -9,7 +9,7 @@ function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

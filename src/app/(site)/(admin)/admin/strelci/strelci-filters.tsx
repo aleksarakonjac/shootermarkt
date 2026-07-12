@@ -18,7 +18,6 @@ interface Props {
   apparatus: string;
 }
 
-const SELECT_CLS = "rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] cursor-pointer";
 
 export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatus }: Props) {
   const router = useRouter();

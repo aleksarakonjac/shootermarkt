@@ -115,6 +115,7 @@ function TopicSelect({
         role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={`${id}-listbox`}
         aria-describedby={ariaDescribedBy}
         aria-invalid={hasError}
         onClick={() => (open ? (setOpen(false), onBlur()) : openDropdown())}
@@ -135,6 +136,7 @@ function TopicSelect({
 
       {open && (
         <ul
+          id={`${id}-listbox`}
           role="listbox"
           aria-label={placeholder}
           className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-lg z-[var(--z-dropdown)] py-1 overflow-hidden"

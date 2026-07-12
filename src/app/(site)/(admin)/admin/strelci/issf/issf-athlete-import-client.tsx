@@ -148,7 +148,7 @@ export function ISSFAthleteImportClient() {
   function toggle(issfId: string) {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(issfId) ? next.delete(issfId) : next.add(issfId);
+      if (next.has(issfId)) { next.delete(issfId); } else { next.add(issfId); }
       return next;
     });
   }

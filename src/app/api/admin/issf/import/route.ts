@@ -6,7 +6,7 @@ import {
   fetchQualResultsFromHtml,
 } from "@/lib/issf/adapter";
 import { db } from "@/lib/db";
-import { shooters, clubs } from "@/lib/db/schema";
+import { shooters } from "@/lib/db/schema";
 import type { ReviewRow } from "@/lib/pdf-import/types";
 
 function isAdmin(email: string | undefined) {
@@ -38,12 +38,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const [allClubs, allShooters] = await Promise.all([
-    db.select().from(clubs),
-    db
-      .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality })
-      .from(shooters),
-  ]);
+  const allShooters = await db
+    .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality })
+    .from(shooters);
 
   const rows: ReviewRow[] = [];
 

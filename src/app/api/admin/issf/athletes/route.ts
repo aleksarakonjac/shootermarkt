@@ -4,7 +4,7 @@ import { searchAthletes, fetchAthleteProfile, inferApparatus } from "@/lib/issf/
 import { db } from "@/lib/db";
 import { shooters } from "@/lib/db/schema";
 import { inArray, eq } from "drizzle-orm";
-import { uploadAvatarFromUrl, NoAvatarError } from "@/lib/avatars/upload-avatar";
+import { uploadAvatarFromUrl } from "@/lib/avatars/upload-avatar";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;

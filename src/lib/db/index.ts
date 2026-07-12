@@ -12,9 +12,7 @@ const connectionOptions = {
 
 // Disable prefetch for Supabase transaction mode pooler
 declare global {
-  // eslint-disable-next-line no-var
   var pgClient: ReturnType<typeof postgres> | undefined;
-  // eslint-disable-next-line no-var
   var db: ReturnType<typeof drizzle<typeof schema>> | undefined;
 }
 

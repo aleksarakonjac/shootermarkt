@@ -3,7 +3,12 @@ import { ScopedLink } from "../components/ScopedLink";
 import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions, countries } from "@/lib/db/schema";
 import { eq, desc, asc, and, isNotNull, sql } from "drizzle-orm";
-import { computeFormaFromEntries, RANKING_MIN_SAMPLE, type CompetitionLevel } from "@/lib/forma";
+import {
+  computeFormaFromEntries,
+  RANKING_MIN_SAMPLE,
+  type CompetitionLevel,
+  type ResultCategory,
+} from "@/lib/forma";
 import { TopFormaClient } from "./top-forma-client";
 import { QuickH2HClient } from "./quick-h2h-client";
 import { Ticker, TickerItem } from "../ticker";
@@ -201,6 +206,7 @@ export default async function HomePage({
         qualTotal: results.qualTotal,
         competitionDate: competitions.date,
         competitionLevel: competitions.level,
+        category: results.category,
       })
       .from(results)
       .innerJoin(shooters, eq(results.shooterId, shooters.id))
@@ -222,7 +228,12 @@ export default async function HomePage({
         lastName: string;
         nationality: string | null;
         clubName: string | null;
-        entries: { qualTotal: number; date: string; level: CompetitionLevel }[];
+        entries: {
+          qualTotal: number;
+          date: string;
+          level: CompetitionLevel;
+          category: ResultCategory;
+        }[];
       }
     >();
 
@@ -240,10 +251,9 @@ export default async function HomePage({
         qualTotal: parseFloat(r.qualTotal!),
         date: r.competitionDate,
         level: r.competitionLevel,
+        category: r.category,
       });
     }
-
-    const maxScore = parseFloat(disc.maxQualScore);
 
     const ranking = Array.from(shooterMap.entries())
       .map(([shooterId, data]) => {
@@ -341,6 +351,7 @@ export default async function HomePage({
         qualTotal: results.qualTotal,
         date: competitions.date,
         level: competitions.level,
+        category: results.category,
         discMax: disciplines.maxQualScore,
         discCode: disciplines.code,
       })
@@ -355,7 +366,16 @@ export default async function HomePage({
 
     // Calculate form score for each shooter
     const shooterFormScores: number[] = [];
-    const shooterEntries: { [id: number]: { qualTotal: number; date: string; level: CompetitionLevel; max: number; code: string }[] } = {};
+    const shooterEntries: {
+      [id: number]: {
+        qualTotal: number;
+        date: string;
+        level: CompetitionLevel;
+        category: ResultCategory;
+        max: number;
+        code: string;
+      }[];
+    } = {};
 
     for (const r of clubResults) {
       if (!shooterEntries[r.shooterId]) {
@@ -365,12 +385,13 @@ export default async function HomePage({
         qualTotal: parseFloat(r.qualTotal!),
         date: r.date,
         level: r.level,
+        category: r.category,
         max: parseFloat(r.discMax),
         code: r.discCode,
       });
     }
 
-    for (const [_, entries] of Object.entries(shooterEntries)) {
+    for (const entries of Object.values(shooterEntries)) {
       if (entries.length < RANKING_MIN_SAMPLE) continue;
       const maxScore = entries[0].max;
       const forma = computeFormaFromEntries(entries, { code: entries[0].code });

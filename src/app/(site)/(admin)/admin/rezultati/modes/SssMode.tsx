@@ -29,7 +29,7 @@ export function SssMode() {
   const [selectedCompName, setSelectedCompName] = useState("");
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
-  const [eventCount, setEventCount] = useState(0);
+  const [eventCount, _setEventCount] = useState(0);
   const [matchedFinals, setMatchedFinals] = useState(0);
   const [unmatchedFinals, setUnmatchedFinals] = useState(0);
   const [nocFilter, setNocFilter] = useState("");
