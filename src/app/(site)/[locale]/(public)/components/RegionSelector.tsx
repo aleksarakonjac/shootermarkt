@@ -54,18 +54,30 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
     };
   }, []);
 
+  function scopeUrl(s: Scope) {
+    const query = window.location.search.slice(1);
+    return withScope(s, `${pathname}${query ? `?${query}` : ""}`);
+  }
+
   function select(nextScope: Scope) {
     setOpen(false);
-    const query = window.location.search.slice(1);
-    const target = withScope(nextScope, `${pathname}${query ? `?${query}` : ""}`);
-    router.push(target, locale ? { locale } : undefined);
+    router.push(scopeUrl(nextScope), locale ? { locale } : undefined);
+  }
+
+  function handleTriggerClick() {
+    // Prefetch the other scope so navigation feels instant after dropdown opens
+    if (!open) {
+      const other: Scope = scope === "srb" ? "issf" : "srb";
+      router.prefetch(scopeUrl(other));
+    }
+    setOpen((v) => !v);
   }
 
   return (
     <div ref={containerRef} className="relative shrink-0">
       {/* Trigger */}
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleTriggerClick}
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={`Opseg: ${scope === "issf" ? "ISSF" : srbName}`}
