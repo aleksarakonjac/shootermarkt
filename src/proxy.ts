@@ -1,7 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import createIntlMiddleware from "next-intl/middleware";
+import { routing } from "./i18n/routing";
+
+const intlMiddleware = createIntlMiddleware(routing);
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Public site: locale routing only, no auth gate.
+  if (!pathname.startsWith("/admin") && !pathname.startsWith("/portal")) {
+    return intlMiddleware(request);
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -43,5 +54,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/portal/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/portal/:path*",
+    "/((?!api|admin|cms|login|_next|_vercel|.*\\..*).*)",
+  ],
 };

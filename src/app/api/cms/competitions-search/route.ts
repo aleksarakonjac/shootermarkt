@@ -12,5 +12,7 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(competitions.date))
     .limit(20);
 
-  return NextResponse.json(data);
+  return NextResponse.json(data, {
+    headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" },
+  });
 }

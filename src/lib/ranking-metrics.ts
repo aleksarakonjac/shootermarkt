@@ -1,11 +1,10 @@
 import type { CompetitionLevel } from "@/lib/forma";
 
-/**
- * Sezonski prozori za statistike koje nisu forma-prognoza (sezona prosek, napredak).
- * Peak / best-3 / poslednja-3 su namerno karijerni (bez sezonskog prozora) — pitanje
- * "koji je moj najbolji rezultat ikad" ne zavisi od toga koju sezonu gledaš.
- */
+/** Dve vrste ograničenog perioda; "karijera" (cela istorija) se tretira posebno — nema prozor. */
 export type SeasonType = "vazdusna" | "kalendarska";
+
+/** Period po kom se statistika (peak/best-3/prosek/poslednja-3) računa. */
+export type PeriodType = "karijera" | SeasonType;
 
 /** Minimalan broj nastupa da bi statistika (osim peak-a) bila prikazana — sprečava
  * da 1 rezultat izgleda kao "prosek". Forma ima sopstveni prag (RANKING_MIN_SAMPLE=5). */
@@ -15,7 +14,7 @@ export function currentSeasonStartYear(type: SeasonType, today: Date = new Date(
   const y = today.getFullYear();
   const m = today.getMonth() + 1;
   if (type === "kalendarska") return y;
-  // Vazdušna sezona: okt–maj. Jan–sep pripada sezoni koja je počela prethodnog okt.
+  // Sezona: okt–maj. Jan–sep pripada sezoni koja je počela prethodnog okt.
   return m >= 10 ? y : y - 1;
 }
 
@@ -29,25 +28,42 @@ export function seasonLabel(type: SeasonType, startYear: number): string {
   return `${startYear}/${String((startYear + 1) % 100).padStart(2, "0")}`;
 }
 
-function inWindow(date: string, win: { from: string; to: string }): boolean {
+export function inWindow(date: string, win: { from: string; to: string }): boolean {
   return date >= win.from && date <= win.to;
 }
 
 export type MetricEntry = { qualTotal: number; date: string; level: CompetitionLevel };
 
-/** Prosek N najboljih rezultata (po skoru), karijerno. */
+/** Filtrira ulaze na dati period. "karijera" = bez filtera (cela istorija). */
+export function filterByPeriod(
+  entries: MetricEntry[],
+  period: PeriodType,
+  periodYear: number
+): MetricEntry[] {
+  if (period === "karijera") return entries;
+  const win = seasonWindow(period, periodYear);
+  return entries.filter((e) => inWindow(e.date, win));
+}
+
+/** Prosek N najboljih rezultata (po skoru) unutar zadatog skupa. */
 export function computeAvgOfTopN(entries: MetricEntry[], n: number): number | null {
   if (entries.length < METRIC_MIN_SAMPLE) return null;
   const top = [...entries].sort((a, b) => b.qualTotal - a.qualTotal).slice(0, n);
   return top.reduce((s, e) => s + e.qualTotal, 0) / top.length;
 }
 
-/** Prosek N hronološki najskorijih rezultata, karijerno. */
+/** Prosek N hronološki najskorijih rezultata unutar zadatog skupa. */
 export function computeRecentAvg(entries: MetricEntry[], n: number): number | null {
   if (entries.length < METRIC_MIN_SAMPLE) return null;
   const sorted = [...entries].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   const recent = sorted.slice(0, n);
   return recent.reduce((s, e) => s + e.qualTotal, 0) / recent.length;
+}
+
+/** Prost prosek svih rezultata u zadatom skupu (već filtriranom po periodu). */
+export function computeMean(entries: MetricEntry[]): number | null {
+  if (entries.length < METRIC_MIN_SAMPLE) return null;
+  return entries.reduce((s, e) => s + e.qualTotal, 0) / entries.length;
 }
 
 /** Prosek rezultata unutar sezonskog prozora. count < MIN_SAMPLE → avg je null (nepouzdano). */

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import type { QualDetail } from "@/lib/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 

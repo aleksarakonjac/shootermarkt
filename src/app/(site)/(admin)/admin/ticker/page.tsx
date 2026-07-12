@@ -6,7 +6,7 @@ import {
 import { gte, lte, and, eq, asc, or } from "drizzle-orm";
 import type { Metadata } from "next";
 import { TickerAdminClient } from "./ticker-client";
-import { USKORO_LEAD_DAYS } from "@/app/(site)/(public)/ticker";
+import { USKORO_LEAD_DAYS } from "@/app/(site)/[locale]/(public)/ticker";
 import { getPublishedArticles } from "@/lib/cms/get-articles";
 
 export const metadata: Metadata = { title: "Admin · Ticker" };

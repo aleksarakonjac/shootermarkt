@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { NocDropdown } from "@/components/ui/NocDropdown";
 import { GenderDropdown } from "@/components/ui/GenderDropdown";
@@ -217,12 +218,15 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
       {/* Profile header */}
       <div className="flex items-start gap-4 mb-8 pb-6 border-b border-[var(--border)]">
         {shooter.avatarUrl ? (
-          <img
-            src={shooter.avatarUrl}
-            alt={`${shooter.firstName} ${shooter.lastName}`}
-            loading="lazy"
-            className="h-[144px] w-auto max-w-[108px] rounded-xl object-cover shrink-0"
-          />
+          <div className="relative h-[144px] w-[108px] rounded-xl overflow-hidden shrink-0">
+            <Image
+              src={shooter.avatarUrl}
+              alt={`${shooter.firstName} ${shooter.lastName}`}
+              fill
+              sizes="108px"
+              className="object-cover"
+            />
+          </div>
         ) : (
           <div
             className="h-[144px] w-[96px] rounded-xl flex items-center justify-center shrink-0 font-[family-name:var(--font-barlow-condensed)] font-bold text-3xl tracking-tight text-white select-none"

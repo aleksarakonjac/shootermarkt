@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
       id: shooters.id,
       firstName: shooters.firstName,
       lastName: shooters.lastName,
+      nationality: shooters.nationality,
       clubName: clubs.name,
     })
     .from(shooters)
@@ -29,5 +30,7 @@ export async function GET(req: NextRequest) {
     .orderBy(shooters.lastName)
     .limit(20);
 
-  return NextResponse.json(data);
+  return NextResponse.json(data, {
+    headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" },
+  });
 }

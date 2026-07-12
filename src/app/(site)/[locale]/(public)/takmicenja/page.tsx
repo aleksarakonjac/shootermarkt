@@ -1,0 +1,734 @@
+export const dynamic = "force-dynamic";
+
+import { db } from "@/lib/db";
+import { competitions, results, disciplines, countries } from "@/lib/db/schema";
+import { eq, desc, ilike, and, sql, or } from "drizzle-orm";
+import { cookies } from "next/headers";
+import type { Metadata } from "next";
+import { Link } from "@/i18n/navigation";
+import { Suspense } from "react";
+import { CompetitionsFilterBar } from "./CompetitionsFilterBar";
+import { ViewToggle } from "./ViewToggle";
+import type { CompetitionLevel } from "@/lib/pdf-import/types";
+import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
+import { KalendarClient, type CalendarComp } from "../kalendar/KalendarClient";
+import { asc } from "drizzle-orm";
+import { getLocale, getTranslations } from "next-intl/server";
+import { buildAlternates } from "@/i18n/alternates";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const [t, locale] = await Promise.all([getTranslations("competition"), getLocale()]);
+  return {
+    title: t("list.title"),
+    alternates: buildAlternates(locale, "/takmicenja"),
+  };
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const DISC_ORDER = ["ARM","ARW","APM","APW","R3PM","R3PW","R3JM","R3JW","SPW","RFPM","FPM"];
+
+const LEVEL_PRIORITY: Record<string, number> = {
+  olympic: 0, world: 1, continental: 2, international: 3, national: 4, regional: 5, club: 6,
+};
+
+const TAG_STYLE: Record<string, { background: string; color: string }> = {
+  sss:  { background: "var(--tag-sss-bg)",  color: "var(--tag-sss-fg)" },
+  issf: { background: "var(--tag-issf-bg)", color: "var(--tag-issf-fg)" },
+  esc:  { background: "var(--tag-esc-bg)",  color: "var(--tag-esc-fg)" },
+  "10m": { background: "#dbeafe", color: "#1d4ed8" },
+  MK: { background: "#fef3c7", color: "#a16207" },
+  "50m": { background: "#dcfce7", color: "#15803d" },
+  "25m": { background: "#dcfce7", color: "#15803d" },
+  "50/25m": { background: "#fef3c7", color: "#a16207" },
+};
+
+const FALLBACK_BADGE = { background: "var(--surface-2)", color: "var(--muted)" };
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const MONTHS_SR = ["jan","feb","mar","apr","maj","jun","jul","avg","sep","okt","nov","dec"];
+const MONTHS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function getMonths(locale: string) {
+  return locale === "en" ? MONTHS_EN : MONTHS_SR;
+}
+
+function monthLabel(key: string, locale: string): string {
+  const [yr, mo] = key.split("-");
+  const months = getMonths(locale);
+  return `${months[parseInt(mo) - 1]} ${yr}`;
+}
+
+function groupByMonth(comps: CompItem[]): Map<string, CompItem[]> {
+  const map = new Map<string, CompItem[]>();
+  for (const c of comps) {
+    const key = c.date.slice(0, 7);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(c);
+  }
+  return map;
+}
+
+function formatDate(date: string, dateEnd?: string | null, locale?: string): string {
+  const M = locale === "en" ? MONTHS_EN : MONTHS_SR;
+  const d = new Date(date + "T00:00:00");
+  const s = `${d.getDate()}. ${M[d.getMonth()]}`;
+  if (!dateEnd || dateEnd === date) return s;
+  const de = new Date(dateEnd + "T00:00:00");
+  return de.getMonth() === d.getMonth()
+    ? `${d.getDate()}\u2013${de.getDate()}. ${M[d.getMonth()]}`
+    : `${s} \u2013 ${de.getDate()}. ${M[de.getMonth()]}`;
+}
+
+function daysUntil(dateStr: string): number {
+  const target = new Date(dateStr + "T00:00:00");
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - now.getTime()) / 86400000);
+}
+
+function formatCountdown(days: number, locale: string): string {
+  if (locale === "en") {
+    if (days <= 0) return "today";
+    if (days === 1) return "tomorrow";
+    if (days < 7) return `in ${days} days`;
+    if (days < 14) return "in 1 week";
+    if (days < 21) return "in 2 weeks";
+    if (days < 30) return "in 3 weeks";
+    if (days < 45) return "in 1 month";
+    return `in ${Math.floor(days / 30)} months`;
+  }
+  if (days <= 0) return "danas";
+  if (days === 1) return "sutra";
+  if (days < 7) return `za ${days} dana`;
+  if (days < 14) return "za nedelju";
+  if (days < 21) return "za 2 ned.";
+  if (days < 30) return "za 3 ned.";
+  if (days < 45) return "za mesec";
+  return `za ${Math.floor(days / 30)} mes.`;
+}
+
+function sortDiscs(codes: string[]): string[] {
+  return [...codes].sort(
+    (a, b) =>
+      (DISC_ORDER.indexOf(a) >= 0 ? DISC_ORDER.indexOf(a) : 99) -
+      (DISC_ORDER.indexOf(b) >= 0 ? DISC_ORDER.indexOf(b) : 99)
+  );
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface CompItem {
+  id: number;
+  name: string;
+  nameSr: string | null;
+  nameEn: string | null;
+  date: string;
+  dateEnd: string | null;
+  location: string | null;
+  level: string;
+  tags: string[] | null;
+  countryCode2: string | null;
+  countryName: string | null;
+  disciplineCodes: string[];
+  resultCount: number;
+}
+
+// ── Row component ─────────────────────────────────────────────────────────────
+
+function CompRow({
+  comp,
+  isLast,
+  showCountdown,
+  locale,
+  levelLabel,
+}: {
+  comp: CompItem;
+  isLast: boolean;
+  showCountdown: boolean;
+  locale: string;
+  levelLabel: string;
+}) {
+  const levelStyle = LEVEL_STYLE[comp.level] ?? FALLBACK_BADGE;
+  const discCodes = sortDiscs(comp.disciplineCodes ?? []);
+  const hasResults = comp.resultCount > 0;
+  const tags = comp.tags ?? [];
+  const countdown = showCountdown ? formatCountdown(daysUntil(comp.date), locale) : null;
+
+  return (
+    <Link
+      href={`/takmicenja/${comp.id}`}
+      className={`group flex items-center gap-3 sm:gap-4 px-4 py-3.5 transition-colors hover:bg-[var(--surface)] ${
+        !isLast ? "border-b border-[var(--border)]" : ""
+      }`}
+    >
+      {/* Date */}
+      <div className="shrink-0 w-[92px] hidden sm:flex flex-col gap-0.5">
+        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] tabular-nums leading-none">
+          {formatDate(comp.date, comp.dateEnd, locale)}
+        </span>
+        {countdown && (
+          <span className="text-[0.65rem] font-semibold text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)] leading-none">
+            {countdown}
+          </span>
+        )}
+      </div>
+
+      {/* Name + location */}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors truncate leading-snug">
+          {comp.name}
+        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="sm:hidden font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)] tabular-nums">
+            {formatDate(comp.date, comp.dateEnd, locale)}{countdown ? ` · ${countdown}` : ""}
+          </span>
+          {(comp.location || comp.countryCode2) && (
+            <span className="hidden md:flex items-center gap-1 text-xs text-[var(--subtle)] min-w-0">
+              {comp.countryCode2 && (
+                <span
+                  className={`fi fi-${comp.countryCode2.toLowerCase()} shrink-0`}
+                  style={{ width: "13px", height: "9px", borderRadius: "1px", display: "inline-block" }}
+                />
+              )}
+              <span className="truncate">
+                {comp.location}
+                {comp.countryName && comp.location ? ` · ${comp.countryName}` : ""}
+                {comp.countryName && !comp.location ? comp.countryName : ""}
+              </span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Disciplines */}
+      <div className="hidden lg:flex items-center gap-1 shrink-0 flex-wrap justify-end" style={{ maxWidth: "130px" }}>
+        {discCodes.slice(0, 4).map((code) => (
+          <span
+            key={code}
+            className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.58rem] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--muted)]"
+          >
+            {code}
+          </span>
+        ))}
+        {discCodes.length > 4 && (
+          <span className="text-[0.58rem] text-[var(--subtle)]">+{discCodes.length - 4}</span>
+        )}
+      </div>
+
+      {/* Tags */}
+      {tags.length > 0 && (
+        <div className="hidden sm:flex items-center gap-1 shrink-0">
+          {tags.map((t) => {
+            const ts = TAG_STYLE[t] ?? FALLBACK_BADGE;
+            return (
+              <span
+                key={t}
+                className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.6rem] uppercase px-1.5 py-0.5 rounded"
+                style={ts}
+              >
+                {t}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Level badge */}
+      <span
+        className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[0.65rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)] whitespace-nowrap"
+        style={levelStyle}
+      >
+        {levelLabel}
+      </span>
+
+      {/* Result count */}
+      {hasResults && (
+        <span className="hidden xl:block shrink-0 text-[0.65rem] font-semibold text-green-600 dark:text-green-400 font-[family-name:var(--font-jetbrains-mono)] tabular-nums whitespace-nowrap">
+          ✓ {comp.resultCount}
+        </span>
+      )}
+
+      {/* Chevron */}
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 12 12"
+        className="shrink-0 text-[var(--border-strong)] group-hover:text-[var(--muted)] transition-colors hidden sm:block"
+        aria-hidden="true"
+      >
+        <path
+          d="M4.5 2L8.5 6L4.5 10"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </svg>
+    </Link>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+
+interface Props {
+  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; archiveAll?: string; when?: string }>;
+}
+
+export default async function TakmicenjaPage({ searchParams }: Props) {
+  const { year, level, q, tag, view, archiveAll, when } = await searchParams;
+
+  const cookieStore = await cookies();
+  const scope = cookieStore.get("shootermarkt_scope")?.value === "issf" ? "issf" : "SRB";
+  const locale = cookieStore.get("NEXT_LOCALE")?.value === "en" ? "en" : "sr";
+  const t = await getTranslations("competition");
+
+  const defaultYear  = new Date().getFullYear().toString();
+  const activeYear   = year && /^\d{4}$/.test(year) ? year : defaultYear;
+  const activeLevel  = level && level !== "all"     ? level : "all";
+  const activeQ      = q?.trim() ?? "";
+  const activeTag    = tag?.trim() ?? "";
+  const activeView   = view === "cal" ? "cal" : "list";
+  const activeWhen   = when === "past" ? "past" : "upcoming";
+
+  // Date boundaries
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const todayStr = now.toISOString().split("T")[0];
+  const recentCutoff = new Date(now);
+  recentCutoff.setDate(recentCutoff.getDate() - 60);
+  const recentCutoffStr = recentCutoff.toISOString().split("T")[0];
+
+  // SRB scope: domestic + European + World/ISSF
+  // ISSF scope: only continental/world/olympic (no club/regional/national/international)
+  const scopeFilter = scope === "issf"
+    ? sql`${competitions.level} IN ('continental', 'world', 'olympic')`
+    : or(
+        sql`${competitions.countryId} = (SELECT id FROM countries WHERE noc_code = 'SRB')`,
+        sql`'sss' = ANY(${competitions.tags})`,
+        sql`${competitions.organizer} = 'SSS'`,
+        sql`'esc' = ANY(${competitions.tags})`,
+        sql`${competitions.organizer} = 'ESC'`,
+        sql`${competitions.level} IN ('world', 'olympic')`,
+        sql`'issf' = ANY(${competitions.tags})`,
+        sql`${competitions.organizer} = 'ISSF'`
+      );
+
+  // SQL filters
+  const sqlFilters = [
+    scopeFilter,
+    activeQ     ? ilike(competitions.name, `%${activeQ}%`)                          : undefined,
+    activeYear  !== "all" ? ilike(competitions.date, `${activeYear}%`)              : undefined,
+    activeLevel !== "all" ? eq(competitions.level, activeLevel as CompetitionLevel) : undefined,
+    activeTag   ? sql`${competitions.tags} @> ARRAY[${activeTag}]::varchar[]`       : undefined,
+  ].filter(Boolean) as Parameters<typeof and>;
+
+  const [rows, yearRows, calRows] = await Promise.all([
+    db
+      .select({
+        id:              competitions.id,
+        name:            competitions.name,
+        nameSr:          competitions.nameSr,
+        nameEn:          competitions.nameEn,
+        date:            competitions.date,
+        dateEnd:         competitions.dateEnd,
+        location:        competitions.location,
+        level:           competitions.level,
+        tags:            competitions.tags,
+        countryCode2:    countries.code2,
+        countryName:     countries.name,
+        disciplineCodes: sql<string[]>`
+          coalesce(
+            array_agg(DISTINCT ${disciplines.code}::text) FILTER (WHERE ${disciplines.code} IS NOT NULL),
+            '{}'::text[]
+          )
+        `,
+        resultCount: sql<number>`COUNT(DISTINCT ${results.id})::int`,
+      })
+      .from(competitions)
+      .leftJoin(countries, eq(competitions.countryId, countries.id))
+      .leftJoin(results, eq(results.competitionId, competitions.id))
+      .leftJoin(disciplines, eq(results.disciplineId, disciplines.id))
+      .where(sqlFilters.length ? and(...sqlFilters) : undefined)
+      .groupBy(competitions.id, countries.name, countries.code2)
+      .orderBy(desc(competitions.date)),
+    db
+      .selectDistinct({ year: sql<string>`LEFT(${competitions.date}, 4)` })
+      .from(competitions)
+      .where(scopeFilter)
+      .orderBy(desc(sql`LEFT(${competitions.date}, 4)`)),
+    db
+      .select({
+        id:      competitions.id,
+        name:    competitions.name,
+        nameSr:  competitions.nameSr,
+        nameEn:  competitions.nameEn,
+        date:    competitions.date,
+        dateEnd: competitions.dateEnd,
+        location: competitions.location,
+        level:   competitions.level,
+      })
+      .from(competitions)
+      .where(scopeFilter)
+      .orderBy(asc(competitions.date)),
+  ]);
+
+  const availableYears = yearRows.map((r) => r.year).filter(Boolean) as string[];
+
+  const filtered = rows as CompItem[];
+
+  const calComps: CalendarComp[] = calRows.map((r) => ({
+    id:       r.id,
+    name:     locale === "en" ? (r.nameEn ?? r.name) : (r.nameSr ?? r.name),
+    date:     r.date,
+    dateEnd:  r.dateEnd ?? null,
+    location: r.location ?? null,
+    level:    r.level as CompetitionLevel,
+  }));
+
+  const translatedFiltered = filtered.map((comp) => ({
+    ...comp,
+    name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
+  }));
+
+  // Temporal split
+  const live = translatedFiltered.filter(
+    (c) => c.date <= todayStr && (c.dateEnd ?? c.date) >= todayStr
+  );
+  const upcoming = translatedFiltered
+    .filter((c) => c.date > todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const recent = translatedFiltered
+    .filter((c) => c.date < todayStr && c.date >= recentCutoffStr && !live.some((l) => l.id === c.id))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const archive = translatedFiltered
+    .filter((c) => c.date < recentCutoffStr)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const isFiltered = activeQ || activeYear !== defaultYear || activeLevel !== "all" || activeTag;
+
+  // Hero: only on unfiltered view
+  const hero =
+    !isFiltered && upcoming.length > 0
+      ? [...upcoming].sort(
+          (a, b) =>
+            (LEVEL_PRIORITY[a.level] ?? 9) - (LEVEL_PRIORITY[b.level] ?? 9) ||
+            a.date.localeCompare(b.date)
+        )[0]
+      : null;
+
+  // Upcoming grouped by month (hero excluded)
+  const upcomingRest = upcoming.filter((c) => c.id !== hero?.id);
+  const upcomingByMonth = groupByMonth(upcomingRest);
+  const upcomingMonths = [...upcomingByMonth.keys()].sort();
+
+  // Past (recent + archive) unified, grouped by month, most recent first
+  const pastAll = [...recent, ...archive].sort((a, b) => b.date.localeCompare(a.date));
+  const pastByMonth = groupByMonth(pastAll);
+  const pastMonths = [...pastByMonth.keys()].sort((a, b) => b.localeCompare(a));
+  const showAllArchive = archiveAll === "1";
+  const visiblePastMonths = showAllArchive ? pastMonths : pastMonths.slice(0, 12);
+
+  // URL builder preserving current filters
+  function filterParams(extra: Record<string, string> = {}) {
+    const p = new URLSearchParams();
+    if (activeQ) p.set("q", activeQ);
+    p.set("year", activeYear);
+    if (activeLevel !== "all") p.set("level", activeLevel);
+    if (activeTag) p.set("tag", activeTag);
+    for (const [k, v] of Object.entries(extra)) if (v) p.set(k, v);
+    return `/takmicenja?${p.toString()}`;
+  }
+
+  const whenHref = (w: string) => filterParams(w === "past" ? { when: "past" } : {});
+  const pastMoreHref = filterParams({ when: "past", archiveAll: "1" });
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
+
+      {/* Header */}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1
+            className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
+            style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
+          >
+            {t("list.title")}
+          </h1>
+        </div>
+        <Suspense fallback={<div className="w-[148px] h-9 rounded-lg bg-[var(--surface-2)]" />}>
+          <ViewToggle activeView={activeView} />
+        </Suspense>
+      </div>
+
+      {/* Filter bar — list view only */}
+      {activeView === "list" && (
+        <Suspense fallback={<div className="h-20 mb-6" />}>
+          <CompetitionsFilterBar
+            availableYears={availableYears}
+            currentYear={activeYear}
+            currentLevel={activeLevel}
+            currentQ={activeQ}
+            currentTag={activeTag}
+            totalCount={translatedFiltered.length}
+          />
+        </Suspense>
+      )}
+
+      {/* Calendar view */}
+      {activeView === "cal" && (
+        <KalendarClient competitions={calComps} />
+      )}
+
+      {/* When toggle — list view only */}
+      {activeView === "list" && (
+        <div className="flex border-b border-[var(--border)] mb-6 -mx-4 px-4 sm:mx-0 sm:px-0" role="tablist" aria-label={locale === "en" ? "Time period" : "Vremenski period"}>
+          {(["upcoming", "past"] as const).map((w) => {
+            const label = w === "upcoming" ? t("list.upcoming") : t("list.past");
+            const count = w === "upcoming" ? live.length + upcoming.length : recent.length + archive.length;
+            const active = activeWhen === w;
+            return (
+              <Link
+                key={w}
+                href={whenHref(w)}
+                role="tab"
+                aria-selected={active}
+                scroll={false}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                  active
+                    ? "border-[var(--ink)] text-[var(--ink)]"
+                    : "border-transparent text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--border-strong)]"
+                }`}
+              >
+                {label}
+                <span className={`text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] tabular-nums transition-colors ${active ? "text-[var(--muted)]" : "text-[var(--subtle)]"}`}>
+                  {count}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* List view — empty state (no SQL results) */}
+      {activeView === "list" && translatedFiltered.length === 0 && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 flex flex-col items-center gap-3">
+          <p className="text-sm text-[var(--muted)] text-center max-w-none">
+            {isFiltered ? t("list.noResults") : (locale === "en" ? "No competitions added yet." : "Još nema unetih takmičenja.")}
+          </p>
+          {isFiltered && (
+            <Link
+              href="/takmicenja"
+              className="text-xs text-[var(--brand-primary)] hover:underline"
+            >
+              {locale === "en" ? "Show all →" : "Prikaži sva →"}
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* List view — filtered results */}
+      {activeView === "list" && translatedFiltered.length > 0 && (
+        <div className="space-y-10">
+
+          {/* ── UPCOMING TAB ──────────────────────────────────────────── */}
+          {activeWhen === "upcoming" && live.length === 0 && upcoming.length === 0 && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 flex flex-col items-center gap-3">
+              <p className="text-sm text-[var(--muted)] text-center max-w-none">
+                {locale === "en" ? "No upcoming competitions for the selected filters." : "Nema nadolazećih takmičenja za izabrane filtere."}
+              </p>
+              <Link href={whenHref("past")} className="text-xs text-[var(--brand-primary)] hover:underline">
+                {locale === "en" ? "View past →" : "Pogledaj prošla →"}
+              </Link>
+            </div>
+          )}
+
+          {/* ── LIVE ──────────────────────────────────────────────────── */}
+          {activeWhen === "upcoming" && live.length > 0 && (
+            <section aria-label="Takmičenja u toku">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span
+                    className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                    style={{ background: "var(--live-dot)" }}
+                  />
+                  <span
+                    className="relative inline-flex rounded-full h-2 w-2"
+                    style={{ background: "var(--live-dot)" }}
+                  />
+                </span>
+              <span className="text-xs font-semibold text-[var(--muted)]">{
+                locale === "en" ? "In progress" : "Upravo teku"
+              }</span>
+              </div>
+              <div
+                className="rounded-xl border overflow-hidden"
+                style={{ borderColor: "var(--live-border)", background: "var(--live-bg)" }}
+              >
+                {live.map((c, i) => (
+                  <CompRow key={c.id} comp={c} isLast={i === live.length - 1} showCountdown={false} locale={locale} levelLabel={getLevelLabel(c.level, locale)} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── UPCOMING ──────────────────────────────────────────────── */}
+          {activeWhen === "upcoming" && upcoming.length > 0 && (
+            <section aria-label="Nadolazeća takmičenja">
+  
+              {/* Hero card */}
+              {hero && (
+                <Link
+                  href={`/takmicenja/${hero.id}`}
+                  className="group block rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:shadow-sm transition-all mb-2 overflow-hidden"
+                >
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="min-w-0 flex-1">
+                        {/* Badges row */}
+                        <div className="flex items-center gap-2 flex-wrap mb-2.5">
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded text-[0.65rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
+                            style={LEVEL_STYLE[hero.level] ?? FALLBACK_BADGE}
+                          >
+                            {getLevelLabel(hero.level, locale)}
+                          </span>
+                          <span className="text-xs font-semibold text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)]">
+                            {formatCountdown(daysUntil(hero.date), locale)}
+                          </span>
+                          {(hero.tags ?? []).map((t) => {
+                            const ts = TAG_STYLE[t] ?? FALLBACK_BADGE;
+                            return (
+                              <span
+                                key={t}
+                                className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.6rem] uppercase px-1.5 py-0.5 rounded"
+                                style={ts}
+                              >
+                                {t}
+                              </span>
+                            );
+                          })}
+                        </div>
+
+                        {/* Name */}
+                        <h2
+                          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors leading-tight mb-2"
+                          style={{ fontSize: "clamp(1.15rem, 2.5vw, 1.65rem)", letterSpacing: "-0.02em" }}
+                        >
+                          {hero.name}
+                        </h2>
+
+                        {/* Meta */}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
+                          <span className="font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
+                            {formatDate(hero.date, hero.dateEnd, locale)}
+                          </span>
+                          {(hero.location || hero.countryCode2) && (
+                            <span className="flex items-center gap-1.5">
+                              {hero.countryCode2 && (
+                                <span
+                                  className={`fi fi-${hero.countryCode2.toLowerCase()} shrink-0`}
+                                  style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }}
+                                />
+                              )}
+                              <span>
+                                {hero.location}
+                                {hero.countryName && hero.location ? ` · ${hero.countryName}` : ""}
+                                {hero.countryName && !hero.location ? hero.countryName : ""}
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Discipline badges */}
+                      {sortDiscs(hero.disciplineCodes ?? []).length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap shrink-0 justify-end pt-0.5">
+                          {sortDiscs(hero.disciplineCodes ?? []).map((code) => (
+                            <span
+                              key={code}
+                              className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.65rem] uppercase tracking-wide px-2 py-1 rounded bg-[var(--surface-2)] text-[var(--muted)]"
+                            >
+                              {code}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              )}
+
+              {/* Rest of upcoming — grouped by month */}
+              {upcomingMonths.length > 0 && (
+                <div className="space-y-5 mt-2">
+                  {upcomingMonths.map((mk) => {
+                    const comps = upcomingByMonth.get(mk)!;
+                    return (
+                      <div key={mk}>
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="text-sm font-semibold text-[var(--muted)] capitalize">{monthLabel(mk, locale)}</span>
+                          <div className="flex-1 h-px bg-[var(--border)]" />
+                          <span className="text-[0.65rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">{comps.length}</span>
+                        </div>
+                        <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+                          {comps.map((c, i) => (
+                            <CompRow key={c.id} comp={c} isLast={i === comps.length - 1} showCountdown locale={locale} levelLabel={getLevelLabel(c.level, locale)} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── PAST TAB — all past unified by month ─────────────────── */}
+          {activeWhen === "past" && pastAll.length === 0 && (
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 flex flex-col items-center gap-3">
+              <p className="text-sm text-[var(--muted)] text-center max-w-none">
+                {locale === "en" ? "No past competitions for the selected filters." : "Nema prošlih takmičenja za izabrane filtere."}
+              </p>
+            </div>
+          )}
+
+          {activeWhen === "past" && pastAll.length > 0 && (
+            <section aria-label="Prošla takmičenja">
+              <div className="space-y-5">
+                {visiblePastMonths.map((mk) => {
+                  const comps = pastByMonth.get(mk)!;
+                  return (
+                    <div key={mk}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-sm font-semibold text-[var(--muted)] capitalize">{monthLabel(mk, locale)}</span>
+                        <div className="flex-1 h-px bg-[var(--border)]" />
+                        <span className="text-[0.65rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">{comps.length}</span>
+                      </div>
+                      <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+                        {comps.map((c, i) => (
+                          <CompRow key={c.id} comp={c} isLast={i === comps.length - 1} showCountdown={false} locale={locale} levelLabel={getLevelLabel(c.level, locale)} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {!showAllArchive && pastMonths.length > 12 && (
+                  <Link
+                    href={pastMoreHref}
+                    className="flex items-center justify-center gap-1.5 py-3 text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors hover:underline"
+                  >
+                    {locale === "en"
+                      ? `Show ${pastMonths.length - 12} older months →`
+                      : `Prikaži ${pastMonths.length - 12} starijih meseci →`}
+                  </Link>
+                )}
+              </div>
+            </section>
+          )}
+
+        </div>
+      )}
+    </div>
+  );
+}

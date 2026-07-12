@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { resolveCompetition } from "@/lib/cms/resolve-competition";
 
 export async function CompetitionEmbedBlock({ competitionId }: { competitionId: number }) {

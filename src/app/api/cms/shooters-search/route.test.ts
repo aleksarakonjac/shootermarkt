@@ -9,7 +9,7 @@ vi.mock("@/lib/db", () => ({
             orderBy: () => ({
               limit: () =>
                 Promise.resolve([
-                  { id: 5, firstName: "Petar", lastName: "Petrović", clubName: "SK Pančevo 1813" },
+                  { id: 5, firstName: "Petar", lastName: "Petrović", nationality: "SRB", clubName: "SK Pančevo 1813" },
                 ]),
             }),
           }),
@@ -28,7 +28,7 @@ describe("GET /api/cms/shooters-search", () => {
     const res = await GET(req);
     const body = await res.json();
     expect(body).toEqual([
-      { id: 5, firstName: "Petar", lastName: "Petrović", clubName: "SK Pančevo 1813" },
+      { id: 5, firstName: "Petar", lastName: "Petrović", nationality: "SRB", clubName: "SK Pančevo 1813" },
     ]);
   });
 });

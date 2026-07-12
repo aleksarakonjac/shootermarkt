@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { resolveShooter } from "@/lib/cms/resolve-shooter";
 
 export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {

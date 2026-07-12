@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import { rollingForma, type CompetitionLevel } from "@/lib/forma";
 import { FormaScoreMark } from "./FormaScoreMark";
