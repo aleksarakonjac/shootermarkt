@@ -17,6 +17,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
 import { trendLabel, trendColor, type Trend } from "@/lib/forma";
+import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
 
@@ -486,7 +487,7 @@ export default async function ShooterPage({ params }: Props) {
 
         {shooterResults.length === 0 ? (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center">
-            <p className="text-sm text-[var(--muted)]">{tProfile("noResults")}</p>
+            <p className="mx-auto text-sm text-[var(--muted)]">{tProfile("noResults")}</p>
           </div>
         ) : (
           <ResultsHistoryTable
@@ -496,6 +497,8 @@ export default async function ShooterPage({ params }: Props) {
           />
         )}
       </div>
+
+      <RelatedNewsSection type="shooter" refId={shooterId} locale={locale} />
     </div>
   );
 }

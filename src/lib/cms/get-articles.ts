@@ -83,6 +83,17 @@ export async function getPublishedArticleBySlug(slug: string): Promise<ArticleDe
   };
 }
 
+export async function getRelatedArticles(
+  type: ArticleTag["type"],
+  refId: number,
+  limit = 3
+): Promise<ArticleSummary[]> {
+  const articles = await getPublishedArticles({ limit: 200 });
+  return articles
+    .filter((a) => a.tags.some((t) => t.type === type && t.refId === refId))
+    .slice(0, limit);
+}
+
 export async function getAllPublishedTags(): Promise<ArticleTag[]> {
   const articles = await getPublishedArticles({ limit: 200 });
   const seen = new Set<string>();

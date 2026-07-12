@@ -22,6 +22,7 @@ import {
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
+import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
 
@@ -288,6 +289,8 @@ export default async function CompetitionPage({ params }: Props) {
         </h2>
         <CompetitionResultsClient groups={groups} />
       </div>
+
+      <RelatedNewsSection type="competition" refId={compId} locale={locale} />
     </div>
   );
 }

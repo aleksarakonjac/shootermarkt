@@ -6,6 +6,7 @@ import { ChevronDown } from "lucide-react";
 import type { FinalDetail } from "@/lib/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { ArApFinalDisplay } from "./ArApFinalDisplay";
+import { BulletinFinalDisplay } from "./BulletinFinalDisplay";
 import { PositionsFinalDisplay } from "./PositionsFinalDisplay";
 
 export type FinalResultRow = {
@@ -44,6 +45,7 @@ export function CompetitionFinalTable({ results }: Props) {
       if (b.finalRank == null) return -1;
       return a.finalRank - b.finalRank;
     });
+  const isHitCountFinal = sorted.some((result) => result.finalDetail?.format === "bulletin" && result.finalDetail.scoring === "hit_count");
 
   if (sorted.length === 0) {
     return (
@@ -68,7 +70,7 @@ export function CompetitionFinalTable({ results }: Props) {
               Klub / NOC
             </th>
             <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--ink)] w-24">
-              Final Σ
+              {isHitCountFinal ? "Pogoci" : "Final Σ"}
             </th>
             <th className="w-9" />
           </tr>
@@ -173,6 +175,8 @@ export function CompetitionFinalTable({ results }: Props) {
                           <div className="bg-[var(--surface)] border-t border-[var(--border)] px-4 py-4">
                             {r.finalDetail.format === "ar_ap_10m" ? (
                               <ArApFinalDisplay detail={r.finalDetail} />
+                            ) : r.finalDetail.format === "bulletin" ? (
+                              <BulletinFinalDisplay detail={r.finalDetail} />
                             ) : (
                               <PositionsFinalDisplay detail={r.finalDetail} />
                             )}
