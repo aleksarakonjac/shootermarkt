@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { usePathname } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
@@ -90,18 +90,20 @@ export function MainNav() {
   const tSearch = useTranslations("search");
   const tCommon = useTranslations("common");
 
-  const openGlobalSearch = useCallback(() => {
+  function openGlobalSearch() {
     setMobileOpen(false);
     setTimeout(
       () => document.dispatchEvent(new CustomEvent("global-search:open")),
       180
     );
-  }, []);
+  }
 
   // Close everything on route change
   useEffect(() => {
-    setOpenKey(null);
-    setMobileOpen(false);
+    void Promise.resolve().then(() => {
+      setOpenKey(null);
+      setMobileOpen(false);
+    });
   }, [pathname]);
 
   // ESC closes dropdowns / drawer

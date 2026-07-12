@@ -43,13 +43,9 @@ export function DateTimePicker({
   const datePart = value ? value.split("T")[0] : "";
   const timePart = value ? (value.split("T")[1] ?? "00:00") : "00:00";
   const [th, tm2] = timePart.split(":");
-  const [hour, setHour] = useState(th  ?? "00");
-  const [min2, setMin2] = useState(tm2 ?? "00");
-
-  useEffect(() => {
-    const tp = value?.split("T")[1];
-    if (tp) { const [hh, mm] = tp.split(":"); setHour(hh ?? "00"); setMin2(mm ?? "00"); }
-  }, [value]);
+  // Fully controlled: derive from value prop, don't keep separate state.
+  const hour = th  ?? "00";
+  const min2 = tm2 ?? "00";
 
   const initDate = datePart ? new Date(datePart + "T00:00:00") : new Date();
   const [viewYear,  setViewYear]  = useState(initDate.getFullYear());
@@ -114,12 +110,10 @@ export function DateTimePicker({
 
   function handleHour(v: string) {
     const clamped = pad(Math.max(0, Math.min(23, parseInt(v, 10) || 0)));
-    setHour(clamped);
     if (datePart) onChange(`${datePart}T${clamped}:${min2.padStart(2, "0")}`);
   }
   function handleMin(v: string) {
     const clamped = pad(Math.max(0, Math.min(59, parseInt(v, 10) || 0)));
-    setMin2(clamped);
     if (datePart) onChange(`${datePart}T${hour.padStart(2, "0")}:${clamped}`);
   }
 

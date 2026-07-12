@@ -139,46 +139,52 @@ export function ManualMode() {
   // When discipline changes: update series arrays on all rows
   useEffect(() => {
     const multi = MULTI_SERIES.has(discipline);
-    setRows((prev) =>
-      prev.map((row) => ({
-        ...row,
-        disciplineCode: discipline,
-        qualSeries: multi
-          ? row.qualSeries?.length === 6
-            ? row.qualSeries
-            : [0, 0, 0, 0, 0, 0]
-          : undefined,
-        qualTotal: multi
-          ? row.qualSeries?.length === 6
-            ? seriesSum(row.qualSeries)
-            : 0
-          : row.qualTotal,
-      }))
+    void Promise.resolve().then(() =>
+      setRows((prev) =>
+        prev.map((row) => ({
+          ...row,
+          disciplineCode: discipline,
+          qualSeries: multi
+            ? row.qualSeries?.length === 6
+              ? row.qualSeries
+              : [0, 0, 0, 0, 0, 0]
+            : undefined,
+          qualTotal: multi
+            ? row.qualSeries?.length === 6
+              ? seriesSum(row.qualSeries)
+              : 0
+            : row.qualTotal,
+        }))
+      )
     );
   }, [discipline]);
 
   // Auto-recompute total from series — only for rows that have at least one series value
   useEffect(() => {
     if (!isMultiSeries) return;
-    setRows((prev) => {
-      const next = prev.map((row) => {
-        if (row.skip || !row.qualSeries || !rowHasSeries(row)) return row;
-        const total = seriesSum(row.qualSeries);
-        return total !== row.qualTotal ? { ...row, qualTotal: total } : row;
-      });
-      const changed = next.some((r, i) => r.qualTotal !== prev[i].qualTotal);
-      return changed ? next : prev;
-    });
+    void Promise.resolve().then(() =>
+      setRows((prev) => {
+        const next = prev.map((row) => {
+          if (row.skip || !row.qualSeries || !rowHasSeries(row)) return row;
+          const total = seriesSum(row.qualSeries);
+          return total !== row.qualTotal ? { ...row, qualTotal: total } : row;
+        });
+        const changed = next.some((r, i) => r.qualTotal !== prev[i].qualTotal);
+        return changed ? next : prev;
+      })
+    );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(rows.map((r) => r.qualSeries)), isMultiSeries]);
 
   // Auto-recompute ranks from totals
   useEffect(() => {
-    setRows((prev) => {
-      const next = computeRanks(prev);
-      const changed = next.some((r, i) => r.qualRank !== prev[i].qualRank);
-      return changed ? next : prev;
-    });
+    void Promise.resolve().then(() =>
+      setRows((prev) => {
+        const next = computeRanks(prev);
+        const changed = next.some((r, i) => r.qualRank !== prev[i].qualRank);
+        return changed ? next : prev;
+      })
+    );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(rows.map((r) => ({ t: r.qualTotal, s: r.skip })))]);
 

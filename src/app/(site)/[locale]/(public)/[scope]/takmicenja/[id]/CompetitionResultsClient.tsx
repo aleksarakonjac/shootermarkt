@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { QualDetail, FinalDetail, AgeCategory } from "@/lib/db/schema";
 import { CATEGORY_LABEL } from "@/lib/pdf-import/types";
 import {
@@ -53,14 +53,13 @@ export function CompetitionResultsClient({ groups }: Props) {
   );
   const [stage, setStage] = useState<"qual" | "final">("qual");
 
-  // Reset category when discipline changes to one that doesn't have it
-  useEffect(() => {
-    if (group && !group.categories.some((c) => c.category === activeCategory)) {
-      setActiveCategory(group.categories[0]?.category);
-    }
-  }, [group, activeCategory]);
+  // If the stored category doesn't exist in the current group, fall back to the first.
+  const effectiveCategory =
+    group?.categories.some((c) => c.category === activeCategory)
+      ? activeCategory
+      : group?.categories[0]?.category;
 
-  const catGroup = group?.categories.find((c) => c.category === activeCategory);
+  const catGroup = group?.categories.find((c) => c.category === effectiveCategory);
   const hasFinal = catGroup?.results.some(
     (r) => r.finalRank != null || r.finalTotal != null
   ) ?? false;
@@ -143,7 +142,7 @@ export function CompetitionResultsClient({ groups }: Props) {
                 setStage("qual");
               }}
               className={`px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors ${
-                activeCategory === c.category
+                effectiveCategory === c.category
                   ? "bg-[var(--ink)] text-[var(--bg)]"
                   : "bg-transparent text-[var(--subtle)] border border-[var(--border)] hover:text-[var(--ink)]"
               }`}
