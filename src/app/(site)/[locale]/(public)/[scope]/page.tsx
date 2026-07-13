@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: { params: Promise<{ scope: Sc
   };
 }
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 interface ShooterFormRow {
   shooterId: number;
