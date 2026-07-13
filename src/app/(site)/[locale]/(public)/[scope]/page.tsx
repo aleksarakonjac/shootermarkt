@@ -45,6 +45,8 @@ interface ShooterFormRow {
 
 const DISC_CODES = ["ARM", "ARW", "APM", "APW"] as const;
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage({ params }: { params: Promise<{ scope: Scope }> }) {
   const { scope } = await params;
   return (
