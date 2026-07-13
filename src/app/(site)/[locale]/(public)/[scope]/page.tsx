@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { ScopedLink } from "../components/ScopedLink";
 import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions, countries, shooterFormaCache } from "@/lib/db/schema";
@@ -29,11 +29,9 @@ export async function generateMetadata({ params }: { params: Promise<{ scope: Sc
   };
 }
 
-// force-dynamic: parent layouts have generateStaticParams([locale],[scope]),
-// which would force build-time pre-render. Supabase cold connections from
-// Vercel build machines exceed the 60s page timeout. At runtime, connections
-// are warm and the optimized cache queries render the page in <200ms.
-export const dynamic = "force-dynamic";
+// PPR: static shell (layout + suspense skeleton) pre-rendered at build time.
+// DB queries run inside HomepageContent (Suspense boundary) on first request.
+export const experimental_ppr = true;
 
 interface ShooterFormRow {
   shooterId: number;
@@ -50,12 +48,34 @@ interface ShooterFormRow {
 
 const DISC_CODES = ["ARM", "ARW", "APM", "APW"] as const;
 
-export default async function HomePage({
-  params,
-}: {
-  params: Promise<{ scope: Scope }>;
-}) {
+export default async function HomePage({ params }: { params: Promise<{ scope: Scope }> }) {
   const { scope } = await params;
+  return (
+    <Suspense fallback={<HomepageSkeleton />}>
+      <HomepageContent scope={scope} />
+    </Suspense>
+  );
+}
+
+function HomepageSkeleton() {
+  return (
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
+      <div className="h-10 bg-[var(--surface)] rounded-xl animate-pulse" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 flex flex-col gap-8">
+          <div className="h-48 bg-[var(--surface)] rounded-xl animate-pulse" />
+          <div className="h-64 bg-[var(--surface)] rounded-xl animate-pulse" />
+        </div>
+        <div className="flex flex-col gap-8">
+          <div className="h-56 bg-[var(--surface)] rounded-xl animate-pulse" />
+          <div className="h-48 bg-[var(--surface)] rounded-xl animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function HomepageContent({ scope }: { scope: Scope }) {
   const locale = await getLocale();
   const t = await getTranslations("home");
   const tCommon = await getTranslations("common");
