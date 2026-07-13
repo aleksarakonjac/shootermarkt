@@ -1,5 +1,4 @@
-export const revalidate = 300;
-export const dynamicParams = true;
+export const dynamic = "force-dynamic";
 
 import { db } from "@/lib/db";
 import { shooters, clubs, results, disciplines, competitions, shooterFormaCache } from "@/lib/db/schema";
