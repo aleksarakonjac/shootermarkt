@@ -29,7 +29,11 @@ export async function generateMetadata({ params }: { params: Promise<{ scope: Sc
   };
 }
 
-export const revalidate = 300;
+// force-dynamic: parent layouts have generateStaticParams([locale],[scope]),
+// which would force build-time pre-render. Supabase cold connections from
+// Vercel build machines exceed the 60s page timeout. At runtime, connections
+// are warm and the optimized cache queries render the page in <200ms.
+export const dynamic = "force-dynamic";
 
 interface ShooterFormRow {
   shooterId: number;
