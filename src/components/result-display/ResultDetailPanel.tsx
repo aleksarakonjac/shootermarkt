@@ -2,6 +2,7 @@ import type { QualDetail, FinalDetail } from "@/lib/db/schema";
 import { SeriesQualDisplay } from "./SeriesQualDisplay";
 import { PositionsQualDisplay } from "./PositionsQualDisplay";
 import { ArApFinalDisplay } from "./ArApFinalDisplay";
+import { BulletinFinalDisplay } from "./BulletinFinalDisplay";
 import { PositionsFinalDisplay } from "./PositionsFinalDisplay";
 
 interface Props {
@@ -62,6 +63,8 @@ export function ResultDetailPanel({
           </p>
           {finalDetail.format === "ar_ap_10m" ? (
             <ArApFinalDisplay detail={finalDetail} />
+          ) : finalDetail.format === "bulletin" ? (
+            <BulletinFinalDisplay detail={finalDetail} />
           ) : (
             <PositionsFinalDisplay detail={finalDetail} />
           )}

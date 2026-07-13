@@ -178,7 +178,23 @@ export type PositionsFinalDetail = {
   total: number;
 };
 
-export type FinalDetail = ArApFinalDetail | PositionsFinalDetail;
+/** Granularni tok finala iz PDF biltena, kada format ne može pouzdano da se
+ * preslika u jednu od standardnih ISSF struktura iznad. */
+export type BulletinFinalDetail = {
+  format: "bulletin";
+  /** SPW finale beleži broj pogodaka po seriji i kumulativno, ne decimalne hice. */
+  scoring?: "decimal" | "hit_count";
+  /** Zbirovi po prikazanoj seriji/fazi finala. */
+  series?: number[];
+  /** Nazivi serija/faza, npr. Klečeći, Ležeći, Stojeći 1, Stojeći 2. */
+  seriesLabels?: string[];
+  /** Pojedinačni hici, ako su eksplicitno navedeni u PDF-u. */
+  shots?: number[];
+  /** Kumulativni rezultat posle svakog prikazanog hica/faze. */
+  cumulative?: number[];
+};
+
+export type FinalDetail = ArApFinalDetail | PositionsFinalDetail | BulletinFinalDetail;
 
 // ── Countries ─────────────────────────────────────────────────────────────────
 

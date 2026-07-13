@@ -208,6 +208,8 @@ export function FormaChart({
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgW, setSvgW] = useState(800);
 
+  const [mode, setMode] = useState<"forma" | "nastup">("forma");
+
   const allData = points
     .filter(p => p.discipline === disc)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -265,7 +267,8 @@ export function FormaChart({
     allData.map(p => ({ score: p.score, date: p.date, level: p.level, category: p.category })),
     { code: disc }
   );
-  const yValues = allFormaValues.slice(windowStart, windowEnd);
+  const allDisplayValues = mode === "forma" ? allFormaValues : allData.map(p => p.score);
+  const yValues = allDisplayValues.slice(windowStart, windowEnd);
 
   const built = buildWindow(data, yValues, CW, maxScore);
   const prevBuilt = prevSlice ? buildWindow(prevSlice.data, prevSlice.yValues, CW, maxScore) : null;
@@ -281,7 +284,7 @@ export function FormaChart({
     // Snapshot current slice before updating windowEnd
     const snapStart = Math.max(0, windowEnd - WINDOW);
     const currentData = allData.slice(snapStart, windowEnd);
-    const currentYValues = allFormaValues.slice(snapStart, windowEnd);
+    const currentYValues = allDisplayValues.slice(snapStart, windowEnd);
     const xExit = dir === "right" ? CW : -CW;
 
     setPrevSlice({ data: currentData, yValues: currentYValues, xExit });
@@ -351,6 +354,7 @@ export function FormaChart({
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-3 pb-2.5 border-b border-[var(--border)] gap-4">
           <div className="flex gap-1.5 flex-wrap items-center">
+
             {available.length === 1 ? (
               <span
                 className="text-[14px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded font-[family-name:var(--font-barlow-condensed)]"
@@ -381,6 +385,24 @@ export function FormaChart({
               ))
             )}
           </div>
+
+          {/* Mode toggle */}
+          <div className="flex items-center gap-0.5 rounded-lg bg-[var(--surface-2)] p-0.5 border border-[var(--border)] shrink-0">
+            {(["forma", "nastup"] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => { setMode(m); setHoverIdx(null); setTooltipPos(null); }}
+                className="px-2.5 py-0.5 rounded text-xs font-semibold transition-colors font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide"
+                style={mode === m
+                  ? { background: "var(--bg)", color: "var(--ink)", boxShadow: "0 1px 2px rgba(0,0,0,0.12)" }
+                  : { background: "transparent", color: "var(--muted)" }
+                }
+              >
+                {m === "forma" ? "Forma" : locale === "en" ? "Results" : "Nastup"}
+              </button>
+            ))}
+          </div>
+
           {forma && (
             <div className="flex items-center gap-2 shrink-0">
               <FormaScoreMark size="base" />
@@ -492,8 +514,8 @@ export function FormaChart({
                   <span className="flex items-center gap-1.5">
                     <span className="relative h-1.5 w-14 rounded-full bg-[var(--border)] overflow-hidden" aria-hidden="true">
                       <span
-                        className="absolute inset-y-0 left-0 rounded-full"
-                        style={{ width: `${Math.round(forma.peakProximity * 100)}%`, background: color, transition: "width 220ms cubic-bezier(0.22,1,0.36,1)" }}
+                        className="absolute inset-y-0 left-0 right-0 rounded-full origin-left"
+                        style={{ background: color, transform: `scaleX(${forma.peakProximity})`, transition: "transform 220ms cubic-bezier(0.22,1,0.36,1)" }}
                       />
                     </span>
                     <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
@@ -557,7 +579,7 @@ export function FormaChart({
                     if (isAnimating) return;
                     const snapStart = Math.max(0, windowEnd - WINDOW);
                     const currentData = allData.slice(snapStart, windowEnd);
-                    const currentYValues = allFormaValues.slice(snapStart, windowEnd);
+                    const currentYValues = allDisplayValues.slice(snapStart, windowEnd);
                     setPrevSlice({ data: currentData, yValues: currentYValues, xExit: -CW });
                     setNavDir("left");
                     setHoverIdx(null);

@@ -22,6 +22,35 @@ interface IndexedRow {
 const stickyHeader = "sticky z-20 bg-[var(--surface)]";
 const stickyCell = "sticky z-10 bg-[var(--bg)]";
 
+function ShotBreakdown({ groups, prefix = "S" }: { groups?: number[][] | null; prefix?: string }) {
+  const shotCount = groups?.reduce((count, group) => count + group.length, 0) ?? 0;
+  if (shotCount === 0) return <span className="text-xs text-[var(--subtle)]">—</span>;
+
+  return (
+    <details className="group relative">
+      <summary className="cursor-pointer whitespace-nowrap text-xs font-semibold text-[var(--brand-primary)] marker:hidden">
+        {shotCount} hitaca
+      </summary>
+      <div className="absolute right-0 z-30 mt-2 w-80 rounded-md border border-[var(--border)] bg-[var(--bg)] p-3 shadow-lg">
+        <div className="space-y-2">
+          {groups!.map((shots, index) => (
+            <div key={index} className="flex gap-1.5">
+              <span className="w-6 pt-0.5 text-xs font-semibold text-[var(--muted)]">{prefix}{index + 1}</span>
+              <div className="flex flex-wrap gap-1">
+                {shots.map((shot, shotIndex) => (
+                  <span key={shotIndex} className="rounded bg-[var(--surface)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--ink)]">
+                    {shot}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function QualificationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: Props["onRowChange"] }) {
   return (
     <div className="overflow-auto border-t border-[var(--border)]">
@@ -68,6 +97,10 @@ function QualificationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowCh
 
 function FinalsTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: Props["onRowChange"] }) {
   if (rows.length === 0) return null;
+  const isHitCountFinal = rows[0]?.row.disciplineCode === "SPW";
+  const finalValues = (row: ReviewRow) => row.finalCumulative ?? row.finalSeries ?? [];
+  const intermediateCount = Math.max(...rows.map(({ row }) => Math.max(row.finalCumulative?.length ?? 0, row.finalSeries?.length ?? 0)));
+  const intermediateLabel = isHitCountFinal ? "Gore: ukupno pogodaka. Dole: pogodaka u seriji." : rows.some(({ row }) => row.finalCumulative?.length) ? "Tok finala" : "Međuserije";
 
   return (
     <div className="border-t border-[var(--border)] bg-[var(--surface)]">
@@ -80,21 +113,26 @@ function FinalsTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: P
             <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
             <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Kval. rank</th>
             <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Kval. ukupno</th>
+            {Array.from({ length: intermediateCount }, (_, index) => <th key={index} className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]" title={intermediateLabel}>{rows[0]?.row.finalSeriesLabels?.[index] ?? `F${index + 1}`}</th>)}
+            {!isHitCountFinal ? <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Hici</th> : null}
             <th className={`${stickyHeader} right-24 w-24 border-l border-[var(--border)] px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]`}>Final rank</th>
-            <th className={`${stickyHeader} right-0 w-24 px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]`}>Final ukupno</th>
+            <th className={`${stickyHeader} right-0 w-24 px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]`}>{isHitCountFinal ? "Pogoci" : "Final ukupno"}</th>
           </tr></thead>
           <tbody className="divide-y divide-[var(--border)]">
-            {rows.map(({ row, index }) => (
-              <tr key={index} className={row.skip ? "opacity-40" : "hover:bg-[var(--bg)]"}>
+            {rows.map(({ row, index }) => {
+              const values = finalValues(row);
+              return <tr key={index} className={row.skip ? "opacity-40" : "hover:bg-[var(--bg)]"}>
                 <td className="px-3 py-2 font-medium text-[var(--ink)]">{row.lastName}</td>
                 <td className="px-3 py-2 text-[var(--ink)]">{row.firstName}</td>
                 <td className="px-3 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.teamNoc}</td>
                 <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.qualRank ?? "—"}</td>
                 <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.qualTotal}</td>
+                {Array.from({ length: intermediateCount }, (_, valueIndex) => isHitCountFinal ? <td key={valueIndex} className="px-3 py-1 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums"><div className="font-bold text-[var(--ink)]">{row.finalCumulative?.[valueIndex] ?? "—"}</div><div className="text-[var(--muted)]">{row.finalSeries?.[valueIndex] ?? "—"}</div></td> : <td key={valueIndex} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{values[valueIndex] ?? "—"}</td>)}
+                {!isHitCountFinal ? <td className="px-3 py-2"><ShotBreakdown groups={row.finalShots ? [row.finalShots] : null} prefix="F" /></td> : null}
                 <td className={`${stickyCell} right-24 w-24 border-l border-[var(--border)] px-3 py-2`}><input type="number" value={row.finalRank ?? ""} onChange={(event) => onRowChange(index, { finalRank: event.target.value ? parseInt(event.target.value) : null })} placeholder="—" className="w-12 border-b border-transparent bg-transparent py-0.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--ink)] hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none" /></td>
                 <td className={`${stickyCell} right-0 w-24 px-3 py-2`}><input type="number" value={row.finalTotal ?? ""} onChange={(event) => onRowChange(index, { finalTotal: event.target.value ? parseFloat(event.target.value) : null })} step="0.1" placeholder="—" className="w-16 border-b border-transparent bg-transparent py-0.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)] hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none" /></td>
-              </tr>
-            ))}
+              </tr>;
+            })}
           </tbody>
         </table>
       </div>

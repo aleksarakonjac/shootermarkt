@@ -178,6 +178,16 @@ export async function POST(req: NextRequest) {
           qualified: row.qualified ?? null,
           finalTotal: row.finalTotal?.toString() ?? null,
           finalRank: row.finalRank ?? null,
+          finalDetail: row.finalSeries || row.finalShots || row.finalCumulative
+            ? {
+                format: "bulletin",
+                scoring: row.finalScoring ?? "decimal",
+                ...(row.finalSeries ? { series: row.finalSeries } : {}),
+                ...(row.finalSeriesLabels ? { seriesLabels: row.finalSeriesLabels } : {}),
+                ...(row.finalShots ? { shots: row.finalShots } : {}),
+                ...(row.finalCumulative ? { cumulative: row.finalCumulative } : {}),
+              }
+            : null,
           source: payload.source ?? "pdf_import",
         })
         .onConflictDoNothing();

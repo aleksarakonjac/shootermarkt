@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { scope } = await params;
   const [t, locale] = await Promise.all([getTranslations("ranking"), getLocale()]);
   return {
-    title: t("h2hTitle") + " — Shootermarkt",
+    title: t("viewH2H") + " — Shootermarkt",
     alternates: buildAlternates(locale, scope, "/head-to-head"),
   };
 }

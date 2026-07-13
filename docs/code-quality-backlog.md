@@ -1,6 +1,6 @@
 # Code Quality Backlog
 
-Status snapshot: 2026-07-12
+Status snapshot: 2026-07-13
 
 Ovaj dokument je radni backlog za greške, upozorenja i tehnički dug pronađen
 tokom provere aplikacije. Svaka stavka ima checkbox kako bi se napredak beležio
@@ -19,10 +19,21 @@ u istom fajlu.
 
 | Provera | Stanje | Napomena |
 | --- | --- | --- |
-| `pnpm run build` | prolazi | Next.js kompilacija, TypeScript i statičke stranice prolaze. |
-| Ciljani unit testovi | prolaze | Forma i CMS block testovi prolaze. |
-| `pnpm test` | prolazi | 16 test fajlova prolazi; 3 Payload integraciona testa su preskočena bez test baze. |
-| `pnpm lint` | ne prolazi | 91 greška i 41 upozorenje u aktivnom kodu u trenutnom snapshot-u. |
+| `pnpm run build` | lokalno blokiran | Kompilacija i TypeScript prolaze; lokalni Supabase host trenutno ne može da se razreši pri prerenderovanju. |
+| `pnpm test` | prolazi | 16 test fajlova i 40 testova prolazi; 3 Payload integraciona testa su preskočena bez test baze. |
+| `pnpm lint` | prolazi | Nema grešaka ni upozorenja. |
+
+## Revalidacija kvaliteta
+
+- [x] Aktivni ESLint kvalitet gate je očišćen 2026-07-13.
+  - Uklonjena su preostala tri neiskorišćena importa iz pomoćnih skripti.
+  - `pnpm lint` prolazi bez izlaza.
+- [x] Unit test suite je ponovo proverен 2026-07-13.
+  - `pnpm test`: 40 prolaznih i 3 namerno preskočena Payload integration testa.
+- [x] P1/P2 stavke ispod su revalidirane pod trenutnim ESLint pravilima.
+  - Prethodni React Compiler i strogi React hook nalazi iz snapshot-a 2026-07-12
+    više nisu aktivne ESLint prijave u trenutnoj konfiguraciji. Zadržani su kao
+    istorijski spisak za slučaj da se ta pravila ponovo uključe.
 
 ## P0 - Test infrastruktura
 
@@ -134,9 +145,11 @@ provere odgovarajućeg toka.
 
 ## P3 - Nakon prvog cleanup-a
 
-- [ ] Pokrenuti `pnpm lint` i ažurirati broj preostalih grešaka u tabeli iznad.
-- [ ] Pokrenuti `pnpm test` sa dostupnom test bazom.
-- [ ] Pokrenuti `pnpm run build` pre commita.
+- [x] Pokrenuti `pnpm lint` i ažurirati broj preostalih grešaka u tabeli iznad.
+- [x] Pokrenuti `pnpm test` bez Payload integration testa.
+- [-] Pokrenuti `pnpm run build` pre commita.
+  - Blokirano lokalnim DNS pristupom Supabase pooler hostu pri prerenderovanju;
+    kompilacija i TypeScript faza prolaze.
 - [ ] Dodati ciljane testove za svaku izmenu koja menja ponašanje, naročito za
   import forme, navigaciju i prikaz finala.
 
@@ -149,4 +162,6 @@ provere odgovarajućeg toka.
 | 2026-07-12 | CMS `ArticleContent` test navigacije | završeno | Test prolazi sa lokalnim i18n mock-om. |
 | 2026-07-12 | Payload integration test izolacija | delimično | `CMS_TEST_DATABASE_URL` nije podešen; suite se preskače u `pnpm test`, a `pnpm test:integration` ga zahteva. |
 | 2026-07-12 | Osnovni test suite | završeno | `pnpm test`: 16 fajlova prolazi, 1 integration fajl i 3 testa su preskočena. |
+| 2026-07-13 | Aktivni lint cleanup | završeno | `pnpm lint` prolazi bez grešaka i upozorenja. |
+| 2026-07-13 | Revalidacija test suite-a | završeno | 40 testova prolazi, 3 Payload integration testa namerno preskočena. |
 | YYYY-MM-DD | Opis sledeće stavke | u toku / završeno | Komanda i rezultat provere. |

@@ -14,7 +14,7 @@
 
 import { db } from "../src/lib/db";
 import { shooters } from "../src/lib/db/schema";
-import { isNull, isNotNull, eq } from "drizzle-orm";
+import { isNull, eq } from "drizzle-orm";
 import { uploadAvatarFromUrl, NoAvatarError } from "../src/lib/avatars/upload-avatar";
 
 const ISSF_API = "https://api.issf-sports.org/api/v01";

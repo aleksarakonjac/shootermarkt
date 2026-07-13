@@ -32,7 +32,11 @@ Za svaki event (tabela) u PDF-u izvuci:
     team_noc — UVEK prisutan: kod države (SRB, GER...) za internacionalna, ili kod/skraćenica države iz koje je strelac za nacionalna
     club_name — SAMO za nacionalna takmičenja: naziv ili skraćenica kluba; null za internacionalna
     birth_year — godina rođenja strelca kao 4-cifreni broj (npr. 2004) AKO je prisutna u biltenu (kolona "God.", "Rođ.", "YOB", datum rođenja → uzmi godinu); inače null
-    series — niz serija kao decimalni/celi brojevi
+    series — niz serija kao decimalni/celi brojevi. Kvalifikacije u PDF biltenu
+      imaju samo zbirove serija; nikada ne izračunavaj ili ne nagađaj pojedinačne
+      hice iz tih zbirova. Za finale, ako postoje, ovo su zbirovi po fazi.
+    series_labels — nazivi koji odgovaraju svakom članu niza series, samo za
+      finale kada PDF jasno imenuje faze/serije; u suprotnom null.
     total — ukupan rezultat
     inners — broj centralnih desetki ("inner tens"), zapisan kao broj pored ukupnog rezultata sa oznakom x/X (npr. "23x" → 23). Prisutan kod Air Pistol (APM/APW) I MK puške trostav (R3PM/R3PW). Ako nema, null.
     qualified — true/false/null
@@ -43,8 +47,21 @@ Pravila:
 - Air Rifle (ARM/ARW): decimalni skorovi u serijama (105.3), 6 serija
 - Air Pistol (APM/APW): celi brojevi, ima inners (X count), 6 serija
 - MK puška trostav (R3PM/R3PW): 50m, tri stava (klečeći/ležeći/stojeći), ukupno do 1200 (3x40); ima inner tens (npr. "1150 23x" → total 1150, inners 23); uzmi kvalifikacioni ukupan
-- Sport pištolj Ž (SPW): 25m, precizni + brzi deo, ukupno do 600
-- Finale: elimination format, kumulativni ukupan
+  MK FINALE: pre eliminacije 8. i 7. strelca PDF prikazuje samo zbirne serije,
+  NE pojedinačne hice: Klečeći (10 hitaca), Ležeći (10), Stojeći 1 (5) i
+  Stojeći 2 (5). Vrati ih kroz series i series_labels baš tim redom. Tek posle
+  eliminacije 8. i 7. strelca se hici pucaju pojedinačno: samo taj nastavak
+  vrati kroz shots; cumulative čuva kumulativne vrednosti koje PDF prikazuje.
+- Sport pištolj Ž (SPW): 25m, precizni + brzi deo, ukupno do 600. SPW FINALE
+  u biltenu ima DVA reda brojeva po strelcu, bez pojedinačnih decimalnih hica:
+  GORNJI red je kumulativni broj pogodaka, a DONJI red je broj pogodaka u toj
+  seriji. Zato za SPW finale obavezno vrati cumulative iz gornjeg reda,
+  series iz donjeg reda, shots kao null i total kao konačan broj pogodaka
+  (celi broj, npr. 17 ili 22). Nikada ne izmišljaj decimalne pojedinačne hice.
+- Finale: elimination format. Pored total i rank vrati, kada postoje u PDF-u:
+  series (međuserije/faze), shots (pojedinačni hici finala) i cumulative
+  (kumulativni rezultat posle svakog hica/faze). Ako bilten prikazuje samo
+  konačan zbir, sva tri polja vrati kao null. Nikada ne izmišljaj vrednosti.
 - Za nacionalna takmičenja: team_noc za srpske strelce je uvek "SRB"
 
 Vrati SAMO JSON, bez markdown, bez teksta:
@@ -141,7 +158,10 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
         team_noc: string;
         club_name?: string | null;
         birth_year?: number | null;
-        series: number[];
+        series?: number[] | null;
+        series_labels?: string[] | null;
+        shots?: number[] | null;
+        cumulative?: number[] | null;
         total: number;
         inners?: number | null;
         qualified?: boolean | null;
@@ -176,9 +196,12 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
         clubName: r.club_name ?? undefined,
         birthYear: r.birth_year ?? null,
         series: r.series ?? [],
+        seriesLabels: r.series_labels ?? null,
         total: r.total,
         inners: r.inners ?? null,
         qualified: r.qualified ?? null,
+        shots: r.shots ?? null,
+        cumulative: r.cumulative ?? null,
       })),
     }));
 

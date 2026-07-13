@@ -96,6 +96,14 @@ export interface ParsedFinalResult {
   firstName: string;
   teamNoc: string;
   total: number;
+  /** Zbirovi po seriji/fazi finala iz biltena. */
+  series?: number[] | null;
+  /** Nazivi serija/faza koji odgovaraju polju series. */
+  seriesLabels?: string[] | null;
+  /** Pojedinačni hici finala, samo ako su eksplicitno prikazani. */
+  shots?: number[] | null;
+  /** Kumulativni rezultat posle svakog hica/faze, kada ga bilten prikazuje. */
+  cumulative?: number[] | null;
 }
 
 export interface ParsedEvent {
@@ -145,6 +153,11 @@ export interface ReviewRow {
   qualified?: boolean | null;
   finalTotal?: number | null;
   finalRank?: number | null;
+  finalSeries?: number[] | null;
+  finalSeriesLabels?: string[] | null;
+  finalShots?: number[] | null;
+  finalCumulative?: number[] | null;
+  finalScoring?: "decimal" | "hit_count";
 
   /** UI controls */
   skip?: boolean;
@@ -209,6 +222,11 @@ export function mergeFinalsIntoRows(
 
       row.finalTotal = rawResult.total;
       row.finalRank = rawResult.rank;
+      row.finalSeries = rawResult.series ?? null;
+      row.finalSeriesLabels = rawResult.seriesLabels ?? null;
+      row.finalShots = rawResult.shots ?? null;
+      row.finalCumulative = rawResult.cumulative ?? null;
+      row.finalScoring = event.discipline === "SPW" ? "hit_count" : "decimal";
       row.qualified = true;
       matchedFinals++;
     }

@@ -364,7 +364,7 @@ function EmptyState({
 }: {
   activeCategory: string;
   label: string;
-  t: (key: string) => string;
+  t: (key: string, values?: Record<string, string | number>) => string;
 }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-10 flex flex-col items-center gap-3 text-center">

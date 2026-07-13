@@ -8,8 +8,8 @@
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { countries, shooters } from "../src/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { countries } from "../src/lib/db/schema";
+import { sql } from "drizzle-orm";
 import * as dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
