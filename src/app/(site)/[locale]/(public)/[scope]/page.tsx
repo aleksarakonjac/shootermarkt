@@ -75,6 +75,9 @@ function HomepageSkeleton() {
 }
 
 async function HomepageContent({ scope }: { scope: Scope }) {
+  const t0 = Date.now();
+  console.log("[homepage] start");
+
   const locale = await getLocale();
   const t = await getTranslations("home");
   const tCommon = await getTranslations("common");
@@ -83,6 +86,8 @@ async function HomepageContent({ scope }: { scope: Scope }) {
   const currentDate = new Date().toISOString().split("T")[0];
   const competitionScopeFilter = buildCompetitionScopeFilter(scope);
   const shooterScopeFilter = buildShooterScopeFilter(scope);
+
+  console.log(`[homepage] translations done +${Date.now() - t0}ms`);
 
   // All heavy fetches run in parallel
   const [
@@ -202,6 +207,8 @@ async function HomepageContent({ scope }: { scope: Scope }) {
       )),
   ]);
 
+  console.log(`[homepage] main Promise.all done +${Date.now() - t0}ms`);
+
   // Ticker
   const tickerLive     = tickerComps.filter((c) => c.date === currentDate);
   const tickerUpcoming = tickerComps.filter((c) => c.date > currentDate);
@@ -256,6 +263,8 @@ async function HomepageContent({ scope }: { scope: Scope }) {
     })
   );
 
+  console.log(`[homepage] compsWithWinners done +${Date.now() - t0}ms`);
+
   // Top forma per discipline — from cache (already fetched above)
   // Get recent scores for top-5 per discipline with one IN query
   const topByDisc = Object.fromEntries(
@@ -278,6 +287,8 @@ async function HomepageContent({ scope }: { scope: Scope }) {
         .where(and(inArray(results.shooterId, allTopIds), isNotNull(results.qualTotal)))
         .orderBy(asc(competitions.date))
     : [];
+
+  console.log(`[homepage] recentResultRows done +${Date.now() - t0}ms`);
 
   const recentScoresByShooter = new Map<number, number[]>();
   for (const r of recentResultRows) {
@@ -340,6 +351,8 @@ async function HomepageContent({ scope }: { scope: Scope }) {
     }))
     .sort((a, b) => b.avgPct - a.avgPct)
     .slice(0, 5);
+
+  console.log(`[homepage] render start +${Date.now() - t0}ms`);
 
   return (
     <>
