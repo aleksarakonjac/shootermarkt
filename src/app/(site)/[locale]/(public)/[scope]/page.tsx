@@ -1,14 +1,9 @@
 import React from "react";
 import { ScopedLink } from "../components/ScopedLink";
 import { db } from "@/lib/db";
-import { shooters, clubs, results, disciplines, competitions, countries } from "@/lib/db/schema";
-import { eq, desc, asc, and, isNotNull, sql } from "drizzle-orm";
-import {
-  computeFormaFromEntries,
-  RANKING_MIN_SAMPLE,
-  type CompetitionLevel,
-  type ResultCategory,
-} from "@/lib/forma";
+import { shooters, clubs, results, disciplines, competitions, countries, shooterFormaCache } from "@/lib/db/schema";
+import { eq, desc, asc, and, isNotNull, sql, gte, inArray } from "drizzle-orm";
+import { RANKING_MIN_SAMPLE } from "@/lib/forma";
 import { TopFormaClient } from "./top-forma-client";
 import { QuickH2HClient } from "./quick-h2h-client";
 import { Ticker, TickerItem } from "../ticker";
@@ -34,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ scope: Sc
   };
 }
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 interface ShooterFormRow {
   shooterId: number;
@@ -48,6 +43,8 @@ interface ShooterFormRow {
   entriesCount: number;
   recentScores: number[];
 }
+
+const DISC_CODES = ["ARM", "ARW", "APM", "APW"] as const;
 
 export default async function HomePage({
   params,
@@ -64,36 +61,132 @@ export default async function HomePage({
   const competitionScopeFilter = buildCompetitionScopeFilter(scope);
   const shooterScopeFilter = buildShooterScopeFilter(scope);
 
-  // Ticker — two tiers: LIVE (today) + NAJAVA (future)
-  const tickerComps = await db
-    .select({
-      id:           competitions.id,
-      name:         competitions.name,
-      nameSr:       competitions.nameSr,
-      nameEn:       competitions.nameEn,
-      date:         competitions.date,
-      level:        competitions.level,
-      location:     competitions.location,
-      countryCode2: countries.code2,
-      nocCode:      countries.nocCode,
-    })
-    .from(competitions)
-    .leftJoin(countries, eq(competitions.countryId, countries.id))
-    .where(and(sql`${competitions.date} >= ${currentDate}`, competitionScopeFilter))
-    .orderBy(competitions.date)
-    .limit(8);
+  // All heavy fetches run in parallel
+  const [
+    tickerComps,
+    allVerified,
+    recentComps,
+    discRows,
+    cacheRows,
+    upcomingComps,
+    calendarComps,
+    clubCacheRows,
+  ] = await Promise.all([
+    // Ticker comps
+    db
+      .select({
+        id:           competitions.id,
+        name:         competitions.name,
+        nameSr:       competitions.nameSr,
+        nameEn:       competitions.nameEn,
+        date:         competitions.date,
+        level:        competitions.level,
+        location:     competitions.location,
+        countryCode2: countries.code2,
+        nocCode:      countries.nocCode,
+      })
+      .from(competitions)
+      .leftJoin(countries, eq(competitions.countryId, countries.id))
+      .where(and(sql`${competitions.date} >= ${currentDate}`, competitionScopeFilter))
+      .orderBy(competitions.date)
+      .limit(8),
 
+    // All verified shooters for QuickH2H
+    db
+      .select({
+        id: shooters.id,
+        firstName: shooters.firstName,
+        lastName: shooters.lastName,
+        clubName: clubs.name,
+        nationality: shooters.nationality,
+      })
+      .from(shooters)
+      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
+      .where(and(eq(shooters.verified, true), shooterScopeFilter))
+      .orderBy(shooters.lastName, shooters.firstName),
+
+    // Recent competitions (last 3)
+    db
+      .select()
+      .from(competitions)
+      .where(competitionScopeFilter)
+      .orderBy(desc(competitions.date))
+      .limit(3),
+
+    // Discipline max scores (for club leaderboard normalization)
+    db.select({ code: disciplines.code, maxQualScore: disciplines.maxQualScore }).from(disciplines),
+
+    // Top forma per discipline — from cache, indexed query
+    db
+      .select({
+        shooterId:    shooterFormaCache.shooterId,
+        discCode:     shooterFormaCache.disciplineCode,
+        forma:        shooterFormaCache.forma,
+        trend:        shooterFormaCache.trend,
+        sampleSize:   shooterFormaCache.sampleSize,
+        peakCareer:   shooterFormaCache.peakCareer,
+        firstName:    shooters.firstName,
+        lastName:     shooters.lastName,
+        clubName:     clubs.name,
+        nationality:  shooters.nationality,
+      })
+      .from(shooterFormaCache)
+      .innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id))
+      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
+      .where(and(
+        eq(shooters.verified, true),
+        shooterScopeFilter,
+        gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE),
+        isNotNull(shooterFormaCache.forma),
+      )),
+
+    // Upcoming competitions
+    db
+      .select()
+      .from(competitions)
+      .where(and(sql`${competitions.date} >= ${currentDate}`, competitionScopeFilter))
+      .orderBy(asc(competitions.date))
+      .limit(10),
+
+    // Calendar competitions (current year)
+    db
+      .select()
+      .from(competitions)
+      .where(and(
+        sql`${competitions.date} >= ${`${new Date().getFullYear()}-01-01`} AND ${competitions.date} <= ${`${new Date().getFullYear()}-12-31`}`,
+        competitionScopeFilter,
+      ))
+      .orderBy(asc(competitions.date)),
+
+    // Club leaderboard — cache rows for all verified shooters
+    db
+      .select({
+        clubId:       shooters.clubId,
+        clubName:     clubs.name,
+        clubCity:     clubs.city,
+        discCode:     shooterFormaCache.disciplineCode,
+        forma:        shooterFormaCache.forma,
+        sampleSize:   shooterFormaCache.sampleSize,
+      })
+      .from(shooterFormaCache)
+      .innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id))
+      .innerJoin(clubs, eq(shooters.clubId, clubs.id))
+      .where(and(
+        eq(shooters.verified, true),
+        shooterScopeFilter,
+        gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE),
+        isNotNull(shooterFormaCache.forma),
+      )),
+  ]);
+
+  // Ticker
   const tickerLive     = tickerComps.filter((c) => c.date === currentDate);
   const tickerUpcoming = tickerComps.filter((c) => c.date > currentDate);
 
   const liveItems: TickerItem[] = await Promise.all(
     tickerLive.map(async (comp) => {
       const best = await db
-        .select({
-          qualTotal: results.qualTotal,
-          lastName:  shooters.lastName,
-          discCode:  disciplines.code,
-        })
+        .select({ qualTotal: results.qualTotal, lastName: shooters.lastName, discCode: disciplines.code })
         .from(results)
         .innerJoin(shooters,    eq(results.shooterId,    shooters.id))
         .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
@@ -104,20 +197,14 @@ export default async function HomePage({
       let detailText = t("inProgress");
       if (best[0]) {
         const score = parseFloat(best[0].qualTotal!);
-        const fmt   = score.toFixed(best[0].discCode.startsWith("AP") ? 0 : 1);
-        detailText  = `1. ${best[0].lastName} ${fmt}`;
+        detailText = `1. ${best[0].lastName} ${score.toFixed(best[0].discCode.startsWith("AP") ? 0 : 1)}`;
       }
-
       return {
         id: comp.id,
         name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
-        date: comp.date,
-        level: comp.level,
-        status: "LIVE" as const,
-        detailText,
+        date: comp.date, level: comp.level, status: "LIVE" as const, detailText,
         href: `/takmicenja/${comp.id}`,
-        nocCode:      comp.nocCode      ?? undefined,
-        countryCode2: comp.countryCode2 ?? undefined,
+        nocCode: comp.nocCode ?? undefined, countryCode2: comp.countryCode2 ?? undefined,
       };
     })
   );
@@ -125,45 +212,16 @@ export default async function HomePage({
   const upcomingItems: TickerItem[] = tickerUpcoming.map((comp) => ({
     id: comp.id,
     name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
-    date: comp.date,
-    level: comp.level,
-    status: "USKORO" as const,
+    date: comp.date, level: comp.level, status: "USKORO" as const,
     detailText: comp.location || tCommon("serbia"),
     href: `/takmicenja/${comp.id}`,
   }));
 
-  // 1. Fetch all verified shooters with their club info
-  const allVerified = await db
-    .select({
-      id: shooters.id,
-      firstName: shooters.firstName,
-      lastName: shooters.lastName,
-      clubName: clubs.name,
-      nationality: shooters.nationality,
-    })
-    .from(shooters)
-    .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-    .where(and(eq(shooters.verified, true), shooterScopeFilter))
-    .orderBy(shooters.lastName, shooters.firstName);
-
-  // 2. Fetch recent competitions (last 3) and find the top shooter for each
-  const recentComps = await db
-    .select()
-    .from(competitions)
-    .where(competitionScopeFilter)
-    .orderBy(desc(competitions.date))
-    .limit(3);
-
+  // Recent comps with winners (3 queries in parallel)
   const compsWithWinners = await Promise.all(
     recentComps.map(async (comp) => {
       const best = await db
-        .select({
-          qualTotal: results.qualTotal,
-          firstName: shooters.firstName,
-          lastName: shooters.lastName,
-          clubName: clubs.name,
-          discCode: disciplines.code,
-        })
+        .select({ qualTotal: results.qualTotal, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, discCode: disciplines.code })
         .from(results)
         .innerJoin(shooters, eq(results.shooterId, shooters.id))
         .leftJoin(clubs, eq(shooters.clubId, clubs.id))
@@ -171,252 +229,92 @@ export default async function HomePage({
         .where(and(eq(results.competitionId, comp.id), shooterScopeFilter))
         .orderBy(desc(results.qualTotal))
         .limit(1);
-
-      return {
-        ...comp,
-        winner: best[0] || null,
-      };
+      return { ...comp, winner: best[0] || null };
     })
   );
 
-  // 3. Fetch data for Top Forma per discipline
-  const activeDisciplines = await db.select().from(disciplines);
+  // Top forma per discipline — from cache (already fetched above)
+  // Get recent scores for top-5 per discipline with one IN query
+  const topByDisc = Object.fromEntries(
+    DISC_CODES.map((code) => [
+      code,
+      cacheRows
+        .filter((r) => r.discCode === code)
+        .sort((a, b) => parseFloat(b.forma!) - parseFloat(a.forma!))
+        .slice(0, 5),
+    ])
+  ) as Record<typeof DISC_CODES[number], typeof cacheRows>;
 
-  const topFormaData: {
-    ARM: ShooterFormRow[];
-    ARW: ShooterFormRow[];
-    APM: ShooterFormRow[];
-    APW: ShooterFormRow[];
-  } = {
-    ARM: [],
-    ARW: [],
-    APM: [],
-    APW: [],
-  };
+  const allTopIds = [...new Set(Object.values(topByDisc).flat().map((r) => r.shooterId))];
 
-  // Pre-fetch results for form scores
-  for (const disc of activeDisciplines) {
-    const rawResults = await db
-      .select({
-        shooterId: results.shooterId,
-        firstName: shooters.firstName,
-        lastName: shooters.lastName,
-        nationality: shooters.nationality,
-        clubName: clubs.name,
-        qualTotal: results.qualTotal,
-        competitionDate: competitions.date,
-        competitionLevel: competitions.level,
-        category: results.category,
-      })
-      .from(results)
-      .innerJoin(shooters, eq(results.shooterId, shooters.id))
-      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-      .innerJoin(competitions, eq(results.competitionId, competitions.id))
-      .where(and(
-        eq(results.disciplineId, disc.id),
-        isNotNull(results.qualTotal),
-        competitionScopeFilter,
-        shooterScopeFilter,
-      ))
-      .orderBy(asc(competitions.date));
+  const recentResultRows = allTopIds.length > 0
+    ? await db
+        .select({ shooterId: results.shooterId, qualTotal: results.qualTotal, date: competitions.date })
+        .from(results)
+        .innerJoin(competitions, eq(results.competitionId, competitions.id))
+        .where(and(inArray(results.shooterId, allTopIds), isNotNull(results.qualTotal)))
+        .orderBy(asc(competitions.date))
+    : [];
 
-    // Group by shooter
-    const shooterMap = new Map<
-      number,
-      {
-        firstName: string;
-        lastName: string;
-        nationality: string | null;
-        clubName: string | null;
-        entries: {
-          qualTotal: number;
-          date: string;
-          level: CompetitionLevel;
-          category: ResultCategory;
-        }[];
-      }
-    >();
-
-    for (const r of rawResults) {
-      if (!shooterMap.has(r.shooterId)) {
-        shooterMap.set(r.shooterId, {
-          firstName: r.firstName,
-          lastName: r.lastName,
-          nationality: r.nationality,
-          clubName: r.clubName,
-          entries: [],
-        });
-      }
-      shooterMap.get(r.shooterId)!.entries.push({
-        qualTotal: parseFloat(r.qualTotal!),
-        date: r.competitionDate,
-        level: r.competitionLevel,
-        category: r.category,
-      });
-    }
-
-    const ranking = Array.from(shooterMap.entries())
-      .map(([shooterId, data]) => {
-        const forma = computeFormaFromEntries(data.entries, { code: disc.code });
-        const peak = data.entries.length > 0 ? Math.max(...data.entries.map((e) => e.qualTotal)) : null;
-
-        // Dynamic sort entries desc by date to get recent scores
-        const sortedScores = [...data.entries]
-          .sort((a, b) => b.date.localeCompare(a.date))
-          .map((e) => e.qualTotal);
-
-        return {
-          shooterId,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          clubName: data.clubName,
-          nationality: data.nationality,
-          formaScore: forma.forma ?? 0,
-          trend: forma.trend,
-          peak,
-          entriesCount: forma.sampleSize,
-          recentScores: sortedScores,
-        };
-      })
-      .filter((s) => s.entriesCount >= RANKING_MIN_SAMPLE) // kvalifikacija: dovoljno nastupa
-      .sort((a, b) => b.formaScore - a.formaScore)
-      .slice(0, 5); // top 5 only
-
-    if (disc.code === "ARM") topFormaData.ARM = ranking;
-    if (disc.code === "ARW") topFormaData.ARW = ranking;
-    if (disc.code === "APM") topFormaData.APM = ranking;
-    if (disc.code === "APW") topFormaData.APW = ranking;
+  const recentScoresByShooter = new Map<number, number[]>();
+  for (const r of recentResultRows) {
+    const arr = recentScoresByShooter.get(r.shooterId) ?? [];
+    arr.push(parseFloat(r.qualTotal!));
+    recentScoresByShooter.set(r.shooterId, arr);
   }
 
-  // 4. Fetch upcoming competitions
-  const upcomingComps = await db
-    .select()
-    .from(competitions)
-    .where(and(sql`${competitions.date} >= ${currentDate}`, competitionScopeFilter))
-    .orderBy(asc(competitions.date))
-    .limit(10);
+  const mapRow = (r: (typeof cacheRows)[number]): ShooterFormRow => ({
+    shooterId:    r.shooterId,
+    firstName:    r.firstName,
+    lastName:     r.lastName,
+    clubName:     r.clubName,
+    nationality:  r.nationality,
+    formaScore:   parseFloat(r.forma!),
+    trend:        (r.trend ?? "stable") as "up" | "down" | "stable",
+    peak:         r.peakCareer != null ? parseFloat(r.peakCareer) : null,
+    entriesCount: r.sampleSize,
+    recentScores: recentScoresByShooter.get(r.shooterId) ?? [],
+  });
 
+  const topFormaData: { ARM: ShooterFormRow[]; ARW: ShooterFormRow[]; APM: ShooterFormRow[]; APW: ShooterFormRow[] } = {
+    ARM: topByDisc.ARM.map(mapRow),
+    ARW: topByDisc.ARW.map(mapRow),
+    APM: topByDisc.APM.map(mapRow),
+    APW: topByDisc.APW.map(mapRow),
+  };
+
+  // Translations
   const translatedUpcoming = upcomingComps.map((comp) => ({
     ...comp,
     name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
   }));
-
-  // 4b. Fetch all competitions for calendar (current year)
-  const yearStart = `${new Date().getFullYear()}-01-01`;
-  const yearEnd = `${new Date().getFullYear()}-12-31`;
-  const calendarComps = await db
-    .select()
-    .from(competitions)
-    .where(and(
-      sql`${competitions.date} >= ${yearStart} AND ${competitions.date} <= ${yearEnd}`,
-      competitionScopeFilter,
-    ))
-    .orderBy(asc(competitions.date));
 
   const translatedCalendar = calendarComps.map((comp) => ({
     ...comp,
     name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
   }));
 
-  // 5. Club Leaderboard: Group shooters by club, calculate average form score
-  const clubAvgForm = await db
-    .select({
-      clubId: shooters.clubId,
-      clubName: clubs.name,
-      clubCity: clubs.city,
-      countShooters: sql<number>`count(distinct ${shooters.id})`,
-    })
-    .from(shooters)
-    .innerJoin(clubs, eq(shooters.clubId, clubs.id))
-    .where(and(eq(shooters.verified, true), shooterScopeFilter))
-    .groupBy(shooters.clubId, clubs.name, clubs.city);
+  // Club leaderboard — aggregate cache rows in memory
+  const maxByCode: Record<string, number> = Object.fromEntries(discRows.map((d) => [d.code, parseFloat(d.maxQualScore)]));
 
-  // Process club rankings based on shooter form scores
-  const clubRankingPromise = clubAvgForm.map(async (c) => {
-    if (!c.clubId) return null;
+  const clubMap = new Map<number, { name: string; city: string | null; scores: number[] }>();
+  for (const row of clubCacheRows) {
+    if (!row.clubId) continue;
+    const maxScore = maxByCode[row.discCode] ?? 630;
+    const pct = (parseFloat(row.forma!) / maxScore) * 100;
+    const c = clubMap.get(row.clubId) ?? { name: row.clubName, city: row.clubCity, scores: [] };
+    c.scores.push(pct);
+    clubMap.set(row.clubId, c);
+  }
 
-    // Fetch all shooters for this club
-    const clubShooters = await db
-      .select({ id: shooters.id })
-      .from(shooters)
-      .where(and(eq(shooters.clubId, c.clubId), eq(shooters.verified, true), shooterScopeFilter));
-
-    const shooterIds = clubShooters.map((s) => s.id);
-    if (shooterIds.length === 0) return null;
-
-    // Fetch results for these shooters
-    const clubResults = await db
-      .select({
-        shooterId: results.shooterId,
-        qualTotal: results.qualTotal,
-        date: competitions.date,
-        level: competitions.level,
-        category: results.category,
-        discMax: disciplines.maxQualScore,
-        discCode: disciplines.code,
-      })
-      .from(results)
-      .innerJoin(competitions, eq(results.competitionId, competitions.id))
-      .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
-      .where(and(
-        sql`${results.shooterId} IN (${sql.join(shooterIds)})`,
-        isNotNull(results.qualTotal),
-        competitionScopeFilter,
-      ));
-
-    // Calculate form score for each shooter
-    const shooterFormScores: number[] = [];
-    const shooterEntries: {
-      [id: number]: {
-        qualTotal: number;
-        date: string;
-        level: CompetitionLevel;
-        category: ResultCategory;
-        max: number;
-        code: string;
-      }[];
-    } = {};
-
-    for (const r of clubResults) {
-      if (!shooterEntries[r.shooterId]) {
-        shooterEntries[r.shooterId] = [];
-      }
-      shooterEntries[r.shooterId].push({
-        qualTotal: parseFloat(r.qualTotal!),
-        date: r.date,
-        level: r.level,
-        category: r.category,
-        max: parseFloat(r.discMax),
-        code: r.discCode,
-      });
-    }
-
-    for (const entries of Object.values(shooterEntries)) {
-      if (entries.length < RANKING_MIN_SAMPLE) continue;
-      const maxScore = entries[0].max;
-      const forma = computeFormaFromEntries(entries, { code: entries[0].code });
-      if (forma.forma !== null) {
-        // Normalize score to percentage of max for fair club comparison
-        const pct = (forma.forma / maxScore) * 100;
-        shooterFormScores.push(pct);
-      }
-    }
-
-    if (shooterFormScores.length === 0) return null;
-
-    const avgPct = shooterFormScores.reduce((a, b) => a + b, 0) / shooterFormScores.length;
-
-    return {
-      clubId: c.clubId,
-      name: c.clubName,
-      city: c.clubCity,
-      avgPct: Math.round(avgPct * 10) / 10,
-      activeShooters: shooterFormScores.length,
-    };
-  });
-
-  const clubRankings = (await Promise.all(clubRankingPromise))
-    .filter((c): c is NonNullable<typeof c> => c !== null)
+  const clubRankings = Array.from(clubMap.entries())
+    .map(([clubId, c]) => ({
+      clubId,
+      name: c.name,
+      city: c.city,
+      avgPct: Math.round((c.scores.reduce((a, b) => a + b, 0) / c.scores.length) * 10) / 10,
+      activeShooters: c.scores.length,
+    }))
     .sort((a, b) => b.avgPct - a.avgPct)
     .slice(0, 5);
 
