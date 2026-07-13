@@ -22,7 +22,10 @@ export async function NewsSection() {
   const locale = await getLocale();
   const t = await getTranslations("news");
   const tHome = await getTranslations("home");
-  const articles = await getPublishedArticles().catch(() => []);
+  const articles = await Promise.race([
+    getPublishedArticles(),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("cms-timeout")), 5000)),
+  ]).catch(() => []);
 
   return (
     <section className="flex flex-col gap-4">
