@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic';
+export const revalidate = 300;
 
 import { Suspense } from "react";
 import { ScopedLink } from "../../components/ScopedLink";
