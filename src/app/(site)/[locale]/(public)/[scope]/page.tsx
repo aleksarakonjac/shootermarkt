@@ -29,9 +29,6 @@ export async function generateMetadata({ params }: { params: Promise<{ scope: Sc
   };
 }
 
-// PPR: static shell (layout + suspense skeleton) pre-rendered at build time.
-// DB queries run inside HomepageContent (Suspense boundary) on first request.
-export const experimental_ppr = true;
 
 interface ShooterFormRow {
   shooterId: number;
