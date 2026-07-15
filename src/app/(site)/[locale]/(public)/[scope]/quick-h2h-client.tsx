@@ -17,10 +17,15 @@ function ShooterSearch({ label, excludedId, onSelect }: { label: string; exclude
     if (query.trim().length < 2) return;
     const controller = new AbortController();
     const timeout = setTimeout(async () => {
-      const response = await fetch(`/api/search?only=shooters&q=${encodeURIComponent(query)}&scope=${scope ?? "srb"}&locale=${locale}`, { signal: controller.signal });
-      if (response.ok) {
-        const data = await response.json();
-        setResults(data.shooters.filter((shooter: Shooter) => String(shooter.id) !== excludedId));
+      try {
+        const response = await fetch(`/api/search?only=shooters&q=${encodeURIComponent(query)}&scope=${scope ?? "srb"}&locale=${locale}`, { signal: controller.signal });
+        if (response.ok) {
+          const data = await response.json();
+          setResults(data.shooters.filter((shooter: Shooter) => String(shooter.id) !== excludedId));
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setResults([]);
       }
     }, 150);
     return () => { controller.abort(); clearTimeout(timeout); };
@@ -68,7 +73,7 @@ export function QuickH2HClient() {
   };
 
   const commonDisciplines = result?.shooterA && result?.shooterB
-    ? Object.keys(result.shooterA.disciplines).filter((code) => Object.hasOwn(result.shooterB!.disciplines, code))
+    ? Object.keys(result.shooterA.disciplines).filter((code) => Object.prototype.hasOwnProperty.call(result.shooterB!.disciplines, code))
     : [];
 
   return (
