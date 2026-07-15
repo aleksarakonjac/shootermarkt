@@ -23,7 +23,7 @@ export async function NewsSection() {
   const t = await getTranslations("news");
   const tHome = await getTranslations("home");
   const articles = await Promise.race([
-    getPublishedArticles(),
+    getPublishedArticles({ limit: 4 }),
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error("cms-timeout")), 5000)),
   ]).catch(() => []);
 

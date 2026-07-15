@@ -99,6 +99,13 @@
       "when": 1783872074852,
       "tag": "0013_brown_deathbird",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784133182000,
+      "tag": "0014_public_search_index",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { useParams } from "next/navigation";
 import { LEVEL_DOT_COLOR } from "@/lib/competition-utils";
 
 interface Competition {
@@ -32,6 +33,7 @@ function getLevelColor(level: string): string {
 export function CalendarModule({ competitions }: CalendarModuleProps) {
   const t = useTranslations("calendar");
   const locale = useLocale();
+  const { scope } = useParams<{ scope?: string }>();
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -40,6 +42,30 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(today.getFullYear());
   const pickerRef = useRef<HTMLDivElement>(null);
+  const [monthCache, setMonthCache] = useState<Record<string, Competition[]>>(() => ({
+    [`${today.getFullYear()}-${today.getMonth()}`]: competitions,
+  }));
+
+  const loadMonth = useCallback(async (year: number, month: number) => {
+    const key = `${year}-${month}`;
+    if (monthCache[key]) return;
+    const response = await fetch(`/api/calendar?year=${year}&month=${month + 1}&scope=${scope ?? "srb"}&locale=${locale}`);
+    if (response.ok) {
+      const data = await response.json();
+      setMonthCache((cache) => cache[key] ? cache : { ...cache, [key]: data });
+    }
+  }, [locale, monthCache, scope]);
+
+  useEffect(() => {
+    const previous = new Date(viewYear, viewMonth - 1, 1);
+    const next = new Date(viewYear, viewMonth + 1, 1);
+    const timeout = setTimeout(() => {
+      void loadMonth(viewYear, viewMonth);
+      void loadMonth(previous.getFullYear(), previous.getMonth());
+      void loadMonth(next.getFullYear(), next.getMonth());
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, [loadMonth, viewMonth, viewYear]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -71,12 +97,12 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
 
   const compsByDate = useMemo(() => {
     const map = new Map<string, Competition[]>();
-    for (const c of competitions) {
+    for (const c of monthCache[`${viewYear}-${viewMonth}`] ?? []) {
       if (!map.has(c.date)) map.set(c.date, []);
       map.get(c.date)!.push(c);
     }
     return map;
-  }, [competitions]);
+  }, [monthCache, viewMonth, viewYear]);
 
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);

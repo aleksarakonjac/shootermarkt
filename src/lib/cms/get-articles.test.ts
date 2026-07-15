@@ -27,6 +27,14 @@ describe("getPublishedArticles", () => {
     );
     expect(articles).toHaveLength(1);
   });
+
+  it("honors a caller's smaller homepage limit", async () => {
+    findMock.mockResolvedValueOnce({ docs: [] });
+
+    await getPublishedArticles({ limit: 4 });
+
+    expect(findMock).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 4 }));
+  });
 });
 
 describe("getPublishedArticleBySlug", () => {
