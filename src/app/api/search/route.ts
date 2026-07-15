@@ -30,15 +30,17 @@ export async function GET(request: NextRequest) {
 
   const [shooterRows, competitionRows] = await Promise.all([
     shootersOnly
-      ? Promise.resolve([])
-      : db
+      ? db
       .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, avatarUrl: shooters.avatarUrl })
       .from(shooters)
       .leftJoin(clubs, eq(shooters.clubId, clubs.id))
       .where(and(eq(shooters.verified, true), inArray(shooters.apparatus, [...MVP_APPARATUS]), buildShooterScopeFilter(scope), ...shooterMatches))
       .orderBy(shooters.lastName, shooters.firstName)
-      .limit(LIMIT),
-    db
+      .limit(LIMIT)
+      : Promise.resolve([]),
+    shootersOnly
+      ? Promise.resolve([])
+      : db
       .select({ id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, level: competitions.level })
       .from(competitions)
       .where(and(buildCompetitionScopeFilter(scope), ...competitionMatches))
