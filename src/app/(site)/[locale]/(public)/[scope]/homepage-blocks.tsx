@@ -3,6 +3,7 @@ import { Ticker, type TickerItem } from "../ticker";
 import { UpcomingEvents } from "../components/UpcomingEvents";
 import { TopFormaClient } from "./top-forma-client";
 import { db } from "@/lib/db";
+import { retryDatabaseRead } from "@/lib/db/retry";
 import { clubs, competitions, countries, disciplines, results, shooterFormaCache, shooters } from "@/lib/db/schema";
 import { RANKING_MIN_SAMPLE } from "@/lib/forma";
 import { buildCompetitionScopeFilter, buildShooterScopeFilter, type Scope } from "@/lib/scope";
@@ -25,7 +26,11 @@ type ShooterFormRow = {
   recentScores: number[];
 };
 
-export async function HomepageTicker({ scope }: { scope: Scope }) {
+export function HomepageTicker({ scope }: { scope: Scope }) {
+  return retryDatabaseRead(() => renderHomepageTicker(scope));
+}
+
+async function renderHomepageTicker(scope: Scope) {
   const [locale, t, tCommon] = await Promise.all([getLocale(), getTranslations("home"), getTranslations("common")]);
   const today = new Date().toISOString().slice(0, 10);
   const scopeFilter = buildCompetitionScopeFilter(scope);
@@ -59,7 +64,11 @@ export async function HomepageTicker({ scope }: { scope: Scope }) {
   return <Ticker liveItems={liveItems} upcomingItems={upcomingItems} />;
 }
 
-export async function HomepageMain({ scope }: { scope: Scope }) {
+export function HomepageMain({ scope }: { scope: Scope }) {
+  return retryDatabaseRead(() => renderHomepageMain(scope));
+}
+
+async function renderHomepageMain(scope: Scope) {
   const [locale, t, tComp] = await Promise.all([getLocale(), getTranslations("home"), getTranslations("competition")]);
   const today = new Date().toISOString().slice(0, 10);
   const competitionScopeFilter = buildCompetitionScopeFilter(scope);
@@ -100,7 +109,11 @@ export async function HomepageMain({ scope }: { scope: Scope }) {
   </>;
 }
 
-export async function HomepageClubLeaderboard({ scope }: { scope: Scope }) {
+export function HomepageClubLeaderboard({ scope }: { scope: Scope }) {
+  return retryDatabaseRead(() => renderHomepageClubLeaderboard(scope));
+}
+
+async function renderHomepageClubLeaderboard(scope: Scope) {
   const [t, tCommon, cacheRows] = await Promise.all([getTranslations("home"), getTranslations("common"), db.select({ clubId: shooters.clubId, clubName: clubs.name, clubCity: clubs.city, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).innerJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), buildShooterScopeFilter(scope), gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE), isNotNull(shooterFormaCache.forma)))]);
   const clubsById = new Map<number, { name: string; city: string | null; scores: number[] }>();
   for (const row of cacheRows) if (row.clubId) { const entry = clubsById.get(row.clubId) ?? { name: row.clubName, city: row.clubCity, scores: [] }; entry.scores.push((Number(row.forma) / (MAX_SCORE_BY_DISCIPLINE[row.discCode] ?? 630)) * 100); clubsById.set(row.clubId, entry); }
