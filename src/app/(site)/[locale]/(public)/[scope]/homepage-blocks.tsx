@@ -10,6 +10,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import { getLocale, getTranslations } from "next-intl/server";
 
 const DISC_CODES = ["ARM", "ARW", "APM", "APW"] as const;
+const MAX_SCORE_BY_DISCIPLINE: Record<string, number> = { ARM: 654, ARW: 654, APM: 600, APW: 600 };
 
 type ShooterFormRow = {
   shooterId: number;
@@ -100,10 +101,9 @@ export async function HomepageMain({ scope }: { scope: Scope }) {
 }
 
 export async function HomepageClubLeaderboard({ scope }: { scope: Scope }) {
-  const [t, tCommon, discRows, cacheRows] = await Promise.all([getTranslations("home"), getTranslations("common"), db.select({ code: disciplines.code, maxQualScore: disciplines.maxQualScore }).from(disciplines), db.select({ clubId: shooters.clubId, clubName: clubs.name, clubCity: clubs.city, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).innerJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), buildShooterScopeFilter(scope), gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE), isNotNull(shooterFormaCache.forma)))]);
-  const maxScores = Object.fromEntries(discRows.map((discipline) => [discipline.code, Number(discipline.maxQualScore)]));
+  const [t, tCommon, cacheRows] = await Promise.all([getTranslations("home"), getTranslations("common"), db.select({ clubId: shooters.clubId, clubName: clubs.name, clubCity: clubs.city, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).innerJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), buildShooterScopeFilter(scope), gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE), isNotNull(shooterFormaCache.forma)))]);
   const clubsById = new Map<number, { name: string; city: string | null; scores: number[] }>();
-  for (const row of cacheRows) if (row.clubId) { const entry = clubsById.get(row.clubId) ?? { name: row.clubName, city: row.clubCity, scores: [] }; entry.scores.push((Number(row.forma) / (maxScores[row.discCode] ?? 630)) * 100); clubsById.set(row.clubId, entry); }
+  for (const row of cacheRows) if (row.clubId) { const entry = clubsById.get(row.clubId) ?? { name: row.clubName, city: row.clubCity, scores: [] }; entry.scores.push((Number(row.forma) / (MAX_SCORE_BY_DISCIPLINE[row.discCode] ?? 630)) * 100); clubsById.set(row.clubId, entry); }
   const rankings = Array.from(clubsById.entries()).map(([clubId, club]) => ({ clubId, ...club, avg: club.scores.reduce((sum, value) => sum + value, 0) / club.scores.length })).sort((a, b) => b.avg - a.avg).slice(0, 5);
   return <section className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden"><div className="bg-[var(--brand-primary)] px-4 py-3"><h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-white uppercase">{t("clubLeaderboard")}</h3></div><div className="p-4">{rankings.length === 0 ? <p className="py-4 text-center text-xs text-[var(--muted)]">{t("noClubData")}</p> : rankings.map((club, index) => <div key={club.clubId} className="flex items-center justify-between py-1.5 text-xs"><span><b className="mr-3 text-[var(--subtle)]">{index + 1}</b><b>{club.name}</b> <span className="text-[var(--muted)]">{club.city || tCommon("serbia")}</span></span><span className="font-mono font-bold">{club.avg.toFixed(1)}%</span></div>)}</div></section>;
 }
