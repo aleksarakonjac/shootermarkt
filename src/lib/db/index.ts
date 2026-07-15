@@ -7,7 +7,7 @@ const connectionOptions = {
   prepare: false,
   max: 1,
   idle_timeout: 20,
-  connect_timeout: 10,
+  connect_timeout: 5,
 };
 
 // Disable prefetch for Supabase transaction mode pooler
