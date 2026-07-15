@@ -1,6 +1,8 @@
+"use client";
+
 import { ScopedLink } from "./ScopedLink";
-import { getPublishedArticles } from "@/lib/cms/get-articles";
-import { getLocale, getTranslations } from "next-intl/server";
+import { useEffect, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 const ACCENTS = [
   "var(--brand-primary)",
@@ -8,6 +10,14 @@ const ACCENTS = [
   "var(--success)",
   "var(--brand-primary)",
 ];
+
+interface ArticleSummary {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string;
+  publishedAt: string | null;
+}
 
 function formatDate(iso: string, locale: string) {
   const localeStr = locale === "en" ? "en-US" : "sr-RS";
@@ -18,14 +28,22 @@ function formatDate(iso: string, locale: string) {
   });
 }
 
-export async function NewsSection() {
-  const locale = await getLocale();
-  const t = await getTranslations("news");
-  const tHome = await getTranslations("home");
-  const articles = await Promise.race([
-    getPublishedArticles({ limit: 4 }),
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("cms-timeout")), 5000)),
-  ]).catch(() => []);
+export function NewsSection() {
+  const locale = useLocale();
+  const t = useTranslations("news");
+  const tHome = useTranslations("home");
+  const [articles, setArticles] = useState<ArticleSummary[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    fetch("/api/news", { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : [])
+      .then(setArticles)
+      .catch(() => setArticles([]))
+      .finally(() => clearTimeout(timeout));
+    return () => { controller.abort(); clearTimeout(timeout); };
+  }, []);
 
   return (
     <section className="flex flex-col gap-4">
