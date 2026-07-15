@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { CalendarModule } from "../components/CalendarModule";
-import { NewsSection } from "../components/NewsSection";
 import { buildAlternates } from "@/i18n/alternates";
 import { getLocale, getTranslations } from "next-intl/server";
 import { type Scope } from "@/lib/scope";
@@ -26,7 +25,6 @@ export default async function HomePage({ params }: { params: Promise<{ scope: Sc
         <main className="lg:col-span-2"><HomepageBlockBoundary><Suspense fallback={<BlockSkeleton />}><HomepageMain scope={scope} /></Suspense></HomepageBlockBoundary></main>
         <aside className="flex flex-col gap-8"><CalendarModule competitions={[]} /><HomepageBlockBoundary><Suspense fallback={<BlockSkeleton />}><HomepageClubLeaderboard scope={scope} /></Suspense></HomepageBlockBoundary><QuickH2HClient /></aside>
       </div>
-      <Suspense fallback={<BlockSkeleton />}><div className="mt-8"><NewsSection /></div></Suspense>
     </div>
   </>;
 }
