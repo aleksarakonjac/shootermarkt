@@ -4,8 +4,9 @@ import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "
 import { createPortal } from "react-dom";
 import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
+import { useParams } from "next/navigation";
 import Image from "next/image";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
@@ -26,10 +27,9 @@ export type SearchCompetition = {
   level: string;
 };
 
-interface Props {
-  shooters: SearchShooter[];
-  competitions: SearchCompetition[];
-}
+type SearchResults = { shooters: SearchShooter[]; competitions: SearchCompetition[] };
+
+const EMPTY_RESULTS: SearchResults = { shooters: [], competitions: [] };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -116,19 +116,25 @@ function ArrowIcon() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function GlobalSearch({ shooters, competitions }: Props) {
+export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS);
+  const [isSearching, setIsSearching] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const scopedHref = useScopedHref();
+  const locale = useLocale();
+  const { scope } = useParams<{ scope?: string }>();
   const t = useTranslations("search");
 
   const openModal = useCallback(() => {
     setIsOpen(true);
     setQuery("");
+    setResults(EMPTY_RESULTS);
+    setIsSearching(false);
     setActiveIndex(0);
   }, []);
 
@@ -171,22 +177,31 @@ export function GlobalSearch({ shooters, competitions }: Props) {
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
-  // Filter
-  const q = query.toLowerCase().trim();
+  const q = query.trim();
 
-  const filteredShooters = q
-    ? shooters
-        .filter((s) =>
-          `${s.firstName} ${s.lastName} ${s.lastName} ${s.firstName} ${s.clubName ?? ""}`.toLowerCase().includes(q)
-        )
-        .slice(0, 5)
-    : [];
+  useEffect(() => {
+    if (q.length < 2) return;
 
-  const filteredComps = q
-    ? competitions
-        .filter((c) => c.name.toLowerCase().includes(q))
-        .slice(0, 5)
-    : [];
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${scope ?? "srb"}&locale=${locale}`, {
+          signal: controller.signal,
+        });
+        if (response.ok) setResults(await response.json());
+      } finally {
+        if (!controller.signal.aborted) setIsSearching(false);
+      }
+    }, 150);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [q, scope, locale]);
+
+  const filteredShooters = results.shooters;
+  const filteredComps = results.competitions;
 
   const total = filteredShooters.length + filteredComps.length;
 
@@ -240,7 +255,13 @@ export function GlobalSearch({ shooters, competitions }: Props) {
             name="q"
             placeholder={t("fullPlaceholder")}
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setActiveIndex(0); }}
+            onChange={(e) => {
+              const nextQuery = e.target.value;
+              setQuery(nextQuery);
+              setResults(EMPTY_RESULTS);
+              setIsSearching(nextQuery.trim().length >= 2);
+              setActiveIndex(0);
+            }}
             onKeyDown={onInputKeyDown}
             className="flex-1 py-[1.1rem] text-sm text-[var(--ink)] placeholder:text-[var(--subtle)] bg-transparent outline-none focus:outline-none focus:ring-0 [&:focus-visible]:outline-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
             autoComplete="off"
@@ -269,6 +290,10 @@ export function GlobalSearch({ shooters, competitions }: Props) {
               <p className="text-sm text-[var(--subtle)]">
                 {t("emptyHint")}
               </p>
+            </div>
+          ) : isSearching ? (
+            <div className="px-4 py-10 text-center">
+              <p className="text-sm text-[var(--muted)]">Pretraživanje…</p>
             </div>
           ) : total === 0 ? (
             <div className="px-4 py-10 text-center">

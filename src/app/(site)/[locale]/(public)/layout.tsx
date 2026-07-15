@@ -1,7 +1,3 @@
-import { db } from "@/lib/db";
-import { shooters, clubs, competitions } from "@/lib/db/schema";
-import { eq, desc, inArray, and } from "drizzle-orm";
-import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { MainNav } from "./components/MainNav";
 import { GlobalSearch } from "./GlobalSearch";
 import HeaderHomeLink from "./components/HeaderHomeLink";
@@ -24,41 +20,7 @@ export default async function PublicLayout({ children, params }: Props) {
   // async context so the setRequestLocale from [locale]/layout.tsx doesn't carry over.
   setRequestLocale(locale);
 
-  const [shootersList, competitionsList, t, tCommon] = await Promise.all([
-    db
-      .select({
-        id: shooters.id,
-        firstName: shooters.firstName,
-        lastName: shooters.lastName,
-        clubName: clubs.name,
-        avatarUrl: shooters.avatarUrl,
-      })
-      .from(shooters)
-      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-      .where(and(eq(shooters.verified, true), inArray(shooters.apparatus, [...MVP_APPARATUS])))
-      .orderBy(shooters.lastName, shooters.firstName),
-
-    db
-      .select({
-        id: competitions.id,
-        name: competitions.name,
-        nameSr: competitions.nameSr,
-        nameEn: competitions.nameEn,
-        date: competitions.date,
-        level: competitions.level,
-      })
-      .from(competitions)
-      .orderBy(desc(competitions.date))
-      .limit(500),
-
-    getTranslations("footer"),
-    getTranslations("common"),
-  ]);
-
-  const translatedCompetitions = competitionsList.map((comp) => ({
-    ...comp,
-    name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
-  }));
+  const [t, tCommon] = await Promise.all([getTranslations("footer"), getTranslations("common")]);
 
   return (
     <>
@@ -83,10 +45,7 @@ export default async function PublicLayout({ children, params }: Props) {
             </div>
 
             {/* Global search — renders desktop pill + mobile icon */}
-            <GlobalSearch
-              shooters={shootersList}
-              competitions={translatedCompetitions}
-            />
+            <GlobalSearch />
 
             {/* Desktop right controls */}
             <div className="hidden md:flex items-center gap-1 shrink-0">

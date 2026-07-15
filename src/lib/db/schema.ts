@@ -317,6 +317,9 @@ export const shooters = pgTable(
   },
   (t) => [
     index("shooters_last_name_idx").on(t.lastName),
+    index("shooters_verified_apparatus_name_idx")
+      .on(t.apparatus, t.lastName, t.firstName)
+      .where(sql`${t.verified} = true`),
     index("shooters_club_id_idx").on(t.clubId),
     index("shooters_country_id_idx").on(t.countryId),
     index("shooters_nationality_idx").on(t.nationality),

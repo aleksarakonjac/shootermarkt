@@ -74,10 +74,19 @@ function HomepageSkeleton() {
   );
 }
 
-async function HomepageContent({ scope }: { scope: Scope }) {
-  const t0 = Date.now();
-  console.log("[homepage] start");
+function NewsSectionSkeleton() {
+  return (
+    <section aria-busy="true" className="flex flex-col gap-4">
+      <div className="h-6 w-28 rounded bg-[var(--surface)] animate-pulse" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-2 h-60 rounded-xl bg-[var(--surface)] animate-pulse" />
+        <div className="h-60 rounded-xl bg-[var(--surface)] animate-pulse" />
+      </div>
+    </section>
+  );
+}
 
+async function HomepageContent({ scope }: { scope: Scope }) {
   const locale = await getLocale();
   const t = await getTranslations("home");
   const tCommon = await getTranslations("common");
@@ -87,17 +96,13 @@ async function HomepageContent({ scope }: { scope: Scope }) {
   const competitionScopeFilter = buildCompetitionScopeFilter(scope);
   const shooterScopeFilter = buildShooterScopeFilter(scope);
 
-  console.log(`[homepage] translations done +${Date.now() - t0}ms`);
-
   // All heavy fetches run in parallel
   const [
     tickerComps,
-    allVerified,
     recentComps,
     discRows,
     cacheRows,
     upcomingComps,
-    calendarComps,
     clubCacheRows,
   ] = await Promise.all([
     // Ticker comps
@@ -118,20 +123,6 @@ async function HomepageContent({ scope }: { scope: Scope }) {
       .where(and(sql`${competitions.date} >= ${currentDate}`, competitionScopeFilter))
       .orderBy(competitions.date)
       .limit(8),
-
-    // All verified shooters for QuickH2H
-    db
-      .select({
-        id: shooters.id,
-        firstName: shooters.firstName,
-        lastName: shooters.lastName,
-        clubName: clubs.name,
-        nationality: shooters.nationality,
-      })
-      .from(shooters)
-      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-      .where(and(eq(shooters.verified, true), shooterScopeFilter))
-      .orderBy(shooters.lastName, shooters.firstName),
 
     // Recent competitions (last 3)
     db
@@ -176,16 +167,6 @@ async function HomepageContent({ scope }: { scope: Scope }) {
       .orderBy(asc(competitions.date))
       .limit(10),
 
-    // Calendar competitions (current year)
-    db
-      .select()
-      .from(competitions)
-      .where(and(
-        sql`${competitions.date} >= ${`${new Date().getFullYear()}-01-01`} AND ${competitions.date} <= ${`${new Date().getFullYear()}-12-31`}`,
-        competitionScopeFilter,
-      ))
-      .orderBy(asc(competitions.date)),
-
     // Club leaderboard — cache rows for all verified shooters
     db
       .select({
@@ -206,9 +187,6 @@ async function HomepageContent({ scope }: { scope: Scope }) {
         isNotNull(shooterFormaCache.forma),
       )),
   ]);
-
-  console.log(`[homepage] main Promise.all done +${Date.now() - t0}ms`);
-
   // Ticker
   const tickerLive     = tickerComps.filter((c) => c.date === currentDate);
   const tickerUpcoming = tickerComps.filter((c) => c.date > currentDate);
@@ -262,9 +240,6 @@ async function HomepageContent({ scope }: { scope: Scope }) {
       return { ...comp, winner: best[0] || null };
     })
   );
-
-  console.log(`[homepage] compsWithWinners done +${Date.now() - t0}ms`);
-
   // Top forma per discipline — from cache (already fetched above)
   // Get recent scores for top-5 per discipline with one IN query
   const topByDisc = Object.fromEntries(
@@ -287,9 +262,6 @@ async function HomepageContent({ scope }: { scope: Scope }) {
         .where(and(inArray(results.shooterId, allTopIds), isNotNull(results.qualTotal)))
         .orderBy(asc(competitions.date))
     : [];
-
-  console.log(`[homepage] recentResultRows done +${Date.now() - t0}ms`);
-
   const recentScoresByShooter = new Map<number, number[]>();
   for (const r of recentResultRows) {
     const arr = recentScoresByShooter.get(r.shooterId) ?? [];
@@ -323,11 +295,6 @@ async function HomepageContent({ scope }: { scope: Scope }) {
     name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
   }));
 
-  const translatedCalendar = calendarComps.map((comp) => ({
-    ...comp,
-    name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name),
-  }));
-
   // Club leaderboard — aggregate cache rows in memory
   const maxByCode: Record<string, number> = Object.fromEntries(discRows.map((d) => [d.code, parseFloat(d.maxQualScore)]));
 
@@ -351,8 +318,6 @@ async function HomepageContent({ scope }: { scope: Scope }) {
     }))
     .sort((a, b) => b.avgPct - a.avgPct)
     .slice(0, 5);
-
-  console.log(`[homepage] render start +${Date.now() - t0}ms`);
 
   return (
     <>
@@ -456,7 +421,7 @@ async function HomepageContent({ scope }: { scope: Scope }) {
         <div className="flex flex-col gap-8">
 
           {/* Calendar Module – top of sidebar */}
-          <CalendarModule competitions={translatedCalendar} />
+          <CalendarModule competitions={[]} />
 
           {/* Club Leaderboard */}
           <section className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
@@ -499,14 +464,16 @@ async function HomepageContent({ scope }: { scope: Scope }) {
 
           {/* Quick H2H Duel Widget – bottom of sidebar */}
           <section>
-            <QuickH2HClient shootersList={allVerified} />
+            <QuickH2HClient />
           </section>
 
         </div>
       </div>
 
-      {/* News Section – full width below grid */}
-      <NewsSection />
+      {/* CMS must not block sports data above it. */}
+      <Suspense fallback={<NewsSectionSkeleton />}>
+        <NewsSection />
+      </Suspense>
       </div>
     </>
   );
