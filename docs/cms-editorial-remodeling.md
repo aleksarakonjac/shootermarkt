@@ -88,8 +88,9 @@ Cilj: Payload ostaje editor i media CMS, ali se odvaja od javnog Shootermarkt ru
 
 ### 3.1 Pretraga entiteta
 
-- [ ] Dodati CMS-polju pretragu strelaca.
-- [ ] Dodati CMS-polju pretragu takmičenja.
+- [x] Dodati CMS-polju pretragu strelaca na zahtev (od dva znaka).
+- [x] Dodati CMS-polju pretragu takmičenja na zahtev (od dva znaka).
+- [x] Dodati CMS-polju pretragu klubova na zahtev i disciplinu kao kontrolisani izbor.
 - [ ] Dodati CMS-polju pretragu klubova ako je potrebna za prvi set blokova.
 - [ ] CMS čuva samo validiran ID i prikazani naziv za lakše uređivanje.
 

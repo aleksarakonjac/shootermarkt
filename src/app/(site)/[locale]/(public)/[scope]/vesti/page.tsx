@@ -21,12 +21,13 @@ export async function generateMetadata({ params }: { params: Promise<{ scope: Sc
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const CATEGORY_KEYS = ["vest", "analiza", "takmicenje", "oprema", "intervju", "rezultati"] as const;
+const CATEGORY_KEYS = ["vest", "takmicenje", "rezultati", "reprezentacija", "analiza", "intervju", "oprema"] as const;
 
 const CATEGORY_COLOR: Record<string, string> = {
   vest:       "var(--brand-primary)",
   analiza:    "var(--brand-accent)",
   takmicenje: "var(--success)",
+  reprezentacija: "oklch(0.48 0.14 250)",
   oprema:     "var(--warning)",
   intervju:   "oklch(0.52 0.17 300)",
   rezultati:  "oklch(0.48 0.16 200)",

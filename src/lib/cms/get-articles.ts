@@ -1,7 +1,8 @@
 export interface ArticleTag {
-  type: "topic" | "competition" | "shooter";
+  type: "topic" | "competition" | "shooter" | "club" | "discipline";
   label: string;
   refId?: number;
+  disciplineCode?: string;
 }
 
 export interface CoverImageData {
@@ -50,10 +51,15 @@ function toTags(value: unknown): ArticleTag[] {
     if (!tag || typeof tag !== "object") return [];
     const item = tag as Record<string, unknown>;
     if (
-      (item.type !== "topic" && item.type !== "competition" && item.type !== "shooter") ||
+      !["topic", "competition", "shooter", "club", "discipline"].includes(String(item.type)) ||
       typeof item.label !== "string"
     ) return [];
-    return [{ type: item.type, label: item.label, refId: typeof item.refId === "number" ? item.refId : undefined }];
+    return [{
+      type: item.type as ArticleTag["type"],
+      label: item.label,
+      refId: typeof item.refId === "number" ? item.refId : undefined,
+      disciplineCode: typeof item.disciplineCode === "string" ? item.disciplineCode : undefined,
+    }];
   });
 }
 
