@@ -1,6 +1,3 @@
-import type { Where } from "payload";
-import { getPayloadClient } from "./get-payload-client";
-
 export interface ArticleTag {
   type: "topic" | "competition" | "shooter";
   label: string;
@@ -30,57 +27,84 @@ export interface ArticleDetail extends ArticleSummary {
   content: unknown;
 }
 
+type CmsArticle = Record<string, unknown>;
+
+const cmsApiUrl = process.env.CMS_API_URL?.replace(/\/$/, "");
+
+function toCoverImage(value: unknown): CoverImageData | null {
+  if (!value || typeof value !== "object") return null;
+  const image = value as Record<string, unknown>;
+  if (typeof image.url !== "string") return null;
+  return {
+    url: image.url,
+    filename: typeof image.filename === "string" ? image.filename : undefined,
+    alt: typeof image.alt === "string" ? image.alt : undefined,
+    width: typeof image.width === "number" ? image.width : undefined,
+    height: typeof image.height === "number" ? image.height : undefined,
+  };
+}
+
+function toTags(value: unknown): ArticleTag[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((tag) => {
+    if (!tag || typeof tag !== "object") return [];
+    const item = tag as Record<string, unknown>;
+    if (
+      (item.type !== "topic" && item.type !== "competition" && item.type !== "shooter") ||
+      typeof item.label !== "string"
+    ) return [];
+    return [{ type: item.type, label: item.label, refId: typeof item.refId === "number" ? item.refId : undefined }];
+  });
+}
+
+function toSummary(doc: CmsArticle): ArticleSummary {
+  return {
+    id: Number(doc.id),
+    title: String(doc.title ?? ""),
+    slug: String(doc.slug ?? ""),
+    excerpt: String(doc.excerpt ?? ""),
+    coverImage: toCoverImage(doc.coverImage),
+    category: typeof doc.category === "string" ? doc.category : null,
+    tags: toTags(doc.tags),
+    publishedAt: typeof doc.publishedAt === "string" ? doc.publishedAt : null,
+  };
+}
+
+async function fetchArticles(params: URLSearchParams): Promise<CmsArticle[]> {
+  if (!cmsApiUrl) return [];
+  const response = await fetch(`${cmsApiUrl}/cms/api/articles?${params}`, {
+    next: { revalidate: 60 },
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error(`CMS request failed: ${response.status}`);
+  const body = await response.json() as { docs?: unknown };
+  return Array.isArray(body.docs) ? body.docs as CmsArticle[] : [];
+}
+
 export async function getPublishedArticles(opts?: {
   category?: string;
   limit?: number;
 }): Promise<ArticleSummary[]> {
-  const payload = await getPayloadClient();
-  const where: Where = { status: { equals: "published" } };
-  if (opts?.category) where.category = { equals: opts.category };
-  const result = await payload.find({
-    collection: "articles",
-    where,
+  const params = new URLSearchParams({
+    "where[status][equals]": "published",
     sort: "-publishedAt",
-    depth: 2,
-    limit: opts?.limit ?? 50,
+    depth: "2",
+    limit: String(opts?.limit ?? 50),
   });
-  return result.docs.map((doc) => ({
-    id: doc.id as number,
-    title: doc.title as string,
-    slug: doc.slug as string,
-    excerpt: doc.excerpt as string,
-    coverImage: (doc.coverImage && typeof doc.coverImage === "object" && "url" in doc.coverImage)
-      ? (doc.coverImage as CoverImageData)
-      : null,
-    category: (doc.category as string | null | undefined) ?? null,
-    tags: ((doc.tags as ArticleTag[] | null | undefined) ?? []),
-    publishedAt: (doc.publishedAt as string | null | undefined) ?? null,
-  }));
+  if (opts?.category) params.set("where[category][equals]", opts.category);
+  return (await fetchArticles(params)).map(toSummary);
 }
 
 export async function getPublishedArticleBySlug(slug: string): Promise<ArticleDetail | null> {
-  const payload = await getPayloadClient();
-  const result = await payload.find({
-    collection: "articles",
-    where: { status: { equals: "published" }, slug: { equals: slug } },
-    depth: 2,
-    limit: 1,
+  const params = new URLSearchParams({
+    "where[status][equals]": "published",
+    "where[slug][equals]": slug,
+    depth: "2",
+    limit: "1",
   });
-  const doc = result.docs[0];
+  const doc = (await fetchArticles(params))[0];
   if (!doc) return null;
-  return {
-    id: doc.id as number,
-    title: doc.title as string,
-    slug: doc.slug as string,
-    excerpt: doc.excerpt as string,
-    coverImage: (doc.coverImage && typeof doc.coverImage === "object" && "url" in doc.coverImage)
-      ? (doc.coverImage as CoverImageData)
-      : null,
-    category: (doc.category as string | null | undefined) ?? null,
-    tags: ((doc.tags as ArticleTag[] | null | undefined) ?? []),
-    publishedAt: (doc.publishedAt as string | null | undefined) ?? null,
-    content: doc.content,
-  };
+  return { ...toSummary(doc), content: doc.content };
 }
 
 export async function getRelatedArticles(
