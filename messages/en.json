@@ -211,6 +211,7 @@
     "navigation": "Navigation",
     "mobileNav": "Mobile navigation",
     "loading": "Loading…",
+    "retry": "Try again",
     "noData": "No data.",
     "error": "Error. Please try again.",
     "seeAll": "See all →",
@@ -232,6 +233,7 @@
     "calendarTitle": "Upcoming calendar",
     "noRecentComps": "No recent results on record.",
     "winner": "Winner",
+    "viewResults": "View results",
     "inProgress": "In progress",
     "noWinner": "No results",
     "viewAll": "View all →",
@@ -349,7 +351,9 @@
       "oprema": "Equipment",
       "intervju": "Interview",
       "rezultati": "Results"
-    }
+    },
+    "relatedArticles": "More articles",
+    "readingTime": "{min} min read"
   },
   "contact": {
     "title": "Contact",

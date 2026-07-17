@@ -10,6 +10,7 @@ export interface ShooterCardData {
   avatarUrl: string | null;
   nationality: string | null;
   clubName: string | null;
+  disciplineCode: string | null;
   forma: FormaResult | null;
 }
 
@@ -36,6 +37,7 @@ export async function resolveShooter(id: number): Promise<ShooterCardData | null
     .where(eq(results.shooterId, id));
 
   let forma: FormaResult | null = null;
+  let disciplineCode: string | null = null;
   if (rows.length > 0) {
     // Group by discipline, use whichever discipline has the most results
     // as the "primary" one shown on the embed card.
@@ -51,6 +53,7 @@ export async function resolveShooter(id: number): Promise<ShooterCardData | null
       if (list.length > bestDisciplineRows.length) bestDisciplineRows = list;
     }
     if (bestDisciplineRows.length > 0) {
+      disciplineCode = bestDisciplineRows[0].disciplineCode;
       forma = computeFormaFromEntries(
         bestDisciplineRows.map((r) => ({
           qualTotal: parseFloat(r.qualTotal!),
@@ -58,7 +61,7 @@ export async function resolveShooter(id: number): Promise<ShooterCardData | null
           level: r.competitionLevel,
           category: r.category,
         })),
-        { code: bestDisciplineRows[0].disciplineCode }
+        { code: disciplineCode }
       );
     }
   }
@@ -70,6 +73,7 @@ export async function resolveShooter(id: number): Promise<ShooterCardData | null
     avatarUrl: shooter.avatarUrl,
     nationality: shooter.nationality,
     clubName: shooter.club?.name ?? null,
+    disciplineCode,
     forma,
   };
 }

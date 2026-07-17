@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { FormaScoreMark } from "./FormaScoreMark";
 
 interface FormaScoreHeadingProps {
@@ -8,81 +8,68 @@ interface FormaScoreHeadingProps {
 }
 
 const INFO: Record<string, string> = {
-  sr: "FormaScore meri trenutnu formu strelca na osnovu rezultata sa novijih takmičenja. Noviji nastupi imaju veći uticaj, a uzima se u obzir i konzistentnost tokom vremena.",
-  en: "FormaScore measures a shooter's current form based on recent competition results. More recent performances carry greater weight, and consistency over time is also factored in.",
+  sr: "Forma Score je prognoza sledećeg rezultata. Noviji i jači nastupi imaju veću težinu, a trend projektuje trenutni nivo unapred. Pouzdanost i konzistentnost se prikazuju odvojeno.",
+  en: "Forma Score predicts the next result. More recent and stronger performances carry greater weight, while trend projects the current level forward. Reliability and consistency are shown separately.",
 };
 
-export function FormaScoreHeading({ locale = "sr" }: FormaScoreHeadingProps) {
+export function FormaScoreInfo({ locale = "sr", inverted = false }: FormaScoreHeadingProps & { inverted?: boolean }) {
   const [open, setOpen] = useState(false);
+  const panelId = useId();
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (btnRef.current?.contains(t) || panelRef.current?.contains(t)) return;
+    const handler = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (btnRef.current?.contains(target) || panelRef.current?.contains(target)) return;
       setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const text = INFO[locale] ?? INFO.sr;
+  return <div
+    style={{ position: "relative", display: "flex", alignItems: "center" }}
+    onMouseEnter={() => setOpen(true)}
+    onMouseLeave={() => setOpen(false)}
+  >
+    <button
+      ref={btnRef}
+      type="button"
+      onClick={() => setOpen((value) => !value)}
+      onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
+      aria-label={locale === "en" ? "What is Forma Score?" : "Šta je Forma Score?"}
+      aria-expanded={open}
+      aria-controls={panelId}
+      style={{
+        width: 17, height: 17, borderRadius: "50%",
+        border: `1.5px solid ${inverted ? "rgba(255,255,255,0.75)" : "var(--muted)"}`,
+        color: inverted ? "white" : "var(--muted)", background: "none",
+        fontSize: "0.65rem", fontWeight: 700, cursor: "pointer", lineHeight: 1,
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        transition: "opacity 0.15s", opacity: open ? 1 : 0.75, marginTop: "3px",
+      }}
+    >
+      i
+    </button>
 
-  return (
-    <h2 className="mb-4 flex items-center gap-1">
-      <FormaScoreMark size="lg" />
-
-      {/* Wrapper gives the absolute panel its reference point */}
-      <div
-        style={{ position: "relative", display: "flex", alignItems: "center" }}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-      >
-        <button
-          ref={btnRef}
-          onClick={() => setOpen(o => !o)}
-          aria-label="Šta je FormaScore?"
-          style={{
-            width: 17, height: 17, borderRadius: "50%",
-            border: "1.5px solid var(--muted)",
-            color: "var(--muted)", background: "none",
-            fontSize: "0.65rem", fontWeight: 700,
-            cursor: "pointer", lineHeight: 1,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0,
-            transition: "opacity 0.15s",
-            opacity: open ? 1 : 0.6,
-            marginTop: "3px",
-          }}
-        >
-          i
-        </button>
-
-        {open && (
-          <div ref={panelRef} style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            left: 0,
-            width: 288,
-            zIndex: 50,
-          }}>
-            <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl shadow-xl px-4 py-3">
-              <div className="mb-2 flex items-baseline gap-1">
-                <span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>
-                  {locale === "en" ? "What is" : "Šta je"}
-                </span>
-                <FormaScoreMark size="md" />
-                <span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>?</span>
-              </div>
-              <p style={{ color: "var(--ink)", fontSize: "0.8rem", lineHeight: 1.6, fontWeight: 400 }}>
-                {text}
-              </p>
-            </div>
-          </div>
-        )}
+    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, width: 288, zIndex: "var(--z-tooltip)" }}>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
+        <div className="mb-2 flex items-baseline gap-1">
+          <span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>{locale === "en" ? "What is" : "Šta je"}</span>
+          <FormaScoreMark size="md" />
+          <span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>?</span>
+        </div>
+        <p style={{ color: "var(--ink)", fontSize: "0.8rem", lineHeight: 1.6, fontWeight: 400 }}>{INFO[locale] ?? INFO.sr}</p>
       </div>
-    </h2>
-  );
+    </div>}
+  </div>;
+}
+
+export function FormaScoreHeading({ locale = "sr" }: FormaScoreHeadingProps) {
+  return <h2 className="mb-4 flex items-center gap-1">
+    <FormaScoreMark size="lg" />
+    <FormaScoreInfo locale={locale} />
+  </h2>;
 }

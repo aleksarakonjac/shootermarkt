@@ -211,6 +211,7 @@
     "navigation": "Navigacija",
     "mobileNav": "Mobilna navigacija",
     "loading": "Učitavam…",
+    "retry": "Pokušaj ponovo",
     "noData": "Nema podataka.",
     "error": "Greška. Pokušaj ponovo.",
     "seeAll": "Vidi sve →",
@@ -232,6 +233,7 @@
     "calendarTitle": "Nadolazeći kalendar",
     "noRecentComps": "Nema skoro unetih rezultata.",
     "winner": "Pobednik",
+    "viewResults": "Pogledaj rezultate",
     "inProgress": "U toku",
     "noWinner": "Bez rezultata",
     "viewAll": "Vidi sve →",
@@ -349,7 +351,9 @@
       "oprema": "Oprema",
       "intervju": "Intervju",
       "rezultati": "Rezultati"
-    }
+    },
+    "relatedArticles": "Više vesti",
+    "readingTime": "{min} min čitanja"
   },
   "contact": {
     "title": "Kontakt",

@@ -4,13 +4,6 @@ import { ScopedLink } from "./ScopedLink";
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
-const ACCENTS = [
-  "var(--brand-primary)",
-  "var(--warning)",
-  "var(--success)",
-  "var(--brand-primary)",
-];
-
 interface ArticleSummary {
   id: number;
   title: string;
@@ -32,18 +25,34 @@ export function NewsSection() {
   const locale = useLocale();
   const t = useTranslations("news");
   const tHome = useTranslations("home");
+  const common = useTranslations("common");
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    let timedOut = false;
+    const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 5000);
     fetch("/api/news", { signal: controller.signal })
-      .then((response) => response.ok ? response.json() : [])
-      .then(setArticles)
-      .catch(() => setArticles([]))
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("News request failed")))
+      .then((data) => {
+        if (!Array.isArray(data)) throw new Error("Invalid news response");
+        setArticles(data);
+        setState("ready");
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError" && !timedOut) return;
+        setState("error");
+      })
       .finally(() => clearTimeout(timeout));
     return () => { controller.abort(); clearTimeout(timeout); };
-  }, []);
+  }, [attempt]);
+
+  const retry = () => {
+    setState("loading");
+    setAttempt((value) => value + 1);
+  };
 
   return (
     <section className="flex flex-col gap-4">
@@ -52,7 +61,7 @@ export function NewsSection() {
         <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-wider text-[var(--ink)]">
           {t("title")}
         </h2>
-        {articles.length > 0 && (
+        {state === "ready" && articles.length > 0 && (
           <ScopedLink
             href="/vesti"
             className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"
@@ -62,7 +71,14 @@ export function NewsSection() {
         )}
       </div>
 
-      {articles.length === 0 ? (
+      {state === "loading" ? (
+        <div aria-busy="true" className="h-56 animate-pulse rounded-xl bg-[var(--surface)]" />
+      ) : state === "error" ? (
+        <div role="alert" className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl bg-[var(--surface)] p-8 text-center text-sm">
+          <p className="text-[var(--muted)]">{common("error")}</p>
+          <button type="button" onClick={retry} className="font-semibold text-[var(--brand-primary)] hover:underline">{common("retry")}</button>
+        </div>
+      ) : articles.length === 0 ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center text-sm text-[var(--muted)]">
           {tHome("noArticles")}
         </div>
@@ -71,32 +87,14 @@ export function NewsSection() {
           {/* Featured card */}
           {(() => {
             const featured = articles[0];
-            const accent = ACCENTS[0];
             return (
               <ScopedLink
                 href={`/vesti/${featured.slug}`}
-                className="md:col-span-2 relative flex flex-col justify-end rounded-xl overflow-hidden border border-[var(--border)] min-h-[240px] group hover:shadow-lg transition-shadow"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%)",
-                }}
+                className="group flex min-h-[240px] flex-col justify-end rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 transition-colors hover:border-[var(--brand-primary)] md:col-span-2"
               >
-                <div
-                  className="absolute top-0 left-0 right-0 h-1"
-                  style={{ background: accent }}
-                />
-                <div
-                  className="absolute inset-0 opacity-[0.03]"
-                  style={{
-                    backgroundImage:
-                      "repeating-linear-gradient(45deg, var(--ink) 0, var(--ink) 1px, transparent 0, transparent 50%)",
-                    backgroundSize: "12px 12px",
-                  }}
-                />
-                <div className="relative z-10 p-5 flex flex-col gap-2">
+                <div className="flex flex-col gap-2">
                   <span
-                    className="self-start text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full text-white"
-                    style={{ background: accent }}
+                    className="self-start rounded bg-[var(--brand-primary)] px-2 py-1 text-xs font-extrabold uppercase tracking-wider text-white"
                   >
                     {tHome("newsBadge")}
                   </span>
@@ -107,7 +105,7 @@ export function NewsSection() {
                     {featured.excerpt}
                   </p>
                   {featured.publishedAt && (
-                    <div className="mt-2 text-[10px] text-[var(--subtle)]">
+                    <div className="mt-2 text-xs text-[var(--muted)]">
                       {formatDate(featured.publishedAt, locale)}
                     </div>
                   )}
@@ -118,22 +116,16 @@ export function NewsSection() {
 
           {/* Smaller cards */}
           <div className="flex flex-col gap-4">
-            {articles.slice(1, 4).map((item, i) => {
-              const accent = ACCENTS[(i + 1) % ACCENTS.length];
+            {articles.slice(1, 4).map((item) => {
               return (
                 <ScopedLink
                   key={item.id}
                   href={`/vesti/${item.slug}`}
-                  className="relative flex flex-col justify-between rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--bg)] p-4 group hover:shadow-md transition-shadow flex-1"
+                  className="group flex flex-1 flex-col justify-between rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4 transition-colors hover:border-[var(--brand-primary)]"
                 >
-                  <div
-                    className="absolute top-0 left-0 right-0 h-0.5"
-                    style={{ background: accent }}
-                  />
                   <div className="flex flex-col gap-1.5">
                     <span
-                      className="self-start text-[8px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded-full text-white"
-                      style={{ background: accent }}
+                      className="self-start rounded bg-[var(--brand-primary)] px-1.5 py-1 text-xs font-extrabold uppercase tracking-wider text-white"
                     >
                       {tHome("newsBadge")}
                     </span>
@@ -142,7 +134,7 @@ export function NewsSection() {
                     </h4>
                   </div>
                   {item.publishedAt && (
-                    <div className="mt-2 text-[9px] text-[var(--subtle)]">
+                    <div className="mt-2 text-xs text-[var(--muted)]">
                       {formatDate(item.publishedAt, locale)}
                     </div>
                   )}

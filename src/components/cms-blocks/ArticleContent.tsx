@@ -68,5 +68,5 @@ async function renderNode(node: LexicalNode, key: number): Promise<React.ReactNo
 
 export async function ArticleContent({ content }: { content: LexicalContent }) {
   const nodes = await Promise.all(content.root.children.map((node, i) => renderNode(node, i)));
-  return <div className="prose max-w-none">{nodes}</div>;
+  return <div className="article-prose">{nodes}</div>;
 }

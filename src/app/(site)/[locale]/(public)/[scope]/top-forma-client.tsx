@@ -3,8 +3,9 @@
 import React, { useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { Sparkline } from "@/components/sparkline";
+import { FormaScoreInfo } from "@/components/shooter/FormaScoreHeading";
 import { trendLabel, trendColor } from "@/lib/forma";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
 interface ShooterFormRow {
@@ -39,6 +40,7 @@ const TABS = [
 export function TopFormaClient({ initialData }: TopFormaClientProps) {
   const [activeTab, setActiveTab] = useState<keyof typeof initialData>("ARM");
   const t = useTranslations("home");
+  const locale = useLocale();
   const scopedHref = useScopedHref();
 
   const rows = initialData[activeTab];
@@ -48,22 +50,23 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
       {/* Widget Header with Tabs */}
       <div className="bg-[var(--brand-primary)] px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)]">
-        <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-white uppercase tracking-wider">
-          {t("topForm")}
+        <h3 className="flex items-center gap-1 font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-white">
+          <span>{t("topForm")}</span>
+          <FormaScoreInfo locale={locale} inverted />
         </h3>
         
-        {/* Tabs switcher */}
-        <div className="flex gap-0.5 p-0.5 rounded bg-[rgba(255,255,255,0.1)]">
+        <div className="flex gap-0.5 rounded bg-[rgba(255,255,255,0.1)] p-0.5" role="group" aria-label={t("topForm")}>
           {TABS.map((tab) => {
             const active = activeTab === tab.code;
             return (
               <button
                 key={tab.code}
                 onClick={() => setActiveTab(tab.code)}
-                className="px-2.5 py-1 rounded text-xs font-semibold uppercase transition-colors"
+                aria-pressed={active}
+                className="min-h-11 min-w-11 rounded px-2.5 py-1 text-xs font-semibold uppercase transition-colors"
                 style={{
                   background: active ? "var(--bg)" : "transparent",
-                  color: active ? "var(--brand-primary)" : "rgba(255, 255, 255, 0.7)",
+                  color: active ? "var(--brand-primary)" : "white",
                 }}
               >
                 {tab.code}
@@ -73,23 +76,37 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        {rows.length === 0 ? (
-          <div className="py-12 text-center">
-            <p className="text-sm text-[var(--muted)]">Nema unetih rezultata za ovu disciplinu.</p>
-          </div>
-        ) : (
-          <table className="w-full text-sm">
+      {rows.length === 0 ? (
+        <div className="py-12 text-center">
+          <p className="text-sm text-[var(--muted)]">Nema unetih rezultata za ovu disciplinu.</p>
+        </div>
+      ) : <>
+      <ol className="divide-y divide-[var(--border)] sm:hidden" aria-label={t("topForm")}>
+        {rows.map((r, i) => (
+          <li key={r.shooterId} className="flex min-h-14 items-center gap-3 px-4 py-2">
+            <span className="w-5 text-right font-[family-name:var(--font-barlow-condensed)] text-lg font-bold text-[var(--subtle)]">{i + 1}</span>
+            <Link href={scopedHref(`/strelci/${r.shooterId}`)} className="min-w-0 flex-1 truncate font-semibold text-[var(--ink)] hover:underline">
+              {r.lastName} {r.firstName}
+            </Link>
+            <span className="text-base font-bold leading-none font-mono" style={{ color: trendColor(r.trend) }} aria-label={r.trend}>
+              {trendLabel(r.trend)}
+            </span>
+            <span className="font-[family-name:var(--font-jetbrains-mono)] text-base font-semibold text-[var(--ink)]">{r.formaScore.toFixed(1)}</span>
+          </li>
+        ))}
+      </ol>
+
+      <div className="hidden overflow-x-auto sm:block" role="region" tabIndex={0} aria-label={t("topForm")}>
+          <table className="min-w-[680px] w-full text-sm">
             <thead>
               <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                <th className="w-10 px-3 py-2.5 text-right text-[0.65rem] font-bold uppercase tracking-wider text-[var(--muted)]">#</th>
-                <th className="px-3 py-2.5 text-left text-[0.65rem] font-bold uppercase tracking-wider text-[var(--muted)]">Strelac</th>
-                <th className="px-3 py-2.5 text-left text-[0.65rem] font-bold uppercase tracking-wider text-[var(--muted)]">Klub</th>
-                <th className="px-3 py-2.5 text-center text-[0.65rem] font-bold uppercase tracking-wider text-[var(--muted)]">Trend</th>
-                <th className="px-3 py-2.5 text-right text-[0.65rem] font-bold uppercase tracking-wider text-[var(--muted)]">Forma</th>
-                <th className="px-3 py-2.5 text-right text-[0.65rem] font-bold uppercase tracking-wider text-[var(--muted)]">Peak</th>
-                <th className="px-4 py-2.5 text-center text-[0.65rem] font-bold uppercase tracking-wider text-[var(--muted)]">Momenta (Zadnjih 5)</th>
+                <th scope="col" className="w-10 px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-[var(--muted)]">#</th>
+                <th scope="col" className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Strelac</th>
+                <th scope="col" className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Klub</th>
+                <th scope="col" className="px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Trend</th>
+                <th scope="col" className="px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Forma</th>
+                <th scope="col" className="px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Peak</th>
+                <th scope="col" className="px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Momenta (Zadnjih 5)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
@@ -130,8 +147,8 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
               ))}
             </tbody>
           </table>
-        )}
       </div>
+      </>}
       
       <div className="bg-[var(--surface)] px-4 py-2.5 text-right border-t border-[var(--border)]">
         <Link

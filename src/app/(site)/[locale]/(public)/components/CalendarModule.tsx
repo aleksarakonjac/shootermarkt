@@ -14,7 +14,7 @@ interface Competition {
 }
 
 interface CalendarModuleProps {
-  competitions: Competition[];
+  competitions?: Competition[];
 }
 
 function getDaysInMonth(year: number, month: number) {
@@ -32,27 +32,38 @@ function getLevelColor(level: string): string {
 
 export function CalendarModule({ competitions }: CalendarModuleProps) {
   const t = useTranslations("calendar");
+  const common = useTranslations("common");
   const locale = useLocale();
   const { scope } = useParams<{ scope?: string }>();
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(today.getFullYear());
   const pickerRef = useRef<HTMLDivElement>(null);
-  const [monthCache, setMonthCache] = useState<Record<string, Competition[]>>(() => ({
-    [`${today.getFullYear()}-${today.getMonth()}`]: competitions,
-  }));
+  const initialMonthKey = `${today.getFullYear()}-${today.getMonth()}`;
+  const [monthCache, setMonthCache] = useState<Record<string, Competition[]>>(() => competitions ? { [initialMonthKey]: competitions } : {});
+  const [monthState, setMonthState] = useState<Record<string, "loading" | "ready" | "error">>(() => competitions ? { [initialMonthKey]: "ready" } : {});
 
   const loadMonth = useCallback(async (year: number, month: number) => {
     const key = `${year}-${month}`;
-    if (monthCache[key]) return;
-    const response = await fetch(`/api/calendar?year=${year}&month=${month + 1}&scope=${scope ?? "srb"}&locale=${locale}`);
-    if (response.ok) {
+    if (Object.hasOwn(monthCache, key)) return;
+    setMonthState((states) => ({ ...states, [key]: "loading" }));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(`/api/calendar?year=${year}&month=${month + 1}&scope=${scope ?? "srb"}&locale=${locale}`, { signal: controller.signal });
+      if (!response.ok) throw new Error("Calendar request failed");
       const data = await response.json();
-      setMonthCache((cache) => cache[key] ? cache : { ...cache, [key]: data });
+      if (!Array.isArray(data)) throw new Error("Invalid calendar response");
+      setMonthCache((cache) => Object.hasOwn(cache, key) ? cache : { ...cache, [key]: data });
+      setMonthState((states) => ({ ...states, [key]: "ready" }));
+    } catch {
+      setMonthState((states) => ({ ...states, [key]: "error" }));
+    } finally {
+      clearTimeout(timeout);
     }
   }, [locale, monthCache, scope]);
 
@@ -76,6 +87,15 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
+  }, [pickerOpen]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPickerOpen(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, [pickerOpen]);
 
   const openPicker = () => {
@@ -122,21 +142,23 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const hoveredComps = hoveredDate ? (compsByDate.get(hoveredDate) ?? []) : [];
+  const selectedComps = selectedDate ? (compsByDate.get(selectedDate) ?? []) : [];
+  const currentMonthKey = `${viewYear}-${viewMonth}`;
+  const currentState = monthState[currentMonthKey] ?? "loading";
 
   const DAYS_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)]">
       {/* Header */}
-      <div className="bg-[var(--brand-primary)] rounded-t-xl px-4 py-3 flex items-center justify-between relative">
-        <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-white uppercase tracking-wider">
+      <div className="relative flex items-center justify-between rounded-t-xl border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+        <h3 className="font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-[var(--ink)]">
           {t("title")}
         </h3>
         <div className="flex items-center gap-1">
           <button
             onClick={prevMonth}
-            className="w-7 h-7 flex items-center justify-center rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-bold"
+            className="h-11 w-11 flex items-center justify-center rounded text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors text-sm font-bold"
             aria-label={locale === "en" ? "Previous month" : "Prethodni mesec"}
           >
             ‹
@@ -145,15 +167,17 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
           {/* Month/year label — opens picker */}
           <button
             onClick={openPicker}
-            className="text-white font-semibold text-sm min-w-[110px] text-center px-2 py-1 rounded hover:bg-white/10 transition-colors"
+            className="min-w-[110px] rounded px-2 py-1 text-center text-sm font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)]"
             aria-label={locale === "en" ? "Select month and year" : "Izaberi mesec i godinu"}
+            aria-expanded={pickerOpen}
+            aria-controls="calendar-picker"
           >
             {t(`months.${viewMonth}`)} {viewYear}
           </button>
 
           <button
             onClick={nextMonth}
-            className="w-7 h-7 flex items-center justify-center rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-bold"
+            className="h-11 w-11 flex items-center justify-center rounded text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors text-sm font-bold"
             aria-label={locale === "en" ? "Next month" : "Sledeći mesec"}
           >
             ›
@@ -164,13 +188,17 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
         {pickerOpen && (
           <div
             ref={pickerRef}
-            className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg)] border border-[var(--border)] rounded-xl shadow-xl z-[var(--z-dropdown)] p-3 flex flex-col gap-2.5"
+            id="calendar-picker"
+            role="group"
+            aria-label={locale === "en" ? "Choose month and year" : "Izaberi mesec i godinu"}
+            className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg)] border border-[var(--border)] rounded-xl z-[var(--z-dropdown)] p-3 flex flex-col gap-2.5"
           >
             {/* Year nav */}
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setPickerYear(y => y - 1)}
-                className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--surface)] text-[var(--ink)] text-sm font-bold transition-colors"
+                className="h-11 w-11 flex items-center justify-center rounded hover:bg-[var(--surface)] text-[var(--ink)] text-sm font-bold transition-colors"
+                aria-label={locale === "en" ? "Previous year" : "Prethodna godina"}
               >
                 ‹
               </button>
@@ -179,7 +207,8 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
               </span>
               <button
                 onClick={() => setPickerYear(y => y + 1)}
-                className="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--surface)] text-[var(--ink)] text-sm font-bold transition-colors"
+                className="h-11 w-11 flex items-center justify-center rounded hover:bg-[var(--surface)] text-[var(--ink)] text-sm font-bold transition-colors"
+                aria-label={locale === "en" ? "Next year" : "Sledeća godina"}
               >
                 ›
               </button>
@@ -195,7 +224,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                     key={i}
                     onClick={() => selectMonth(i)}
                     className={[
-                      "py-1.5 rounded text-[11px] font-semibold uppercase tracking-wide transition-colors",
+                      "min-h-11 rounded text-xs font-semibold uppercase tracking-wide transition-colors",
                       isActive
                         ? "bg-[var(--brand-primary)] text-white"
                         : isTodayMonth
@@ -212,7 +241,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
             {/* Reset to current */}
             <button
               onClick={goToCurrent}
-              className="border-t border-[var(--border)] pt-2 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline text-center transition-colors"
+              className="min-h-11 border-t border-[var(--border)] pt-2 text-xs font-semibold text-[var(--brand-primary)] hover:underline text-center transition-colors"
             >
               {locale === "en" ? "↩ Current month" : "↩ Tekući mesec"}
             </button>
@@ -220,13 +249,20 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
         )}
       </div>
 
-      <div className="p-3 flex flex-col gap-2">
+      {currentState === "loading" ? (
+        <div aria-busy="true" className="flex h-72 items-center justify-center p-3 text-sm text-[var(--muted)]">{common("loading")}</div>
+      ) : currentState === "error" ? (
+        <div role="alert" className="flex h-72 flex-col items-center justify-center gap-3 p-3 text-center text-sm">
+          <p className="text-[var(--muted)]">{common("error")}</p>
+          <button type="button" onClick={() => void loadMonth(viewYear, viewMonth)} className="font-semibold text-[var(--brand-primary)] hover:underline">{common("retry")}</button>
+        </div>
+      ) : <div className="p-3 flex flex-col gap-2">
         {/* Day labels */}
         <div className="grid grid-cols-7 mb-1">
           {DAYS_ORDER.map((d) => (
             <div
               key={d}
-              className="text-center text-[9px] font-bold uppercase tracking-wider text-[var(--muted)] py-1"
+              className="py-1 text-center text-xs font-bold uppercase tracking-wider text-[var(--muted)]"
             >
               {t(`weekdays.${d}`)}
             </div>
@@ -245,23 +281,28 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
               viewMonth === today.getMonth() &&
               viewYear === today.getFullYear();
             const hasComp = comps.length > 0;
-            const isHovered = hoveredDate === dateStr;
 
             return (
               <div
                 key={dateStr}
                 className="relative"
-                onMouseEnter={() => hasComp && setHoveredDate(dateStr)}
-                onMouseLeave={() => setHoveredDate(null)}
               >
-                <div
+                <button
+                  type="button"
+                  onClick={() => hasComp && setSelectedDate((value) => value === dateStr ? null : dateStr)}
+                  onFocus={() => hasComp && setSelectedDate(dateStr)}
+                  onMouseEnter={() => hasComp && setSelectedDate(dateStr)}
+                  aria-expanded={hasComp ? selectedDate === dateStr : undefined}
+                  aria-describedby={hasComp && selectedDate === dateStr ? `calendar-events-${dateStr}` : undefined}
+                  aria-label={hasComp ? `${dateStr}: ${t("competitionPlural", { count: comps.length })}` : dateStr}
+                  disabled={!hasComp}
                   className={[
-                    "flex flex-col items-center justify-center rounded-md py-1.5 text-[11px] font-semibold transition-all cursor-default select-none",
+                    "flex min-h-11 w-full flex-col items-center justify-center rounded-md py-1.5 text-xs font-semibold transition-colors select-none",
                     isToday
                       ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
-                      : hasComp
+                    : hasComp
                       ? "bg-[var(--brand-primary)]/10 text-[var(--ink)] hover:bg-[var(--brand-primary)]/20 cursor-pointer"
-                      : "text-[var(--ink)] hover:bg-[var(--surface)]",
+                      : "cursor-default text-[var(--ink)]",
                   ].join(" ")}
                 >
                   {day}
@@ -271,25 +312,25 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                       style={{ background: getLevelColor(comps[0].level) }}
                     />
                   )}
-                </div>
+                </button>
 
                 {/* Tooltip */}
-                {isHovered && hoveredComps.length > 0 && (
+                {selectedDate === dateStr && selectedComps.length > 0 && (
                   <div
-                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-52 bg-[var(--ink)] text-white rounded-lg shadow-xl p-2.5 text-[10px] pointer-events-none"
-                    style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}
+                    id={`calendar-events-${dateStr}`}
+                    className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-52 -translate-x-1/2 rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white"
                   >
-                    {hoveredComps.map((c) => (
+                    {selectedComps.map((c) => (
                       <div key={c.id} className="flex flex-col gap-0.5 py-1 border-b border-white/10 last:border-0">
                         <span
-                          className="text-[8px] font-bold uppercase tracking-wider"
+                          className="text-xs font-bold uppercase tracking-wider"
                           style={{ color: getLevelColor(c.level) }}
                         >
                           {c.level}
                         </span>
                         <span className="font-semibold leading-tight">{c.name}</span>
                         {c.location && (
-                          <span className="text-white/60">{c.location}</span>
+                          <span className="text-white/80">{c.location}</span>
                         )}
                       </div>
                     ))}
@@ -299,6 +340,8 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
             );
           })}
         </div>
+
+        {compsByDate.size === 0 && <p className="py-2 text-center text-sm text-[var(--muted)]">{t("noEvents")}</p>}
 
         {/* Legend */}
         <div className="flex items-center gap-3 pt-2 border-t border-[var(--border)] flex-wrap">
@@ -313,13 +356,13 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ background: l.color }}
               />
-              <span className="text-[9px] text-[var(--muted)] font-semibold uppercase tracking-wide">
+              <span className="text-xs text-[var(--muted)] font-semibold uppercase tracking-wide">
                 {l.label}
               </span>
             </div>
           ))}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

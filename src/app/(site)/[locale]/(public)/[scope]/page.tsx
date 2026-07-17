@@ -21,7 +21,7 @@ export default function HomePage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <main className="lg:col-span-2"><HomepageMainClient /></main>
-        <aside className="flex flex-col gap-8"><CalendarModule competitions={[]} /><HomepageClubsClient /><QuickH2HClient /></aside>
+        <aside className="flex flex-col gap-8"><CalendarModule /><HomepageClubsClient /><QuickH2HClient /></aside>
       </div>
       <div className="mt-8"><NewsSection /></div>
     </div>
