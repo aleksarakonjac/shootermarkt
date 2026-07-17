@@ -78,8 +78,8 @@ export function QuickH2HClient() {
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
-      <div className="bg-[var(--brand-primary)] px-4 py-3 border-b border-[var(--border)]">
-        <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-white uppercase tracking-wider">Direktni duel</h3>
+      <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+        <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-[var(--ink)] uppercase tracking-wider">Direktni duel</h3>
       </div>
       <div className="p-4 flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-2">
