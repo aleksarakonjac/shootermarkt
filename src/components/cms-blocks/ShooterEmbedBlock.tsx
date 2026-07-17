@@ -40,8 +40,8 @@ export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {
       {/* Profile header */}
       <div className="flex items-center gap-4 px-4 pt-4 pb-3 border-b border-[var(--border)]">
         {/* Avatar */}
-        <div className="relative shrink-0 w-14 h-14 rounded-full overflow-hidden bg-[var(--surface-2)] border-2 border-[var(--border)] flex items-center justify-center">
-          {shooter.avatarUrl ? (
+        {shooter.avatarUrl ? (
+          <div className="relative shrink-0 w-14 h-14 rounded-2xl ring-1 ring-[var(--border)] overflow-hidden">
             <Image
               src={shooter.avatarUrl}
               alt={`${shooter.firstName} ${shooter.lastName}`}
@@ -49,12 +49,17 @@ export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {
               sizes="56px"
               className="object-cover"
             />
-          ) : (
-            <span className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl text-[var(--muted)]">
+          </div>
+        ) : (
+          <div
+            className="shrink-0 w-14 h-14 rounded-2xl ring-1 ring-[var(--border)] flex items-center justify-center"
+            style={{ background: "var(--brand-primary)" }}
+          >
+            <span className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-xl text-white">
               {initials}
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Name + meta */}
         <div className="min-w-0 flex-1">
