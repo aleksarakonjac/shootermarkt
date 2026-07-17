@@ -6,7 +6,7 @@ import { eq, isNotNull, and, inArray, asc } from "drizzle-orm";
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
-import { buildShooterScopeFilter, type Scope } from "@/lib/scope";
+import { type Scope } from "@/lib/scope";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { ScopedLink } from "../../components/ScopedLink";
 import { HeadToHeadPanel, type H2HCandidate, type H2HLabels } from "../rangiranje/HeadToHeadPanel";
@@ -49,8 +49,6 @@ export default async function HeadToHeadPage({ params, searchParams }: Props) {
   const initialP1 = a ? parseInt(a) : undefined;
   const initialP2 = b ? parseInt(b) : undefined;
 
-  const scopeFilter = buildShooterScopeFilter(scope);
-
   const discipline = await db.query.disciplines.findFirst({
     where: eq(disciplines.code, activeCode),
   });
@@ -80,7 +78,7 @@ export default async function HeadToHeadPage({ params, searchParams }: Props) {
               eq(results.disciplineId, discipline.id),
               isNotNull(results.qualTotal),
               inArray(shooters.apparatus, [...MVP_APPARATUS]),
-              scopeFilter,
+
             )
           )
           .orderBy(asc(competitions.date)),

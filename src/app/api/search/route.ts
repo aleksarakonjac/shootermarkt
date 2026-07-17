@@ -3,7 +3,7 @@ import { and, eq, ilike, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { clubs, competitions, shooters } from "@/lib/db/schema";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
-import { buildCompetitionScopeFilter, buildShooterScopeFilter, DEFAULT_SCOPE, type Scope, VALID_SCOPES } from "@/lib/scope";
+import { buildCompetitionScopeFilter, DEFAULT_SCOPE, type Scope, VALID_SCOPES } from "@/lib/scope";
 
 const LIMIT = 5;
 
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, avatarUrl: shooters.avatarUrl })
     .from(shooters)
     .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-    .where(and(eq(shooters.verified, true), inArray(shooters.apparatus, [...MVP_APPARATUS]), buildShooterScopeFilter(scope), ...shooterMatches))
+    .where(and(eq(shooters.verified, true), inArray(shooters.apparatus, [...MVP_APPARATUS]), ...shooterMatches))
     .orderBy(shooters.lastName, shooters.firstName)
     .limit(LIMIT);
 
