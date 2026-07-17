@@ -222,7 +222,7 @@ export function UpcomingEvents({ competitions }: UpcomingEventsProps) {
         {/* Right edge fade — signals more cards when not at end */}
         {!atEnd && (
           <div
-            className="absolute right-0 top-0 bottom-2 w-14 pointer-events-none"
+            className="absolute right-0 top-0 bottom-0 w-14 pointer-events-none"
             style={{ background: "linear-gradient(to right, transparent, var(--bg))" }}
           />
         )}
