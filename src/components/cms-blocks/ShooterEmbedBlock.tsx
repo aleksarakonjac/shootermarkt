@@ -62,7 +62,7 @@ export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {
         )}
 
         {/* Name + meta */}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 flex flex-col justify-center">
           <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors leading-tight">
             {shooter.firstName} {shooter.lastName}
           </h3>
