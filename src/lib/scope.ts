@@ -1,5 +1,5 @@
-import { eq, inArray, or, sql } from 'drizzle-orm';
-import { competitions, shooters } from '@/lib/db/schema';
+import { inArray, or, sql } from 'drizzle-orm';
+import { competitions } from '@/lib/db/schema';
 
 export type Scope = 'srb' | 'issf';
 export const VALID_SCOPES: readonly Scope[] = ['srb', 'issf'] as const;
@@ -27,9 +27,6 @@ export function buildCompetitionScopeFilter(scope: Scope) {
   );
 }
 
-export function buildShooterScopeFilter(scope: Scope) {
-  if (scope === 'issf') {
-    return undefined;
-  }
-  return eq(shooters.nationality, 'SRB');
+export function buildShooterScopeFilter(_scope: Scope) {
+  return undefined;
 }

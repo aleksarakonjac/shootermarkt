@@ -179,7 +179,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
 
   const sp           = await searchParams;
   const activeQ      = sp.q?.trim() ?? "";
-  const activeZemlja = sp.zemlja ?? "";
+  const activeZemlja = sp.zemlja ?? (scope === "srb" ? "SRB" : "");
   const activePol    = sp.pol ?? "";
   const activeAparat = sp.aparat ?? "";
   const page         = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
