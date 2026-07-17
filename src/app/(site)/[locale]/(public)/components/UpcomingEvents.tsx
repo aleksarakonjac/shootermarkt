@@ -147,7 +147,7 @@ export function UpcomingEvents({ competitions }: UpcomingEventsProps) {
           onMouseUp={stopDrag}
           onMouseLeave={stopDrag}
           onScroll={checkBounds}
-          className="flex gap-3 overflow-x-auto pb-2 select-none"
+          className="-mt-1 flex gap-3 overflow-x-auto pb-2 pt-1 select-none"
           style={{ scrollbarWidth: "none", cursor: isDragging ? "grabbing" : "grab" }}
         >
           {competitions.map((comp) => {
