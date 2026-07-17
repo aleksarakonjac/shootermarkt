@@ -15,7 +15,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@/lib/pdf-import/types";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Metadata } from "next";
-import { type Scope } from "@/lib/scope";
+import { buildShooterScopeFilter, type Scope } from "@/lib/scope";
 
 export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
   const { scope } = await params;
@@ -166,6 +166,7 @@ type Props = {
 
 export default async function StrelciPage({ params, searchParams }: Props) {
   const { scope } = await params;
+  const scopeFilter = buildShooterScopeFilter(scope);
   const locale       = await getLocale();
   const t            = await getTranslations("shooters");
   const tProfile     = await getTranslations("shooters.profile");
@@ -189,6 +190,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
   const activeDir    = (sp.dir === "desc" ? "desc" : "asc") as SortDir;
   const conditions: (SQL | undefined)[] = [
     inArray(shooters.apparatus, [...MVP_APPARATUS]),
+    scopeFilter,
     activeQ
       ? and(
           ...activeQ
