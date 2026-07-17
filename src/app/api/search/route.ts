@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     .leftJoin(clubs, eq(shooters.clubId, clubs.id))
     .where(and(eq(shooters.verified, true), inArray(shooters.apparatus, [...MVP_APPARATUS]), ...shooterMatches))
     .orderBy(shooters.lastName, shooters.firstName)
-    .limit(LIMIT);
+    .limit(shootersOnly ? 50 : LIMIT);
 
   const competitionQuery = db
     .select({ id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, level: competitions.level })
