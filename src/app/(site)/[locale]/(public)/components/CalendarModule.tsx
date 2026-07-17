@@ -298,7 +298,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                   aria-label={hasComp ? `${dateStr}: ${t("competitionPlural", { count: comps.length })}` : dateStr}
                   disabled={!hasComp}
                   className={[
-                    "flex min-h-11 w-full flex-col items-center justify-center rounded-md py-1.5 text-sm font-semibold transition-colors select-none",
+                    "relative flex min-h-11 w-full items-center justify-center rounded-md py-1.5 text-sm font-semibold transition-colors select-none",
                     isToday
                       ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
                     : hasComp
@@ -309,7 +309,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                   {day}
                   {hasComp && !isToday && (
                     <span
-                      className="block w-1 h-1 rounded-full mt-0.5"
+                      className="absolute bottom-1.5 h-1 w-1 rounded-full"
                       style={{ background: getLevelColor(comps[0].level) }}
                     />
                   )}
