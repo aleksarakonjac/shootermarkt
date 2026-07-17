@@ -149,10 +149,10 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   const DAYS_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+    <div className="rounded-xl border border-t-2 border-[var(--border)] border-t-[var(--brand-primary)] bg-[var(--bg)]">
       {/* Header */}
       <div className="relative flex items-center justify-between rounded-t-xl border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-        <h3 className="font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-[var(--ink)]">
+        <h3 className="font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-[var(--brand-primary)]">
           {t("title")}
         </h3>
         <div className="flex items-center gap-1">
