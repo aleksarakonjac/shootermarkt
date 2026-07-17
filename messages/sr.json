@@ -269,7 +269,7 @@
     }
   },
   "calendar": {
-    "title": "Kalendar takmičenja",
+    "title": "Kalendar",
     "subtitle": "Pregled takmičenja po datumu",
     "noEvents": "Nema takmičenja u ovom mesecu.",
     "noEventsDay": "Nema takmičenja ovog dana.",

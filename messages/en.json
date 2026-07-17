@@ -269,7 +269,7 @@
     }
   },
   "calendar": {
-    "title": "Competition Calendar",
+    "title": "Calendar",
     "subtitle": "Browse competitions by date",
     "noEvents": "No competitions this month.",
     "noEventsDay": "No competitions on this day.",
