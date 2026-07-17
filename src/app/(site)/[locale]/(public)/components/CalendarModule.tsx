@@ -286,6 +286,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
               <div
                 key={dateStr}
                 className="relative"
+                onMouseLeave={() => setSelectedDate((value) => value === dateStr ? null : value)}
               >
                 <button
                   type="button"
