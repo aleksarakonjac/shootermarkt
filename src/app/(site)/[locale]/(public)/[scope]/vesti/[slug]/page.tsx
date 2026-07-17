@@ -111,15 +111,8 @@ export default async function VestPage({ params }: Props) {
       {/* Back nav */}
       <ScopedLink
         href="/vesti"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--muted)] hover:text-[var(--ink)] mb-7 transition-colors group"
+        className="inline-flex items-center text-sm font-medium text-[var(--muted)] hover:text-[var(--ink)] mb-7 transition-colors"
       >
-        <svg
-          width="14" height="14" viewBox="0 0 16 16" fill="none"
-          aria-hidden="true"
-          className="group-hover:-translate-x-0.5 transition-transform"
-        >
-          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
         {t("backToNews")}
       </ScopedLink>
 
