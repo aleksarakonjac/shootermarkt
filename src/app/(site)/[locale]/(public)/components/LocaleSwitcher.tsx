@@ -29,7 +29,7 @@ function LocaleSwitcherInner() {
         onClick={toggle}
         disabled={isPending}
         aria-label={locale === "sr" ? t("switchToEn") : t("switchToSr")}
-        className="flex items-center justify-center h-8 px-2.5 rounded-md text-[0.7rem] font-bold font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors select-none disabled:opacity-40 border border-transparent hover:border-[var(--border)]"
+        className="flex h-11 items-center justify-center rounded-md border border-transparent px-2.5 text-[0.7rem] font-bold font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] transition-colors hover:border-[var(--border)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] disabled:opacity-40 lg:h-8"
       >
         {locale === "sr" ? "EN" : "SR"}
       </button>

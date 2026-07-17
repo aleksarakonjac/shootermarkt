@@ -230,7 +230,7 @@ export function GlobalSearch() {
 
   const modal = (
     <div
-      className="fixed inset-0 z-[500] flex items-start justify-center px-4"
+      className="fixed inset-0 z-[var(--z-modal)] flex items-start justify-center px-4"
       style={{ paddingTop: "12vh", background: "oklch(0 0 0 / 0.45)", backdropFilter: "blur(3px)" }}
       onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
       role="dialog"
@@ -239,10 +239,7 @@ export function GlobalSearch() {
     >
       <div
         className="w-full max-w-xl rounded-xl border border-[var(--border)] overflow-hidden"
-        style={{
-          background: "var(--bg)",
-          boxShadow: "0 24px 80px oklch(0 0 0 / 0.2), 0 4px 16px oklch(0 0 0 / 0.1)",
-        }}
+        style={{ background: "var(--bg)" }}
       >
         {/* Input row */}
         <div className="flex items-center gap-3 px-4 border-b border-[var(--border)]">
@@ -275,12 +272,14 @@ export function GlobalSearch() {
               {t("clear")}
             </button>
           )}
-          <kbd
+          <button
+            type="button"
             onClick={closeModal}
-            className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] px-1.5 py-1 rounded bg-[var(--surface-2)] border border-[var(--border)] text-[var(--subtle)] cursor-pointer hover:text-[var(--muted)] transition-colors select-none"
+            aria-label={t("navEsc")}
+            className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] px-1.5 py-1 rounded bg-[var(--surface-2)] border border-[var(--border)] text-[var(--subtle)] hover:text-[var(--muted)] transition-colors select-none"
           >
             ESC
-          </kbd>
+          </button>
         </div>
 
         {/* Results */}
@@ -357,10 +356,7 @@ export function GlobalSearch() {
                   {filteredComps.map((c, i) => {
                     const globalIdx = filteredShooters.length + i;
                     const active = activeIndex === globalIdx;
-                    const levelStyle = LEVEL_STYLE[c.level] ?? {
-                      background: "#f3f4f6",
-                      color: "#4b5563",
-                    };
+                    const levelStyle = LEVEL_STYLE[c.level] ?? LEVEL_STYLE.club;
                     const levelLabel = LEVEL_LABEL[c.level] ?? c.level;
 
                     return (
@@ -455,7 +451,7 @@ export function GlobalSearch() {
       {/* Desktop trigger — pill with ⌘K hint */}
       <button
         onClick={openModal}
-        className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-xs text-[var(--muted)] hover:border-[var(--border-strong)] hover:text-[var(--ink)] transition-all w-44 lg:w-52 cursor-pointer"
+        className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] text-xs text-[var(--muted)] hover:border-[var(--border-strong)] hover:text-[var(--ink)] transition-all w-52 cursor-pointer"
       >
         <span className="text-[var(--subtle)] shrink-0">
           <SearchIcon size={13} />
@@ -469,7 +465,7 @@ export function GlobalSearch() {
       {/* Mobile trigger — icon only */}
       <button
         onClick={openModal}
-        className="md:hidden flex items-center justify-center w-8 h-8 rounded-md text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
+        className="lg:hidden flex items-center justify-center w-11 h-11 rounded-md text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
         aria-label={t("ariaLabel")}
       >
         <SearchIcon size={16} />

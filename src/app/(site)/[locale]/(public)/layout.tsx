@@ -24,7 +24,7 @@ export default async function PublicLayout({ children, params }: Props) {
 
   return (
     <>
-      <header className="sticky top-0 z-[200] bg-[var(--bg)] border-b border-[var(--border)]">
+      <header className="sticky top-0 z-[var(--z-sticky)] bg-[var(--bg)] border-b border-[var(--border)]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center gap-4">
 
@@ -37,7 +37,7 @@ export default async function PublicLayout({ children, params }: Props) {
                 markt
               </span>
             </ScopedLink>
-            <div className="hidden md:block"><HeaderHomeLink /></div>
+            <div className="hidden lg:block"><HeaderHomeLink /></div>
 
             {/* Nav groups (desktop) + hamburger (mobile, inside MainNav) */}
             <div className="flex-1 flex items-center">
@@ -48,7 +48,7 @@ export default async function PublicLayout({ children, params }: Props) {
             <GlobalSearch />
 
             {/* Desktop right controls */}
-            <div className="hidden md:flex items-center gap-1 shrink-0">
+            <div className="hidden lg:flex items-center gap-1 shrink-0">
               <RegionSelector />
               <LocaleSwitcher />
               <ThemeToggle />

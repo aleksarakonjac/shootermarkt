@@ -6,6 +6,7 @@ import { usePathname } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import ThemeToggle from "./ThemeToggle";
 import { RegionSelector } from "./RegionSelector";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -86,6 +87,9 @@ export function MainNav() {
   const [openMobileGroup, setOpenMobileGroup] = useState<string | null>(null);
   const desktopNavRef = useRef<HTMLDivElement>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
 
   const tSearch = useTranslations("search");
   const tCommon = useTranslations("common");
@@ -135,6 +139,35 @@ export function MainNav() {
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
 
+  useEffect(() => {
+    if (!mobileOpen) {
+      lastFocusedElementRef.current?.focus();
+      lastFocusedElementRef.current = null;
+      return;
+    }
+
+    lastFocusedElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = drawerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])');
+    focusable?.[0]?.focus();
+
+    function trapFocus(event: KeyboardEvent) {
+      if (event.key !== "Tab" || !focusable?.length) return;
+      const items = [...focusable];
+      const first = items[0];
+      const last = items.at(-1)!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", trapFocus);
+    return () => document.removeEventListener("keydown", trapFocus);
+  }, [mobileOpen]);
+
   function toggleDropdown(key: string) {
     setOpenKey((prev) => (prev === key ? null : key));
   }
@@ -159,7 +192,7 @@ export function MainNav() {
   return (
     <>
       {/* ── Desktop nav ──────────────────────────────────────────────── */}
-      <div ref={desktopNavRef} className="hidden md:flex items-center gap-0.5">
+      <div ref={desktopNavRef} className="hidden lg:flex items-center gap-0.5">
         {NAV.map((group) => {
           const active = isGroupActive(group);
           const open = openKey === group.key;
@@ -195,7 +228,6 @@ export function MainNav() {
               <button
                 onClick={() => toggleDropdown(group.key)}
                 aria-expanded={open}
-                aria-haspopup="true"
                 className={`relative flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 select-none ${
                   open
                     ? "text-[var(--ink)] bg-[var(--surface-2)]"
@@ -229,7 +261,6 @@ export function MainNav() {
                     ? "opacity-100 translate-y-0 visible pointer-events-auto"
                     : "opacity-0 -translate-y-2 invisible pointer-events-none"
                   }`}
-                role="menu"
               >
                 {group.items.map((item, idx) => {
                   const itemActive = !item.soon && unscopedPathname.startsWith(item.href);
@@ -251,7 +282,6 @@ export function MainNav() {
                     <div
                       key={item.href}
                       className={`px-3.5 py-3 cursor-default ${!isLast ? "border-b border-[var(--border)]" : ""}`}
-                      role="menuitem"
                       aria-disabled="true"
                     >
                       {inner}
@@ -264,7 +294,6 @@ export function MainNav() {
                       className={`block px-3.5 py-3 transition-colors duration-100 ${!isLast ? "border-b border-[var(--border)]" : ""} ${
                         itemActive ? "bg-[var(--surface)]" : "hover:bg-[var(--surface-2)]"
                       }`}
-                      role="menuitem"
                     >
                       {inner}
                     </Link>
@@ -281,7 +310,9 @@ export function MainNav() {
         onClick={() => setMobileOpen((v) => !v)}
         aria-label={mobileOpen ? tCommon("closeMenu") : tCommon("openMenu")}
         aria-expanded={mobileOpen}
-        className="md:hidden ml-auto flex flex-col items-center justify-center w-9 h-9 rounded-md hover:bg-[var(--surface-2)] transition-colors gap-[5px] shrink-0"
+        ref={menuButtonRef}
+        aria-controls="mobile-navigation"
+        className="lg:hidden ml-auto flex flex-col items-center justify-center w-11 h-11 rounded-md hover:bg-[var(--surface-2)] transition-colors gap-[5px] shrink-0"
       >
         <span className={`block w-5 h-[1.5px] bg-[var(--ink)] rounded-full transition-all duration-200 origin-center ${mobileOpen ? "rotate-45 translate-y-[6.5px]" : ""}`} />
         <span className={`block w-5 h-[1.5px] bg-[var(--ink)] rounded-full transition-all duration-200 ${mobileOpen ? "opacity-0 scale-x-0" : ""}`} />
@@ -290,7 +321,7 @@ export function MainNav() {
 
       {/* ── Mobile backdrop ───────────────────────────────────────────── */}
       <div
-        className={`fixed inset-0 top-14 z-[350] bg-black/30 backdrop-blur-[2px] transition-opacity duration-300  md:hidden ${
+        className={`fixed inset-0 top-14 z-[var(--z-modal-bd)] bg-black/30 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden ${
           mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setMobileOpen(false)}
@@ -299,8 +330,10 @@ export function MainNav() {
 
       {/* ── Mobile drawer ─────────────────────────────────────────────── */}
       <div
-        className={`fixed top-14 left-0 bottom-0 w-[17.5rem] max-w-[90vw] z-[400] bg-[var(--bg)] border-r border-[var(--border)] flex flex-col
-          transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]  md:hidden ${
+        ref={drawerRef}
+        id="mobile-navigation"
+        className={`fixed top-14 left-0 bottom-0 w-[17.5rem] max-w-[90vw] z-[var(--z-modal)] bg-[var(--bg)] border-r border-[var(--border)] flex flex-col
+          transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         role="dialog"
@@ -416,6 +449,7 @@ export function MainNav() {
         {/* Bottom controls */}
         <div className="border-t border-[var(--border)] px-4 py-4 flex items-center justify-between gap-3">
           <ThemeToggle />
+          <LocaleSwitcher />
           <Link
             href="/admin"
             onClick={() => setMobileOpen(false)}

@@ -82,7 +82,7 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={`Opseg: ${scope === "issf" ? "ISSF" : srbName}`}
-        className={`flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] transition-colors px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] ${
+        className={`flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] lg:min-h-8 ${
           open ? "border-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]" : ""
         }`}
       >
@@ -99,7 +99,7 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
 
       {/* Panel */}
       <div
-        className={`absolute right-0 w-[13rem] rounded-xl border border-[var(--border)] bg-[var(--bg)] shadow-[0_12px_40px_oklch(0_0_0/0.12)] z-[var(--z-dropdown)] overflow-hidden
+        className={`absolute right-0 z-[var(--z-dropdown)] w-[13rem] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]
           transition-[opacity,transform,visibility] duration-150 ease-out
           ${placement === "top" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]"}
           ${open
