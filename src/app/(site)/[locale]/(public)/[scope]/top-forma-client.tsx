@@ -49,7 +49,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
       {/* Widget Header with Tabs */}
-      <div className="bg-[var(--brand-primary)] px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)]">
+      <div className="bg-[var(--brand-primary)] px-4 py-2 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)]">
         <h3 className="flex items-center gap-1 font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-white">
           <span>{t("topForm")}</span>
           <FormaScoreInfo locale={locale} inverted />
