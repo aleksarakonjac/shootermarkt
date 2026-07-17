@@ -63,7 +63,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
                 key={tab.code}
                 onClick={() => setActiveTab(tab.code)}
                 aria-pressed={active}
-                className="min-h-11 min-w-11 rounded px-2.5 py-1 text-xs font-semibold uppercase transition-colors"
+                className="min-h-10 min-w-11 rounded px-2.5 py-1 text-xs font-semibold uppercase transition-colors"
                 style={{
                   background: active ? "var(--bg)" : "transparent",
                   color: active ? "var(--brand-primary)" : "white",
