@@ -299,7 +299,18 @@ export function RangiranjeClient({
       {/* Category tabs */}
       {categoriesPresent.length > 1 && (
         <div className="flex items-center gap-1 mb-4 flex-wrap">
-          {categoriesPresent.map((cat) => {
+          <button
+            onClick={() => setActiveKategorija(null)}
+            className="inline-flex items-center px-2.5 py-1 rounded-md text-[0.7rem] font-semibold transition-colors"
+            style={
+              activeKategorija === null
+                ? { background: "var(--brand-primary)", color: "white" }
+                : { background: "transparent", color: "var(--subtle)", border: "1px solid var(--border)" }
+            }
+          >
+            {labels.all}
+          </button>
+          {categoriesPresent.filter((cat) => cat !== "mladji_senior").map((cat) => {
             const active = activeKategorija === cat;
             return (
               <button
