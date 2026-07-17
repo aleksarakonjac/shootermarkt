@@ -435,46 +435,55 @@ function UpcomingWidget({
       {competitions.length === 0 ? (
         <p className="px-4 py-3 text-sm text-[var(--muted)]">{emptyLabel}</p>
       ) : (
-        <ul className="divide-y divide-[var(--border)]">
-          {competitions.map((comp) => {
-            const { day, month } = formatDateShort(comp.date, locale);
-            const displayName = locale === "en" ? (comp.nameEn ?? comp.nameSr ?? comp.name) : (comp.nameSr ?? comp.name);
-            return (
-              <li key={comp.id}>
-                <ScopedLink
-                  href={`/takmicenja/${comp.id}`}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)] transition-colors group"
-                >
-                  <div className="shrink-0 w-9 text-center">
-                    <div className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-lg leading-none text-[var(--ink)]">
-                      {day}
+        <div className="relative">
+          <ul className="divide-y divide-[var(--border)] max-h-[240px] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--border-strong)_transparent]">
+            {competitions.map((comp) => {
+              const { day, month } = formatDateShort(comp.date, locale);
+              const displayName = locale === "en" ? (comp.nameEn ?? comp.nameSr ?? comp.name) : (comp.nameSr ?? comp.name);
+              return (
+                <li key={comp.id}>
+                  <ScopedLink
+                    href={`/takmicenja/${comp.id}`}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-2)] transition-colors group"
+                  >
+                    <div className="shrink-0 w-9 text-center">
+                      <div className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-lg leading-none text-[var(--ink)]">
+                        {day}
+                      </div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mt-0.5">
+                        {month}
+                      </div>
                     </div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] mt-0.5">
-                      {month}
-                    </div>
-                  </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-semibold text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors line-clamp-1 leading-snug">
-                      {displayName}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-semibold text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors line-clamp-1 leading-snug">
+                        {displayName}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[11px] text-[var(--muted)]">
+                          {getLevelLabel(comp.level)}
+                        </span>
+                        {comp.location && (
+                          <>
+                            <span className="text-[var(--border-strong)]">·</span>
+                            <span className="text-[11px] text-[var(--muted)] truncate">{comp.location}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-[11px] text-[var(--muted)]">
-                        {getLevelLabel(comp.level)}
-                      </span>
-                      {comp.location && (
-                        <>
-                          <span className="text-[var(--border-strong)]">·</span>
-                          <span className="text-[11px] text-[var(--muted)] truncate">{comp.location}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </ScopedLink>
-              </li>
-            );
-          })}
-        </ul>
+                  </ScopedLink>
+                </li>
+              );
+            })}
+          </ul>
+          {competitions.length > 4 && (
+            <div
+              className="pointer-events-none absolute bottom-0 left-0 right-0 h-8"
+              style={{ background: "linear-gradient(to top, var(--surface) 0%, transparent 100%)" }}
+              aria-hidden="true"
+            />
+          )}
+        </div>
       )}
     </div>
   );
