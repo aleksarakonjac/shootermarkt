@@ -99,7 +99,7 @@ export function HomepageMainClient() {
         {recent.map((item) => {
           const name = locale === "en" ? (item.nameEn ?? item.name) : (item.nameSr ?? item.name);
           const levelKey = `levels.${item.level.toLowerCase()}`;
-          return <div key={item.id} className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4">
+          return <div key={item.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
             <p className="text-xs font-bold uppercase text-[var(--muted)]">{tComp.has(levelKey) ? tComp(levelKey) : item.level}</p>
             <h3 className="mt-1 truncate text-sm font-semibold">{name}</h3>
             <p className="mt-3 text-sm text-[var(--muted)]">{item.date.split("-").reverse().join(".")} · {item.location || "—"}</p>

@@ -161,13 +161,13 @@ export function UpcomingEvents({ competitions }: UpcomingEventsProps) {
               <Link
                 key={comp.id}
                 href={scopedHref(`/takmicenja/${comp.id}`)}
-                className="shrink-0 w-[230px] rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-[box-shadow,transform] duration-200 flex flex-col no-underline"
+                className="shrink-0 w-[230px] rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-[box-shadow,transform] duration-200 flex flex-col no-underline"
               >
                 <div className="p-4 flex flex-col gap-3 flex-1">
                   {/* Date block + badge + weekday/year */}
                   <div className="flex items-stretch gap-4">
                     <div className="self-stretch shrink-0 min-w-[44px] flex">
-                      <div className="h-full aspect-square flex flex-col items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] font-[family-name:var(--font-barlow-condensed)] leading-none">
+                      <div className="h-full aspect-square flex flex-col items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg)] font-[family-name:var(--font-barlow-condensed)] leading-none">
                         <span className="text-sm font-bold uppercase text-[var(--muted)] -mb-1">
                           {date.month}
                         </span>
