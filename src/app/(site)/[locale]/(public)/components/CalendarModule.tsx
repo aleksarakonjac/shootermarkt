@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useParams } from "next/navigation";
-import { LEVEL_DOT_COLOR } from "@/lib/competition-utils";
+import { getLevelLabel, LEVEL_DOT_COLOR, LEVEL_STYLE } from "@/lib/competition-utils";
 
 interface Competition {
   id: number;
@@ -321,20 +321,18 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                     id={`calendar-events-${dateStr}`}
                     className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-52 -translate-x-1/2 rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white"
                   >
-                    {selectedComps.map((c) => (
-                      <div key={c.id} className="flex flex-col gap-0.5 py-1 border-b border-white/10 last:border-0">
-                        <span
-                          className="text-xs font-bold uppercase tracking-wider"
-                          style={{ color: getLevelColor(c.level) }}
-                        >
-                          {c.level}
+                    {selectedComps.map((c) => {
+                      const levelStyle = LEVEL_STYLE[c.level.toLowerCase()] ?? LEVEL_STYLE.club;
+                      return <div key={c.id} className="flex flex-col gap-1 py-1 border-b border-white/10 last:border-0">
+                        <span className="self-start rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider" style={levelStyle}>
+                          {getLevelLabel(c.level.toLowerCase(), locale)}
                         </span>
                         <span className="font-semibold leading-tight">{c.name}</span>
                         {c.location && (
                           <span className="text-white/80">{c.location}</span>
                         )}
-                      </div>
-                    ))}
+                      </div>;
+                    })}
                   </div>
                 )}
               </div>
