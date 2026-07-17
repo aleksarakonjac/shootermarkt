@@ -51,14 +51,14 @@ function ShooterAvatar({
         alt=""
         width={32}
         height={32}
-        className="w-8 h-8 rounded-full object-cover shrink-0"
+        className="w-8 h-8 rounded-lg object-cover shrink-0"
       />
     );
   }
 
   return (
     <span
-      className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[0.65rem] font-bold text-white select-none"
+      className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-[0.65rem] font-bold text-white select-none"
       style={{ background: "var(--brand-primary)" }}
     >
       {initials}
