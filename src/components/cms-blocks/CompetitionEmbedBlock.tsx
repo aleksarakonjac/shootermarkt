@@ -5,11 +5,11 @@ import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 function formatCompDate(date: string, dateEnd: string | null): string {
   const start = new Date(date);
   const fmt = (d: Date) =>
-    d.toLocaleDateString("sr-RS", { day: "numeric", month: "short", year: "numeric" });
+    d.toLocaleDateString("sr-Latn-RS", { day: "numeric", month: "short", year: "numeric" });
   if (!dateEnd || dateEnd === date) return fmt(start);
   const end = new Date(dateEnd);
   if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
-    return `${start.getDate()}–${end.getDate()}. ${start.toLocaleString("sr-RS", { month: "short" })} ${start.getFullYear()}.`;
+    return `${start.getDate()}–${end.getDate()}. ${start.toLocaleString("sr-Latn-RS", { month: "short" })} ${start.getFullYear()}.`;
   }
   return `${fmt(start)} – ${fmt(end)}`;
 }
