@@ -24,7 +24,6 @@ export type ResultRowData = {
   category?: string | null;
   qualDetail: QualDetail | null;
   finalDetail: FinalDetail | null;
-  apparatus: string | null;
 };
 
 export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }: { results: ResultRowData[]; allLabel?: string; locale?: string }) {
@@ -105,7 +104,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
             {filtered.map((r) => {
               const isExpanded = expanded.has(r.id);
               const canExpand = r.qualDetail != null || r.finalDetail != null;
-              const hasDecimals = r.apparatus === "air_rifle";
+              const hasDecimals = r.disciplineCode === "ARM" || r.disciplineCode === "ARW";
 
               return (
                 <Fragment key={r.id}>

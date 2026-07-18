@@ -69,7 +69,6 @@ export default async function ShooterPage({ params }: Props) {
         competitionLevel: competitions.level,
         disciplineCode: disciplines.code,
         disciplineId: disciplines.id,
-        apparatus: disciplines.apparatus,
         maxQualScore: disciplines.maxQualScore,
       })
       .from(results)
