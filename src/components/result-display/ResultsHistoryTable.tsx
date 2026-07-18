@@ -75,29 +75,29 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[480px]">
+      <div>
+        <table className="w-full table-fixed text-xs sm:text-sm">
           <thead>
             <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-              <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
+              <th className="w-[40%] px-2 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Competition" : "Takmičenje"}
               </th>
-              <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
+              <th className="hidden px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:table-cell">
                 {locale === "en" ? "Date" : "Datum"}
               </th>
-              <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
+              <th className="w-[15%] px-1 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Disc." : "Disc."}
               </th>
-              <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
+              <th className="w-[18%] px-1 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Qual." : "Kval."}
               </th>
-              <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
+              <th className="hidden px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:table-cell">
                 {locale === "en" ? "Rank" : "Rang"}
               </th>
-              <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
+              <th className="w-[16%] px-1 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Final" : "Finale"}
               </th>
-              <th className="w-9" />
+              <th className="w-6" />
             </tr>
           </thead>
           <tbody>
@@ -117,37 +117,37 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                     }`}
                     aria-expanded={canExpand ? isExpanded : undefined}
                   >
-                    <td className="px-4 py-3 font-medium text-[var(--ink)]">
-                      {r.competitionName}
+                    <td className="px-2 py-2.5 font-medium text-[var(--ink)] sm:px-4 sm:py-3">
+                      <span className="block truncate" title={r.competitionName}>{r.competitionName}</span>
                     </td>
-                    <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] hidden sm:table-cell">
+                    <td className="hidden px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] sm:table-cell">
                       {r.competitionDate.split("-").reverse().join(".")}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-1 py-2.5 sm:px-4 sm:py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="inline-block rounded px-2 py-0.5 text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] tracking-wide bg-[var(--surface-2)] text-[var(--ink)]">
+                        <span className="inline-block rounded px-1 py-0.5 text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] tracking-wide bg-[var(--surface-2)] text-[var(--ink)] sm:px-2 sm:text-xs">
                           {r.disciplineCode}
                         </span>
                         {r.category && r.category !== "senior" && (
-                          <span className="inline-block rounded px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide bg-[var(--brand-primary-light)] text-[var(--brand-primary)]">
+                          <span className="hidden rounded px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide bg-[var(--brand-primary-light)] text-[var(--brand-primary)] sm:inline-block">
                             {CATEGORY_SHORT[r.category] ?? r.category}
                           </span>
                         )}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
+                    <td className="whitespace-nowrap px-1 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] sm:px-4 sm:py-3">
                       {r.qualTotal != null ? (
                         <>
                           {r.qualTotal}
                           {r.qualInners != null && (
-                            <span className="text-xs text-[var(--muted)] ml-1">{r.qualInners}×</span>
+                            <span className="ml-0.5 text-[0.65rem] text-[var(--muted)] sm:ml-1 sm:text-xs">{r.qualInners}×</span>
                           )}
                         </>
                       ) : (
                         <span className="text-[var(--subtle)]">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right text-[var(--muted)] hidden sm:table-cell">
+                    <td className="hidden px-4 py-3 text-right text-[var(--muted)] sm:table-cell">
                       {r.qualRank != null ? (
                         <span>
                           <span className="text-[var(--subtle)] text-xs">#</span>
@@ -157,10 +157,10 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                         <span className="text-[var(--subtle)]">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)]">
+                    <td className="whitespace-nowrap px-1 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] sm:px-4 sm:py-3">
                       {r.finalTotal ?? <span className="text-[var(--subtle)]">—</span>}
                     </td>
-                    <td className="px-2 py-3 text-center">
+                    <td className="px-1 py-2.5 text-center sm:px-2 sm:py-3">
                       {canExpand && (
                         <ChevronDown
                           size={14}
