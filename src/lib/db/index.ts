@@ -5,7 +5,9 @@ import * as schema from "./schema";
 const connectionString = process.env.DATABASE_URL!;
 const connectionOptions = {
   prepare: false,
-  max: 1,
+  // Homepage endpoints load independently; a single local connection turns
+  // those requests into a queue and can exceed the client-side retry window.
+  max: 3,
   idle_timeout: 20,
   connect_timeout: 5,
 };
