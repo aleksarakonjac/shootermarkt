@@ -15,7 +15,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@/lib/pdf-import/types";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Metadata } from "next";
-import { buildShooterScopeFilter, type Scope } from "@/lib/scope";
+import { type Scope } from "@/lib/scope";
 
 export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
   const { scope } = await params;
@@ -166,7 +166,6 @@ type Props = {
 
 export default async function StrelciPage({ params, searchParams }: Props) {
   const { scope } = await params;
-  const scopeFilter = buildShooterScopeFilter(scope);
   const locale       = await getLocale();
   const t            = await getTranslations("shooters");
   const tProfile     = await getTranslations("shooters.profile");
@@ -190,7 +189,6 @@ export default async function StrelciPage({ params, searchParams }: Props) {
   const activeDir    = (sp.dir === "desc" ? "desc" : "asc") as SortDir;
   const conditions: (SQL | undefined)[] = [
     inArray(shooters.apparatus, [...MVP_APPARATUS]),
-    scopeFilter,
     activeQ
       ? and(
           ...activeQ
@@ -252,7 +250,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
     db
       .selectDistinct({ noc: shooters.nationality })
       .from(shooters)
-      .where(and(isNotNull(shooters.nationality), scopeFilter))
+      .where(isNotNull(shooters.nationality))
       .orderBy(asc(shooters.nationality)),
 
     // Active this year = at least 1 result in current year
@@ -264,21 +262,20 @@ export default async function StrelciPage({ params, searchParams }: Props) {
       .where(and(
         gte(competitions.date, `${thisYear}-01-01`),
         inArray(shooters.apparatus, [...MVP_APPARATUS]),
-        scopeFilter,
       )),
 
     // Breakdown by apparatus (global, unfiltered)
     db
       .select({ apparatus: shooters.apparatus, count: sql<number>`COUNT(*)::int` })
       .from(shooters)
-      .where(and(inArray(shooters.apparatus, [...MVP_APPARATUS]), scopeFilter))
+      .where(inArray(shooters.apparatus, [...MVP_APPARATUS]))
       .groupBy(shooters.apparatus),
 
     // Total shooters in MVP scope (unfiltered)
     db
       .select({ totalAll: sql<number>`COUNT(*)::int` })
       .from(shooters)
-      .where(and(inArray(shooters.apparatus, [...MVP_APPARATUS]), scopeFilter)),
+      .where(inArray(shooters.apparatus, [...MVP_APPARATUS])),
 
   ]);
 
@@ -318,7 +315,6 @@ export default async function StrelciPage({ params, searchParams }: Props) {
         inArray(shooterFormaCache.disciplineCode, ["ARM", "ARW", "APM", "APW"]),
         isNotNull(shooterFormaCache.forma),
         gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE),
-        scopeFilter,
       ))
       .orderBy(asc(shooterFormaCache.disciplineCode), desc(shooterFormaCache.forma)),
   ]);

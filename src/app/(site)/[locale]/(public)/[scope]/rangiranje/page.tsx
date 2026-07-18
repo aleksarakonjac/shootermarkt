@@ -10,7 +10,7 @@ import { type CompetitionLevel, type Trend } from "@/lib/forma";
 import { type AgeCategory, CATEGORY_RANK } from "@/lib/pdf-import/types";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
-import { buildShooterScopeFilter, type Scope } from "@/lib/scope";
+import { type Scope } from "@/lib/scope";
 import { RangiranjeClient, type RangiranjeShooter, type RangiranjeLabels } from "./RangiranjeClient";
 
 export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
@@ -45,8 +45,6 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
   ]);
 
   const { disciplina } = await searchParams;
-  const scopeFilter = buildShooterScopeFilter(scope);
-
   const validCode = TABS.find((tab) => tab.code === disciplina?.toUpperCase())?.code;
   const activeCode: DiscCode = validCode ?? "ARM";
   const isAP = activeCode.startsWith("AP");
@@ -81,7 +79,6 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
             eq(results.disciplineId, discipline.id),
             isNotNull(results.qualTotal),
             inArray(shooters.apparatus, [...MVP_APPARATUS]),
-            scopeFilter,
           )
         )
         .orderBy(asc(competitions.date))
