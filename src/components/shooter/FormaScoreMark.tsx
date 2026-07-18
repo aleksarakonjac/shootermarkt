@@ -42,6 +42,7 @@ export function FormaScoreMark({ className, style, size = "md", inverted = false
           fontSize: s.score,
           letterSpacing: "-0.04em",
           color: inverted ? "rgba(255,255,255,0.82)" : "var(--brand-primary)",
+          textTransform: "none",
         }}
       >
         Score
