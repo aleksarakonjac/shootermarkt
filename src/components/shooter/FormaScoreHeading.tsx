@@ -7,12 +7,21 @@ interface FormaScoreHeadingProps {
   locale?: string;
 }
 
+interface FormaScoreInfoProps extends FormaScoreHeadingProps {
+  heading?: string;
+  description?: string;
+  ariaLabel?: string;
+  align?: "left" | "right";
+  placement?: "top" | "bottom";
+  className?: string;
+}
+
 const INFO: Record<string, string> = {
   sr: "FORMAScore je prognoza sledećeg rezultata. Noviji i jači nastupi imaju veću težinu, a trend projektuje trenutni nivo unapred. Pouzdanost i konzistentnost se prikazuju odvojeno.",
   en: "FORMAScore predicts the next result. More recent and stronger performances carry greater weight, while trend projects the current level forward. Reliability and consistency are shown separately.",
 };
 
-export function FormaScoreInfo({ locale = "sr", inverted = false }: FormaScoreHeadingProps & { inverted?: boolean }) {
+export function FormaScoreInfo({ locale = "sr", inverted = false, heading, description, ariaLabel, align = "left", placement = "bottom", className }: FormaScoreInfoProps & { inverted?: boolean }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -30,6 +39,7 @@ export function FormaScoreInfo({ locale = "sr", inverted = false }: FormaScoreHe
   }, [open]);
 
   return <div
+    className={className}
     style={{ position: "relative", display: "flex", alignItems: "center" }}
     onMouseEnter={() => setOpen(true)}
     onMouseLeave={() => setOpen(false)}
@@ -39,7 +49,7 @@ export function FormaScoreInfo({ locale = "sr", inverted = false }: FormaScoreHe
       type="button"
       onClick={() => setOpen((value) => !value)}
       onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
-      aria-label={locale === "en" ? "What is FORMAScore?" : "Šta je FORMAScore?"}
+      aria-label={ariaLabel ?? (locale === "en" ? "What is FORMAScore?" : "Šta je FORMAScore?")}
       aria-expanded={open}
       aria-controls={panelId}
       style={{
@@ -54,14 +64,15 @@ export function FormaScoreInfo({ locale = "sr", inverted = false }: FormaScoreHe
       i
     </button>
 
-    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, width: 288, zIndex: "var(--z-tooltip)", fontFamily: "var(--font-sans)", textTransform: "none" }}>
+    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "absolute", ...(placement === "top" ? { bottom: "calc(100% + 8px)" } : { top: "calc(100% + 8px)" }), ...(align === "right" ? { right: 0 } : { left: 0 }), width: 288, zIndex: "var(--z-tooltip)", fontFamily: "var(--font-sans)", textTransform: "none" }}>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
-        <div className="mb-2 flex items-baseline gap-1">
+        {heading && <p className="mb-2" style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>{heading}</p>}
+        {!heading && <div className="mb-2 flex items-baseline gap-1">
           <span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>{locale === "en" ? "What is" : "Šta je"}</span>
           <FormaScoreMark size="md" />
           <span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>?</span>
-        </div>
-        <p style={{ color: "var(--ink)", fontSize: "0.8rem", lineHeight: 1.6, fontWeight: 400 }}>{INFO[locale] ?? INFO.sr}</p>
+        </div>}
+        <p style={{ color: "var(--ink)", fontSize: "0.8rem", lineHeight: 1.6, fontWeight: 400 }}>{description ?? INFO[locale] ?? INFO.sr}</p>
       </div>
     </div>}
   </div>;

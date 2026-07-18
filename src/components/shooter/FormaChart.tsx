@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import { rollingForma, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 import { FormaScoreMark } from "./FormaScoreMark";
+import { FormaScoreInfo } from "./FormaScoreHeading";
 import { DisciplineSelector, DISCIPLINE_COLOR } from "./DisciplineSelector";
 
 export type ChartPoint = {
@@ -249,6 +250,10 @@ export function FormaChart({
     actualPerformances: en
       ? "Actual qualification results by appearance"
       : "Ostvareni kvalifikacioni rezultati po nastupima",
+    metricsTitle: en ? "What do these metrics mean?" : "Šta znače ove metrike?",
+    metricsDescription: en
+      ? "Level is the estimated current result. Peak shows how close FORMAScore is to the best result. Stability shows how consistent performances are. Momentum indicates whether the trend is accelerating or slowing."
+      : "Nivo je procenjeni trenutni rezultat. Peak pokazuje koliko je FORMAScore blizu najboljeg rezultata. Stabilnost govori koliko su nastupi ujednačeni, a momentum da li trend ubrzava ili usporava.",
   };
 
   const CW = svgW > 0 ? svgW - ML - MR : 600;
@@ -505,7 +510,7 @@ export function FormaChart({
 
         {/* Metric strip */}
         {forma && (
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0 px-3 py-2.5 text-[0.8125rem] border-t border-[var(--border)] bg-[var(--surface-2)] sm:gap-x-3 sm:px-4">
+          <div className="relative flex flex-wrap items-center gap-x-1.5 gap-y-0 py-2.5 pl-3 pr-9 text-[0.75rem] border-t border-[var(--border)] bg-[var(--surface-2)] sm:gap-x-3 sm:px-4 sm:text-[0.8125rem]">
               <span className="flex items-center gap-1">
                 <span className="text-[var(--subtle)]">{t.level}</span>
                 <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
@@ -549,6 +554,15 @@ export function FormaChart({
                 {(forma.momentum > 0) === (forma.trend === "up") ? t.momentumUp : t.momentumDown}
               </span>
             )}
+            <FormaScoreInfo
+              locale={locale}
+              heading={t.metricsTitle}
+              description={t.metricsDescription}
+              ariaLabel={t.metricsTitle}
+              align="right"
+              placement="top"
+              className="absolute right-3 top-1/2 -translate-y-1/2"
+            />
           </div>
         )}
 
