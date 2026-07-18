@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useTransition, Suspense } from "react";
-import { PageTransitionOverlay } from "./PageTransitionOverlay";
+import { PageTransitionOverlay, startPageTransitionSplash } from "./PageTransitionOverlay";
 
 function LocaleSwitcherInner() {
   const locale = useLocale();
@@ -17,6 +17,7 @@ function LocaleSwitcherInner() {
   function toggle() {
     const next = locale === "sr" ? "en" : "sr";
     const query = Object.fromEntries(searchParams.entries());
+    startPageTransitionSplash();
     startTransition(() => {
       router.replace({ pathname, query }, { locale: next });
     });

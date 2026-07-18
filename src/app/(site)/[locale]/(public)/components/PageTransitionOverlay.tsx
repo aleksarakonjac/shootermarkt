@@ -3,10 +3,36 @@
 import { createPortal } from "react-dom";
 import { useSyncExternalStore } from "react";
 
+const MIN_SPLASH_DURATION = 3_000;
+let splashUntil = 0;
+let splashTimeout: number | null = null;
+const splashListeners = new Set<() => void>();
+
+function subscribeSplash(listener: () => void) {
+  splashListeners.add(listener);
+  return () => splashListeners.delete(listener);
+}
+
+function getSplashUntil() {
+  return splashUntil;
+}
+
+export function startPageTransitionSplash() {
+  splashUntil = Date.now() + MIN_SPLASH_DURATION;
+  if (splashTimeout) window.clearTimeout(splashTimeout);
+  splashTimeout = window.setTimeout(() => {
+    splashUntil = 0;
+    splashTimeout = null;
+    splashListeners.forEach((listener) => listener());
+  }, MIN_SPLASH_DURATION);
+  splashListeners.forEach((listener) => listener());
+}
+
 export function PageTransitionOverlay({ visible }: { visible: boolean }) {
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const heldUntil = useSyncExternalStore(subscribeSplash, getSplashUntil, () => 0);
 
-  if (!mounted || !visible) return null;
+  if (!mounted || (!visible && heldUntil === 0)) return null;
 
   return createPortal(
     <>
