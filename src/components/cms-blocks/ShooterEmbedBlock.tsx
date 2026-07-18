@@ -121,7 +121,7 @@ export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {
         </div>
       ) : (
         <div className="px-4 py-3">
-          <p className="text-sm text-[var(--muted)] italic">Nema dovoljno podataka za forma score.</p>
+          <p className="text-sm text-[var(--muted)] italic">Nema dovoljno podataka za FormaScore.</p>
         </div>
       )}
 

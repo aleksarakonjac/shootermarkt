@@ -10,6 +10,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import { getLevelLabel } from "@/lib/competition-utils";
 import type { Scope } from "@/lib/scope";
+import { FormaScoreMark } from "@/components/shooter/FormaScoreMark";
 
 export const revalidate = 300;
 
@@ -197,7 +198,7 @@ export default async function VestiPage({ searchParams }: Props) {
           />
           <TopShootersWidget
             topShooters={topShooters}
-            title={t("topFormWidget")}
+            title={<><span>Top </span><FormaScoreMark size="sm" /></>}
             rankingLabel={locale === "en" ? "Ranking" : "Rangiranje"}
           />
           {tags.length > 0 && <TagsWidget tags={tags} title={t("popularTags")} />}
@@ -398,7 +399,7 @@ function EmptyState({
 
 // ── Sidebar shared ────────────────────────────────────────────────────────────
 
-function WidgetHeader({ title, linkHref, linkLabel }: { title: string; linkHref: string; linkLabel: string }) {
+function WidgetHeader({ title, linkHref, linkLabel }: { title: React.ReactNode; linkHref: string; linkLabel: string }) {
   return (
     <div className="px-4 pt-4 pb-2.5 flex items-center justify-between border-b border-[var(--border)]">
       <span className="font-[family-name:var(--font-barlow-condensed)] font-bold text-sm uppercase tracking-wide text-[var(--ink)]">
@@ -425,7 +426,7 @@ function UpcomingWidget({
   getLevelLabel,
 }: {
   competitions: Awaited<ReturnType<typeof getUpcomingCompetitions>>;
-  title: string;
+  title: React.ReactNode;
   emptyLabel: string;
   seeAllLabel: string;
   locale: string;
@@ -508,7 +509,7 @@ function TopShootersWidget({
   rankingLabel,
 }: {
   topShooters: Awaited<ReturnType<typeof getTopShootersByDiscipline>>;
-  title: string;
+  title: React.ReactNode;
   rankingLabel: string;
 }) {
   const hasAny = DISC_ORDER.some((code) => (topShooters[code]?.length ?? 0) > 0);

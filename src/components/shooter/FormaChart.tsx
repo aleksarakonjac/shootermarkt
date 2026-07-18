@@ -398,7 +398,7 @@ export function FormaChart({
                   : { background: "transparent", color: "var(--muted)" }
                 }
               >
-                {m === "forma" ? "Forma" : locale === "en" ? "Results" : "Nastup"}
+                {m === "forma" ? <FormaScoreMark size="sm" inverted={mode === m} /> : locale === "en" ? "Results" : "Nastup"}
               </button>
             ))}
           </div>

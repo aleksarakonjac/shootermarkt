@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { Sparkline } from "@/components/sparkline";
 import { FormaScoreInfo } from "@/components/shooter/FormaScoreHeading";
+import { FormaScoreMark } from "@/components/shooter/FormaScoreMark";
 import { trendLabel, trendColor } from "@/lib/forma";
 import { useLocale, useTranslations } from "next-intl";
 import { useScopedHref } from "@/hooks/use-scoped-href";
@@ -51,7 +52,8 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
       {/* Widget Header with Tabs */}
       <div className="bg-[var(--brand-primary)] px-4 py-2 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)]">
         <h3 className="flex items-center gap-1 font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-white">
-          <span>{t("topForm")}</span>
+          <span>Top</span>
+          <FormaScoreMark size="base" inverted />
           <FormaScoreInfo locale={locale} inverted />
         </h3>
         
@@ -104,7 +106,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
                 <th scope="col" className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Strelac</th>
                 <th scope="col" className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Klub</th>
                 <th scope="col" className="px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Trend</th>
-                <th scope="col" className="px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Forma</th>
+                <th scope="col" className="px-3 py-2.5 text-right"><FormaScoreMark size="sm" /></th>
                 <th scope="col" className="px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Peak</th>
                 <th scope="col" className="px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Momenta (Zadnjih 5)</th>
               </tr>

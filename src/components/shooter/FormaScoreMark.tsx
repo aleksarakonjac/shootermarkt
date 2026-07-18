@@ -4,6 +4,7 @@ interface FormaScoreMarkProps {
   className?: string;
   style?: CSSProperties;
   size?: "sm" | "md" | "base" | "lg" | "xl";
+  inverted?: boolean;
 }
 
 const SIZE = {
@@ -14,7 +15,7 @@ const SIZE = {
   xl:   { forma: "2rem",     score: "1.93rem"  },
 };
 
-export function FormaScoreMark({ className, style, size = "md" }: FormaScoreMarkProps) {
+export function FormaScoreMark({ className, style, size = "md", inverted = false }: FormaScoreMarkProps) {
   const s = SIZE[size];
   return (
     <span
@@ -28,7 +29,7 @@ export function FormaScoreMark({ className, style, size = "md" }: FormaScoreMark
           fontWeight: 800,
           fontSize: s.forma,
           letterSpacing: "-0.01em",
-          color: "var(--ink)",
+          color: inverted ? "white" : "var(--ink)",
           textTransform: "uppercase",
         }}
       >
@@ -40,7 +41,7 @@ export function FormaScoreMark({ className, style, size = "md" }: FormaScoreMark
           fontWeight: 800,
           fontSize: s.score,
           letterSpacing: "-0.04em",
-          color: "var(--brand-primary)",
+          color: inverted ? "rgba(255,255,255,0.82)" : "var(--brand-primary)",
         }}
       >
         Score

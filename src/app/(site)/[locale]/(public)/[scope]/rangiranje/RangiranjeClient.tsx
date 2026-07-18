@@ -25,6 +25,7 @@ import {
   type MetricEntry,
 } from "@/lib/ranking-metrics";
 import { CATEGORY_LABEL, type AgeCategory } from "@/lib/pdf-import/types";
+import { FormaScoreMark } from "@/components/shooter/FormaScoreMark";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -355,7 +356,7 @@ export function RangiranjeClient({
                   : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--border)" }
               }
             >
-              {labels[labelKey] as string}
+              {key === "forma" ? <FormaScoreMark size="sm" inverted={active} /> : labels[labelKey] as string}
             </button>
           );
         })}
@@ -474,7 +475,7 @@ export function RangiranjeClient({
                 <th scope="col" className={`${TH} text-left hidden md:table-cell`}>{labels.country}</th>
                 <th scope="col" className={`${TH} text-left hidden lg:table-cell`}>{labels.club}</th>
                 <th scope="col" className={`${TH} text-right`}>
-                  {activeView === "improved"
+                  {activeView === "forma" ? <FormaScoreMark size="sm" /> : activeView === "improved"
                     ? labels.improvedCol
                     : labels[VIEWS.find((v) => v.key === activeView)!.labelKey] as string}
                 </th>
