@@ -253,6 +253,9 @@ export function FormaChart({
       ? "Unreliable estimate — fewer than 5 starts"
       : "Procena nepouzdana — manje od 5 nastupa",
     lowConfidenceBadge: en ? "low data" : "malo podataka",
+    actualPerformances: en
+      ? "Actual qualification results by appearance"
+      : "Ostvareni kvalifikacioni rezultati po nastupima",
   };
 
   const CW = svgW > 0 ? svgW - ML - MR : 600;
@@ -400,7 +403,7 @@ export function FormaChart({
                   : { background: "transparent", color: "var(--muted)" }
                 }
               >
-                {m === "forma" ? <FormaScoreMark size="sm" /> : locale === "en" ? "Results" : "Nastup"}
+                {m === "forma" ? <FormaScoreMark size="sm" /> : locale === "en" ? "Results" : "Nastupi"}
               </button>
             ))}
           </div>
@@ -440,6 +443,12 @@ export function FormaChart({
             </div>
           )}
         </div>
+
+        {mode === "nastup" && (
+          <p className="border-b border-[var(--border)] px-4 py-2 text-xs text-[var(--muted)]">
+            {t.actualPerformances}
+          </p>
+        )}
 
         {/* SVG chart */}
         <div ref={containerRef} className="select-none" style={{ cursor: isAnimating ? "default" : "crosshair" }}>
