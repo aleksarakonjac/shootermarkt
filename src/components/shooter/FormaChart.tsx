@@ -354,7 +354,7 @@ export function FormaChart({
 
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-3 pb-2.5 border-b border-[var(--border)] gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 pt-3 pb-2.5 border-b border-[var(--border)]">
           <div className="flex gap-1.5 flex-wrap items-center">
 
             {available.length === 1 ? (
@@ -406,8 +406,7 @@ export function FormaChart({
           </div>
 
           {forma && (
-            <div className="flex items-center gap-2 shrink-0">
-              <FormaScoreMark size="base" />
+            <div className="ml-auto flex items-center gap-2 shrink-0">
               <span
                 title={forma.lowConfidence ? t.lowConfidence : undefined}
                 style={{
