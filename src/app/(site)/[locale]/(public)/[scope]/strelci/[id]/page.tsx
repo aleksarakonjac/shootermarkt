@@ -241,7 +241,7 @@ export default async function ShooterPage({ params }: Props) {
 
             {/* Compact meta */}
             <dl className="grid grid-cols-1 gap-y-0.5 mt-2 max-w-full min-[360px]:grid-cols-2 min-[360px]:gap-x-3 sm:grid-cols-[auto_auto] sm:gap-x-4">
-              {/* Row 1: Nacionalnost | Godište */}
+              {/* Row 1: NOC | Disciplina */}
               {nocEntry && (
                 <div className="flex min-w-0 items-center gap-1 text-sm">
                   <dt className="sr-only">{tProfile("nationality")}</dt>
@@ -253,6 +253,15 @@ export default async function ShooterPage({ params }: Props) {
                   </dd>
                 </div>
               )}
+              {shooter.apparatus && (
+                <div className="flex min-w-0 items-baseline gap-1 text-sm">
+                  <dt className="text-[var(--subtle)] shrink-0">{tProfile("discipline")}:</dt>
+                  <dd className="min-w-0 text-[var(--ink)]">
+                    {shooter.apparatus === "rifle" ? t("aparatRifle") : shooter.apparatus === "pistol" ? t("aparatPistol") : tProfile("bothApparatus")}
+                  </dd>
+                </div>
+              )}
+              {/* Row 2: Godište | Kategorija */}
               {(shooter.birthDate || shooter.birthYear) && (
                 <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{tProfile("birthYear")}:</dt>
@@ -263,25 +272,16 @@ export default async function ShooterPage({ params }: Props) {
                   </dd>
                 </div>
               )}
-              {/* Row 2: Disciplina | Klub */}
-              {shooter.apparatus && (
-                <div className="flex min-w-0 items-baseline gap-1 text-sm">
-                  <dt className="text-[var(--subtle)] shrink-0">{tProfile("discipline")}:</dt>
-                  <dd className="min-w-0 text-[var(--ink)]">
-                    {shooter.apparatus === "rifle" ? t("aparatRifle") : shooter.apparatus === "pistol" ? t("aparatPistol") : tProfile("bothApparatus")}
-                  </dd>
-                </div>
-              )}
-              {shooter.club && (
-                <div className="flex min-w-0 items-baseline gap-1 text-sm">
-                  <dt className="text-[var(--subtle)] shrink-0">{tProfile("club")}:</dt>
-                  <dd className="min-w-0 truncate text-[var(--ink)]">{shooter.club.name}</dd>
-                </div>
-              )}
               {currentCategory && (
                 <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{locale === "en" ? "Category" : "Kategorija"}:</dt>
                   <dd className="min-w-0 text-[var(--ink)]">{CATEGORY_LABEL[currentCategory]}</dd>
+                </div>
+              )}
+              {shooter.club && (
+                <div className="flex min-w-0 items-baseline gap-1 text-sm min-[360px]:col-span-2">
+                  <dt className="text-[var(--subtle)] shrink-0">{tProfile("club")}:</dt>
+                  <dd className="min-w-0 truncate text-[var(--ink)]">{shooter.club.name}</dd>
                 </div>
               )}
             </dl>
