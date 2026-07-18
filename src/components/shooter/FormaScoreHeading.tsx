@@ -13,6 +13,7 @@ interface FormaScoreInfoProps extends FormaScoreHeadingProps {
   ariaLabel?: string;
   align?: "left" | "center" | "right";
   placement?: "top" | "bottom";
+  buttonMarginTop?: number;
   className?: string;
 }
 
@@ -21,7 +22,7 @@ const INFO: Record<string, string> = {
   en: "FORMAScore predicts the next result. More recent and stronger performances carry greater weight, while trend projects the current level forward. Reliability and consistency are shown separately.",
 };
 
-export function FormaScoreInfo({ locale = "sr", inverted = false, heading, description, ariaLabel, align = "left", placement = "bottom", className }: FormaScoreInfoProps & { inverted?: boolean }) {
+export function FormaScoreInfo({ locale = "sr", inverted = false, heading, description, ariaLabel, align = "left", placement = "bottom", buttonMarginTop = 3, className }: FormaScoreInfoProps & { inverted?: boolean }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -58,7 +59,7 @@ export function FormaScoreInfo({ locale = "sr", inverted = false, heading, descr
         color: inverted ? "white" : "var(--muted)", background: "none",
         fontSize: "0.65rem", fontWeight: 700, cursor: "pointer", lineHeight: 1,
         display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        transition: "opacity 0.15s", opacity: open ? 1 : 0.75, marginTop: "3px",
+        transition: "opacity 0.15s", opacity: open ? 1 : 0.75, marginTop: buttonMarginTop,
       }}
     >
       i

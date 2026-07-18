@@ -241,8 +241,6 @@ export function FormaChart({
       c >= 0.75 ? (en ? "Stable" : "Stabilan")
       : c >= 0.5 ? (en ? "Variable" : "Promenljiv")
       : (en ? "Volatile" : "Nestabilan"),
-    momentumUp:   en ? "accelerating" : "ubrzava",
-    momentumDown: en ? "slowing" : "usporava",
     lowConfidence: en
       ? "Unreliable estimate — fewer than 5 starts"
       : "Procena nepouzdana — manje od 5 nastupa",
@@ -252,8 +250,8 @@ export function FormaChart({
       : "Ostvareni kvalifikacioni rezultati po nastupima",
     metricsTitle: en ? "What do these metrics mean?" : "Šta znače ove metrike?",
     metricsDescription: en
-      ? "Level is the estimated current result. Peak shows how close FORMAScore is to the best result. Stability shows how consistent performances are. Momentum indicates whether the trend is accelerating or slowing."
-      : "Nivo je procenjeni trenutni rezultat. Peak pokazuje koliko je FORMAScore blizu najboljeg rezultata. Stabilnost govori koliko su nastupi ujednačeni, a momentum da li trend ubrzava ili usporava.",
+      ? "Level is the estimated current level without projecting the trend. FORMAScore forecasts the next result by adjusting the level for the trend. Peak shows how close FORMAScore is to the best result, while stability shows how consistent performances are."
+      : "Nivo je procenjeni trenutni nivo bez projekcije trenda. FORMAScore je prognoza sledećeg rezultata: polazi od nivoa i prilagođava ga trendu. Peak pokazuje koliko je FORMAScore blizu najboljeg rezultata, a stabilnost koliko su nastupi ujednačeni.",
   };
 
   const CW = svgW > 0 ? svgW - ML - MR : 600;
@@ -510,7 +508,7 @@ export function FormaChart({
 
         {/* Metric strip */}
         {forma && (
-          <div className="relative flex flex-wrap items-center gap-x-1.5 gap-y-0 py-2.5 pl-3 pr-9 text-[0.75rem] border-t border-[var(--border)] bg-[var(--surface-2)] sm:gap-x-3 sm:px-4 sm:text-[0.8125rem]">
+          <div className="relative flex flex-wrap items-center gap-x-1.5 gap-y-0 py-2.5 pl-3 pr-11 text-[0.75rem] border-t border-[var(--border)] bg-[var(--surface-2)] sm:gap-x-3 sm:px-4 sm:text-[0.8125rem]">
               <span className="flex items-center gap-1">
                 <span className="text-[var(--subtle)]">{t.level}</span>
                 <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
@@ -549,11 +547,6 @@ export function FormaChart({
                 })}
               </span>
             </span>
-            {forma.trend !== "stable" && Math.abs(forma.momentum) > 0.15 && (
-              <span className="hidden text-[var(--subtle)] italic min-[400px]:inline">
-                {(forma.momentum > 0) === (forma.trend === "up") ? t.momentumUp : t.momentumDown}
-              </span>
-            )}
             <FormaScoreInfo
               locale={locale}
               heading={t.metricsTitle}
@@ -561,6 +554,7 @@ export function FormaChart({
               ariaLabel={t.metricsTitle}
               align="right"
               placement="top"
+              buttonMarginTop={0}
               className="absolute right-3 top-1/2 -translate-y-1/2"
             />
           </div>
