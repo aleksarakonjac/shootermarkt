@@ -54,7 +54,7 @@ export function FormaScoreInfo({ locale = "sr", inverted = false }: FormaScoreHe
       i
     </button>
 
-    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, width: 288, zIndex: "var(--z-tooltip)" }}>
+    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, width: 288, zIndex: "var(--z-tooltip)", fontFamily: "var(--font-sans)" }}>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
         <div className="mb-2 flex items-baseline gap-1">
           <span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>{locale === "en" ? "What is" : "Šta je"}</span>
