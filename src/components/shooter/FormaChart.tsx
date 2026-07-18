@@ -516,6 +516,7 @@ export function FormaChart({
                 <>
                   <span className="hidden text-[var(--border-strong)] min-[360px]:inline" aria-hidden="true">·</span>
                   <span className="flex items-center gap-1 sm:gap-1.5">
+                    <span className="hidden text-[var(--subtle)] min-[360px]:inline">{t.peak}</span>
                     <span className="relative h-1.5 w-10 rounded-full bg-[var(--border)] overflow-hidden sm:w-14" aria-hidden="true">
                       <span
                         className="absolute inset-y-0 left-0 right-0 rounded-full origin-left"
@@ -525,7 +526,6 @@ export function FormaChart({
                     <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
                       {Math.round(forma.peakProximity * 100)}%
                     </span>
-                    <span className="hidden text-[var(--subtle)] min-[360px]:inline">{t.peak}</span>
                   </span>
                 </>
               )}
