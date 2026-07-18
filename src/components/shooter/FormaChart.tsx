@@ -128,6 +128,7 @@ function buildWindow(data: ChartPoint[], yValues: number[], CW: number, maxScore
 interface LayerProps {
   data: ChartPoint[];
   built: NonNullable<ReturnType<typeof buildWindow>>;
+  chartWidth: number;
   color: string;
   locale: string;
   hoverIdx: number | null;
@@ -137,9 +138,10 @@ interface LayerProps {
   onAnimationComplete?: () => void;
 }
 
-function ChartLayer({ data, built, color, locale, hoverIdx, onHover, xInitial, xAnimate, onAnimationComplete }: LayerProps) {
+function ChartLayer({ data, built, chartWidth, color, locale, hoverIdx, onHover, xInitial, xAnimate, onAnimationComplete }: LayerProps) {
   const { pts, line, area, sx } = built;
-  const every = data.length > 8 ? 2 : 1;
+  const maxLabels = Math.max(2, Math.floor(chartWidth / 72));
+  const every = Math.max(1, Math.ceil((data.length - 1) / (maxLabels - 1)));
 
   return (
     <motion.g
@@ -471,6 +473,7 @@ export function FormaChart({
                     key="prev"
                     data={prevSlice.data}
                     built={prevBuilt}
+                    chartWidth={CW}
                     color={color}
                     locale={locale}
                     hoverIdx={null}
@@ -485,6 +488,7 @@ export function FormaChart({
                   key={`${windowStart}-${windowEnd}`}
                   data={data}
                   built={built}
+                  chartWidth={CW}
                   color={color}
                   locale={locale}
                   hoverIdx={isAnimating ? null : hoverIdx}
@@ -565,7 +569,7 @@ export function FormaChart({
             <button
               onClick={() => navigate("right")}
               disabled={!canGoBack || isAnimating}
-              className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="min-h-11 px-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               ← {locale === "en" ? "Older" : "Starije"}
             </button>
@@ -596,7 +600,7 @@ export function FormaChart({
             <button
               onClick={() => navigate("left")}
               disabled={!canGoForward || isAnimating}
-              className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="min-h-11 px-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               {locale === "en" ? "Newer" : "Novije"} →
             </button>
