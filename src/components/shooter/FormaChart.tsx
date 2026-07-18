@@ -506,7 +506,7 @@ export function FormaChart({
         {/* Metric strip */}
         {forma && (
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0 px-3 py-2.5 text-[0.8125rem] border-t border-[var(--border)] bg-[var(--surface-2)] sm:gap-x-3 sm:px-4">
-              <span className="flex items-baseline gap-0.5 sm:gap-1">
+              <span className="flex items-baseline gap-1">
                 <span className="text-[var(--subtle)]">{t.level}</span>
                 <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
                   {forma.level.toFixed(1)}
