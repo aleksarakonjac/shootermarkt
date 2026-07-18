@@ -26,7 +26,7 @@ export default async function PublicLayout({ children, params }: Props) {
     <>
       <header className="sticky top-0 z-[var(--z-sticky)] bg-[var(--bg)] border-b border-[var(--border)]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-14 items-center gap-4">
+          <div className="flex h-14 items-center gap-2 lg:gap-4">
 
             {/* Logo */}
             <ScopedLink href="/" className="flex items-baseline gap-0 shrink-0 no-underline">
