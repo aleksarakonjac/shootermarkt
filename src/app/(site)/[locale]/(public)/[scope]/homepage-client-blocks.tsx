@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import { Ticker, type TickerItem } from "../ticker";
 import { UpcomingEvents } from "../components/UpcomingEvents";
 import { ScopedLink } from "../components/ScopedLink";
 import { TopFormaClient } from "./top-forma-client";
+import { useHomepageDataStatus } from "./homepage-data-status";
+import { LEVEL_STYLE } from "@/lib/competition-utils";
+
+const FALLBACK_LEVEL_STYLE = { background: "var(--level-club-bg)", color: "var(--level-club-fg)" };
 
 function useHomepageData<T>(path: string) {
   const locale = useLocale();
@@ -14,23 +18,34 @@ function useHomepageData<T>(path: string) {
   const [data, setData] = useState<T | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
+  const autoRetried = useRef<string | null>(null);
+  const { clearFailure, reportFailure } = useHomepageDataStatus();
+  const retry = useCallback(() => {
+    setState("loading");
+    setAttempt((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
+    clearFailure(path);
     fetch(`${path}?scope=${scope ?? "srb"}&locale=${locale}`, { signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Homepage request failed")))
-      .then((result) => { setData(result); setState("ready"); })
+      .then((result) => { setData(result); setState("ready"); clearFailure(path); })
       .catch((error) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setState("error");
+        reportFailure(path, retry);
       });
     return () => controller.abort();
-  }, [attempt, locale, path, scope]);
+  }, [attempt, clearFailure, locale, path, reportFailure, retry, scope]);
 
-  const retry = () => {
-    setState("loading");
-    setAttempt((value) => value + 1);
-  };
+  useEffect(() => {
+    const key = `${path}:${scope}:${locale}`;
+    if (state !== "error" || autoRetried.current === key) return;
+    autoRetried.current = key;
+    const timeout = window.setTimeout(retry, 3_000);
+    return () => window.clearTimeout(timeout);
+  }, [locale, path, retry, scope, state]);
 
   return { data, state, retry };
 }

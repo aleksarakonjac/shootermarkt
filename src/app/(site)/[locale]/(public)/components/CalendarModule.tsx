@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useParams } from "next/navigation";
 import { getLevelLabel, LEVEL_DOT_COLOR, LEVEL_STYLE } from "@/lib/competition-utils";
+import { useHomepageDataStatus } from "../[scope]/homepage-data-status";
 
 interface Competition {
   id: number;
@@ -46,10 +47,14 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   const initialMonthKey = `${today.getFullYear()}-${today.getMonth()}`;
   const [monthCache, setMonthCache] = useState<Record<string, Competition[]>>(() => competitions ? { [initialMonthKey]: competitions } : {});
   const [monthState, setMonthState] = useState<Record<string, "loading" | "ready" | "error">>(() => competitions ? { [initialMonthKey]: "ready" } : {});
+  const autoRetriedMonths = useRef(new Set<string>());
+  const { clearFailure, reportFailure } = useHomepageDataStatus();
 
   const loadMonth = useCallback(async (year: number, month: number) => {
     const key = `${year}-${month}`;
     if (Object.hasOwn(monthCache, key)) return;
+    const isCurrentMonth = key === `${viewYear}-${viewMonth}`;
+    if (isCurrentMonth) clearFailure("calendar");
     setMonthState((states) => ({ ...states, [key]: "loading" }));
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
@@ -60,12 +65,13 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
       if (!Array.isArray(data)) throw new Error("Invalid calendar response");
       setMonthCache((cache) => Object.hasOwn(cache, key) ? cache : { ...cache, [key]: data });
       setMonthState((states) => ({ ...states, [key]: "ready" }));
+      if (isCurrentMonth) clearFailure("calendar");
     } catch {
       setMonthState((states) => ({ ...states, [key]: "error" }));
     } finally {
       clearTimeout(timeout);
     }
-  }, [locale, monthCache, scope]);
+  }, [clearFailure, locale, monthCache, scope, viewMonth, viewYear]);
 
   useEffect(() => {
     const previous = new Date(viewYear, viewMonth - 1, 1);
@@ -145,6 +151,15 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   const selectedComps = selectedDate ? (compsByDate.get(selectedDate) ?? []) : [];
   const currentMonthKey = `${viewYear}-${viewMonth}`;
   const currentState = monthState[currentMonthKey] ?? "loading";
+
+  useEffect(() => {
+    if (currentState !== "error") return;
+    reportFailure("calendar", () => void loadMonth(viewYear, viewMonth));
+    if (autoRetriedMonths.current.has(currentMonthKey)) return;
+    autoRetriedMonths.current.add(currentMonthKey);
+    const timeout = window.setTimeout(() => void loadMonth(viewYear, viewMonth), 3_000);
+    return () => window.clearTimeout(timeout);
+  }, [currentMonthKey, currentState, loadMonth, reportFailure, viewMonth, viewYear]);
 
   const DAYS_ORDER = [1, 2, 3, 4, 5, 6, 0];
 

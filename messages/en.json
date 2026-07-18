@@ -246,6 +246,7 @@
     "scrollRight": "Scroll right",
     "allNewsLink": "All news →",
     "noArticles": "Coming soon — first news and analysis",
+    "someDataUnavailable": "Some data could not be loaded.",
     "newsBadge": "News",
     "clubLeaderboard": "Club Leaderboard",
     "noClubData": "Not enough data for club ranking.",

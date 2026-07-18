@@ -1,8 +1,9 @@
 "use client";
 
 import { ScopedLink } from "./ScopedLink";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { useHomepageDataStatus } from "../[scope]/homepage-data-status";
 
 interface ArticleSummary {
   id: number;
@@ -29,30 +30,41 @@ export function NewsSection() {
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
+  const autoRetried = useRef(false);
+  const { clearFailure, reportFailure } = useHomepageDataStatus();
+  const retry = useCallback(() => {
+    setState("loading");
+    setAttempt((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     let timedOut = false;
     const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 5000);
+    clearFailure("news");
     fetch("/api/news", { signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("News request failed")))
       .then((data) => {
         if (!Array.isArray(data)) throw new Error("Invalid news response");
         setArticles(data);
         setState("ready");
+        clearFailure("news");
       })
       .catch((error) => {
         if (error instanceof DOMException && error.name === "AbortError" && !timedOut) return;
         setState("error");
+        reportFailure("news", retry);
       })
       .finally(() => clearTimeout(timeout));
     return () => { controller.abort(); clearTimeout(timeout); };
-  }, [attempt]);
+  }, [attempt, clearFailure, reportFailure, retry]);
 
-  const retry = () => {
-    setState("loading");
-    setAttempt((value) => value + 1);
-  };
+  useEffect(() => {
+    if (state !== "error" || autoRetried.current) return;
+    autoRetried.current = true;
+    const timeout = window.setTimeout(retry, 3_000);
+    return () => window.clearTimeout(timeout);
+  }, [retry, state]);
 
   return (
     <section className="flex flex-col gap-4">
