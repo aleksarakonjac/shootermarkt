@@ -240,8 +240,7 @@ export default async function ShooterPage({ params }: Props) {
             </h1>
 
             {/* Compact meta */}
-            <dl className="grid grid-cols-1 gap-y-0.5 mt-2 max-w-full min-[360px]:grid-cols-2 min-[360px]:gap-x-3 sm:grid-cols-[auto_auto] sm:gap-x-4">
-              {/* Row 1: NOC | Disciplina */}
+            <dl className="mt-2 flex max-w-full flex-wrap items-baseline gap-x-3 gap-y-1">
               {nocEntry && (
                 <div className="flex min-w-0 items-center gap-1 text-sm">
                   <dt className="sr-only">{tProfile("nationality")}</dt>
@@ -261,7 +260,6 @@ export default async function ShooterPage({ params }: Props) {
                   </dd>
                 </div>
               )}
-              {/* Row 2: Godište | Kategorija */}
               {(shooter.birthDate || shooter.birthYear) && (
                 <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{tProfile("birthYear")}:</dt>
@@ -279,7 +277,7 @@ export default async function ShooterPage({ params }: Props) {
                 </div>
               )}
               {shooter.club && (
-                <div className="flex min-w-0 items-baseline gap-1 text-sm min-[360px]:col-span-2">
+                <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{tProfile("club")}:</dt>
                   <dd className="min-w-0 truncate text-[var(--ink)]">{shooter.club.name}</dd>
                 </div>
