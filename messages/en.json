@@ -29,6 +29,8 @@
     "shootersSection": "Shooters",
     "competitionsSection": "Competitions",
     "noResults": "No results for \"{query}\"",
+    "error": "Search is temporarily unavailable.",
+    "retry": "Try again",
     "emptyHint": "Type to search shooters and competitions",
     "clear": "Clear",
     "navArrows": "navigate",

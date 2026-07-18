@@ -29,6 +29,8 @@
     "shootersSection": "Strelci",
     "competitionsSection": "Takmičenja",
     "noResults": "Nema rezultata za „{query}“",
+    "error": "Pretraga trenutno nije dostupna.",
+    "retry": "Pokušaj ponovo",
     "emptyHint": "Kucajte za pretragu strelaca i takmičenja",
     "clear": "Obriši",
     "navArrows": "navigacija",

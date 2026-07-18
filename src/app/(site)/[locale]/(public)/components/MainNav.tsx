@@ -336,9 +336,11 @@ export function MainNav() {
           transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden ${
           mobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
-        role="dialog"
+        inert={!mobileOpen}
+        role={mobileOpen ? "dialog" : undefined}
         aria-label={tCommon("navigation")}
-        aria-modal="true"
+        aria-hidden={!mobileOpen}
+        aria-modal={mobileOpen || undefined}
       >
         {/* Search trigger */}
         <div className="px-4 pt-4 pb-3 border-b border-[var(--border)]">

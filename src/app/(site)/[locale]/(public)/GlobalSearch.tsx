@@ -121,9 +121,13 @@ export function GlobalSearch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
   const router = useRouter();
   const scopedHref = useScopedHref();
   const locale = useLocale();
@@ -131,10 +135,12 @@ export function GlobalSearch() {
   const t = useTranslations("search");
 
   const openModal = useCallback(() => {
+    lastFocusedElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setIsOpen(true);
     setQuery("");
     setResults(EMPTY_RESULTS);
     setIsSearching(false);
+    setSearchError(false);
     setActiveIndex(0);
   }, []);
 
@@ -145,16 +151,14 @@ export function GlobalSearch() {
     function onGlobalKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setIsOpen((v) => {
-          if (!v) { setQuery(""); setActiveIndex(0); }
-          return !v;
-        });
+        if (isOpen) closeModal();
+        else openModal();
       }
       if (e.key === "Escape") closeModal();
     }
     document.addEventListener("keydown", onGlobalKey);
     return () => document.removeEventListener("keydown", onGlobalKey);
-  }, [closeModal]);
+  }, [isOpen, closeModal, openModal]);
 
   // External trigger (mobile drawer, etc.)
   useEffect(() => {
@@ -171,6 +175,32 @@ export function GlobalSearch() {
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      lastFocusedElementRef.current?.focus();
+      lastFocusedElementRef.current = null;
+      return;
+    }
+
+    function trapFocus(event: KeyboardEvent) {
+      if (event.key !== "Tab") return;
+      const items = [...(dialogRef.current?.querySelectorAll<HTMLElement>('input, button:not([disabled]), a[href]') ?? [])];
+      if (!items.length) return;
+      const first = items[0];
+      const last = items.at(-1)!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", trapFocus);
+    return () => document.removeEventListener("keydown", trapFocus);
+  }, [isOpen]);
+
   // Scroll lock
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
@@ -183,22 +213,24 @@ export function GlobalSearch() {
     if (q.length < 2) return;
 
     const controller = new AbortController();
-    const timeout = setTimeout(async () => {
-      try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${scope ?? "srb"}&locale=${locale}`, {
-          signal: controller.signal,
-        });
-        if (response.ok) setResults(await response.json());
-      } finally {
-        if (!controller.signal.aborted) setIsSearching(false);
-      }
+    const timeout = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(q)}&scope=${scope ?? "srb"}&locale=${locale}`, {
+        signal: controller.signal,
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error("Search request failed");
+          return response.json();
+        })
+        .then((data) => setResults(data))
+        .catch(() => { if (!controller.signal.aborted) setSearchError(true); })
+        .finally(() => { if (!controller.signal.aborted) setIsSearching(false); });
     }, 150);
 
     return () => {
       controller.abort();
       clearTimeout(timeout);
     };
-  }, [q, scope, locale]);
+  }, [q, scope, locale, retry]);
 
   const filteredShooters = results.shooters;
   const filteredComps = results.competitions;
@@ -209,15 +241,16 @@ export function GlobalSearch() {
   function onInputKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIndex((v) => Math.min(v + 1, total - 1));
+      if (total > 0) setActiveIndex((v) => Math.max(0, Math.min(v + 1, total - 1)));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActiveIndex((v) => Math.max(v - 1, 0));
+      if (total > 0) setActiveIndex((v) => Math.max(0, v - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (total === 0) return;
-      if (activeIndex < filteredShooters.length) {
-        router.push(scopedHref(`/strelci/${filteredShooters[activeIndex].id}`));
+      const shooter = filteredShooters[activeIndex];
+      if (shooter) {
+        router.push(scopedHref(`/strelci/${shooter.id}`));
       } else {
         const c = filteredComps[activeIndex - filteredShooters.length];
         if (c) router.push(scopedHref(`/takmicenja/${c.id}`));
@@ -238,6 +271,7 @@ export function GlobalSearch() {
       aria-label={t("ariaLabel")}
     >
       <div
+        ref={dialogRef}
         className="w-full max-w-xl rounded-xl border border-[var(--border)] overflow-hidden"
         style={{ background: "var(--bg)" }}
       >
@@ -257,6 +291,7 @@ export function GlobalSearch() {
               setQuery(nextQuery);
               setResults(EMPTY_RESULTS);
               setIsSearching(nextQuery.trim().length >= 2);
+              setSearchError(false);
               setActiveIndex(0);
             }}
             onKeyDown={onInputKeyDown}
@@ -276,7 +311,7 @@ export function GlobalSearch() {
             type="button"
             onClick={closeModal}
             aria-label={t("navEsc")}
-            className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] px-1.5 py-1 rounded bg-[var(--surface-2)] border border-[var(--border)] text-[var(--subtle)] hover:text-[var(--muted)] transition-colors select-none"
+            className="shrink-0 min-h-11 px-2 font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] rounded bg-[var(--surface-2)] border border-[var(--border)] text-[var(--subtle)] hover:text-[var(--muted)] transition-colors select-none"
           >
             ESC
           </button>
@@ -293,6 +328,13 @@ export function GlobalSearch() {
           ) : isSearching ? (
             <div className="px-4 py-10 text-center">
               <p className="text-sm text-[var(--muted)]">Pretraživanje…</p>
+            </div>
+          ) : searchError ? (
+            <div className="px-4 py-10 text-center">
+              <p className="text-sm text-[var(--muted)]">{t("error")}</p>
+              <button onClick={() => { setSearchError(false); setIsSearching(true); setRetry((v) => v + 1); }} className="mt-3 min-h-11 px-3 text-sm font-semibold text-[var(--brand-primary)] hover:underline">
+                {t("retry")}
+              </button>
             </div>
           ) : total === 0 ? (
             <div className="px-4 py-10 text-center">
@@ -427,7 +469,7 @@ export function GlobalSearch() {
 
         {/* Footer hints */}
         {total > 0 && (
-          <div className="border-t border-[var(--border)] px-4 py-2 flex items-center gap-4 text-[0.6rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] select-none">
+          <div className="hidden border-t border-[var(--border)] px-4 py-2 sm:flex items-center gap-4 text-[0.6rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] select-none">
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 rounded border border-[var(--border)] bg-[var(--surface-2)]">↑↓</kbd>
               {t("navArrows")}
