@@ -11,7 +11,7 @@ interface FormaScoreInfoProps extends FormaScoreHeadingProps {
   heading?: string;
   description?: string;
   ariaLabel?: string;
-  align?: "left" | "right";
+  align?: "left" | "center" | "right";
   placement?: "top" | "bottom";
   className?: string;
 }
@@ -64,7 +64,7 @@ export function FormaScoreInfo({ locale = "sr", inverted = false, heading, descr
       i
     </button>
 
-    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "absolute", ...(placement === "top" ? { bottom: "calc(100% + 8px)" } : { top: "calc(100% + 8px)" }), ...(align === "right" ? { right: 0 } : { left: 0 }), width: 288, zIndex: "var(--z-tooltip)", fontFamily: "var(--font-sans)", textTransform: "none" }}>
+    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "absolute", ...(placement === "top" ? { bottom: "calc(100% + 8px)" } : { top: "calc(100% + 8px)" }), ...(align === "right" ? { right: 0 } : align === "center" ? { left: "50%", transform: "translateX(-50%)" } : { left: 0 }), width: "min(288px, calc(100vw - 2rem))", zIndex: "var(--z-tooltip)", fontFamily: "var(--font-sans)", textTransform: "none" }}>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
         {heading && <p className="mb-2" style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>{heading}</p>}
         {!heading && <div className="mb-2 flex items-baseline gap-1">
