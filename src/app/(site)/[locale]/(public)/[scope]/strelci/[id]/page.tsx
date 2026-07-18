@@ -239,12 +239,12 @@ export default async function ShooterPage({ params }: Props) {
               <span className="font-medium">{shooter.firstName}</span>
             </h1>
 
-            {/* Meta — inline key: value */}
-            <dl className="grid grid-cols-1 gap-y-0.5 mt-2 max-w-full sm:grid-cols-[auto_auto] sm:gap-x-4">
+            {/* Compact meta */}
+            <dl className="grid grid-cols-1 gap-y-0.5 mt-2 max-w-full min-[360px]:grid-cols-2 min-[360px]:gap-x-3 sm:grid-cols-[auto_auto] sm:gap-x-4">
               {/* Row 1: Nacionalnost | Godište */}
               {nocEntry && (
                 <div className="flex min-w-0 items-center gap-1 text-sm">
-                  <dt className="text-[var(--subtle)] shrink-0">{tProfile("nationality")}:</dt>
+                  <dt className="sr-only">{tProfile("nationality")}</dt>
                   <dd className="text-[var(--ink)] flex items-center gap-1">
                     {nocEntry.alpha2 && (
                       <span className={`fi fi-${nocEntry.alpha2.toLowerCase()} shrink-0`} style={{ fontSize: "0.9em", borderRadius: 2 }} aria-hidden="true" />
@@ -256,9 +256,9 @@ export default async function ShooterPage({ params }: Props) {
               {(shooter.birthDate || shooter.birthYear) && (
                 <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{tProfile("birthYear")}:</dt>
-                  <dd className="text-[var(--ink)]">
+                  <dd className="min-w-0 text-[var(--ink)]">
                     {shooter.birthDate
-                      ? `${new Date(shooter.birthDate).getFullYear()} (${shooter.birthDate.split("-").reverse().join(".")})`
+                      ? <><span className="sm:hidden">{new Date(shooter.birthDate).getFullYear()}</span><span className="hidden sm:inline">{`${new Date(shooter.birthDate).getFullYear()} (${shooter.birthDate.split("-").reverse().join(".")})`}</span></>
                       : shooter.birthYear}
                   </dd>
                 </div>
@@ -267,7 +267,7 @@ export default async function ShooterPage({ params }: Props) {
               {shooter.apparatus && (
                 <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{tProfile("discipline")}:</dt>
-                  <dd className="text-[var(--ink)]">
+                  <dd className="min-w-0 text-[var(--ink)]">
                     {shooter.apparatus === "rifle" ? t("aparatRifle") : shooter.apparatus === "pistol" ? t("aparatPistol") : tProfile("bothApparatus")}
                   </dd>
                 </div>
@@ -281,7 +281,7 @@ export default async function ShooterPage({ params }: Props) {
               {currentCategory && (
                 <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{locale === "en" ? "Category" : "Kategorija"}:</dt>
-                  <dd className="text-[var(--ink)]">{CATEGORY_LABEL[currentCategory]}</dd>
+                  <dd className="min-w-0 text-[var(--ink)]">{CATEGORY_LABEL[currentCategory]}</dd>
                 </div>
               )}
             </dl>
