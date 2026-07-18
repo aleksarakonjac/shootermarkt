@@ -465,7 +465,7 @@ export function GlobalSearch() {
       {/* Mobile trigger — icon only */}
       <button
         onClick={openModal}
-        className="lg:hidden flex items-center justify-center w-11 h-11 rounded-md text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
+        className="ml-auto flex h-11 w-11 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)] lg:hidden lg:ml-0"
         aria-label={t("ariaLabel")}
       >
         <SearchIcon size={16} />

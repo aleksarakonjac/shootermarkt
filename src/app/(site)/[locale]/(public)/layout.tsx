@@ -40,7 +40,7 @@ export default async function PublicLayout({ children, params }: Props) {
             <div className="hidden lg:block"><HeaderHomeLink /></div>
 
             {/* Nav groups (desktop) + hamburger (mobile, inside MainNav) */}
-            <div className="order-3 flex flex-1 items-center lg:order-none">
+            <div className="order-3 flex items-center lg:order-none lg:flex-1">
               <MainNav />
             </div>
 
