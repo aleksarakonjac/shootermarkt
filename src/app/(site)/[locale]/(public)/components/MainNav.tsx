@@ -332,9 +332,9 @@ export function MainNav() {
       <div
         ref={drawerRef}
         id="mobile-navigation"
-        className={`fixed top-14 left-0 bottom-0 w-[17.5rem] max-w-[90vw] z-[var(--z-modal)] bg-[var(--bg)] border-r border-[var(--border)] flex flex-col
+        className={`fixed top-14 right-0 bottom-0 w-[17.5rem] max-w-[90vw] z-[var(--z-modal)] bg-[var(--bg)] border-l border-[var(--border)] flex flex-col
           transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
+          mobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
         aria-label={tCommon("navigation")}
