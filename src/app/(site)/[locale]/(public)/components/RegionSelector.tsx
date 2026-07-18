@@ -87,7 +87,7 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
         }`}
       >
         {scopeIcon(scope)}
-        {!compact && <span className="hidden lg:block">{scope === "issf" ? "ISSF" : srbName}</span>}
+        {!compact && <span>{scope === "issf" ? "ISSF" : srbName}</span>}
         <svg
           width="9" height="9" viewBox="0 0 9 9"
           className={`shrink-0 text-[var(--muted)] transition-transform duration-150 ${open ? "rotate-180" : ""}`}

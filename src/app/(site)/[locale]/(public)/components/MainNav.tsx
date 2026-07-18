@@ -447,16 +447,9 @@ export function MainNav() {
         </div>
 
         {/* Bottom controls */}
-        <div className="border-t border-[var(--border)] px-4 py-4 flex items-center justify-between gap-3">
+        <div className="border-t border-[var(--border)] px-4 py-4 flex items-center gap-3">
           <ThemeToggle />
           <LocaleSwitcher />
-          <Link
-            href="/admin"
-            onClick={() => setMobileOpen(false)}
-            className="flex-1 text-center rounded-lg bg-[var(--surface-2)] hover:bg-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-colors"
-          >
-            Admin
-          </Link>
         </div>
       </div>
     </>
