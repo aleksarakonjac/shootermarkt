@@ -292,7 +292,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
               <>
                 <dt className="text-[var(--muted)]">Oružje</dt>
                 <dd className="text-[var(--ink)]">
-                  {{rifle:"Puška", pistol:"Pištolj", both:"Puška i pištolj", shotgun:"Shotgun"}[shooter.apparatus] ?? shooter.apparatus}
+                  {{rifle:"Puška", pistol:"Pištolj", both:"Puška/pištolj", shotgun:"Shotgun"}[shooter.apparatus] ?? shooter.apparatus}
                 </dd>
               </>
             )}

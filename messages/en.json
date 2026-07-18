@@ -169,7 +169,7 @@
       "club": "Club",
       "birthYear": "Birth year",
       "birthDate": "Date of birth",
-      "bothApparatus": "Rifle and pistol",
+      "bothApparatus": "Rifle/pistol",
       "verified": "Verified",
       "appearancesCount": "{count, plural, =1 {# appearance} other {# appearances}}",
       "age": "Age",

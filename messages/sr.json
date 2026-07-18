@@ -169,7 +169,7 @@
       "club": "Klub",
       "birthYear": "Godište",
       "birthDate": "Datum rođenja",
-      "bothApparatus": "Puška i pištolj",
+      "bothApparatus": "Puška/pištolj",
       "verified": "Verifikovan",
       "appearancesCount": "{count, plural, =1 {# nastup} other {# nastupa}}",
       "age": "Godina",
