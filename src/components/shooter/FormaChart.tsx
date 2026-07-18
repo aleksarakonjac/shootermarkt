@@ -505,8 +505,8 @@ export function FormaChart({
 
         {/* Metric strip */}
         {forma && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[0.8125rem] border-t border-[var(--border)] bg-[var(--surface-2)]">
-              <span className="flex items-baseline gap-1">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0 px-3 py-2.5 text-[0.8125rem] border-t border-[var(--border)] bg-[var(--surface-2)] sm:gap-x-3 sm:px-4">
+              <span className="flex items-baseline gap-0.5 sm:gap-1">
                 <span className="text-[var(--subtle)]">{t.level}</span>
                 <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
                   {forma.level.toFixed(1)}
@@ -514,9 +514,9 @@ export function FormaChart({
               </span>
               {forma.peakProximity !== null && (
                 <>
-                  <span className="text-[var(--border-strong)]" aria-hidden="true">·</span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="relative h-1.5 w-14 rounded-full bg-[var(--border)] overflow-hidden" aria-hidden="true">
+                  <span className="hidden text-[var(--border-strong)] min-[360px]:inline" aria-hidden="true">·</span>
+                  <span className="flex items-center gap-1 sm:gap-1.5">
+                    <span className="relative h-1.5 w-10 rounded-full bg-[var(--border)] overflow-hidden sm:w-14" aria-hidden="true">
                       <span
                         className="absolute inset-y-0 left-0 right-0 rounded-full origin-left"
                         style={{ background: color, transform: `scaleX(${forma.peakProximity})`, transition: "transform 220ms cubic-bezier(0.22,1,0.36,1)" }}
@@ -525,11 +525,11 @@ export function FormaChart({
                     <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
                       {Math.round(forma.peakProximity * 100)}%
                     </span>
-                    <span className="text-[var(--subtle)]">{t.peak}</span>
+                    <span className="hidden text-[var(--subtle)] min-[360px]:inline">{t.peak}</span>
                   </span>
                 </>
               )}
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1 sm:gap-1.5">
               <span className="text-[var(--ink)] font-medium">{t.consistency(forma.consistency)}</span>
               <span className="flex items-center gap-0.5" aria-hidden="true">
                 {Array.from({ length: 5 }).map((_, i) => {
@@ -545,7 +545,7 @@ export function FormaChart({
               </span>
             </span>
             {forma.trend !== "stable" && Math.abs(forma.momentum) > 0.15 && (
-              <span className="text-[var(--subtle)] italic">
+              <span className="hidden text-[var(--subtle)] italic min-[400px]:inline">
                 {(forma.momentum > 0) === (forma.trend === "up") ? t.momentumUp : t.momentumDown}
               </span>
             )}
