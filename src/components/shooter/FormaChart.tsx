@@ -324,7 +324,7 @@ export function FormaChart({
 
   const hovPt = hoverIdx !== null ? data[hoverIdx] : null;
   const hovForma = hoverIdx !== null ? yValues[hoverIdx] : null;
-  const TIP_W = 220, TIP_H = 115;
+  const TIP_W = 220, TIP_H = 132;
   const tipX = tooltipPos ? (tooltipPos.x + 16 + TIP_W > vpW ? tooltipPos.x - TIP_W - 16 : tooltipPos.x + 16) : 0;
   const tipY = tooltipPos ? Math.max(8, tooltipPos.y - TIP_H / 2) : 0;
 
@@ -343,14 +343,21 @@ export function FormaChart({
             <p style={{ color: "var(--muted)", fontSize: "0.75rem", marginTop: 3, fontFamily: "var(--font-jetbrains-mono,monospace)" }}>
               {fmtFull(hovPt.date)}
             </p>
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
+            <div className="flex items-start gap-2" style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
               <Link
                 href={`${competitionUrlBase}/${hovPt.competitionId}`}
-                className="pointer-events-auto hover:underline"
+                className="pointer-events-auto min-w-0 flex-1 hover:underline"
                 style={{ color: "var(--ink)", fontSize: "0.75rem", lineHeight: 1.4 }}
               >
                 {hovPt.competitionName}
               </Link>
+              <span
+                title={locale === "en" ? "Qualification result" : "Kvalifikacioni rezultat"}
+                className="shrink-0"
+                style={{ color: "var(--muted)", fontFamily: "var(--font-jetbrains-mono,monospace)", fontSize: "0.75rem", fontWeight: 700, lineHeight: 1.4 }}
+              >
+                {hovPt.score % 1 === 0 ? hovPt.score : hovPt.score.toFixed(1)}
+              </span>
             </div>
           </div>
         </div>
