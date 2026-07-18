@@ -110,34 +110,37 @@ export default async function VestiPage({ searchParams }: Props) {
       </div>
 
       {/* ── Category filter chips ── */}
-      <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-        <ScopedLink
-          href="/vesti"
-          className={`shrink-0 px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
-            !activeCategory
-              ? "bg-[var(--ink)] text-[var(--bg)]"
-              : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]"
-          }`}
-        >
-          {t("allCategories")}
-        </ScopedLink>
-        {CATEGORIES.map((cat) => (
+      <div className="relative mb-6">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
           <ScopedLink
-            key={cat.value}
-            href={`/vesti?kategorija=${cat.value}`}
+            href="/vesti"
             className={`shrink-0 px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
-              activeCategory === cat.value
-                ? "text-white"
+              !activeCategory
+                ? "bg-[var(--ink)] text-[var(--bg)]"
                 : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]"
             }`}
-            style={activeCategory === cat.value
-              ? { background: CATEGORY_COLOR[cat.value] }
-              : undefined
-            }
           >
-            {cat.label}
+            {t("allCategories")}
           </ScopedLink>
-        ))}
+          {CATEGORIES.map((cat) => (
+            <ScopedLink
+              key={cat.value}
+              href={`/vesti?kategorija=${cat.value}`}
+              className={`shrink-0 px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
+                activeCategory === cat.value
+                  ? "text-white"
+                  : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]"
+              }`}
+              style={activeCategory === cat.value
+                ? { background: CATEGORY_COLOR[cat.value] }
+                : undefined
+              }
+            >
+              {cat.label}
+            </ScopedLink>
+          ))}
+        </div>
+        <div aria-hidden="true" className="pointer-events-none absolute -right-4 top-0 bottom-0 w-12 bg-gradient-to-l from-[var(--bg)] to-transparent sm:hidden" />
       </div>
 
       {/* ── Main layout: articles + sidebar ── */}
