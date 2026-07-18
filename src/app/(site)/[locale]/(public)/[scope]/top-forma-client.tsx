@@ -50,14 +50,14 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
       {/* Widget Header with Tabs */}
-      <div className="bg-[var(--brand-primary)] px-4 py-2 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)]">
-        <h3 className="flex items-center gap-1 font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-white">
+      <div className="flex flex-nowrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--brand-primary)] px-4 py-2">
+        <h3 className="flex shrink-0 items-center gap-1 font-[family-name:var(--font-barlow-condensed)] text-base font-bold uppercase tracking-wider text-white sm:text-lg">
           <span>Top</span>
-          <FormaScoreMark size="base" inverted />
+          <FormaScoreMark size="md" inverted />
           <FormaScoreInfo locale={locale} inverted />
         </h3>
         
-        <div className="flex gap-0.5 rounded bg-[rgba(255,255,255,0.1)] p-0.5" role="group" aria-label={t("topForm")}>
+        <div className="flex shrink-0 gap-0.5 rounded bg-[rgba(255,255,255,0.1)] p-0.5" role="group" aria-label={t("topForm")}>
           {TABS.map((tab) => {
             const active = activeTab === tab.code;
             return (
@@ -65,7 +65,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
                 key={tab.code}
                 onClick={() => setActiveTab(tab.code)}
                 aria-pressed={active}
-                className="min-h-10 min-w-11 rounded px-2.5 py-1 text-xs font-semibold uppercase transition-colors"
+                className="min-h-10 min-w-9 rounded px-1.5 py-1 text-xs font-semibold uppercase transition-colors sm:min-w-11 sm:px-2.5"
                 style={{
                   background: active ? "var(--bg)" : "transparent",
                   color: active ? "var(--brand-primary)" : "white",

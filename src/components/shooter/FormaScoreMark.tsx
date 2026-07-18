@@ -21,7 +21,7 @@ export function FormaScoreMark({ className, style, size = "md", inverted = false
     <span
       className={className}
       style={{ whiteSpace: "nowrap", lineHeight: 1, ...style }}
-      aria-label="FormaScore"
+      aria-label="FORMAScore"
     >
       <span
         style={{

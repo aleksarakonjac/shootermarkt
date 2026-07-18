@@ -8,8 +8,8 @@ interface FormaScoreHeadingProps {
 }
 
 const INFO: Record<string, string> = {
-  sr: "FormaScore je prognoza sledećeg rezultata. Noviji i jači nastupi imaju veću težinu, a trend projektuje trenutni nivo unapred. Pouzdanost i konzistentnost se prikazuju odvojeno.",
-  en: "FormaScore predicts the next result. More recent and stronger performances carry greater weight, while trend projects the current level forward. Reliability and consistency are shown separately.",
+  sr: "FORMAScore je prognoza sledećeg rezultata. Noviji i jači nastupi imaju veću težinu, a trend projektuje trenutni nivo unapred. Pouzdanost i konzistentnost se prikazuju odvojeno.",
+  en: "FORMAScore predicts the next result. More recent and stronger performances carry greater weight, while trend projects the current level forward. Reliability and consistency are shown separately.",
 };
 
 export function FormaScoreInfo({ locale = "sr", inverted = false }: FormaScoreHeadingProps & { inverted?: boolean }) {
@@ -39,7 +39,7 @@ export function FormaScoreInfo({ locale = "sr", inverted = false }: FormaScoreHe
       type="button"
       onClick={() => setOpen((value) => !value)}
       onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
-      aria-label={locale === "en" ? "What is FormaScore?" : "Šta je FormaScore?"}
+      aria-label={locale === "en" ? "What is FORMAScore?" : "Šta je FORMAScore?"}
       aria-expanded={open}
       aria-controls={panelId}
       style={{
