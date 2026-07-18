@@ -7,14 +7,24 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 const DISC_CODES = ["ARM", "ARW", "APM", "APW"] as const;
 const MAX_SCORE_BY_DISCIPLINE: Record<string, number> = { ARM: 654, ARW: 654, APM: 600, APW: 600 };
 
+export function selectTickerUpcoming<T extends { date: string }>(competitions: T[], today: string) {
+  const deadline = new Date(`${today}T00:00:00Z`);
+  deadline.setUTCDate(deadline.getUTCDate() + 14);
+  const withinTwoWeeks = competitions.filter((competition) => competition.date > today && competition.date <= deadline.toISOString().slice(0, 10)).slice(0, 8);
+  return withinTwoWeeks.length ? withinTwoWeeks : competitions.filter((competition) => competition.date > today).slice(0, 3);
+}
+
 export async function getHomepageTicker(scope: Scope, locale: string) {
   const today = new Date().toISOString().slice(0, 10);
-  const rows = await db.select({ id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, level: competitions.level, location: competitions.location, countryCode2: countries.code2, nocCode: countries.nocCode }).from(competitions).leftJoin(countries, eq(competitions.countryId, countries.id)).where(and(sql`${competitions.date} >= ${today}`, buildCompetitionScopeFilter(scope))).orderBy(competitions.date).limit(8);
-  const live = await Promise.all(rows.filter((competition) => competition.date === today).map(async (competition) => {
+  const fields = { id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, level: competitions.level, location: competitions.location, countryCode2: countries.code2, nocCode: countries.nocCode };
+  const scopeFilter = buildCompetitionScopeFilter(scope);
+  const liveRows = await db.select(fields).from(competitions).leftJoin(countries, eq(competitions.countryId, countries.id)).where(and(eq(competitions.date, today), scopeFilter)).orderBy(competitions.date);
+  const futureRows = await db.select(fields).from(competitions).leftJoin(countries, eq(competitions.countryId, countries.id)).where(and(sql`${competitions.date} > ${today}`, scopeFilter)).orderBy(competitions.date).limit(8);
+  const live = await Promise.all(liveRows.map(async (competition) => {
     const best = await db.select({ qualTotal: results.qualTotal, lastName: shooters.lastName, discCode: disciplines.code }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).innerJoin(disciplines, eq(results.disciplineId, disciplines.id)).where(and(eq(results.competitionId, competition.id), scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined)).orderBy(desc(results.qualTotal)).limit(1);
     return { ...competition, name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name), best: best[0] ?? null };
   }));
-  return { today, live, upcoming: rows.filter((competition) => competition.date > today).map((competition) => ({ ...competition, name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name) })) };
+  return { today, live, upcoming: selectTickerUpcoming(futureRows, today).map((competition) => ({ ...competition, name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name) })) };
 }
 
 export async function getHomepageMain(scope: Scope) {
