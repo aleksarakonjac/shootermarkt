@@ -235,7 +235,7 @@ export function FormaChart({
   const t = {
     reliability: en ? "Prediction confidence range (±)" : "Raspon pouzdanosti prognoze (±)",
     level:       en ? "Level" : "Nivo",
-    peak:        en ? "peak" : "peak",
+    peak:        "Peak",
     consistency: (c: number) =>
       c >= 0.75 ? (en ? "Stable" : "Stabilan")
       : c >= 0.5 ? (en ? "Variable" : "Promenljiv")
