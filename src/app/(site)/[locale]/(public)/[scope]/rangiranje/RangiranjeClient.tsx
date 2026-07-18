@@ -300,12 +300,13 @@ export function RangiranjeClient({
       {categoriesPresent.length > 1 && (
         <div className="flex items-center gap-1 mb-4 flex-wrap">
           <button
+            aria-pressed={activeKategorija === null}
             onClick={() => setActiveKategorija(null)}
-            className="inline-flex items-center px-2.5 py-1 rounded-md text-[0.7rem] font-semibold transition-colors"
+            className="inline-flex items-center px-2.5 py-2 rounded-md text-[0.7rem] font-semibold transition-colors"
             style={
               activeKategorija === null
                 ? { background: "var(--brand-primary)", color: "white" }
-                : { background: "transparent", color: "var(--subtle)", border: "1px solid var(--border)" }
+                : { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" }
             }
           >
             {labels.all}
@@ -315,12 +316,13 @@ export function RangiranjeClient({
             return (
               <button
                 key={cat}
+                aria-pressed={active}
                 onClick={() => setActiveKategorija(cat)}
-                className="inline-flex items-center px-2.5 py-1 rounded-md text-[0.7rem] font-semibold transition-colors"
+                className="inline-flex items-center px-2.5 py-2 rounded-md text-[0.7rem] font-semibold transition-colors"
                 style={
                   active
                     ? { background: "var(--brand-primary)", color: "white" }
-                    : { background: "transparent", color: "var(--subtle)", border: "1px solid var(--border)" }
+                    : { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" }
                 }
               >
                 {CATEGORY_LABEL[cat]}
@@ -337,6 +339,7 @@ export function RangiranjeClient({
           return (
             <button
               key={key}
+              aria-pressed={active}
               onClick={() => {
                 setActiveView(key);
                 // "improved" doesn't allow "karijera" period
@@ -345,7 +348,7 @@ export function RangiranjeClient({
                   setSeasonYear(currentSeasonStartYear("vazdusna"));
                 }
               }}
-              className="inline-flex items-center shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border"
+              className="inline-flex items-center shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-colors border"
               style={
                 active
                   ? { background: "var(--brand-primary)", color: "white", borderColor: "var(--brand-primary)" }
@@ -368,8 +371,9 @@ export function RangiranjeClient({
             ).map((pt) => (
               <button
                 key={pt}
+                aria-pressed={activePeriod === pt}
                 onClick={() => handlePeriodChange(pt)}
-                className="px-2.5 py-1 rounded-md text-[0.7rem] font-semibold transition-colors"
+                className="px-2.5 py-2 rounded-md text-[0.7rem] font-semibold transition-colors"
                 style={
                   activePeriod === pt
                     ? { background: "var(--ink)", color: "var(--bg)" }
@@ -391,8 +395,9 @@ export function RangiranjeClient({
                 {seasonPeriods.map((y) => (
                   <button
                     key={y}
+                    aria-pressed={seasonYear === y}
                     onClick={() => setSeasonYear(y)}
-                    className="px-2 py-1 rounded-md text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] font-semibold transition-colors"
+                    className="px-2 py-2 rounded-md text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] font-semibold transition-colors"
                     style={
                       seasonYear === y
                         ? { background: "var(--brand-primary)", color: "white" }
@@ -412,6 +417,7 @@ export function RangiranjeClient({
       {allNocs.length > 1 && (
         <div className="flex flex-wrap items-center gap-1 mb-5">
           <button
+            aria-pressed={!activeZemlja}
             onClick={() => setActiveZemlja(null)}
             className="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors font-[family-name:var(--font-jetbrains-mono)]"
             style={
@@ -428,6 +434,7 @@ export function RangiranjeClient({
             return (
               <button
                 key={noc}
+                aria-pressed={active}
                 onClick={() => setActiveZemlja(active ? null : noc)}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors font-[family-name:var(--font-jetbrains-mono)]"
                 style={
@@ -446,7 +453,7 @@ export function RangiranjeClient({
               </button>
             );
           })}
-          <span className="text-xs text-[var(--subtle)] ml-1 font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
+          <span className="text-xs text-[var(--muted)] ml-1 font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
             {displayed.length}
           </span>
         </div>
@@ -459,24 +466,25 @@ export function RangiranjeClient({
       ) : (
         <div className="rounded-xl border border-[var(--border)] overflow-hidden">
           <table className="w-full text-sm">
+            <caption className="sr-only">{labels.activeTabLabel} — {labels.title}</caption>
             <thead>
               <tr className="bg-[var(--surface-2)] border-b border-[var(--border)]">
-                <th className={`${TH} text-right w-12`}>#</th>
-                <th className={`${TH} text-left`}>{labels.shooter}</th>
-                <th className={`${TH} text-left hidden md:table-cell`}>{labels.country}</th>
-                <th className={`${TH} text-left hidden lg:table-cell`}>{labels.club}</th>
-                <th className={`${TH} text-right`}>
+                <th scope="col" className={`${TH} text-right w-12`}>#</th>
+                <th scope="col" className={`${TH} text-left`}>{labels.shooter}</th>
+                <th scope="col" className={`${TH} text-left hidden md:table-cell`}>{labels.country}</th>
+                <th scope="col" className={`${TH} text-left hidden lg:table-cell`}>{labels.club}</th>
+                <th scope="col" className={`${TH} text-right`}>
                   {activeView === "improved"
                     ? labels.improvedCol
                     : labels[VIEWS.find((v) => v.key === activeView)!.labelKey] as string}
                 </th>
-                <th className={`${TH} text-right hidden sm:table-cell`}>
+                <th scope="col" className={`${TH} text-right hidden sm:table-cell`}>
                   {activeView === "forma" ? labels.peak : labels.inSeason}
                 </th>
                 {isAP && (
-                  <th className={`${TH} text-right hidden sm:table-cell`}>{labels.inners}</th>
+                  <th scope="col" className={`${TH} text-right hidden sm:table-cell`}>{labels.inners}</th>
                 )}
-                <th className={`${TH} text-right hidden md:table-cell`}>{labels.appearances}</th>
+                <th scope="col" className={`${TH} text-right hidden md:table-cell`}>{labels.appearances}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
@@ -493,7 +501,7 @@ export function RangiranjeClient({
                         className="font-[family-name:var(--font-barlow-condensed)] font-extrabold tabular-nums leading-none"
                         style={{
                           fontSize: isFirst ? "1.2rem" : isTop3 ? "1rem" : "0.875rem",
-                          color: isFirst ? "var(--brand-primary)" : isTop3 ? "var(--ink)" : "var(--subtle)",
+                          color: isFirst ? "var(--rank-accent)" : isTop3 ? "var(--ink)" : "var(--muted)",
                         }}
                       >
                         {rank}
@@ -589,7 +597,7 @@ export function RangiranjeClient({
                           >
                             {s.improvement! > 0 ? "+" : ""}{s.improvement!.toFixed(1)}
                           </span>
-                          <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
+                          <span className="text-xs text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)]">
                             → {s.seasonAvg!.toFixed(1)}
                           </span>
                         </span>
@@ -615,7 +623,7 @@ export function RangiranjeClient({
                     )}
 
                     {/* Nastupa */}
-                    <td className="px-4 py-3 text-right text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] tabular-nums hidden md:table-cell">
+                    <td className="px-4 py-3 text-right text-xs text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)] tabular-nums hidden md:table-cell">
                       {s.matches.length}
                     </td>
                   </tr>
@@ -626,12 +634,12 @@ export function RangiranjeClient({
 
           {/* Footer */}
           <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 flex items-center justify-between">
-            <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
+            <span className="text-xs text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)]">
               {t("shootersCount", { count: displayed.length })} · {labels.activeTabLabel}
               {activeKategorija ? ` · ${CATEGORY_LABEL[activeKategorija]}` : ""}
               {activeZemlja ? ` · ${activeZemlja}` : ""}
             </span>
-            <span className="text-xs text-[var(--subtle)]">{labels.footerSubtitle}</span>
+            <span className="text-xs text-[var(--muted)]">{labels.footerSubtitle}</span>
           </div>
         </div>
       )}

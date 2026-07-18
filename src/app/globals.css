@@ -7,6 +7,7 @@
   --brand-primary:        #C20000;
   --brand-primary-hover: #A00000;
   --brand-primary-light: #ffb3b3;
+  --rank-accent:          var(--brand-primary);
 
   /* Accent — darker secondary blue */
   --brand-accent:         #003366;
@@ -68,14 +69,15 @@ html.dark {
   --border:        oklch(0.33 0.007 250);
   --border-strong: oklch(0.42 0.009 250);
 
-  /* Typography — dark */
+  /* Typography — dark (bumped for WCAG AA on dark surfaces) */
   --ink:    oklch(0.90 0.004 250);
-  --muted:  oklch(0.64 0.005 250);
-  --subtle: oklch(0.52 0.005 250);
+  --muted:  oklch(0.72 0.005 250);
+  --subtle: oklch(0.65 0.005 250);
 
-  /* Brand stays the same, slightly lighter accent */
+  /* Brand stays the same, slightly lighter accent; rank accent lightened for contrast on dark bg */
   --brand-accent:       #1a5fa8;
   --brand-accent-hover: #1450a0;
+  --rank-accent:        oklch(0.65 0.22 28);
 
   /* Tag badge tokens — dark */
   --tag-sss-bg: oklch(0.22 0.04 150);  --tag-sss-fg: oklch(0.72 0.15 150);
