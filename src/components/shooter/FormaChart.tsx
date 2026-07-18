@@ -206,7 +206,7 @@ export function FormaChart({
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const vpW = useSyncExternalStore(subscribeToViewportWidth, getViewportWidth, getServerViewportWidth);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [svgW, setSvgW] = useState(800);
+  const [svgW, setSvgW] = useState(0);
 
   const [mode, setMode] = useState<"forma" | "nastup">("forma");
 

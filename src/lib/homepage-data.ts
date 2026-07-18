@@ -32,13 +32,29 @@ export async function getHomepageMain(scope: Scope) {
   const competitionScope = buildCompetitionScopeFilter(scope);
   const nationalityFilter = scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined;
   const [recentComps, cacheRows, upcoming] = await Promise.all([
-    db.select().from(competitions).where(competitionScope).orderBy(desc(competitions.date)).limit(3),
+    db.select().from(competitions).where(and(sql`${competitions.date} <= ${today}`, competitionScope)).orderBy(desc(competitions.date)).limit(3),
     db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE), isNotNull(shooterFormaCache.forma))),
     db.select().from(competitions).where(and(sql`${competitions.date} >= ${today}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
   ]);
   const recent = await Promise.all(recentComps.map(async (competition) => {
-    const winner = await db.select({ qualTotal: results.qualTotal, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, discCode: disciplines.code }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).innerJoin(disciplines, eq(results.disciplineId, disciplines.id)).where(and(eq(results.competitionId, competition.id), nationalityFilter)).orderBy(desc(results.qualTotal)).limit(1);
-    return { ...competition, winner: winner[0] ?? null };
+    // ponytail: fetches all qualifying rows per competition (bounded by event size); result is cached
+    const rows = await db.select({ discCode: disciplines.code, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, qualTotal: results.qualTotal, finalTotal: results.finalTotal, finalRank: results.finalRank }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).innerJoin(disciplines, eq(results.disciplineId, disciplines.id)).where(and(eq(results.competitionId, competition.id), isNotNull(results.qualTotal), inArray(disciplines.code, [...DISC_CODES]), nationalityFilter)).orderBy(asc(disciplines.code), desc(results.qualTotal)).limit(200);
+    type DE = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
+    const preferredCat = new Map<string, string>();
+    for (const row of rows) { const cur = preferredCat.get(row.discCode); if (!cur || (row.category === 'senior' && cur !== 'senior')) preferredCat.set(row.discCode, row.category); }
+    const qualMap = new Map<string, DE[]>();
+    const finalMap = new Map<string, DE[]>();
+    for (const row of rows) {
+      const cat = preferredCat.get(row.discCode);
+      if (row.category !== cat) continue;
+      const entry: DE = { firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality: row.nationality ?? null, countryCode2: row.countryCode2 ?? null, qualTotal: parseFloat(row.qualTotal!), finalTotal: row.finalTotal != null ? parseFloat(row.finalTotal) : null, finalRank: row.finalRank };
+      const qual = qualMap.get(row.discCode) ?? [];
+      if (qual.length < 3) { qual.push(entry); qualMap.set(row.discCode, qual); }
+      if (row.finalRank != null && row.finalRank >= 1 && row.finalRank <= 3) { const fins = finalMap.get(row.discCode) ?? []; fins.push(entry); finalMap.set(row.discCode, fins); }
+    }
+    for (const [, fins] of finalMap) fins.sort((a, b) => (a.finalRank ?? 99) - (b.finalRank ?? 99));
+    const discResults = DISC_CODES.map((code) => { const cat = preferredCat.get(code); if (!cat) return null; const qualTop3 = qualMap.get(code) ?? []; const finalTop3 = finalMap.get(code) ?? []; if (qualTop3.length === 0 && finalTop3.length === 0) return null; return { discCode: code, isJunior: cat !== 'senior', category: cat, hasFinale: finalTop3.length > 0, qualTop3, finalTop3 }; }).filter((x): x is NonNullable<typeof x> => x !== null);
+    return { ...competition, discResults };
   }));
   const topByDisc = Object.fromEntries(DISC_CODES.map((code) => [code, cacheRows.filter((row) => row.discCode === code).sort((a, b) => Number(b.forma) - Number(a.forma)).slice(0, 5)])) as Record<typeof DISC_CODES[number], typeof cacheRows>;
   const ids = [...new Set(Object.values(topByDisc).flat().map((row) => row.shooterId))];

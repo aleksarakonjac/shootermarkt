@@ -11,6 +11,7 @@ import { useHomepageDataStatus } from "./homepage-data-status";
 import { LEVEL_STYLE } from "@/lib/competition-utils";
 
 const FALLBACK_LEVEL_STYLE = { background: "var(--level-club-bg)", color: "var(--level-club-fg)" };
+const INTL_LEVELS = new Set(["olympic", "world", "continental", "international"]);
 
 function useHomepageData<T>(path: string) {
   const locale = useLocale();
@@ -78,52 +79,184 @@ export function HomepageMainClient() {
   const locale = useLocale();
   const t = useTranslations("home");
   const tComp = useTranslations("competition");
-  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; winner: { firstName: string; lastName: string; qualTotal: string; discCode: string } | null }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; discResults: Array<{ discCode: string; isJunior: boolean; category: string; hasFinale: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; finalTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
   if (state === "loading") return <div aria-busy="true" className="h-48 animate-pulse rounded-xl bg-[var(--surface)]" />;
   if (state === "error" || !data) return <HomepageError retry={retry} />;
 
   const upcoming = data.upcoming.map((item) => ({ ...item, name: locale === "en" ? (item.nameEn ?? item.name) : (item.nameSr ?? item.name) }));
   const [lead, ...recent] = data.recent;
+
+  type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
+  type DiscResult = { discCode: string; isJunior: boolean; hasFinale: boolean; qualTop3: Shooter[]; finalTop3: Shooter[] };
+
+  function renderDiscResults(discResults: DiscResult[], level: string) {
+    if (discResults.length === 0) return <p className="mt-4 text-sm italic text-[var(--muted)]">{t("noWinner")}</p>;
+    const isIntl = INTL_LEVELS.has(level.toLowerCase());
+    const aff = (e: Shooter) => {
+      if (!isIntl && e.clubName) return <span className="shrink-0 hidden sm:block text-[10px] text-[var(--muted)] max-w-[80px] truncate">{e.clubName}</span>;
+      if (!e.nationality) return null;
+      return (
+        <span className="shrink-0 flex items-center gap-0.5">
+          {e.countryCode2 && <span className={`fi fi-${e.countryCode2.toLowerCase()}`} style={{ fontSize: 11 }} aria-hidden="true" />}
+          <span className="font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold text-[var(--muted)]">{e.nationality}</span>
+        </span>
+      );
+    };
+    return (
+      <div className="mt-4 divide-y divide-[var(--border)]">
+        {discResults.map((disc) => {
+          if (disc.qualTop3.length === 0 && disc.finalTop3.length === 0) return null;
+          const isAP = disc.discCode.startsWith("AP");
+          const discBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--subtle)]">{disc.discCode}</span>;
+          const junBadge = disc.isJunior ? <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>JUN</span> : null;
+          return (
+            <div key={disc.discCode} className="py-2.5 first:pt-0 last:pb-0">
+              {disc.hasFinale && disc.finalTop3[0] ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    {discBadge}{junBadge}
+                    <span className="flex-1 min-w-0 text-sm font-semibold text-[var(--ink)] truncate">{disc.finalTop3[0].lastName} {disc.finalTop3[0].firstName.charAt(0)}.</span>
+                    {aff(disc.finalTop3[0])}
+                    <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums">{disc.finalTop3[0].finalTotal?.toFixed(1) ?? "—"}</span>
+                  </div>
+                  {disc.finalTop3.length > 1 && (
+                    <p className="mt-0.5 text-xs text-[var(--muted)]">
+                      {disc.finalTop3.slice(1).map((r, i) => `${i + 2}. ${r.lastName} ${r.firstName.charAt(0)}.`).join("  ·  ")}
+                    </p>
+                  )}
+                  {disc.qualTop3[0] && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--subtle)]">Q</span>
+                      <span className="flex-1 min-w-0 text-xs text-[var(--muted)] truncate">{disc.qualTop3[0].lastName} {disc.qualTop3[0].firstName.charAt(0)}.</span>
+                      {aff(disc.qualTop3[0])}
+                      <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums">{disc.qualTop3[0].qualTotal.toFixed(isAP ? 0 : 1)}</span>
+                    </div>
+                  )}
+                </>
+              ) : disc.qualTop3[0] ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    {discBadge}{junBadge}
+                    <span className="flex-1 min-w-0 text-sm font-semibold text-[var(--ink)] truncate">{disc.qualTop3[0].lastName} {disc.qualTop3[0].firstName.charAt(0)}.</span>
+                    {aff(disc.qualTop3[0])}
+                    <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums">{disc.qualTop3[0].qualTotal.toFixed(isAP ? 0 : 1)}</span>
+                  </div>
+                  {disc.qualTop3.length > 1 && (
+                    <p className="mt-0.5 text-xs text-[var(--muted)]">
+                      {disc.qualTop3.slice(1).map((r, i) => `${i + 2}. ${r.lastName} ${r.firstName.charAt(0)}. ${r.qualTotal.toFixed(isAP ? 0 : 1)}`).join("  ·  ")}
+                    </p>
+                  )}
+                </>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return <>
-    <UpcomingEvents competitions={upcoming} />
-    <section className="mt-8 flex flex-col gap-4">
+    <section className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between">
         <h2 className="font-[family-name:var(--font-barlow-condensed)] text-xl font-bold uppercase tracking-wider">{t("recentCompetitions")}</h2>
         <ScopedLink href="/takmicenja" className="text-sm font-semibold text-[var(--brand-primary)] hover:underline">{t("allCompsLink")}</ScopedLink>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {lead ? (() => {
-          const name = locale === "en" ? (lead.nameEn ?? lead.name) : (lead.nameSr ?? lead.name);
-          const levelKey = `levels.${lead.level.toLowerCase()}`;
-          return <ScopedLink href={`/takmicenja/${lead.id}`} className="group flex min-h-52 flex-col justify-between rounded-xl border border-[var(--border-strong)] bg-[var(--bg)] p-5 transition-colors hover:border-[var(--brand-primary)] md:col-span-2">
-            <div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-[var(--brand-primary)]">{t("winner")}</span>
-                <span className="text-xs font-bold uppercase text-[var(--muted)]">{tComp.has(levelKey) ? tComp(levelKey) : lead.level}</span>
+
+      {!lead ? (
+        <p className="py-8 text-sm text-[var(--muted)]">{t("noRecentComps")}</p>
+      ) : (() => {
+        const name = locale === "en" ? (lead.nameEn ?? lead.name) : (lead.nameSr ?? lead.name);
+        const levelKey = `levels.${lead.level.toLowerCase()}`;
+        const leadLevelLabel = tComp.has(levelKey) ? tComp(levelKey) : lead.level;
+        const leadLevelStyle = LEVEL_STYLE[lead.level.toLowerCase()] ?? FALLBACK_LEVEL_STYLE;
+        return (
+          <ScopedLink
+            href={`/takmicenja/${lead.id}`}
+            className="group block rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 hover:border-[var(--brand-primary)] transition-colors no-underline"
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
+                {leadLevelLabel}
+              </span>
+              <span className="text-xs text-[var(--muted)]">
+                {lead.date.split("-").reverse().join(".")}{lead.location ? ` · ${lead.location}` : ""}
+              </span>
+            </div>
+            <h3 className="mt-2 font-[family-name:var(--font-barlow-condensed)] text-xl sm:text-2xl font-extrabold uppercase leading-tight line-clamp-2 group-hover:text-[var(--brand-primary)] transition-colors">
+              {name}
+            </h3>
+            {renderDiscResults(lead.discResults, lead.level)}
+            <p className="mt-4 pt-3 border-t border-[var(--border)] text-sm font-semibold text-[var(--brand-primary)] group-hover:underline">
+              {t("viewResults")} →
+            </p>
+          </ScopedLink>
+        );
+      })()}
+
+      {recent.length > 0 && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
+          {recent.map((item) => {
+            const isExpanded = expandedId === item.id;
+            const name = locale === "en" ? (item.nameEn ?? item.name) : (item.nameSr ?? item.name);
+            const levelKey = `levels.${item.level.toLowerCase()}`;
+            const rowLevelLabel = tComp.has(levelKey) ? tComp(levelKey) : item.level;
+            const rowLevelStyle = LEVEL_STYLE[item.level.toLowerCase()] ?? FALLBACK_LEVEL_STYLE;
+            return (
+              <div key={item.id}>
+                <button
+                  onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                  aria-expanded={isExpanded}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--surface-2)] transition-colors"
+                >
+                  <span className="hidden sm:block shrink-0 text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={rowLevelStyle}>
+                    {rowLevelLabel}
+                  </span>
+                  <span className="flex-1 min-w-0 text-sm font-semibold text-[var(--ink)] truncate">
+                    {name}
+                  </span>
+                  <div className="shrink-0 flex items-center gap-2">
+                    {item.discResults[0]?.qualTop3[0] ? (
+                      <>
+                        <span className="text-xs text-[var(--muted)] hidden sm:block">{item.discResults[0].qualTop3[0].lastName}</span>
+                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--brand-primary)] tabular-nums">
+                          {item.discResults[0].qualTop3[0].qualTotal.toFixed(item.discResults[0].discCode.startsWith("AP") ? 0 : 1)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs italic text-[var(--muted)]">—</span>
+                    )}
+                  </div>
+                  <svg
+                    width="12" height="12" viewBox="0 0 12 12"
+                    className={`shrink-0 text-[var(--muted)] transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                    aria-hidden="true"
+                  >
+                    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                </button>
+
+                <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                  <div className="overflow-hidden">
+                    <div className="px-4 pb-4">
+                      {renderDiscResults(item.discResults, item.level)}
+                      <ScopedLink
+                        href={`/takmicenja/${item.id}`}
+                        className="mt-4 pt-3 border-t border-[var(--border)] text-sm font-semibold text-[var(--brand-primary)] hover:underline flex no-underline"
+                      >
+                        {t("viewResults")} →
+                      </ScopedLink>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <h3 className="mt-3 text-balance font-[family-name:var(--font-barlow-condensed)] text-2xl font-bold uppercase leading-tight group-hover:text-[var(--brand-primary)]">{name}</h3>
-              <p className="mt-2 text-sm text-[var(--muted)]">{lead.date.split("-").reverse().join(".")} · {lead.location || "—"}</p>
-            </div>
-            <div className="mt-6 flex items-end justify-between gap-4 border-t border-[var(--border)] pt-3">
-              {lead.winner ? <div className="min-w-0"><p className="truncate text-sm font-semibold">{lead.winner.lastName} {lead.winner.firstName} <span className="font-mono text-[var(--muted)]">· {lead.winner.discCode}</span></p></div> : <p className="text-sm italic text-[var(--muted)]">{t("noWinner")}</p>}
-              {lead.winner && <span className="shrink-0 font-mono text-3xl font-bold tracking-tight text-[var(--brand-primary)]">{Number(lead.winner.qualTotal).toFixed(lead.winner.discCode.startsWith("AP") ? 0 : 1)}</span>}
-            </div>
-            <span className="mt-4 text-sm font-semibold text-[var(--brand-primary)] group-hover:underline">{t("viewResults")} →</span>
-          </ScopedLink>;
-        })() : <p className="py-8 text-sm text-[var(--muted)] md:col-span-3">{t("noRecentComps")}</p>}
-        {recent.map((item) => {
-          const name = locale === "en" ? (item.nameEn ?? item.name) : (item.nameSr ?? item.name);
-          const levelKey = `levels.${item.level.toLowerCase()}`;
-          return <div key={item.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
-            <p className="text-xs font-bold uppercase text-[var(--muted)]">{tComp.has(levelKey) ? tComp(levelKey) : item.level}</p>
-            <h3 className="mt-1 truncate text-sm font-semibold">{name}</h3>
-            <p className="mt-3 text-sm text-[var(--muted)]">{item.date.split("-").reverse().join(".")} · {item.location || "—"}</p>
-            <div className="mt-3 border-t border-[var(--border)] pt-2 text-sm">{item.winner ? <><span className="font-semibold">{item.winner.lastName} {item.winner.firstName}</span><span className="float-right font-mono font-bold text-[var(--brand-primary)]">{Number(item.winner.qualTotal).toFixed(item.winner.discCode.startsWith("AP") ? 0 : 1)}</span></> : <span className="italic text-[var(--muted)]">{tComp("detail.noResults")}</span>}</div>
-          </div>;
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </section>
     <section className="mt-8"><TopFormaClient initialData={data.topForma as never} /></section>
+    <section className="mt-8"><UpcomingEvents competitions={upcoming} /></section>
   </>;
 }
 

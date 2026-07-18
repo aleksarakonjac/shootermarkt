@@ -232,7 +232,7 @@ export default async function ShooterPage({ params }: Props) {
         <div className="flex-1 min-w-0 pt-1 flex items-start gap-4">
           <div className="flex-1 min-w-0">
             <h1
-              className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] leading-none mb-3"
+              className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] leading-none mb-3 break-words"
               style={{ fontSize: "clamp(1.75rem, 5vw, 2.75rem)", letterSpacing: "-0.02em" }}
             >
               {shooter.lastName}{" "}
@@ -240,7 +240,7 @@ export default async function ShooterPage({ params }: Props) {
             </h1>
 
             {/* Meta — inline key: value */}
-            <dl className="grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 mt-2 w-fit">
+            <dl className="grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 mt-2 max-w-full">
               {/* Row 1: Nacionalnost | Godište */}
               {nocEntry && (
                 <div className="flex items-center gap-1 text-sm">
@@ -414,10 +414,10 @@ export default async function ShooterPage({ params }: Props) {
                   </div>
 
                   {/* Stats grid: 3-col mobile → 5-col desktop */}
-                  <div className="grid grid-cols-3 sm:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-[var(--border)]">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-px bg-[var(--border)]">
 
                     {/* Forma — primary stat */}
-                    <div className="px-4 py-3 sm:col-span-1">
+                    <div className="bg-[var(--surface)] px-4 py-3 sm:col-span-1">
                       <p className={LABEL_CLS}>{tProfile("form")}</p>
                       {forma !== null ? (
                         <div className="flex items-baseline gap-1.5 mt-0.5">
@@ -437,19 +437,19 @@ export default async function ShooterPage({ params }: Props) {
                     </div>
 
                     {/* Vrhunac */}
-                    <div className="px-4 py-3">
+                    <div className="bg-[var(--surface)] px-4 py-3">
                       <p className={LABEL_CLS}>{tProfile("statPeak")}</p>
                       <span className={`${VAL_CLS} text-base mt-0.5 block`}>{fmtNum(peak)}</span>
                     </div>
 
                     {/* Best-3 */}
-                    <div className="px-4 py-3">
+                    <div className="bg-[var(--surface)] px-4 py-3">
                       <p className={LABEL_CLS}>{tProfile("statBest3")}</p>
                       <span className={`${VAL_CLS} text-base mt-0.5 block`}>{fmtNum(best3)}</span>
                     </div>
 
                     {/* Sezona */}
-                    <div className="px-4 py-3">
+                    <div className="bg-[var(--surface)] px-4 py-3">
                       <p className={LABEL_CLS}>{tProfile("statSezonaProsek")}</p>
                       <div className="flex items-baseline gap-1 mt-0.5">
                         <span className={`${VAL_CLS} text-base`}>{fmtNum(sezona)}</span>
@@ -462,7 +462,7 @@ export default async function ShooterPage({ params }: Props) {
                     </div>
 
                     {/* Napredak vs prošla sezona */}
-                    <div className="px-4 py-3">
+                    <div className="bg-[var(--surface)] px-4 py-3">
                       <p className={LABEL_CLS}>{tProfile("statNapredak")}</p>
                       <span
                         className={`${VAL_CLS} text-base mt-0.5 block`}

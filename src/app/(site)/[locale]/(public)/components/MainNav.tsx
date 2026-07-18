@@ -442,16 +442,13 @@ export function MainNav() {
           })}
         </nav>
 
-        {/* Region selector */}
-        <div className="border-t border-[var(--border)] px-4 py-3 relative">
-          <p className="text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)] mb-2">{tCommon("scopeLabel")}</p>
-          <RegionSelector placement="top" />
-        </div>
-
         {/* Bottom controls */}
-        <div className="border-t border-[var(--border)] px-4 py-4 flex items-center gap-3">
-          <ThemeToggle />
-          <LocaleSwitcher />
+        <div className="border-t border-[var(--border)] px-4 py-3 flex items-center gap-2">
+          <RegionSelector placement="top" />
+          <div className="ml-auto flex items-center gap-1">
+            <ThemeToggle />
+            <LocaleSwitcher />
+          </div>
         </div>
       </div>
     </>

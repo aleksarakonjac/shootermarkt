@@ -96,12 +96,9 @@ export function UpcomingEvents({ competitions }: UpcomingEventsProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl leading-none uppercase tracking-wider text-[var(--ink)]">
+          <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl leading-none uppercase tracking-wider text-[var(--ink)] whitespace-nowrap">
             {t("upcomingEvents")}
           </h2>
-          <span className="inline-flex h-6 items-center rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 text-[10px] font-semibold leading-none text-[var(--muted)]">
-            {t("upcomingAnnounced", { count: competitions.length })}
-          </span>
         </div>
 
         <div className="flex items-center gap-2">

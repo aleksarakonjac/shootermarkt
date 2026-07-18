@@ -16,7 +16,7 @@ const SRB = { noc: "SRB", alpha2: "RS" };
 
 function scopeIcon(scope: Scope): React.ReactNode {
   if (scope === "issf")
-    return <Image src="/logos/issf.svg" alt="" aria-hidden={true} width={32} height={16} className="h-4 w-auto max-w-[2rem] object-contain" />;
+    return <Image src="/logos/issf.svg" alt="" aria-hidden={true} width={0} height={0} className="h-4 w-auto max-w-[2rem] object-contain" />;
   return <span className="fi fi-rs" style={{ fontSize: 15, borderRadius: 2 }} aria-hidden="true" />;
 }
 
@@ -118,7 +118,7 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
             }`}
           >
             <span className="flex items-center justify-center h-7 w-full">
-              <Image src="/logos/issf.svg" alt="" aria-hidden={true} width={64} height={28} className="h-7 w-auto max-w-[4rem] object-contain" />
+              <Image src="/logos/issf.svg" alt="" aria-hidden={true} width={0} height={0} className="h-7 w-auto max-w-[4rem] object-contain" />
             </span>
             <span className="text-[0.65rem] uppercase tracking-widest leading-none">ISSF</span>
           </button>

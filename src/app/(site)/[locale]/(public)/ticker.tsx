@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "@/i18n/navigation";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { useTranslations, useLocale } from "next-intl";
@@ -268,7 +268,38 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
 
 function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcoming: string; locale: string }) {
   const [paused, setPaused] = useState(false);
+  const [touchDx, setTouchDx] = useState(0);
+  const [smoothReturn, setSmoothReturn] = useState(false);
+  const touchStartX = useRef(0);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const doubled = [...items, ...items];
+
+  function cancelResume() {
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    cancelResume();
+    setSmoothReturn(false);
+    setPaused(true);
+    touchStartX.current = e.touches[0].clientX;
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    setTouchDx(e.touches[0].clientX - touchStartX.current);
+  }
+
+  function handleTouchEnd() {
+    resumeTimer.current = setTimeout(() => {
+      setSmoothReturn(true);
+      setTouchDx(0);
+      // resume after transition finishes
+      setTimeout(() => {
+        setSmoothReturn(false);
+        setPaused(false);
+      }, 250);
+    }, 1000);
+  }
 
   return (
     <div
@@ -276,8 +307,11 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
       style={{ height: 32, background: "var(--surface-2)", borderTop: "1px solid var(--border)" }}
       role="region"
       aria-label="Najava takmičenja"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      onMouseEnter={() => { cancelResume(); setPaused(true); }}
+      onMouseLeave={() => { cancelResume(); setPaused(false); }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       <div className="mx-auto max-w-7xl px-4 h-full flex items-center gap-3">
 
@@ -292,20 +326,26 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
 
         {/* Marquee track */}
         <div className="flex-1 overflow-hidden min-w-0">
-          <div
-            className="flex items-center"
-            style={{
-              animation: `ticker-scroll ${doubled.length * 7}s linear infinite`,
-              animationPlayState: paused ? "paused" : "running",
-              width: "max-content",
-            }}
-          >
-            {doubled.map((item, i) => (
-              <div key={`${item.id}-${i}`} className="flex items-center shrink-0">
-                <span className="px-3 shrink-0" style={{ color: "var(--border)", fontSize: 13, lineHeight: 1, userSelect: "none" }} aria-hidden="true">·</span>
-                <UpcomingItem item={item} locale={locale} />
-              </div>
-            ))}
+          {/* Touch offset wrapper — shifts content during swipe, smoothly returns on resume */}
+          <div style={{
+            transform: `translateX(${touchDx}px)`,
+            transition: smoothReturn ? "transform 250ms ease-out" : "none",
+          }}>
+            <div
+              className="flex items-center"
+              style={{
+                animation: `ticker-scroll ${doubled.length * 7}s linear infinite`,
+                animationPlayState: paused ? "paused" : "running",
+                width: "max-content",
+              }}
+            >
+              {doubled.map((item, i) => (
+                <div key={`${item.id}-${i}`} className="flex items-center shrink-0">
+                  <span className="px-3 shrink-0" style={{ color: "var(--border)", fontSize: 13, lineHeight: 1, userSelect: "none" }} aria-hidden="true">·</span>
+                  <UpcomingItem item={item} locale={locale} />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
