@@ -131,6 +131,7 @@ interface LayerProps {
   chartWidth: number;
   color: string;
   locale: string;
+  showLabels: boolean;
   hoverIdx: number | null;
   onHover?: (i: number) => void;
   xInitial: number;
@@ -138,9 +139,9 @@ interface LayerProps {
   onAnimationComplete?: () => void;
 }
 
-function ChartLayer({ data, built, chartWidth, color, locale, hoverIdx, onHover, xInitial, xAnimate, onAnimationComplete }: LayerProps) {
+function ChartLayer({ data, built, chartWidth, color, locale, showLabels, hoverIdx, onHover, xInitial, xAnimate, onAnimationComplete }: LayerProps) {
   const { pts, line, area, sx } = built;
-  const maxLabels = Math.max(2, Math.floor(chartWidth / 72));
+  const maxLabels = Math.max(2, Math.floor(chartWidth / 96));
   const every = Math.max(1, Math.ceil((data.length - 1) / (maxLabels - 1)));
 
   return (
@@ -163,7 +164,7 @@ function ChartLayer({ data, built, chartWidth, color, locale, hoverIdx, onHover,
           style={{ cursor: onHover ? "crosshair" : "default" }}
         />
       ))}
-      {data.map((p, i) => {
+      {showLabels && data.map((p, i) => {
         if (i % every !== 0 && i !== data.length - 1) return null;
         const anchor = i === 0 ? "start" : i === data.length - 1 ? "end" : "middle";
         return (
@@ -484,6 +485,7 @@ export function FormaChart({
                     chartWidth={CW}
                     color={color}
                     locale={locale}
+                    showLabels={false}
                     hoverIdx={null}
                     xInitial={0}
                     xAnimate={prevSlice.xExit}
@@ -499,6 +501,7 @@ export function FormaChart({
                   chartWidth={CW}
                   color={color}
                   locale={locale}
+                  showLabels={!isAnimating}
                   hoverIdx={isAnimating ? null : hoverIdx}
                   onHover={isAnimating ? undefined : setHoverIdx}
                   xInitial={xEnter}
