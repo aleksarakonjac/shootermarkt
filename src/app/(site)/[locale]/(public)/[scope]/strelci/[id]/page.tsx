@@ -203,7 +203,7 @@ export default async function ShooterPage({ params }: Props) {
       </nav>
 
       {/* ── Hero ────────────────────────────────────────────────────────────── */}
-      <div className="flex items-start gap-6 mb-5 pb-5 border-b border-[var(--border)]">
+      <div className="flex items-start gap-4 sm:gap-6 mb-5 pb-5 border-b border-[var(--border)]">
         {/* Avatar */}
         <div
           className="shrink-0"
@@ -240,10 +240,10 @@ export default async function ShooterPage({ params }: Props) {
             </h1>
 
             {/* Meta — inline key: value */}
-            <dl className="grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 mt-2 max-w-full">
+            <dl className="grid grid-cols-1 gap-y-0.5 mt-2 max-w-full sm:grid-cols-[auto_auto] sm:gap-x-4">
               {/* Row 1: Nacionalnost | Godište */}
               {nocEntry && (
-                <div className="flex items-center gap-1 text-sm">
+                <div className="flex min-w-0 items-center gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{tProfile("nationality")}:</dt>
                   <dd className="text-[var(--ink)] flex items-center gap-1">
                     {nocEntry.alpha2 && (
@@ -254,7 +254,7 @@ export default async function ShooterPage({ params }: Props) {
                 </div>
               )}
               {(shooter.birthDate || shooter.birthYear) && (
-                <div className="flex items-baseline gap-1 text-sm">
+                <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{tProfile("birthYear")}:</dt>
                   <dd className="text-[var(--ink)]">
                     {shooter.birthDate
@@ -265,7 +265,7 @@ export default async function ShooterPage({ params }: Props) {
               )}
               {/* Row 2: Disciplina | Klub */}
               {shooter.apparatus && (
-                <div className="flex items-baseline gap-1 text-sm">
+                <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{tProfile("discipline")}:</dt>
                   <dd className="text-[var(--ink)]">
                     {shooter.apparatus === "rifle" ? t("aparatRifle") : shooter.apparatus === "pistol" ? t("aparatPistol") : tProfile("bothApparatus")}
@@ -273,13 +273,13 @@ export default async function ShooterPage({ params }: Props) {
                 </div>
               )}
               {shooter.club && (
-                <div className="flex items-baseline gap-1 text-sm">
+                <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{tProfile("club")}:</dt>
-                  <dd className="text-[var(--ink)] truncate">{shooter.club.name}</dd>
+                  <dd className="min-w-0 truncate text-[var(--ink)]">{shooter.club.name}</dd>
                 </div>
               )}
               {currentCategory && (
-                <div className="flex items-baseline gap-1 text-sm">
+                <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{locale === "en" ? "Category" : "Kategorija"}:</dt>
                   <dd className="text-[var(--ink)]">{CATEGORY_LABEL[currentCategory]}</dd>
                 </div>
