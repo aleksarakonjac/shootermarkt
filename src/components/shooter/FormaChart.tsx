@@ -563,9 +563,7 @@ export function FormaChart({
 
         {/* Metric strip */}
         {forma && (
-          <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--surface-2)] flex flex-col gap-1.5">
-            {/* Line 1: level · peak proximity */}
-            <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[0.8125rem]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-[0.8125rem] border-t border-[var(--border)] bg-[var(--surface-2)]">
               <span className="flex items-baseline gap-1">
                 <span className="text-[var(--subtle)]">{t.level}</span>
                 <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
@@ -589,33 +587,26 @@ export function FormaChart({
                   </span>
                 </>
               )}
-            </div>
-            {/* Line 2: consistency dots · sample size */}
-            <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[0.8125rem]">
-              <span className="flex items-center gap-1.5">
-                <span className="text-[var(--ink)] font-medium">{t.consistency(forma.consistency)}</span>
-                <span className="flex items-center gap-0.5" aria-hidden="true">
-                  {Array.from({ length: 5 }).map((_, i) => {
-                    const filled = i < Math.round(forma.consistency * 5);
-                    return (
-                      <span
-                        key={i}
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: filled ? color : "var(--border-strong)" }}
-                      />
-                    );
-                  })}
-                </span>
+            <span className="flex items-center gap-1.5">
+              <span className="text-[var(--ink)] font-medium">{t.consistency(forma.consistency)}</span>
+              <span className="flex items-center gap-0.5" aria-hidden="true">
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const filled = i < Math.round(forma.consistency * 5);
+                  return (
+                    <span
+                      key={i}
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ background: filled ? color : "var(--border-strong)" }}
+                    />
+                  );
+                })}
               </span>
-              {forma.trend !== "stable" && Math.abs(forma.momentum) > 0.15 && (
-                <>
-                  <span className="text-[var(--border-strong)]" aria-hidden="true">·</span>
-                  <span className="text-[var(--subtle)] italic">
-                    {(forma.momentum > 0) === (forma.trend === "up") ? t.momentumUp : t.momentumDown}
-                  </span>
-                </>
-              )}
-            </div>
+            </span>
+            {forma.trend !== "stable" && Math.abs(forma.momentum) > 0.15 && (
+              <span className="text-[var(--subtle)] italic">
+                {(forma.momentum > 0) === (forma.trend === "up") ? t.momentumUp : t.momentumDown}
+              </span>
+            )}
           </div>
         )}
 
