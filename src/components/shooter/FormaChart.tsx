@@ -261,8 +261,6 @@ export function FormaChart({
     reliability: en ? "Prediction confidence range (±)" : "Raspon pouzdanosti prognoze (±)",
     level:       en ? "Level" : "Nivo",
     peak:        en ? "peak" : "peak",
-    appearances: (n: number) =>
-      en ? `${n} ${n === 1 ? "start" : "starts"}` : `${n} ${n === 1 ? "nastup" : "nastupa"}`,
     consistency: (c: number) =>
       c >= 0.75 ? (en ? "Stable" : "Stabilan")
       : c >= 0.5 ? (en ? "Variable" : "Promenljiv")
@@ -608,10 +606,6 @@ export function FormaChart({
                     );
                   })}
                 </span>
-              </span>
-              <span className="text-[var(--border-strong)]" aria-hidden="true">·</span>
-              <span className="font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] tabular-nums">
-                {t.appearances(forma.sampleSize)}
               </span>
               {forma.trend !== "stable" && Math.abs(forma.momentum) > 0.15 && (
                 <>
