@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useId, useSyncExternalStore } from "react";
+import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import { rollingForma, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 import { FormaScoreMark } from "./FormaScoreMark";
+import { DisciplineSelector, DISCIPLINE_COLOR } from "./DisciplineSelector";
 
 export type ChartPoint = {
   date: string;
@@ -26,13 +27,6 @@ export type FormaScore = {
   momentum: number;
   sampleSize: number;
   lowConfidence: boolean;      // sampleSize < 5 → procena nepouzdana
-};
-
-const DISC_COLOR: Record<string, string> = {
-  ARM: "#C20000",
-  ARW: "#1d4ed8",
-  APM: "#15803d",
-  APW: "#7e22ce",
 };
 
 const WINDOW = 10;
@@ -205,13 +199,10 @@ export function FormaChart({
 }: FormaChartProps) {
   const available = disciplines.filter(d => points.some(p => p.discipline === d.code));
   const [disc, setDisc] = useState(available[0]?.code ?? "");
-  const [disciplineOpen, setDisciplineOpen] = useState(false);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const vpW = useSyncExternalStore(subscribeToViewportWidth, getViewportWidth, getServerViewportWidth);
   const containerRef = useRef<HTMLDivElement>(null);
-  const disciplinePickerRef = useRef<HTMLDivElement>(null);
-  const disciplinePickerId = useId();
   const [svgW, setSvgW] = useState(0);
 
   const [mode, setMode] = useState<"forma" | "nastup">("forma");
@@ -235,24 +226,8 @@ export function FormaChart({
     return () => ro.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (!disciplineOpen) return;
-    const closeOnOutside = (event: MouseEvent) => {
-      if (!disciplinePickerRef.current?.contains(event.target as Node)) setDisciplineOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setDisciplineOpen(false);
-    };
-    document.addEventListener("mousedown", closeOnOutside);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOnOutside);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [disciplineOpen]);
-
   const maxScore = disciplines.find(d => d.code === disc)?.maxScore ?? 630;
-  const color = DISC_COLOR[disc] ?? "#C20000";
+  const color = DISCIPLINE_COLOR[disc] ?? "#C20000";
   const forma = formaScores[disc];
   const forma_trend_color = forma?.trend === "up" ? "#15803d" : forma?.trend === "down" ? "#C20000" : "#888";
 
@@ -319,7 +294,6 @@ export function FormaChart({
 
   function selectDiscipline(nextDisc: string) {
     setDisc(nextDisc);
-    setDisciplineOpen(false);
     setWindowOffset(0);
     setHoverIdx(null);
     setTooltipPos(null);
@@ -400,44 +374,12 @@ export function FormaChart({
             {available.length === 1 ? (
               <span
                 className="text-[14px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded font-[family-name:var(--font-barlow-condensed)]"
-                style={{ background: DISC_COLOR[available[0].code] ?? "#C20000", color: "#fff" }}
+                style={{ background: DISCIPLINE_COLOR[available[0].code] ?? "#C20000", color: "#fff" }}
               >
                 {available[0].code}
               </span>
             ) : (
-              <div ref={disciplinePickerRef} className="relative">
-                <button
-                  type="button"
-                  onClick={() => setDisciplineOpen((value) => !value)}
-                  aria-haspopup="listbox"
-                  aria-expanded={disciplineOpen}
-                  aria-controls={disciplinePickerId}
-                  aria-label={locale === "en" ? "Select discipline" : "Izaberi disciplinu"}
-                  className="flex items-center gap-1 rounded px-2 py-0.5 text-[14px] font-extrabold tracking-wider uppercase transition-colors font-[family-name:var(--font-barlow-condensed)]"
-                  style={{ background: DISC_COLOR[disc] ?? "#C20000", color: "#fff" }}
-                >
-                  {disc}
-                  <svg width="9" height="9" viewBox="0 0 9 9" className={`transition-transform ${disciplineOpen ? "rotate-180" : ""}`} aria-hidden="true">
-                    <path d="M1.5 3L4.5 6L7.5 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                  </svg>
-                </button>
-                {disciplineOpen && (
-                  <ul id={disciplinePickerId} role="listbox" className="absolute left-0 top-[calc(100%+4px)] z-[var(--z-dropdown)] min-w-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_4px_12px_oklch(0_0_0/0.12)]">
-                    {available.map((d) => (
-                      <li key={d.code} role="option" aria-selected={disc === d.code}>
-                        <button
-                          type="button"
-                          onClick={() => selectDiscipline(d.code)}
-                          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface-2)]"
-                        >
-                          <span className="h-2 w-2 rounded-full" style={{ background: DISC_COLOR[d.code] ?? "#C20000" }} aria-hidden="true" />
-                          {d.code}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <DisciplineSelector options={available} value={disc} onChange={selectDiscipline} locale={locale} />
             )}
           </div>
 

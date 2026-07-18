@@ -11,12 +11,12 @@ import { ResultsHistoryTable } from "@/components/result-display/ResultsHistoryT
 import { FormaChart } from "@/components/shooter/FormaChart";
 import type { ChartPoint, FormaScore } from "@/components/shooter/FormaChart";
 import { FormaScoreHeading } from "@/components/shooter/FormaScoreHeading";
+import { CareerStats, type CareerStat } from "@/components/shooter/CareerStats";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@/lib/pdf-import/types";
 import { NOC_LIST } from "@/lib/noc-list";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
-import { trendLabel, trendColor, type Trend } from "@/lib/forma";
 import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
@@ -179,9 +179,22 @@ export default async function ShooterPage({ params }: Props) {
 
   const cacheByCode = new Map(cacheRows.map((r) => [r.disciplineCode, r]));
   // Keep only disciplines that actually have results, in the same order
-  const careerStatsDisciplines = chartDisciplines
-    .map((d) => ({ code: d.code, cache: cacheByCode.get(d.code) ?? null }))
-    .filter((d) => d.cache !== null);
+  const careerStats: CareerStat[] = chartDisciplines.flatMap(({ code }) => {
+    const cache = cacheByCode.get(code);
+    if (!cache) return [];
+    return [{
+      code,
+      name: DISC_NAMES[code]?.[locale as "sr" | "en"] ?? DISC_NAMES[code]?.sr ?? code,
+      careerCount: cache.careerCount,
+      forma: cache.forma != null ? Number(cache.forma) : null,
+      peak: cache.peakCareer != null ? Number(cache.peakCareer) : null,
+      best3: cache.best3Career != null ? Number(cache.best3Career) : null,
+      season: cache.seasonAvg != null ? Number(cache.seasonAvg) : null,
+      seasonCount: cache.seasonCount,
+      improvement: cache.improvement != null ? Number(cache.improvement) : null,
+      trend: cache.trend as CareerStat["trend"],
+    }];
+  });
 
   // ── Country info ─────────────────────────────────────────────────────────────
   const nocEntry = shooter.nationality
@@ -365,114 +378,13 @@ export default async function ShooterPage({ params }: Props) {
       )}
 
       {/* ── Career stats ──────────────────────────────────────────────────────── */}
-      {careerStatsDisciplines.length > 0 && (
+      {careerStats.length > 0 && (
         <div className="mb-10">
           <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-tight text-[var(--ink)] mb-4">
             {tProfile("statsCareer")}
           </h2>
 
-          <div className="flex flex-col gap-3">
-            {careerStatsDisciplines.map(({ code, cache }) => {
-              if (!cache) return null;
-              const discName = DISC_NAMES[code]?.[locale as "sr" | "en"] ?? DISC_NAMES[code]?.sr ?? code;
-              const forma     = cache.forma     != null ? Number(cache.forma)     : null;
-              const peak      = cache.peakCareer != null ? Number(cache.peakCareer) : null;
-              const best3     = cache.best3Career != null ? Number(cache.best3Career) : null;
-              const sezona    = cache.seasonAvg  != null ? Number(cache.seasonAvg)  : null;
-              const delta     = cache.improvement != null ? Number(cache.improvement) : null;
-              const trend     = (cache.trend ?? null) as Trend | null;
-
-              const fmtNum = (v: number | null, decimals = 1) =>
-                v === null ? "—" : v % 1 === 0 ? String(v) : v.toFixed(decimals);
-
-              const deltaColor =
-                delta === null ? "var(--subtle)"
-                : delta > 0    ? "var(--success)"
-                : delta < 0    ? "var(--brand-primary)"
-                :                "var(--muted)";
-
-              const LABEL_CLS = "text-[0.6rem] font-semibold uppercase tracking-wider text-[var(--subtle)] font-[family-name:var(--font-barlow-condensed)] leading-none mb-1.5";
-              const VAL_CLS   = "font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)] leading-none";
-
-              return (
-                <div
-                  key={code}
-                  className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden"
-                >
-                  {/* Discipline header */}
-                  <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-2)]">
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-xs text-white bg-[var(--ink)] px-1.5 py-0.5 rounded">
-                      {code}
-                    </span>
-                    <span className="text-sm font-medium text-[var(--muted)]">{discName}</span>
-                    <span className="ml-auto text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
-                      {cache.careerCount} {tProfile("statUkupnoNastupa").toLowerCase()}
-                    </span>
-                  </div>
-
-                  {/* Stats grid: 3-col mobile → 5-col desktop */}
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-px bg-[var(--border)]">
-
-                    {/* Forma — primary stat */}
-                    <div className="bg-[var(--surface)] px-4 py-3 sm:col-span-1">
-                      <p className={LABEL_CLS}>{tProfile("form")}</p>
-                      {forma !== null ? (
-                        <div className="flex items-baseline gap-1.5 mt-0.5">
-                          <span className={`${VAL_CLS} text-xl`}>{fmtNum(forma)}</span>
-                          {trend && (
-                            <span
-                              className="text-sm font-bold font-[family-name:var(--font-jetbrains-mono)]"
-                              style={{ color: trendColor(trend) }}
-                            >
-                              {trendLabel(trend)}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className={`${VAL_CLS} text-xl text-[var(--subtle)]`}>—</span>
-                      )}
-                    </div>
-
-                    {/* Vrhunac */}
-                    <div className="bg-[var(--surface)] px-4 py-3">
-                      <p className={LABEL_CLS}>{tProfile("statPeak")}</p>
-                      <span className={`${VAL_CLS} text-base mt-0.5 block`}>{fmtNum(peak)}</span>
-                    </div>
-
-                    {/* Best-3 */}
-                    <div className="bg-[var(--surface)] px-4 py-3">
-                      <p className={LABEL_CLS}>{tProfile("statBest3")}</p>
-                      <span className={`${VAL_CLS} text-base mt-0.5 block`}>{fmtNum(best3)}</span>
-                    </div>
-
-                    {/* Sezona */}
-                    <div className="bg-[var(--surface)] px-4 py-3">
-                      <p className={LABEL_CLS}>{tProfile("statSezonaProsek")}</p>
-                      <div className="flex items-baseline gap-1 mt-0.5">
-                        <span className={`${VAL_CLS} text-base`}>{fmtNum(sezona)}</span>
-                        {sezona !== null && cache.seasonCount > 0 && (
-                          <span className="text-[0.65rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
-                            /{cache.seasonCount}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Napredak vs prošla sezona */}
-                    <div className="bg-[var(--surface)] px-4 py-3">
-                      <p className={LABEL_CLS}>{tProfile("statNapredak")}</p>
-                      <span
-                        className={`${VAL_CLS} text-base mt-0.5 block`}
-                        style={{ color: deltaColor }}
-                      >
-                        {delta === null ? "—" : `${delta > 0 ? "+" : ""}${fmtNum(delta)}`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <CareerStats stats={careerStats} locale={locale} />
         </div>
       )}
 
