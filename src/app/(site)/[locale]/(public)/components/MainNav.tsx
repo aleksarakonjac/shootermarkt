@@ -44,7 +44,6 @@ function buildNav(t: TFn): NavGroup[] {
         { href: "/rangiranje", label: t("ranking"),        desc: t("rankingDesc") },
         { href: "/rangiranje?view=h2h", label: t("h2h"),   desc: t("h2hDesc") },
         { href: "/klubovi",    label: t("clubLeaderboard"),desc: t("clubLeaderboardDesc"), soon: true },
-        { href: "/forma",      label: t("trendAnalysis"),  desc: t("trendAnalysisDesc"),   soon: true },
       ],
     },
     {

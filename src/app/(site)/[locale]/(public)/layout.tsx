@@ -137,10 +137,6 @@ export default async function PublicLayout({ children, params }: Props) {
                     <span className="text-sm text-[var(--subtle)]">{t("clubLeaderboard")}</span>
                     <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">{tCommon("soon")}</span>
                   </li>
-                  <li className="flex items-center gap-1.5">
-                    <span className="text-sm text-[var(--subtle)]">{t("trendAnalysis")}</span>
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">{tCommon("soon")}</span>
-                  </li>
                 </ul>
               </div>
 
