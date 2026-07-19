@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { Link } from "@/i18n/navigation";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { rollingForma, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 import { FormaScoreMark } from "./FormaScoreMark";
 import { FormaScoreInfo } from "./FormaScoreHeading";
@@ -392,13 +392,22 @@ export function FormaChart({
               <button
                 key={m}
                 onClick={() => { setMode(m); setHoverIdx(null); setTooltipPos(null); }}
-                className="px-2.5 py-0.5 rounded text-xs font-semibold transition-colors font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide"
+                className="relative px-2.5 py-0.5 text-xs font-semibold transition-colors font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide"
                 style={mode === m
-                  ? { background: "var(--bg)", color: "var(--ink)", boxShadow: "0 1px 2px rgba(0,0,0,0.12)" }
+                  ? { color: "var(--ink)" }
                   : { background: "transparent", color: "var(--muted)" }
                 }
               >
-                {m === "forma" ? <FormaScoreMark size="sm" /> : locale === "en" ? "Results" : "Nastupi"}
+                {mode === m && (
+                  <motion.span
+                    layoutId="forma-chart-mode"
+                    className="absolute inset-0 rounded bg-[var(--bg)] shadow-sm"
+                    transition={{ type: "spring", stiffness: 500, damping: 36 }}
+                  />
+                )}
+                <span className="relative z-10">
+                  {m === "forma" ? <FormaScoreMark size="sm" /> : locale === "en" ? "Results" : "Nastupi"}
+                </span>
               </button>
             ))}
           </div>
@@ -439,11 +448,19 @@ export function FormaChart({
           )}
         </div>
 
-        {mode === "nastup" && (
-          <p className="border-b border-[var(--border)] px-4 py-2 text-xs text-[var(--muted)]">
-            {t.actualPerformances}
-          </p>
-        )}
+        <AnimatePresence initial={false}>
+          {mode === "nastup" && (
+            <motion.p
+              initial={{ height: 0, opacity: 0, paddingTop: 0, paddingBottom: 0, y: -4 }}
+              animate={{ height: "auto", opacity: 1, paddingTop: 8, paddingBottom: 8, y: 0 }}
+              exit={{ height: 0, opacity: 0, paddingTop: 0, paddingBottom: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="overflow-hidden border-b border-[var(--border)] px-4 text-xs text-[var(--muted)]"
+            >
+              {t.actualPerformances}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
         {/* SVG chart */}
         <div ref={containerRef} className="select-none" style={{ cursor: isAnimating ? "default" : "crosshair" }}>
