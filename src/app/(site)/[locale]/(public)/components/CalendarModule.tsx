@@ -3,7 +3,9 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useParams } from "next/navigation";
+import { Link } from "@/i18n/navigation";
 import { getLevelLabel, LEVEL_DOT_COLOR, LEVEL_STYLE } from "@/lib/competition-utils";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 import { useHomepageDataStatus } from "../[scope]/homepage-data-status";
 
 interface Competition {
@@ -37,6 +39,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   const common = useTranslations("common");
   const locale = useLocale();
   const { scope } = useParams<{ scope?: string }>();
+  const scopedHref = useScopedHref();
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -125,14 +128,15 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   const compsByDate = useMemo(() => {
     const map = new Map<string, Competition[]>();
     for (const c of monthCache[`${viewYear}-${viewMonth}`] ?? []) {
-      const endStr = c.endDate ?? c.date;
-      const cur = new Date(c.date + "T00:00:00");
-      const end = new Date(endStr + "T00:00:00");
+      const startDate = c.date.slice(0, 10);
+      const endDate = (c.endDate ?? c.date).slice(0, 10);
+      const cur = new Date(`${startDate}T00:00:00Z`);
+      const end = new Date(`${endDate}T00:00:00Z`);
       while (cur <= end) {
         const ds = cur.toISOString().slice(0, 10);
         if (!map.has(ds)) map.set(ds, []);
         map.get(ds)!.push(c);
-        cur.setDate(cur.getDate() + 1);
+        cur.setUTCDate(cur.getUTCDate() + 1);
       }
     }
     return map;
@@ -304,18 +308,17 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
               viewMonth === today.getMonth() &&
               viewYear === today.getFullYear();
             const hasComp = comps.length > 0;
+            const hasOneComp = comps.length === 1;
 
             // Span position + tooltip placement
             const col = idx % 7;
             const row = Math.floor(idx / 7);
-            const isFirstInRow = col === 0;
-            const isLastInRow = col === 6;
             const tooltipH = row === 0 ? "top-full mt-2" : "bottom-full mb-2";
             const tooltipX = col <= 1 ? "left-0" : col >= 5 ? "right-0" : "left-1/2 -translate-x-1/2";
-            const hasStart = comps.some(c => c.date === dateStr);
-            const hasEnd = comps.some(c => (c.endDate ?? c.date) === dateStr);
-            const roundLeft  = !hasComp || isToday || hasStart || isFirstInRow;
-            const roundRight = !hasComp || isToday || hasEnd   || isLastInRow;
+            const hasStart = comps.some(c => c.date.slice(0, 10) === dateStr);
+            const hasEnd = comps.some(c => (c.endDate ?? c.date).slice(0, 10) === dateStr);
+            const roundLeft  = !hasComp || isToday || hasStart;
+            const roundRight = !hasComp || isToday || hasEnd;
             const roundedClass =
               roundLeft && roundRight ? "rounded-md" :
               roundLeft               ? "rounded-l-md rounded-r-none" :
@@ -328,42 +331,53 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                 className="relative"
                 onMouseLeave={() => setSelectedDate((value) => value === dateStr ? null : value)}
               >
-                <button
-                  type="button"
-                  onClick={() => hasComp && setSelectedDate((value) => value === dateStr ? null : dateStr)}
-                  onFocus={() => hasComp && setSelectedDate(dateStr)}
-                  onMouseEnter={() => hasComp && setSelectedDate(dateStr)}
-                  aria-expanded={hasComp ? selectedDate === dateStr : undefined}
-                  aria-describedby={hasComp && selectedDate === dateStr ? `calendar-events-${dateStr}` : undefined}
-                  aria-label={hasComp ? `${dateStr}: ${t("competitionPlural", { count: comps.length })}` : dateStr}
-                  disabled={!hasComp}
-                  className={[
-                    `relative flex min-h-11 w-full items-center justify-center py-1.5 text-sm font-semibold transition-colors select-none ${roundedClass}`,
-                    isToday
-                      ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
-                    : hasComp
-                      ? "bg-[var(--brand-primary)]/10 text-[var(--ink)] hover:bg-[var(--brand-primary)]/20 cursor-pointer"
-                      : "cursor-default text-[var(--ink)]",
-                  ].join(" ")}
-                >
-                  {day}
-                  {hasComp && !isToday && hasStart && (
-                    <span
-                      className="absolute bottom-1.5 h-1 w-1 rounded-full"
-                      style={{ background: getLevelColor(comps[0].level) }}
-                    />
-                  )}
-                </button>
+                {hasOneComp ? (
+                  <Link
+                    href={scopedHref(`/takmicenja/${comps[0].id}`)}
+                    aria-label={`${dateStr}: ${comps[0].name}`}
+                    className={[
+                      `relative flex min-h-11 w-full items-center justify-center py-1.5 text-sm font-semibold transition-colors select-none ${roundedClass}`,
+                      isToday
+                        ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
+                        : "bg-[var(--brand-primary)]/10 text-[var(--ink)] hover:bg-[var(--brand-primary)]/20 cursor-pointer",
+                    ].join(" ")}
+                  >
+                    {day}
+                    {!isToday && <span className="absolute bottom-1.5 h-1 w-1 rounded-full" style={{ background: getLevelColor(comps[0].level) }} />}
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => hasComp && setSelectedDate((value) => value === dateStr ? null : dateStr)}
+                    onFocus={() => hasComp && setSelectedDate(dateStr)}
+                    onMouseEnter={() => hasComp && setSelectedDate(dateStr)}
+                    aria-expanded={hasComp ? selectedDate === dateStr : undefined}
+                    aria-describedby={hasComp && selectedDate === dateStr ? `calendar-events-${dateStr}` : undefined}
+                    aria-label={hasComp ? `${dateStr}: ${t("competitionPlural", { count: comps.length })}` : dateStr}
+                    disabled={!hasComp}
+                    className={[
+                      `relative flex min-h-11 w-full items-center justify-center py-1.5 text-sm font-semibold transition-colors select-none ${roundedClass}`,
+                      isToday
+                        ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
+                        : hasComp
+                          ? "bg-[var(--brand-primary)]/10 text-[var(--ink)] hover:bg-[var(--brand-primary)]/20 cursor-pointer"
+                          : "cursor-default text-[var(--ink)]",
+                    ].join(" ")}
+                  >
+                    {day}
+                    {hasComp && !isToday && <span className="absolute bottom-1.5 h-1 w-1 rounded-full" style={{ background: getLevelColor(comps[0].level) }} />}
+                  </button>
+                )}
 
                 {/* Tooltip */}
                 {selectedDate === dateStr && selectedComps.length > 0 && (
                   <div
                     id={`calendar-events-${dateStr}`}
-                    className={`pointer-events-none absolute z-50 w-52 rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white ${tooltipH} ${tooltipX}`}
+                    className={`absolute z-50 w-52 rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white ${tooltipH} ${tooltipX}`}
                   >
                     {selectedComps.map((c) => {
                       const levelStyle = LEVEL_STYLE[c.level.toLowerCase()] ?? LEVEL_STYLE.club;
-                      return <div key={c.id} className="flex flex-col gap-1 py-1 border-b border-white/10 last:border-0">
+                      return <Link key={c.id} href={scopedHref(`/takmicenja/${c.id}`)} className="flex flex-col gap-1 py-1 border-b border-white/10 last:border-0 hover:text-white/80">
                         <span className="self-start rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider" style={levelStyle}>
                           {getLevelLabel(c.level.toLowerCase(), locale)}
                         </span>
@@ -371,7 +385,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                         {c.location && (
                           <span className="text-white/80">{c.location}</span>
                         )}
-                      </div>;
+                      </Link>;
                     })}
                   </div>
                 )}

@@ -107,9 +107,9 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
       `}</style>
       {/* Widget Header with Tabs */}
       <div className="relative flex flex-nowrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--brand-primary)] px-4 py-2">
-        <h3 className="flex shrink-0 items-center gap-1.5 font-[family-name:var(--font-barlow-condensed)] text-base font-bold uppercase tracking-wider text-white sm:text-lg">
+        <h3 className="flex min-h-10 shrink-0 items-center gap-1.5 leading-none font-[family-name:var(--font-barlow-condensed)] text-base font-bold uppercase tracking-wider text-white sm:text-lg">
           <span>Top</span>
-          <span className="inline-flex items-center gap-1 rounded bg-white/95 px-1.5 py-0.5">
+          <span className="inline-flex h-7 items-center gap-1 rounded bg-white/95 px-1.5">
             <FormaScoreMark size="md" />
             <FormaScoreInfo locale={locale} buttonMarginTop={0} />
           </span>
