@@ -134,7 +134,7 @@ export function StrelciFilterBar({
             onChange={(e) => setQ(e.target.value)}
             placeholder={t("search")}
             aria-label="Pretraži strelce"
-            className="w-full rounded-md border border-[var(--border)] bg-[var(--bg)] pl-9 pr-3 py-2 text-xs text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
+            className="h-10 w-full rounded-md border border-[var(--border)] bg-[var(--bg)] pl-9 pr-3 py-0 text-xs text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
           />
         </div>
 
@@ -149,7 +149,7 @@ export function StrelciFilterBar({
           labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
           showSelectedSublabel={false}
           align="right"
-          className="w-full sm:w-auto sm:min-w-[130px]"
+          className="w-full sm:w-auto sm:min-w-[130px] [&>button]:h-10"
         />
       </div>
 

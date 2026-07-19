@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { Link } from "@/i18n/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { rollingForma, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 import { FormaScoreMark } from "./FormaScoreMark";
 import { FormaScoreInfo } from "./FormaScoreHeading";
@@ -76,7 +76,7 @@ function TrendArrow({ trend }: { trend: "up"|"down"|"stable" }) {
 // ── Chart geometry ────────────────────────────────────────────────────────────
 
 const H = 180;
-const ML = 52, MR = 12, MT = 12, MB = 28;
+const ML = 48, MR = 28, MT = 12, MB = 28;
 const CH = H - MT - MB;
 
 function buildWindow(data: ChartPoint[], yValues: number[], CW: number, maxScore: number) {
@@ -205,6 +205,7 @@ export function FormaChart({
   const [disc, setDisc] = useState(available[0]?.code ?? "");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const prefersReducedMotion = useReducedMotion();
   const vpW = useSyncExternalStore(subscribeToViewportWidth, getViewportWidth, getServerViewportWidth);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgW, setSvgW] = useState(0);
@@ -338,7 +339,9 @@ export function FormaChart({
 
   const hovPt = hoverIdx !== null ? data[hoverIdx] : null;
   const hovForma = hoverIdx !== null ? yValues[hoverIdx] : null;
-  const TIP_W = 220, TIP_H = mode === "forma" ? 132 : 115;
+  const compactTooltip = vpW < 640;
+  const TIP_W = compactTooltip ? 184 : 220;
+  const TIP_H = compactTooltip ? (mode === "forma" ? 155 : 135) : (mode === "forma" ? 132 : 115);
   const tipX = tooltipPos ? Math.min(vpW - TIP_W - 8, Math.max(8, tooltipPos.x + 16 + TIP_W > vpW ? tooltipPos.x - TIP_W - 16 : tooltipPos.x + 16)) : 0;
   const tipY = tooltipPos ? Math.min(window.innerHeight - TIP_H - 8, Math.max(8, tooltipPos.y - TIP_H / 2)) : 0;
 
@@ -357,10 +360,10 @@ export function FormaChart({
             <p style={{ color: "var(--muted)", fontSize: "0.75rem", marginTop: 3, fontFamily: "var(--font-jetbrains-mono,monospace)" }}>
               {fmtFull(hovPt.date)}
             </p>
-            <div className="flex items-start gap-2" style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
+            <div className={compactTooltip ? "" : "flex items-start gap-2"} style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
               <Link
                 href={`${competitionUrlBase}/${hovPt.competitionId}`}
-                className="pointer-events-auto min-w-0 flex-1 hover:underline"
+                className={compactTooltip ? "pointer-events-auto block hover:underline" : "pointer-events-auto min-w-0 flex-1 hover:underline"}
                 style={{ color: "var(--ink)", fontSize: "0.75rem", lineHeight: 1.4 }}
               >
                 {hovPt.competitionName}
@@ -368,7 +371,7 @@ export function FormaChart({
               {mode === "forma" && (
                 <span
                   title={locale === "en" ? "Qualification result" : "Kvalifikacioni rezultat"}
-                  className="shrink-0"
+                  className={compactTooltip ? "mt-1 block" : "shrink-0"}
                   style={{ color: "var(--muted)", fontFamily: "var(--font-jetbrains-mono,monospace)", fontSize: "0.75rem", fontWeight: 700, lineHeight: 1.4 }}
                 >
                   {hovPt.score % 1 === 0 ? hovPt.score : hovPt.score.toFixed(1)}
@@ -381,7 +384,7 @@ export function FormaChart({
 
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2.5 border-b border-[var(--border)]">
+        <div className="flex items-center justify-between gap-1.5 px-3 pt-3 pb-2.5 border-b border-[var(--border)] sm:gap-3 sm:px-4">
           <div className="flex gap-1.5 flex-wrap items-center">
 
             {available.length === 1 ? (
@@ -402,7 +405,7 @@ export function FormaChart({
               <button
                 key={m}
                 onClick={() => selectMode(m)}
-                className="relative px-2.5 py-0.5 text-xs font-semibold transition-colors font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide"
+                className="relative px-2 py-0.5 text-xs font-semibold transition-colors font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide sm:px-2.5"
                 style={mode === m
                   ? { color: "var(--ink)" }
                   : { background: "transparent", color: "var(--muted)" }
@@ -423,7 +426,7 @@ export function FormaChart({
           </div>
 
           {forma && (
-            <div className="ml-auto mr-2 flex shrink-0 items-center gap-2 sm:mr-0">
+            <div className="ml-auto mr-2 flex shrink-0 items-center gap-2">
               <span
                 title={forma.lowConfidence ? t.lowConfidence : undefined}
                 style={{
@@ -457,20 +460,6 @@ export function FormaChart({
             </div>
           )}
         </div>
-
-        <AnimatePresence initial={false}>
-          {mode === "nastup" && (
-            <motion.p
-              initial={{ height: 0, opacity: 0, paddingTop: 0, paddingBottom: 0, y: -4 }}
-              animate={{ height: "auto", opacity: 1, paddingTop: 8, paddingBottom: 8, y: 0 }}
-              exit={{ height: 0, opacity: 0, paddingTop: 0, paddingBottom: 0, y: -4 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="overflow-hidden border-b border-[var(--border)] px-4 text-xs text-[var(--muted)]"
-            >
-              {t.actualPerformances}
-            </motion.p>
-          )}
-        </AnimatePresence>
 
         {/* SVG chart */}
         <div ref={containerRef} className="select-none" style={{ cursor: isAnimating ? "default" : "crosshair" }}>
@@ -532,6 +521,20 @@ export function FormaChart({
             </svg>
           )}
         </div>
+
+        <AnimatePresence initial={false}>
+          {mode === "nastup" && (
+            <motion.p
+              initial={prefersReducedMotion ? false : { height: 0, opacity: 0, y: -8 }}
+              animate={{ height: 40, opacity: 1, y: 0 }}
+              exit={prefersReducedMotion ? undefined : { height: 0, opacity: 0, y: -6 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.32, ease: [0.42, 0, 0.58, 1] }}
+              className="flex items-center overflow-hidden px-4 text-xs text-[var(--muted)]"
+            >
+              {t.actualPerformances}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
         {/* Metric strip */}
         {forma && (

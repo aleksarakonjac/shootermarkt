@@ -1,6 +1,6 @@
 export const revalidate = 300;
 
-import { Suspense } from "react";
+import { Suspense, type CSSProperties } from "react";
 import { ScopedLink } from "../../components/ScopedLink";
 import Image from "next/image";
 import { db } from "@/lib/db";
@@ -386,7 +386,27 @@ export default async function StrelciPage({ params, searchParams }: Props) {
 
 
   return (
-    <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+    <main className="_strelci-page mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+      <style>{`
+        @keyframes _strelci-page-in {
+          from { opacity: 0.84; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes _strelci-row-in {
+          from { opacity: 0.72; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        ._strelci-page {
+          animation: _strelci-page-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        ._strelci-result-row {
+          animation: _strelci-row-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: calc(var(--strelci-row-index) * 30ms);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          ._strelci-page, ._strelci-result-row { animation: none; }
+        }
+      `}</style>
 
       {/* ── Header ── */}
       <div className="mb-5">
@@ -496,7 +516,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
             <table className="w-full table-fixed text-sm border-collapse sm:table-auto sm:min-w-[520px]">
               <thead>
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                  <th scope="col" className="w-[48%] px-3 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-2/5 sm:px-4">
+                  <th scope="col" className="w-[54%] px-3 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-2/5 sm:px-4">
                     <ScopedLink href={sortUrl("name")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
                       {tProfile("shooter")}<SortIcon col="name" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
@@ -506,7 +526,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       {tProfile("birthYear")}<SortIcon col="godiste" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
                   </th>
-                  <th scope="col" className="w-[21%] px-2 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
+                  <th scope="col" className="w-[18%] px-2 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
                     <ScopedLink href={sortUrl("disc")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
                       {tProfile("discipline")}<SortIcon col="disc" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
@@ -514,7 +534,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
                     {locale === "en" ? "Category" : "Kategorija"}
                   </th>
-                  <th scope="col" className="w-[21%] px-2 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
+                  <th scope="col" className="w-[18%] px-2 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
                     {tProfile("form")}
                   </th>
                   <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
@@ -524,7 +544,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {enrichedData.map((s) => {
+                {enrichedData.map((s, index) => {
                   const alpha2  = s.nationality
                     ? NOC_LIST.find((n) => n.noc === s.nationality)?.alpha2
                     : undefined;
@@ -536,11 +556,12 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                   return (
                     <tr
                       key={s.id}
-                      className="border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface)] transition-colors group"
+                      className="_strelci-result-row border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface)] transition-colors group"
+                      style={{ "--strelci-row-index": Math.min(index, 8) } as CSSProperties}
                     >
                       {/* Name + club + nationality inline */}
-                      <td className="px-3 py-3 sm:px-4">
-                        <div className="flex min-w-0 items-start gap-2 sm:gap-2.5">
+                      <td className="px-3 py-2.5 sm:px-4">
+                        <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
                           {/* Avatar / initials */}
                           <div className="shrink-0 w-7 h-7 rounded-full overflow-hidden bg-[var(--surface-2)] flex items-center justify-center">
                             {s.avatarUrl ? (
@@ -558,15 +579,25 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                             )}
                           </div>
                         <div className="min-w-0 flex-1">
+                          <div className="sm:flex sm:items-center sm:gap-2">
                           <ScopedLink
                             href={`/strelci/${s.id}`}
-                            className="block font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors leading-tight"
+                            className="block min-w-0 font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors leading-tight"
                           >
-                            <span className="block truncate">{s.lastName}</span>
-                            <span className="block truncate">{s.firstName}</span>
+                            <span className="block truncate sm:hidden">{s.lastName}</span>
+                            <span className="flex min-w-0 items-center gap-1 sm:hidden">
+                              <span className="truncate">{s.firstName}</span>
+                              {s.nationality && (
+                                <span className="flex shrink-0 items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-semibold text-[var(--muted)]">
+                                  {alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "2px", display: "inline-block" }} />}
+                                  {s.nationality}
+                                </span>
+                              )}
+                            </span>
+                            <span className="hidden truncate sm:block">{s.lastName} {s.firstName}</span>
                           </ScopedLink>
                           {s.nationality && (
-                            <span className="mt-1 hidden items-center gap-1 sm:inline-flex">
+                            <span className="hidden shrink-0 items-center gap-1 sm:inline-flex sm:self-center">
                               {alpha2 && (
                                 <span
                                   className={`fi fi-${alpha2.toLowerCase()}`}
@@ -578,6 +609,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                               </span>
                             </span>
                           )}
+                          </div>
                         </div>
                         {s.clubName && (
                           <div className="mt-1 hidden max-w-[200px] truncate text-xs leading-none text-[var(--muted)] sm:block">
@@ -591,7 +623,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       </td>
 
                       {/* Godište */}
-                      <td className="px-4 py-3 text-right hidden md:table-cell">
+                      <td className="px-4 py-2.5 text-right hidden md:table-cell">
                         {s.birthYear ? (
                           <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--ink)]">
                             {s.birthYear}
@@ -605,7 +637,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       </td>
 
                       {/* Discipline badge */}
-                      <td className="px-2 py-3 sm:px-4">
+                      <td className="px-2 py-2.5 sm:px-4">
                         {disc && discSty ? (
                           <span className="inline-block rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-xs font-semibold leading-none whitespace-nowrap text-[var(--muted)]">
                             <span className="sm:hidden">{disc}</span>
@@ -617,7 +649,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       </td>
 
                       {/* Uzrasna kategorija */}
-                      <td className="px-4 py-3 text-xs font-semibold text-[var(--muted)] hidden sm:table-cell">
+                      <td className="px-4 py-2.5 text-xs font-semibold text-[var(--muted)] hidden sm:table-cell">
                         {currentCategory ? (
                           CATEGORY_LABEL[currentCategory]
                         ) : (
@@ -626,7 +658,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       </td>
 
                       {/* Forma + trend */}
-                      <td className="px-2 py-3 text-right sm:px-4">
+                      <td className="px-2 py-2.5 text-right sm:px-4">
                         {s.forma !== null ? (
                           <div className="inline-flex items-center justify-end gap-1.5">
                             <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] tabular-nums text-sm">
@@ -657,7 +689,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       </td>
 
                       {/* Result count */}
-                      <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-sm tabular-nums hidden sm:table-cell">
+                      <td className="px-4 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-sm tabular-nums hidden sm:table-cell">
                         {s.resultCount > 0 ? (
                           s.resultCount
                         ) : (
@@ -666,7 +698,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       </td>
 
                       {/* Chevron */}
-                      <td className="px-2 py-3 sm:px-3">
+                      <td className="px-2 py-2.5 sm:px-3">
                         <svg
                           width="12" height="12" viewBox="0 0 12 12"
                           className="text-[var(--border-strong)] group-hover:text-[var(--muted)] transition-colors"
