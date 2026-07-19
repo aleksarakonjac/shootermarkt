@@ -279,3 +279,76 @@ export async function fetchQualResultsFromHtml(
 
   return results;
 }
+
+export interface ISSFFinalResult {
+  rank: number;
+  issfId: string;
+  lastName: string;
+  firstName: string;
+  nationCode: string;
+  /** Kumulativni skor posle svake faze finala. Svaka faza = 2 hica (AR) ili 2 hica (AP). */
+  stageCumulatives: number[];
+  /** Ukupan skor finala (= poslednji kumulativ). */
+  total: number;
+}
+
+/**
+ * Scrape ISSF final results HTML.
+ *
+ * Format: main rows have bold-black tds with cumulative scores per stage.
+ * Sub-rows (individual shots) are ignored.
+ * Pattern: rank | bib | name link | noc | bold_cum1 ... bold_cumN | bold_total (= last cumulative, repeated)
+ *
+ * Eliminated finalists have shorter arrays — they stop at the round where they were knocked out.
+ */
+export async function fetchFinalResultsFromHtml(
+  competitionId: number,
+  resultKey: string
+): Promise<ISSFFinalResult[]> {
+  const url = `${ISSF_WEB}/competitions/${competitionId}/results/${resultKey}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    next: { revalidate: 3600 },
+  });
+  if (!res.ok) throw new Error(`ISSF final HTML fetch failed: ${res.status} ${url}`);
+  const html = await res.text();
+
+  const results: ISSFFinalResult[] = [];
+
+  const rowRe =
+    /<tr>\s*<td[^>]*>(\d+)<\/td>\s*<td[^>]*>\d+<\/td>\s*<td[^>]*><a href="\/athletes\/([^"]+)">([^<]+)<\/a><\/td>\s*<td[^>]*>([A-Z]{3})<\/td>([\s\S]*?)<\/tr>/g;
+
+  let m: RegExpExecArray | null;
+  while ((m = rowRe.exec(html)) !== null) {
+    const rank = parseInt(m[1]);
+    const issfId = m[2].trim();
+    const rawName = m[3].replace(/&nbsp;/gi, " ").replace(/ /g, " ").trim();
+    const spaceIdx = rawName.indexOf(" ");
+    const lastName = spaceIdx > 0 ? rawName.slice(0, spaceIdx) : rawName;
+    const firstName = spaceIdx > 0 ? rawName.slice(spaceIdx + 1) : "";
+    const nationCode = m[4];
+    const rest = m[5];
+
+    // All bold-black tds contain stage cumulatives; the last one is the repeated total
+    const boldRe = /<td[^>]*class="bold black"[^>]*>([\d.]+)<\/td>/g;
+    const allVals: number[] = [];
+    let bm: RegExpExecArray | null;
+    while ((bm = boldRe.exec(rest)) !== null) {
+      const v = parseFloat(bm[1]);
+      if (!isNaN(v)) allVals.push(v);
+    }
+
+    if (allVals.length < 2) continue;
+
+    const total = allVals[allVals.length - 1];
+    // Drop trailing duplicate (total col = last cumulative)
+    const stageCumulatives =
+      allVals[allVals.length - 1] === allVals[allVals.length - 2]
+        ? allVals.slice(0, -1)
+        : allVals.slice(0, -1);
+
+    results.push({ rank, issfId, lastName, firstName, nationCode, stageCumulatives, total });
+  }
+
+  return results;
+}

@@ -4,7 +4,9 @@ import {
   fetchCompetitionResults,
   extractMvpEvents,
   fetchQualResultsFromHtml,
+  fetchFinalResultsFromHtml,
 } from "@/lib/issf/adapter";
+import { deriveFinalRankProgression } from "@/lib/pdf-import/types";
 import { db } from "@/lib/db";
 import { shooters } from "@/lib/db/schema";
 import type { ReviewRow } from "@/lib/pdf-import/types";
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   const rows: ReviewRow[] = [];
 
-  for (const { disciplineCode, category, qualPhase } of mvpEvents) {
+  for (const { disciplineCode, category, qualPhase, finalPhase } of mvpEvents) {
     if (!qualPhase?.resultKey) continue;
 
     let qualResults;
@@ -54,6 +56,8 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
+    const discRows: typeof rows = [];
+
     for (const result of qualResults) {
       const matchedShooter = allShooters.find(
         (s) =>
@@ -62,7 +66,7 @@ export async function POST(req: NextRequest) {
           (!s.nationality || s.nationality === result.nationCode)
       );
 
-      rows.push({
+      discRows.push({
         shooterId: matchedShooter?.id,
         firstName: result.firstName,
         lastName: result.lastName,
@@ -79,6 +83,34 @@ export async function POST(req: NextRequest) {
         warning: matchedShooter ? undefined : "Novi strelac — biće kreiran",
       });
     }
+
+    // Merge final results when available
+    if (finalPhase?.resultKey) {
+      try {
+        const finalResults = await fetchFinalResultsFromHtml(competitionId, finalPhase.resultKey);
+        const allCumulatives = finalResults.map((f) => f.stageCumulatives);
+
+        for (const finalist of finalResults) {
+          const row = discRows.find(
+            (r) =>
+              r.lastName.toLowerCase() === finalist.lastName.toLowerCase() &&
+              r.firstName.toLowerCase() === finalist.firstName.toLowerCase()
+          );
+          if (!row) continue;
+
+          row.finalRank = finalist.rank;
+          row.finalTotal = finalist.total;
+          row.finalCumulative = finalist.stageCumulatives;
+          row.finalRanks = deriveFinalRankProgression(finalist.stageCumulatives, allCumulatives);
+          row.finalScoring = disciplineCode.startsWith("AP") ? "hit_count" : "decimal";
+          row.qualified = true;
+        }
+      } catch {
+        // Finals may not be published yet — non-fatal
+      }
+    }
+
+    rows.push(...discRows);
   }
 
   return NextResponse.json({ rows, eventCount: mvpEvents.length });

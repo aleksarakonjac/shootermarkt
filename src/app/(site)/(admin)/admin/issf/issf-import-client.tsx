@@ -23,6 +23,160 @@ interface CommitResult {
   competitionId: number;
 }
 
+// ── Finals sub-section ────────────────────────────────────────────────────────
+
+function rankColor(rank: number | null | undefined): string {
+  if (rank === 1) return "oklch(0.75 0.18 85)";   // gold
+  if (rank === 2) return "oklch(0.65 0.06 250)";   // silver
+  if (rank === 3) return "oklch(0.60 0.12 40)";    // bronze
+  return "var(--muted)";
+}
+
+function FinalSection({ discRows, isAP }: { discRows: ReviewRow[]; isAP: boolean }) {
+  const finalists = discRows
+    .filter((r) => r.finalRank != null && r.finalCumulative?.length)
+    .sort((a, b) => (a.finalRank ?? 99) - (b.finalRank ?? 99));
+
+  if (finalists.length === 0) return null;
+
+  // Longest cumulative array = number of stages
+  const stageCount = Math.max(...finalists.map((f) => f.finalCumulative!.length));
+  const stageLabels = Array.from({ length: stageCount }, (_, i) => {
+    // 1st comp stage = first 2 cols, rest = elimination
+    if (i === 0) return "F1";
+    if (i === 1) return "F2";
+    return `E${i - 1}`;
+  });
+
+  return (
+    <div className="border-t-2 border-[var(--brand-primary)] border-opacity-30" style={{ borderColor: "oklch(0.75 0.18 85 / 0.3)" }}>
+      {/* Finals header */}
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--surface)]">
+        <span className="text-[0.65rem] font-bold uppercase tracking-widest" style={{ color: "oklch(0.65 0.12 85)" }}>
+          ★ Finale
+        </span>
+        <span className="text-xs text-[var(--muted)]">
+          {finalists.length} finalista · {stageCount} faza
+        </span>
+      </div>
+
+      {/* Finals table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ minWidth: `${320 + stageCount * 56}px` }}>
+          <thead>
+            <tr className="border-b border-[var(--border)]">
+              <th className="w-8 px-2 py-2 text-center text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">
+                #
+              </th>
+              <th className="min-w-[140px] px-3 py-2 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">
+                Strelac
+              </th>
+              <th className="px-2 py-2 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">
+                NOC
+              </th>
+              {stageLabels.map((label, i) => (
+                <th
+                  key={i}
+                  className="w-14 px-1 py-2 text-center text-[0.65rem] font-semibold uppercase tracking-wider bg-[var(--surface)]"
+                  style={{ color: i < 2 ? "var(--muted)" : "oklch(0.65 0.12 85 / 0.7)" }}
+                >
+                  {label}
+                </th>
+              ))}
+              <th className="px-3 py-2 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">
+                Total
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border)]">
+            {finalists.map((row) => {
+              const cum = row.finalCumulative!;
+              const ranks = row.finalRanks;
+              const eliminated = cum.length < stageCount;
+
+              return (
+                <tr
+                  key={`${row.lastName}-${row.firstName}`}
+                  className="hover:bg-[var(--surface)] transition-colors"
+                  style={{ opacity: eliminated ? 0.75 : 1 }}
+                >
+                  {/* Final rank */}
+                  <td className="w-8 px-2 py-2 text-center">
+                    <span
+                      className="font-[family-name:var(--font-barlow-condensed)] font-bold text-base"
+                      style={{ color: rankColor(row.finalRank) }}
+                    >
+                      {row.finalRank}
+                    </span>
+                  </td>
+
+                  {/* Name */}
+                  <td className="min-w-[140px] px-3 py-2">
+                    <span className="text-xs font-semibold text-[var(--ink)]">
+                      {row.lastName}
+                    </span>{" "}
+                    <span className="text-xs text-[var(--muted)]">{row.firstName}</span>
+                  </td>
+
+                  {/* NOC */}
+                  <td className="px-2 py-2">
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">
+                      {row.teamNoc}
+                    </span>
+                  </td>
+
+                  {/* Stage cells */}
+                  {Array.from({ length: stageCount }, (_, i) => {
+                    const score = cum[i];
+                    const rank = ranks?.[i];
+                    const isLastForShooter = i === cum.length - 1 && eliminated;
+
+                    return (
+                      <td
+                        key={i}
+                        className="w-14 px-1 py-2 text-center"
+                        style={isLastForShooter ? { background: "oklch(0.95 0.04 25 / 0.3)" } : undefined}
+                      >
+                        {score != null ? (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">
+                              {isAP ? score : score.toFixed(1)}
+                            </span>
+                            {rank != null && (
+                              <span
+                                className="text-[0.55rem] font-bold leading-none"
+                                style={{ color: rankColor(rank) }}
+                              >
+                                #{rank}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[var(--subtle)] text-[0.65rem]">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+
+                  {/* Final total */}
+                  <td className="px-3 py-2 text-right">
+                    <span
+                      className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm"
+                      style={{ color: rankColor(row.finalRank) }}
+                    >
+                      {isAP ? row.finalTotal : row.finalTotal?.toFixed(1)}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 const DISCIPLINES = ["ARM", "ARW", "APM", "APW"] as const;
 const DISC_LABEL: Record<string, string> = {
   ARM: "Air Rifle Men",
@@ -517,6 +671,9 @@ export function ISSFImportClient() {
                       Skupi ↑
                     </button>
                   )}
+
+                  {/* Finals sub-section */}
+                  <FinalSection discRows={discRows} isAP={isAP} />
                 </div>
               );
             })}
