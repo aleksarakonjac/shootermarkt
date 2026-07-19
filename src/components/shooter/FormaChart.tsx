@@ -508,7 +508,7 @@ export function FormaChart({
 
         {/* Metric strip */}
         {forma && (
-          <div className="relative flex flex-wrap items-center gap-x-1.5 gap-y-0 py-2.5 pl-3 pr-11 text-[0.75rem] border-t border-[var(--border)] bg-[var(--surface-2)] sm:gap-x-3 sm:px-4 sm:text-[0.8125rem]">
+          <div className="flex flex-nowrap items-center gap-x-1.5 py-2.5 px-3 text-[0.75rem] border-t border-[var(--border)] bg-[var(--surface-2)] sm:gap-x-3 sm:px-4 sm:text-[0.8125rem]">
               <span className="flex items-center gap-1">
                 <span className="text-[var(--subtle)]">{t.level}</span>
                 <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
@@ -555,7 +555,7 @@ export function FormaChart({
               align="right"
               placement="top"
               buttonMarginTop={0}
-              className="absolute right-3 top-1/2 -translate-y-1/2"
+              className="ml-auto shrink-0"
             />
           </div>
         )}
