@@ -1,9 +1,9 @@
 import type { BulletinFinalDetail } from "@/lib/db/schema";
 
-export function BulletinFinalDisplay({ detail }: { detail: BulletinFinalDetail }) {
-  const fmt = (value: number) => Number.isInteger(value) ? String(value) : value.toFixed(1);
+export function BulletinFinalDisplay({ detail, ranks }: { detail: BulletinFinalDetail; ranks?: Array<number | null> | null }) {
   const hasData = detail.series?.length || detail.shots?.length || detail.cumulative?.length;
   const isHitCount = detail.scoring === "hit_count";
+  const fmt = (value: number) => isHitCount ? String(value) : value.toFixed(1);
 
   if (!hasData) return null;
 
@@ -39,7 +39,7 @@ export function BulletinFinalDisplay({ detail }: { detail: BulletinFinalDetail }
 
       {!isHitCount && detail.series?.length ? (
         <div>
-          <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Međuserije</p>
+          <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Serije finala</p>
           <div className="flex flex-wrap gap-1.5">
             {detail.series.map((value, index) => (
               <div key={index} className="min-w-12 rounded bg-[var(--surface-2)] px-2 py-1 text-center">
@@ -76,6 +76,23 @@ export function BulletinFinalDisplay({ detail }: { detail: BulletinFinalDetail }
                 <div className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)]">{fmt(value)}</div>
               </div>
             ))}
+          </div>
+        </div>
+      ) : null}
+
+      {!isHitCount && detail.cumulative?.length && ranks?.some((rank) => rank != null) ? (
+        <div>
+          <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Plasman tokom finala</p>
+          <div className="overflow-x-auto">
+            <div className="flex w-max gap-1.5 pb-1">
+              {detail.cumulative.map((value, index) => (
+                <div key={index} className="min-w-14 rounded bg-[var(--surface-2)] px-2 py-1 text-center">
+                  <div className="text-[0.6rem] font-semibold text-[var(--subtle)]">F{index + 1}</div>
+                  <div className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)]">{fmt(value)}</div>
+                  <div className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-semibold tabular-nums text-[var(--muted)]">{ranks[index] != null ? `#${ranks[index]}` : "—"}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}

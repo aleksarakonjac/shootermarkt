@@ -2,7 +2,7 @@ export const revalidate = 300;
 
 import { db } from "@/lib/db";
 import { shooters, results, competitions, disciplines, shooterFormaCache } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ScopedLink } from "../../../components/ScopedLink";
@@ -12,6 +12,7 @@ import { FormaChart } from "@/components/shooter/FormaChart";
 import type { ChartPoint, FormaScore } from "@/components/shooter/FormaChart";
 import { FormaScoreHeading } from "@/components/shooter/FormaScoreHeading";
 import { CareerStats, type CareerStat } from "@/components/shooter/CareerStats";
+import { deriveFinalRankProgression } from "@/lib/final-rank-progression";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@/lib/pdf-import/types";
 import { NOC_LIST } from "@/lib/noc-list";
 import { getLocale, getTranslations } from "next-intl/server";
@@ -100,6 +101,36 @@ export default async function ShooterPage({ params }: Props) {
       .from(shooterFormaCache)
       .where(eq(shooterFormaCache.shooterId, shooterId)),
   ]);
+
+  const detailedFinalCompetitionIds = [...new Set(shooterResults
+    .filter((result) => result.finalDetail?.format === "bulletin" && result.finalDetail.cumulative?.length)
+    .map((result) => result.competitionId))];
+  const peerFinals = detailedFinalCompetitionIds.length > 0
+    ? await db
+      .select({
+        competitionId: results.competitionId,
+        disciplineId: results.disciplineId,
+        category: results.category,
+        finalDetail: results.finalDetail,
+      })
+      .from(results)
+      .where(inArray(results.competitionId, detailedFinalCompetitionIds))
+    : [];
+  const finalRanksByResult = new Map<number, Array<number | null>>();
+
+  for (const result of shooterResults) {
+    if (result.finalDetail?.format !== "bulletin" || !result.finalDetail.cumulative?.length) continue;
+    const peerCumulatives = peerFinals
+      .filter((peer) => peer.competitionId === result.competitionId && peer.disciplineId === result.disciplineId && peer.category === result.category)
+      .map((peer) => peer.finalDetail?.format === "bulletin" ? peer.finalDetail.cumulative : undefined);
+    const ranks = deriveFinalRankProgression(result.finalDetail.cumulative, peerCumulatives);
+    if (ranks?.some((rank) => rank != null)) finalRanksByResult.set(result.id, ranks);
+  }
+
+  const historyResults = shooterResults.map((result) => ({
+    ...result,
+    finalRanks: finalRanksByResult.get(result.id) ?? null,
+  }));
 
   const initials = `${shooter.firstName[0]}${shooter.lastName[0]}`;
 
@@ -401,7 +432,7 @@ export default async function ShooterPage({ params }: Props) {
           </div>
         ) : (
           <ResultsHistoryTable
-            results={shooterResults}
+            results={historyResults}
             allLabel={tProfile("allDisciplines")}
             locale={locale}
           />

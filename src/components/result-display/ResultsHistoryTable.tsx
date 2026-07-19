@@ -24,6 +24,7 @@ export type ResultRowData = {
   category?: string | null;
   qualDetail: QualDetail | null;
   finalDetail: FinalDetail | null;
+  finalRanks?: Array<number | null> | null;
 };
 
 export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }: { results: ResultRowData[]; allLabel?: string; locale?: string }) {
@@ -183,6 +184,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                           <ResultDetailPanel
                             qualDetail={r.qualDetail}
                             finalDetail={r.finalDetail}
+                            finalRanks={r.finalRanks}
                             hasDecimals={hasDecimals}
                             inners={r.qualInners}
                           />

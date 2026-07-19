@@ -8,6 +8,7 @@ import { PositionsFinalDisplay } from "./PositionsFinalDisplay";
 interface Props {
   qualDetail: QualDetail | null;
   finalDetail: FinalDetail | null;
+  finalRanks?: Array<number | null> | null;
   hasDecimals?: boolean;
   inners?: number | null;
 }
@@ -15,6 +16,7 @@ interface Props {
 export function ResultDetailPanel({
   qualDetail,
   finalDetail,
+  finalRanks,
   hasDecimals,
   inners,
 }: Props) {
@@ -64,7 +66,7 @@ export function ResultDetailPanel({
           {finalDetail.format === "ar_ap_10m" ? (
             <ArApFinalDisplay detail={finalDetail} />
           ) : finalDetail.format === "bulletin" ? (
-            <BulletinFinalDisplay detail={finalDetail} />
+            <BulletinFinalDisplay detail={finalDetail} ranks={finalRanks} />
           ) : (
             <PositionsFinalDisplay detail={finalDetail} />
           )}
