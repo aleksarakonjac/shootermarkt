@@ -17,6 +17,7 @@ import { asc } from "drizzle-orm";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
+import { WhenTabs } from "./WhenTabs";
 
 export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
   const { scope } = await params;
@@ -475,32 +476,14 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
 
       {/* When toggle — list view only */}
       {activeView === "list" && (
-        <div className="flex border-b border-[var(--border)] mb-6 -mx-4 px-4 sm:mx-0 sm:px-0" role="tablist" aria-label={locale === "en" ? "Time period" : "Vremenski period"}>
-          {(["upcoming", "past"] as const).map((w) => {
-            const label = w === "upcoming" ? t("list.upcoming") : t("list.past");
-            const count = w === "upcoming" ? live.length + upcoming.length : recent.length + archive.length;
-            const active = activeWhen === w;
-            return (
-              <ScopedLink
-                key={w}
-                href={whenHref(w)}
-                role="tab"
-                aria-selected={active}
-                scroll={false}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-                  active
-                    ? "border-[var(--ink)] text-[var(--ink)]"
-                    : "border-transparent text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--border-strong)]"
-                }`}
-              >
-                {label}
-                <span className={`text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] tabular-nums transition-colors ${active ? "text-[var(--muted)]" : "text-[var(--subtle)]"}`}>
-                  {count}
-                </span>
-              </ScopedLink>
-            );
-          })}
-        </div>
+        <WhenTabs
+          activeWhen={activeWhen}
+          upcomingHref={whenHref("upcoming")}
+          pastHref={whenHref("past")}
+          upcomingCount={live.length + upcoming.length}
+          pastCount={recent.length + archive.length}
+          locale={locale}
+        />
       )}
 
       {/* List view — empty state (no SQL results) */}
