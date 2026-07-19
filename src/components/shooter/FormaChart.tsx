@@ -33,6 +33,7 @@ export type FormaScore = {
 const WINDOW = 10;
 const SLIDE_DUR = 0.9;
 const SLIDE_EASE = [0.76, 0, 0.24, 1] as const;
+const MORPH_DUR = 0.35;
 
 const SR_MONTHS = ["jan","feb","mar","apr","maj","jun","jul","avg","sep","okt","nov","dec"];
 const EN_MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -146,12 +147,14 @@ function ChartLayer({ data, built, chartWidth, color, locale, showLabels, hoverI
       transition={{ duration: SLIDE_DUR, ease: SLIDE_EASE }}
       onAnimationComplete={onAnimationComplete}
     >
-      {area && <path d={area} fill={color} fillOpacity={0.1} stroke="none" />}
-      {line && <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
+      {area && <motion.path initial={false} animate={{ d: area }} transition={{ duration: MORPH_DUR, ease: "easeInOut" }} fill={color} fillOpacity={0.1} stroke="none" />}
+      {line && <motion.path initial={false} animate={{ d: line }} transition={{ duration: MORPH_DUR, ease: "easeInOut" }} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
       {pts.map(([cx, cy], i) => (
-        <circle
+        <motion.circle
           key={i}
-          cx={cx.toFixed(1)} cy={cy.toFixed(1)}
+          initial={false}
+          animate={{ cx, cy }}
+          transition={{ duration: MORPH_DUR, ease: "easeInOut" }}
           r={hoverIdx === i ? "5" : "3.5"}
           fill={hoverIdx === i ? color : "var(--bg)"}
           stroke={color} strokeWidth="2"
@@ -306,8 +309,6 @@ export function FormaChart({
 
   function selectMode(nextMode: "forma" | "nastup") {
     if (nextMode === mode || isAnimating) return;
-    setPrevSlice({ data, yValues, xExit: -CW });
-    setNavDir("left");
     setHoverIdx(null);
     setTooltipPos(null);
     setMode(nextMode);
@@ -515,7 +516,7 @@ export function FormaChart({
 
                 {/* Entering new window */}
                 <ChartLayer
-                  key={`${mode}-${windowStart}-${windowEnd}`}
+                  key={`${windowStart}-${windowEnd}`}
                   data={data}
                   built={built}
                   chartWidth={CW}
