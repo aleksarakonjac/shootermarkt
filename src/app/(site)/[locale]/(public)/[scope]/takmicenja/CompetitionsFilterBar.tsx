@@ -5,12 +5,16 @@ import { useRouter } from "@/i18n/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
+import { ISSF_LEVELS } from "@/lib/scope";
 
-const LEVEL_VALUES: Array<CompetitionLevel | "all"> = [
+const ALL_LEVEL_VALUES: Array<CompetitionLevel | "all"> = [
   "all", "olympic", "world", "continental", "international", "national", "regional", "club",
 ];
+const ISSF_LEVEL_VALUES: Array<CompetitionLevel | "all"> = [
+  "all", ...ISSF_LEVELS,
+];
 
-const TAGS: { value: string; label: string; activeBg: string; activeColor: string }[] = [
+const ALL_TAGS: { value: string; label: string; activeBg: string; activeColor: string }[] = [
   { value: "sss",  label: "SSS",  activeBg: "var(--tag-sss-bg)",  activeColor: "var(--tag-sss-fg)" },
   { value: "issf", label: "ISSF", activeBg: "var(--tag-issf-bg)", activeColor: "var(--tag-issf-fg)" },
   { value: "esc",  label: "ESC",  activeBg: "var(--tag-esc-bg)",  activeColor: "var(--tag-esc-fg)" },
@@ -28,6 +32,7 @@ interface Props {
   currentQ: string;
   currentTag: string;
   totalCount: number;
+  scope: string;
 }
 
 export function CompetitionsFilterBar({
@@ -37,6 +42,7 @@ export function CompetitionsFilterBar({
   currentQ,
   currentTag,
   totalCount,
+  scope,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -81,6 +87,10 @@ export function CompetitionsFilterBar({
       document.removeEventListener("keydown", onKey);
     };
   }, [yearOpen]);
+
+  const isIssf = scope === "issf";
+  const levelValues = isIssf ? ISSF_LEVEL_VALUES : ALL_LEVEL_VALUES;
+  const tags = isIssf ? ALL_TAGS.filter((tag) => tag.value !== "sss") : ALL_TAGS;
 
   const hasFilters = currentQ || currentLevel !== "all" || currentTag;
 
@@ -175,7 +185,7 @@ export function CompetitionsFilterBar({
         <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
 
         <div role="group" className="contents">
-          {LEVEL_VALUES.map((value) => (
+          {levelValues.map((value) => (
             <button
               key={value}
               onClick={() => setParam("level", value)}
@@ -189,7 +199,7 @@ export function CompetitionsFilterBar({
         <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
 
         <div role="group" className="contents">
-          {TAGS.map((tag) => {
+          {tags.map((tag) => {
             const active = currentTag === tag.value;
             return (
               <button

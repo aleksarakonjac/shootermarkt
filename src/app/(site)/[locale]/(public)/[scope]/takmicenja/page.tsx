@@ -465,6 +465,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
             currentQ={activeQ}
             currentTag={activeTag}
             totalCount={translatedFiltered.length}
+            scope={scope}
           />
         </Suspense>
       )}
