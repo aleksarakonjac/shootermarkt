@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import { competitions } from "@/lib/db/schema";
+import { isNull, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
+}
+
+function detectLang(text: string): "sr" | "en" {
+  return /[čćšđžČĆŠĐŽ]/.test(text) ? "sr" : "en";
 }
 
 const PROMPT = (text: string, from: string, to: string) => `\
@@ -32,8 +40,6 @@ ${from === "sr" ? `
 - Brza vatra → Rapid Fire Pistol
 - Memorijal → Memorial
 - Turnir → Tournament
-- Trap → Trap
-- Skeet → Skeet
 `.trim() : `
 - National/Serbian → Državno/Srpsko/Srbije
 - Championship → Prvenstvo
@@ -53,11 +59,6 @@ ${from === "sr" ? `
 - Rapid Fire Pistol → Brza vatra
 - Memorial → Memorijal
 - Tournament → Turnir
-- Trap → Trap
-- Skeet → Skeet
-- 10 Meter / 10m → 10m
-- 25 Meter / 25m → 25m
-- 50 Meter / 50m → 50m
 `.trim()}
 
 Examples:
@@ -71,14 +72,8 @@ EN: "European Championship Junior 10m"
 SR: "ISSF Svetski Kup, Granada"
 EN: "ISSF World Cup, Granada"
 
-SR: "ISSF Svetsko prvenstvo Puška/Pištolj"
-EN: "ISSF World Championship Rifle/Pistol"
-
 SR: "Seniorsko Prvenstvo Srbije, A program, 25m i 50m"
-EN: "Serbian Championship Seniors, A program, 25/50m"
-
-SR: "Regionalna Prvenstva, C program, 25/50/100m"
-EN: "Serbian Regional Championships, C program, 25/50/100m"` : `\
+EN: "Serbian Championship Seniors, A program, 25/50m"` : `\
 EN: "ISSF Grand Prix 10m"
 SR: "ISSF Grand Prix 10m"
 
@@ -88,44 +83,22 @@ SR: "Evropsko juniorsko prvenstvo 10m"
 EN: "ISSF World Cup, Granada"
 SR: "ISSF Svetski Kup, Granada"
 
-EN: "ISSF World Championship Rifle/Pistol"
-SR: "ISSF Svetsko prvenstvo Puška/Pištolj"
-
 EN: "Serbian Championship Seniors, A program, 25/50m"
-SR: "Seniorsko Prvenstvo Srbije, A program, 25m i 50m"
-
-EN: "Serbian Regional Championships, C program, 25/50/100m"
-SR: "Regionalna Prvenstva, C program, 25/50/100m"`}
+SR: "Seniorsko Prvenstvo Srbije, A program, 25m i 50m"`}
 
 Now translate this competition name from ${from === "sr" ? "Serbian" : "English"} to ${to === "en" ? "English" : "Serbian"}:
 
 ${text}`;
 
-export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const body = await req.json();
-  const { text, from, to } = body as { text: string; from: string; to: string };
-
-  if (!text?.trim() || !from || !to) {
-    return NextResponse.json({ error: "text, from, to required" }, { status: 400 });
-  }
-  if (!["sr", "en"].includes(from) || !["sr", "en"].includes(to) || from === to) {
-    return NextResponse.json({ error: "from/to must be sr or en and different" }, { status: 400 });
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: "GEMINI_API_KEY not set" }, { status: 500 });
-
+async function translate(text: string, from: "sr" | "en", to: "sr" | "en"): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY!;
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: PROMPT(text.trim(), from, to) }] }],
+        contents: [{ parts: [{ text: PROMPT(text, from, to) }] }],
         generationConfig: { maxOutputTokens: 1000, temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } },
         safetySettings: [
           { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
@@ -136,19 +109,66 @@ export async function POST(req: NextRequest) {
       }),
     }
   );
-
   if (!res.ok) {
     const err = await res.text();
-    console.error("Gemini error:", err);
-    return NextResponse.json({ error: `Gemini ${res.status}: ${err.slice(0, 300)}` }, { status: 502 });
+    throw new Error(`Gemini ${res.status}: ${err.slice(0, 200)}`);
   }
-
   const json = await res.json();
-  const translated = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  const result = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!result) throw new Error("No translation returned");
+  return result;
+}
 
-  if (!translated) {
-    return NextResponse.json({ error: "No translation returned" }, { status: 502 });
+export async function POST(req: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return NextResponse.json({ error: "GEMINI_API_KEY not set" }, { status: 500 });
+
+  const rows = await db
+    .select({ id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn })
+    .from(competitions)
+    .where(or(isNull(competitions.nameSr), isNull(competitions.nameEn)));
+
+  let translated = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const row of rows) {
+    const lang = detectLang(row.name);
+    const patch: { nameSr?: string; nameEn?: string } = {};
+
+    try {
+      if (!row.nameSr) {
+        if (lang === "sr") {
+          patch.nameSr = row.name;
+        } else {
+          patch.nameSr = await translate(row.name, "en", "sr");
+        }
+      }
+      if (!row.nameEn) {
+        if (lang === "en") {
+          patch.nameEn = row.name;
+        } else {
+          patch.nameEn = await translate(row.name, "sr", "en");
+        }
+      }
+
+      if (Object.keys(patch).length > 0) {
+        await db.update(competitions).set(patch).where(eq(competitions.id, row.id));
+        translated++;
+      } else {
+        skipped++;
+      }
+    } catch (e) {
+      errors.push(`[${row.id}] ${row.name}: ${String(e)}`);
+    }
+
+    // Small delay to avoid rate limiting
+    await new Promise((r) => setTimeout(r, 200));
   }
 
-  return NextResponse.json({ translated });
+  return NextResponse.json({ translated, skipped, errors, total: rows.length });
 }

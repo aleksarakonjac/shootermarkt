@@ -7,6 +7,7 @@ import { Pagination } from "../components/Pagination";
 import { TakmicenjaFilters } from "./takmicenja-filters";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { formatDateRangeSr } from "@/lib/date-utils";
+import { BatchTranslateButton } from "./batch-translate-button";
 
 export const metadata: Metadata = { title: "Admin · Takmičenja" };
 
@@ -165,6 +166,7 @@ export default async function AdminTakmicenjaPage({
           <p className="text-sm text-[var(--muted)] mt-0.5">prikazano {data.length} od {total}</p>
         </div>
         <div className="flex gap-2">
+          <BatchTranslateButton />
           <Link
             href="/admin/takmicenja/sync"
             className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"

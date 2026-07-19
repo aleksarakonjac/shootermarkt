@@ -7,20 +7,18 @@ import { DISCIPLINE_META, type CommitPayload } from "@/lib/pdf-import/types";
 import { matchShooter } from "@/lib/name-match";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 
-const DISCIPLINE_DISTANCE_TAGS: Record<string, string> = {
-  ARM: "10m", ARW: "10m", APM: "10m", APW: "10m",
-  R3PM: "MK",  R3PW: "MK",  R3JM: "MK",  R3JW: "MK",
-  SPW: "25m",  RFPM: "25m",
-  FPM: "50m",
+const DISCIPLINE_DISTANCE_TAGS: Record<string, string[]> = {
+  ARM: ["10m"], ARW: ["10m"], APM: ["10m"], APW: ["10m"],
+  R3PM: ["25m", "50m"], R3PW: ["25m", "50m"], R3JM: ["25m", "50m"], R3JW: ["25m", "50m"],
+  SPW: ["25m"], RFPM: ["25m"],
+  FPM: ["50m"],
 };
 
 function distanceTagsFromCodes(codes: string[]): string[] {
   const tags = new Set<string>();
   for (const code of codes) {
-    const t = DISCIPLINE_DISTANCE_TAGS[code];
-    if (t) tags.add(t);
+    for (const t of DISCIPLINE_DISTANCE_TAGS[code] ?? []) tags.add(t);
   }
-  if (tags.has("50m") && tags.has("25m")) tags.add("50/25m");
   return [...tags];
 }
 

@@ -69,7 +69,7 @@ export function TranslatedNameInput({
           <button
             type="button"
             onClick={translate}
-            disabled={loading || !sourceName.trim()}
+            disabled={loading || !sourceName.trim() || from === to}
             className="flex items-center gap-1 text-[0.65rem] font-semibold px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--border-strong)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? (

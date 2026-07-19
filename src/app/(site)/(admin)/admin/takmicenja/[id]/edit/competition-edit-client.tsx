@@ -21,7 +21,7 @@ interface Competition {
   resultCount: number;
 }
 
-const TAG_SUGGESTIONS = ["SSS", "ISSF", "ESC", "10m", "MK", "50m", "25m", "50/25m"];
+const TAG_SUGGESTIONS = ["SSS", "ISSF", "ESC", "10m", "25m", "50m"];
 
 const inputCls = "w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]";
 
