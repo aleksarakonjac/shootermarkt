@@ -193,15 +193,17 @@ export async function POST(req: NextRequest) {
           qualified: row.qualified ?? null,
           finalTotal: row.finalTotal?.toString() ?? null,
           finalRank: row.finalRank ?? null,
-          finalDetail: row.finalSeries || row.finalShots || row.finalCumulative
+          finalDetail: row.finalSeries || row.finalShots || row.finalCumulative || row.finalShotsByStage
             ? {
                 format: "bulletin",
                 scoring: row.finalScoring ?? "decimal",
                 ...(row.finalSeries ? { series: row.finalSeries } : {}),
                 ...(row.finalSeriesLabels ? { seriesLabels: row.finalSeriesLabels } : {}),
                 ...(row.finalShots ? { shots: row.finalShots } : {}),
+                ...(row.finalShotsByStage ? { shotsByStage: row.finalShotsByStage } : {}),
                 ...(row.finalCumulative ? { cumulative: row.finalCumulative } : {}),
                 ...(row.finalRanks ? { ranks: row.finalRanks } : {}),
+                ...(row.finalShootOff ? { shootOff: true } : {}),
               }
             : null,
           source: payload.source ?? "pdf_import",

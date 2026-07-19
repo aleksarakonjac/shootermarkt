@@ -286,20 +286,24 @@ export interface ISSFFinalResult {
   lastName: string;
   firstName: string;
   nationCode: string;
-  /** Kumulativni skor posle svake faze finala. Svaka faza = 2 hica (AR) ili 2 hica (AP). */
+  /** Kumulativni skor posle svake faze finala. */
   stageCumulatives: number[];
   /** Ukupan skor finala (= poslednji kumulativ). */
   total: number;
+  /** Individualni hici grupisani po fazi: shotsByStage[i] = hici u fazi i. */
+  shotsByStage: number[][];
+  /** true ako je strelac bio u shoot-off-u (SO u Remarks koloni). */
+  shootOff: boolean;
 }
 
 /**
  * Scrape ISSF final results HTML.
  *
- * Format: main rows have bold-black tds with cumulative scores per stage.
- * Sub-rows (individual shots) are ignored.
- * Pattern: rank | bib | name link | noc | bold_cum1 ... bold_cumN | bold_total (= last cumulative, repeated)
+ * Main rows: rank | bib | name link | noc | bold cumulative per stage | bold total | remarks | targets
+ * Sub-rows: colspan=4 (empty) | shot per stage column (multiple sub-rows stacked vertically per stage)
  *
- * Eliminated finalists have shorter arrays — they stop at the round where they were knocked out.
+ * Eliminated finalists have shorter cumulative arrays (they stop at elimination round).
+ * Shoot-offs detected via "SO" in Remarks td.
  */
 export async function fetchFinalResultsFromHtml(
   competitionId: number,
@@ -313,23 +317,35 @@ export async function fetchFinalResultsFromHtml(
   if (!res.ok) throw new Error(`ISSF final HTML fetch failed: ${res.status} ${url}`);
   const html = await res.text();
 
-  const results: ISSFFinalResult[] = [];
+  // ── Pass 1: locate all main rows ─────────────────────────────────────────────
 
-  const rowRe =
+  interface RawEntry {
+    rank: number;
+    issfId: string;
+    lastName: string;
+    firstName: string;
+    nationCode: string;
+    stageCumulatives: number[];
+    total: number;
+    shootOff: boolean;
+    endOffset: number;
+  }
+
+  const mainRowRe =
     /<tr>\s*<td[^>]*>(\d+)<\/td>\s*<td[^>]*>\d+<\/td>\s*<td[^>]*><a href="\/athletes\/([^"]+)">([^<]+)<\/a><\/td>\s*<td[^>]*>([A-Z]{3})<\/td>([\s\S]*?)<\/tr>/g;
 
-  let m: RegExpExecArray | null;
-  while ((m = rowRe.exec(html)) !== null) {
-    const rank = parseInt(m[1]);
-    const issfId = m[2].trim();
-    const rawName = m[3].replace(/&nbsp;/gi, " ").replace(/ /g, " ").trim();
+  const rawEntries: RawEntry[] = [];
+  let mm: RegExpExecArray | null;
+  while ((mm = mainRowRe.exec(html)) !== null) {
+    const rank = parseInt(mm[1]);
+    const issfId = mm[2].trim();
+    const rawName = mm[3].replace(/&nbsp;/gi, " ").replace(/\u00a0/g, " ").trim();
     const spaceIdx = rawName.indexOf(" ");
     const lastName = spaceIdx > 0 ? rawName.slice(0, spaceIdx) : rawName;
     const firstName = spaceIdx > 0 ? rawName.slice(spaceIdx + 1) : "";
-    const nationCode = m[4];
-    const rest = m[5];
+    const nationCode = mm[4];
+    const rest = mm[5];
 
-    // All bold-black tds contain stage cumulatives; the last one is the repeated total
     const boldRe = /<td[^>]*class="bold black"[^>]*>([\d.]+)<\/td>/g;
     const allVals: number[] = [];
     let bm: RegExpExecArray | null;
@@ -337,17 +353,62 @@ export async function fetchFinalResultsFromHtml(
       const v = parseFloat(bm[1]);
       if (!isNaN(v)) allVals.push(v);
     }
-
     if (allVals.length < 2) continue;
 
     const total = allVals[allVals.length - 1];
-    // Drop trailing duplicate (total col = last cumulative)
-    const stageCumulatives =
-      allVals[allVals.length - 1] === allVals[allVals.length - 2]
-        ? allVals.slice(0, -1)
-        : allVals.slice(0, -1);
+    const stageCumulatives = allVals.slice(0, -1);
 
-    results.push({ rank, issfId, lastName, firstName, nationCode, stageCumulatives, total });
+    const shootOff = />\s*SO\s*</.test(rest);
+
+    rawEntries.push({
+      rank, issfId, lastName, firstName, nationCode,
+      stageCumulatives, total, shootOff,
+      endOffset: mm.index + mm[0].length,
+    });
+  }
+
+  // ── Pass 2: parse sub-rows between consecutive main rows ──────────────────────
+
+  const results: ISSFFinalResult[] = [];
+  const subRowRe = /<tr>\s*<td[^>]*colspan[^>]*>[\s\S]*?<\/td>([\s\S]*?)<\/tr>/g;
+
+  for (let i = 0; i < rawEntries.length; i++) {
+    const entry = rawEntries[i];
+    const blockStart = entry.endOffset;
+    const blockEnd = i + 1 < rawEntries.length ? rawEntries[i + 1].endOffset : html.length;
+    const block = html.slice(blockStart, blockEnd);
+
+    const stageCount = entry.stageCumulatives.length;
+    const shotCols: number[][] = Array.from({ length: stageCount }, () => []);
+
+    subRowRe.lastIndex = 0;
+    let sm: RegExpExecArray | null;
+    while ((sm = subRowRe.exec(block)) !== null) {
+      const shotPart = sm[1];
+      const tdRe = /<td[^>]*>([\d.]*)<\/td>/g;
+      let col = 0;
+      let tm: RegExpExecArray | null;
+      while ((tm = tdRe.exec(shotPart)) !== null) {
+        const val = tm[1].trim();
+        if (val && col < stageCount) {
+          const n = parseFloat(val);
+          if (!isNaN(n)) shotCols[col].push(n);
+        }
+        col++;
+      }
+    }
+
+    results.push({
+      rank: entry.rank,
+      issfId: entry.issfId,
+      lastName: entry.lastName,
+      firstName: entry.firstName,
+      nationCode: entry.nationCode,
+      stageCumulatives: entry.stageCumulatives,
+      total: entry.total,
+      shotsByStage: shotCols,
+      shootOff: entry.shootOff,
+    });
   }
 
   return results;

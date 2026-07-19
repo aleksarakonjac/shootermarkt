@@ -174,6 +174,10 @@ export interface ReviewRow {
   finalCumulative?: number[] | null;
   finalRanks?: Array<number | null> | null;
   finalScoring?: "decimal" | "hit_count";
+  /** Hici grupisani po fazi finala (ISSF scraper). */
+  finalShotsByStage?: number[][] | null;
+  /** Strelac je bio u shoot-off-u. */
+  finalShootOff?: boolean | null;
 
   /** UI controls */
   skip?: boolean;

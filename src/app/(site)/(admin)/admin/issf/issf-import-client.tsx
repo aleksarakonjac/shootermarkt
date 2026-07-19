@@ -33,93 +33,108 @@ function rankColor(rank: number | null | undefined): string {
 }
 
 function FinalSection({ discRows, isAP }: { discRows: ReviewRow[]; isAP: boolean }) {
+  const [showShots, setShowShots] = useState(false);
+
   const finalists = discRows
     .filter((r) => r.finalRank != null && r.finalCumulative?.length)
     .sort((a, b) => (a.finalRank ?? 99) - (b.finalRank ?? 99));
 
   if (finalists.length === 0) return null;
 
-  // Longest cumulative array = number of stages
   const stageCount = Math.max(...finalists.map((f) => f.finalCumulative!.length));
-  const stageLabels = Array.from({ length: stageCount }, (_, i) => {
-    // 1st comp stage = first 2 cols, rest = elimination
-    if (i === 0) return "F1";
-    if (i === 1) return "F2";
-    return `E${i - 1}`;
-  });
+  const hasShots = finalists.some((f) => f.finalShotsByStage?.some((s) => s.length > 0));
+
+  // Max shots per stage (for row height when shots are shown)
+  const maxShotsPerStage = Array.from({ length: stageCount }, (_, i) =>
+    Math.max(0, ...finalists.map((f) => f.finalShotsByStage?.[i]?.length ?? 0))
+  );
+
+  const stageLabels = Array.from({ length: stageCount }, (_, i) =>
+    i === 0 ? "F1" : i === 1 ? "F2" : `E${i - 1}`
+  );
+
+  const fmtScore = (v: number) => isAP ? String(v) : v.toFixed(1);
 
   return (
-    <div className="border-t-2 border-[var(--brand-primary)] border-opacity-30" style={{ borderColor: "oklch(0.75 0.18 85 / 0.3)" }}>
+    <div className="border-t-2" style={{ borderColor: "oklch(0.75 0.18 85 / 0.25)" }}>
       {/* Finals header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--surface)]">
-        <span className="text-[0.65rem] font-bold uppercase tracking-widest" style={{ color: "oklch(0.65 0.12 85)" }}>
-          ★ Finale
-        </span>
-        <span className="text-xs text-[var(--muted)]">
-          {finalists.length} finalista · {stageCount} faza
-        </span>
+      <div className="flex items-center justify-between px-4 py-2.5 bg-[var(--surface)]">
+        <div className="flex items-center gap-2">
+          <span className="text-[0.65rem] font-bold uppercase tracking-widest" style={{ color: "oklch(0.65 0.12 85)" }}>
+            ★ Finale
+          </span>
+          <span className="text-xs text-[var(--muted)]">
+            {finalists.length} finalista · {stageCount} faza
+          </span>
+          {finalists.some((f) => f.finalShootOff) && (
+            <span className="rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-wider bg-amber-100 text-amber-700">
+              SO
+            </span>
+          )}
+        </div>
+        {hasShots && (
+          <button
+            onClick={() => setShowShots((v) => !v)}
+            className="text-[0.65rem] font-semibold text-[var(--brand-primary)] hover:underline transition-colors"
+          >
+            {showShots ? "Sakrij hice ↑" : "Prikaži hice ↓"}
+          </button>
+        )}
       </div>
 
       {/* Finals table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm" style={{ minWidth: `${320 + stageCount * 56}px` }}>
+        <table className="w-full text-sm" style={{ minWidth: `${320 + stageCount * 64}px` }}>
           <thead>
             <tr className="border-b border-[var(--border)]">
-              <th className="w-8 px-2 py-2 text-center text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">
-                #
-              </th>
-              <th className="min-w-[140px] px-3 py-2 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">
-                Strelac
-              </th>
-              <th className="px-2 py-2 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">
-                NOC
-              </th>
+              <th className="w-8 px-2 py-2 text-center text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">#</th>
+              <th className="min-w-[150px] px-3 py-2 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">Strelac</th>
+              <th className="px-2 py-2 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">NOC</th>
               {stageLabels.map((label, i) => (
                 <th
                   key={i}
-                  className="w-14 px-1 py-2 text-center text-[0.65rem] font-semibold uppercase tracking-wider bg-[var(--surface)]"
-                  style={{ color: i < 2 ? "var(--muted)" : "oklch(0.65 0.12 85 / 0.7)" }}
+                  className="w-16 px-1 py-2 text-center text-[0.65rem] font-semibold uppercase tracking-wider bg-[var(--surface)]"
+                  style={{ color: i < 2 ? "var(--muted)" : "oklch(0.65 0.12 85 / 0.8)" }}
                 >
                   {label}
                 </th>
               ))}
-              <th className="px-3 py-2 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">
-                Total
-              </th>
+              <th className="px-3 py-2 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] bg-[var(--surface)]">Total</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
             {finalists.map((row) => {
               const cum = row.finalCumulative!;
               const ranks = row.finalRanks;
+              const shots = row.finalShotsByStage;
               const eliminated = cum.length < stageCount;
 
               return (
                 <tr
                   key={`${row.lastName}-${row.firstName}`}
                   className="hover:bg-[var(--surface)] transition-colors"
-                  style={{ opacity: eliminated ? 0.75 : 1 }}
+                  style={{ opacity: eliminated ? 0.72 : 1 }}
                 >
-                  {/* Final rank */}
-                  <td className="w-8 px-2 py-2 text-center">
-                    <span
-                      className="font-[family-name:var(--font-barlow-condensed)] font-bold text-base"
-                      style={{ color: rankColor(row.finalRank) }}
-                    >
-                      {row.finalRank}
-                    </span>
+                  {/* Rank + SO badge */}
+                  <td className="w-8 px-2 py-2 text-center align-top">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="font-[family-name:var(--font-barlow-condensed)] font-bold text-base leading-none" style={{ color: rankColor(row.finalRank) }}>
+                        {row.finalRank}
+                      </span>
+                      {row.finalShootOff && (
+                        <span className="text-[0.55rem] font-bold text-amber-600 leading-none">SO</span>
+                      )}
+                    </div>
                   </td>
 
                   {/* Name */}
-                  <td className="min-w-[140px] px-3 py-2">
-                    <span className="text-xs font-semibold text-[var(--ink)]">
-                      {row.lastName}
-                    </span>{" "}
+                  <td className="min-w-[150px] px-3 py-2 align-top">
+                    <span className="text-xs font-semibold text-[var(--ink)]">{row.lastName}</span>{" "}
                     <span className="text-xs text-[var(--muted)]">{row.firstName}</span>
                   </td>
 
                   {/* NOC */}
-                  <td className="px-2 py-2">
+                  <td className="px-2 py-2 align-top">
                     <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">
                       {row.teamNoc}
                     </span>
@@ -129,26 +144,44 @@ function FinalSection({ discRows, isAP }: { discRows: ReviewRow[]; isAP: boolean
                   {Array.from({ length: stageCount }, (_, i) => {
                     const score = cum[i];
                     const rank = ranks?.[i];
+                    const stageShots = shots?.[i] ?? [];
                     const isLastForShooter = i === cum.length - 1 && eliminated;
 
                     return (
                       <td
                         key={i}
-                        className="w-14 px-1 py-2 text-center"
-                        style={isLastForShooter ? { background: "oklch(0.95 0.04 25 / 0.3)" } : undefined}
+                        className="w-16 px-1 py-1.5 text-center align-top"
+                        style={isLastForShooter ? { background: "oklch(0.95 0.04 25 / 0.25)" } : undefined}
                       >
                         {score != null ? (
                           <div className="flex flex-col items-center gap-0.5">
+                            {/* Cumulative score */}
                             <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">
-                              {isAP ? score : score.toFixed(1)}
+                              {fmtScore(score)}
                             </span>
+                            {/* Rank chip */}
                             {rank != null && (
-                              <span
-                                className="text-[0.55rem] font-bold leading-none"
-                                style={{ color: rankColor(rank) }}
-                              >
+                              <span className="text-[0.5rem] font-bold leading-none" style={{ color: rankColor(rank) }}>
                                 #{rank}
                               </span>
+                            )}
+                            {/* Individual shots (toggle) */}
+                            {showShots && stageShots.length > 0 && (
+                              <div className="mt-1 flex flex-col items-center gap-px border-t border-[var(--border)] pt-1">
+                                {stageShots.map((shot, si) => (
+                                  <span
+                                    key={si}
+                                    className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] leading-tight"
+                                    style={{ color: shot >= (isAP ? 10 : 10.5) ? "var(--brand-primary)" : "var(--muted)" }}
+                                  >
+                                    {fmtScore(shot)}
+                                  </span>
+                                ))}
+                                {/* Pad empty rows for alignment across finalists */}
+                                {Array.from({ length: maxShotsPerStage[i] - stageShots.length }, (_, pi) => (
+                                  <span key={`pad-${pi}`} className="text-[0.6rem] leading-tight text-transparent">0</span>
+                                ))}
+                              </div>
                             )}
                           </div>
                         ) : (
@@ -159,11 +192,8 @@ function FinalSection({ discRows, isAP }: { discRows: ReviewRow[]; isAP: boolean
                   })}
 
                   {/* Final total */}
-                  <td className="px-3 py-2 text-right">
-                    <span
-                      className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm"
-                      style={{ color: rankColor(row.finalRank) }}
-                    >
+                  <td className="px-3 py-2 text-right align-top">
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm" style={{ color: rankColor(row.finalRank) }}>
                       {isAP ? row.finalTotal : row.finalTotal?.toFixed(1)}
                     </span>
                   </td>

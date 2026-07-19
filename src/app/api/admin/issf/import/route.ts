@@ -102,6 +102,8 @@ export async function POST(req: NextRequest) {
           row.finalTotal = finalist.total;
           row.finalCumulative = finalist.stageCumulatives;
           row.finalRanks = deriveFinalRankProgression(finalist.stageCumulatives, allCumulatives);
+          row.finalShotsByStage = finalist.shotsByStage;
+          row.finalShootOff = finalist.shootOff || null;
           row.finalScoring = disciplineCode.startsWith("AP") ? "hit_count" : "decimal";
           row.qualified = true;
         }
