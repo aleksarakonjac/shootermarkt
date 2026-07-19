@@ -115,7 +115,7 @@ export function StrelciFilterBar({
       <div className="flex items-center gap-1.5">
 
         {/* Search */}
-        <div className="relative min-w-0 flex-1 max-w-xs">
+        <div className="relative min-w-0 flex-1 max-w-[13rem] sm:max-w-xs">
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--subtle)] pointer-events-none"
             width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"
@@ -144,7 +144,7 @@ export function StrelciFilterBar({
           labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
           showSelectedSublabel={false}
           align="right"
-          className="w-[5.5rem] shrink-0 sm:min-w-[130px]"
+          className="w-[6.5rem] shrink-0 sm:min-w-[130px]"
         />
       </div>
 
