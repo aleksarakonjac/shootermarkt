@@ -1,0 +1,40 @@
+/* ── Competition list entrance animations ──────────────────────────────────── */
+@keyframes comp-hero-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes comp-month-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes comp-row-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.comp-hero {
+  animation: comp-hero-in 200ms ease-out both;
+}
+
+.comp-month {
+  animation: comp-month-in 160ms ease-out both;
+  animation-delay: calc(min(var(--month-idx, 0), 4) * 45ms);
+}
+
+.comp-row {
+  animation: comp-row-in 150ms ease-out both;
+  animation-delay: calc(
+    min(var(--month-idx, 0), 4) * 45ms +
+    min(var(--row-idx, 0), 5) * 20ms
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comp-hero,
+  .comp-month,
+  .comp-row {
+    animation: none;
+  }
+}

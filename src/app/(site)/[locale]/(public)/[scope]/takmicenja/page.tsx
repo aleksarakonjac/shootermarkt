@@ -4,8 +4,10 @@ import { db } from "@/lib/db";
 import { competitions, results, disciplines, countries } from "@/lib/db/schema";
 import { eq, desc, ilike, and, sql } from "drizzle-orm";
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { ScopedLink } from "../../components/ScopedLink";
 import { Suspense } from "react";
+import "./takmicenja.css";
 import { CompetitionsFilterBar } from "./CompetitionsFilterBar";
 import { ViewToggle } from "./ViewToggle";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
@@ -143,12 +145,16 @@ function CompRow({
   showCountdown,
   locale,
   levelLabel,
+  animClass,
+  animStyle,
 }: {
   comp: CompItem;
   isLast: boolean;
   showCountdown: boolean;
   locale: string;
   levelLabel: string;
+  animClass?: string;
+  animStyle?: CSSProperties;
 }) {
   const levelStyle = LEVEL_STYLE[comp.level] ?? FALLBACK_BADGE;
   const discCodes = sortDiscs(comp.disciplineCodes ?? []);
@@ -159,9 +165,10 @@ function CompRow({
   return (
     <ScopedLink
       href={`/takmicenja/${comp.id}`}
-      className={`group flex items-center gap-3 sm:gap-4 px-4 py-3.5 transition-colors hover:bg-[var(--surface)] ${
+      className={`group flex items-center gap-3 sm:gap-4 px-4 py-3.5 transition-colors hover:bg-[var(--surface)] ${animClass ?? ""} ${
         !isLast ? "border-b border-[var(--border)]" : ""
       }`}
+      style={animStyle}
     >
       {/* Date */}
       <div className="shrink-0 w-[92px] hidden sm:flex flex-col gap-0.5">
@@ -552,7 +559,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
                 style={{ borderColor: "var(--live-border)", background: "var(--live-bg)" }}
               >
                 {live.map((c, i) => (
-                  <CompRow key={c.id} comp={c} isLast={i === live.length - 1} showCountdown={false} locale={locale} levelLabel={getLevelLabel(c.level, locale)} />
+                  <CompRow key={c.id} comp={c} isLast={i === live.length - 1} showCountdown={false} locale={locale} levelLabel={getLevelLabel(c.level, locale)} animClass="comp-row" animStyle={{ '--row-idx': i } as CSSProperties} />
                 ))}
               </div>
             </section>
@@ -566,7 +573,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
               {hero && (
                 <ScopedLink
                   href={`/takmicenja/${hero.id}`}
-                  className="group block rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:shadow-sm transition-all mb-2 overflow-hidden"
+                  className="comp-hero group block rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:shadow-sm transition-all mb-2 overflow-hidden"
                 >
                   <div className="p-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -648,10 +655,10 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
               {/* Rest of upcoming — grouped by month */}
               {upcomingMonths.length > 0 && (
                 <div className="space-y-5 mt-2">
-                  {upcomingMonths.map((mk) => {
+                  {upcomingMonths.map((mk, monthIdx) => {
                     const comps = upcomingByMonth.get(mk)!;
                     return (
-                      <div key={mk}>
+                      <div key={mk} className="comp-month" style={{ '--month-idx': monthIdx } as CSSProperties}>
                         <div className="flex items-center gap-3 mb-2">
                           <span className="text-sm font-semibold text-[var(--muted)] capitalize">{monthLabel(mk, locale)}</span>
                           <div className="flex-1 h-px bg-[var(--border)]" />
@@ -659,7 +666,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
                         </div>
                         <div className="rounded-xl border border-[var(--border)] overflow-hidden">
                           {comps.map((c, i) => (
-                            <CompRow key={c.id} comp={c} isLast={i === comps.length - 1} showCountdown locale={locale} levelLabel={getLevelLabel(c.level, locale)} />
+                            <CompRow key={c.id} comp={c} isLast={i === comps.length - 1} showCountdown locale={locale} levelLabel={getLevelLabel(c.level, locale)} animClass="comp-row" animStyle={{ '--month-idx': monthIdx, '--row-idx': i } as CSSProperties} />
                           ))}
                         </div>
                       </div>
@@ -682,10 +689,10 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
           {activeWhen === "past" && pastAll.length > 0 && (
             <section aria-label="Prošla takmičenja">
               <div className="space-y-5">
-                {visiblePastMonths.map((mk) => {
+                {visiblePastMonths.map((mk, monthIdx) => {
                   const comps = pastByMonth.get(mk)!;
                   return (
-                    <div key={mk}>
+                    <div key={mk} className="comp-month" style={{ '--month-idx': monthIdx } as CSSProperties}>
                       <div className="flex items-center gap-3 mb-2">
                         <span className="text-sm font-semibold text-[var(--muted)] capitalize">{monthLabel(mk, locale)}</span>
                         <div className="flex-1 h-px bg-[var(--border)]" />
@@ -693,7 +700,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
                       </div>
                       <div className="rounded-xl border border-[var(--border)] overflow-hidden">
                         {comps.map((c, i) => (
-                          <CompRow key={c.id} comp={c} isLast={i === comps.length - 1} showCountdown={false} locale={locale} levelLabel={getLevelLabel(c.level, locale)} />
+                          <CompRow key={c.id} comp={c} isLast={i === comps.length - 1} showCountdown={false} locale={locale} levelLabel={getLevelLabel(c.level, locale)} animClass="comp-row" animStyle={{ '--month-idx': monthIdx, '--row-idx': i } as CSSProperties} />
                         ))}
                       </div>
                     </div>
