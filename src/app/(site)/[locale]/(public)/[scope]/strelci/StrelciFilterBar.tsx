@@ -112,10 +112,10 @@ export function StrelciFilterBar({
     <div className="space-y-2 mb-6">
 
       {/* Search and country stay in the first mobile row. */}
-      <div className="flex items-center gap-1.5">
+      <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(6.5rem,30%)] items-center gap-1.5 sm:flex">
 
         {/* Search */}
-        <div className="relative min-w-0 flex-1 max-w-[13rem] sm:max-w-xs">
+        <div className="relative min-w-0 sm:flex-1 sm:max-w-xs">
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--subtle)] pointer-events-none"
             width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"
@@ -144,7 +144,7 @@ export function StrelciFilterBar({
           labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
           showSelectedSublabel={false}
           align="right"
-          className="w-[6.5rem] shrink-0 sm:min-w-[130px]"
+          className="w-full sm:w-auto sm:min-w-[130px]"
         />
       </div>
 
