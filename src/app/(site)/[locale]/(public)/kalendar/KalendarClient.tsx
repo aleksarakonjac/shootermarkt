@@ -155,6 +155,7 @@ export function KalendarClient({ competitions }: Props) {
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
+      <style>{`.react-calendar__navigation__label{text-align:center!important;padding-left:0!important}`}</style>
       {/* ── Calendar ──────────────────────────────────────────── */}
       <div className="w-full lg:w-auto lg:shrink-0 lg:sticky lg:top-[88px]">
         <Calendar
@@ -186,14 +187,12 @@ export function KalendarClient({ competitions }: Props) {
             const dayComps = eventMap.get(key);
             if (!dayComps) return null;
             const levels = dayComps.map((c) => c.level);
-            if (levels.some((l) => l === "world" || l === "olympic"))
-              return "tile-has-event tile-level-world";
-            if (levels.some((l) => l === "international" || l === "continental"))
-              return "tile-has-event tile-level-intl";
-            if (levels.some((l) => l === "national"))
-              return "tile-has-event tile-level-national";
-            if (levels.some((l) => l === "regional"))
-              return "tile-has-event tile-level-regional";
+            if (levels.some((l) => l === "olympic"))      return "tile-has-event tile-level-olympic";
+            if (levels.some((l) => l === "world"))        return "tile-has-event tile-level-world";
+            if (levels.some((l) => l === "continental"))  return "tile-has-event tile-level-continental";
+            if (levels.some((l) => l === "international"))return "tile-has-event tile-level-international";
+            if (levels.some((l) => l === "national"))     return "tile-has-event tile-level-national";
+            if (levels.some((l) => l === "regional"))     return "tile-has-event tile-level-regional";
             return "tile-has-event tile-level-club";
           }}
           calendarType="iso8601"

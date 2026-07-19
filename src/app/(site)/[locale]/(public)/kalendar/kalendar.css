@@ -136,11 +136,13 @@
   transform: translateX(-50%);
 }
 
-.tile-level-club::after         { background: var(--subtle); }
-.tile-level-regional::after     { background: var(--brand-accent); }
-.tile-level-national::after     { background: var(--success); }
-.tile-level-intl::after         { background: oklch(0.52 0.15 220); }
-.tile-level-world::after        { background: var(--brand-primary); }
+.tile-level-club::after          { background: var(--level-club-fg); }
+.tile-level-regional::after      { background: var(--level-regional-fg); }
+.tile-level-national::after      { background: var(--level-national-fg); }
+.tile-level-international::after { background: var(--level-international-fg); }
+.tile-level-continental::after   { background: var(--level-continental-fg); }
+.tile-level-world::after         { background: var(--level-world-fg); }
+.tile-level-olympic::after       { background: var(--level-olympic-fg); }
 
 /* Dot on selected tile */
 .react-calendar__tile--active.tile-has-event::after {

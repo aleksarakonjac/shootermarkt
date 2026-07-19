@@ -178,8 +178,8 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)]">
       {/* Header */}
-      <div className="relative flex items-center justify-between rounded-t-xl bg-[var(--brand-primary)] px-4 py-1">
-        <h3 className="font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-white">
+      <div className="relative flex items-center justify-center sm:justify-between rounded-t-xl bg-[var(--brand-primary)] px-4 py-1">
+        <h3 className="hidden sm:block font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-white">
           {t("title")}
         </h3>
         <div className="flex items-center gap-1">
