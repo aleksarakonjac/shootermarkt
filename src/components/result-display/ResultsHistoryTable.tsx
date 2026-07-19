@@ -79,7 +79,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
         <table className="w-full table-fixed text-xs sm:text-sm">
           <thead>
             <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-              <th className="w-[40%] px-2 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
+              <th className="w-[42%] px-2 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Competition" : "Takmičenje"}
               </th>
               <th className="hidden px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:table-cell">
@@ -88,16 +88,15 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
               <th className="w-[15%] px-1 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Disc." : "Disc."}
               </th>
-              <th className="w-[18%] px-1 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
+              <th className="w-[22%] px-1 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Qual." : "Kval."}
               </th>
               <th className="hidden px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:table-cell">
                 {locale === "en" ? "Rank" : "Rang"}
               </th>
-              <th className="w-[16%] px-1 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
+              <th className="w-[21%] px-1 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Final" : "Finale"}
               </th>
-              <th className="w-6" />
             </tr>
           </thead>
           <tbody>
@@ -118,7 +117,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                     aria-expanded={canExpand ? isExpanded : undefined}
                   >
                     <td className="px-2 py-2.5 font-medium text-[var(--ink)] sm:px-4 sm:py-3">
-                      <span className="block truncate" title={r.competitionName}>{r.competitionName}</span>
+                      <span className="block break-words leading-snug">{r.competitionName}</span>
                     </td>
                     <td className="hidden px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] sm:table-cell">
                       {r.competitionDate.split("-").reverse().join(".")}
@@ -158,23 +157,23 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                       )}
                     </td>
                     <td className="whitespace-nowrap px-1 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] sm:px-4 sm:py-3">
-                      {r.finalTotal ?? <span className="text-[var(--subtle)]">—</span>}
-                    </td>
-                    <td className="px-1 py-2.5 text-center sm:px-2 sm:py-3">
-                      {canExpand && (
+                      <span className="inline-flex items-center gap-1">
+                        {r.finalTotal ?? <span className="text-[var(--subtle)]">—</span>}
+                        {canExpand && (
                         <ChevronDown
                           size={14}
-                          className={`text-[var(--muted)] transition-transform duration-200 mx-auto ${
+                          className={`text-[var(--muted)] transition-transform duration-200 ${
                             isExpanded ? "rotate-180" : ""
                           }`}
                           aria-hidden="true"
                         />
-                      )}
+                        )}
+                      </span>
                     </td>
                   </tr>
 
                   <tr aria-hidden={!isExpanded}>
-                    <td colSpan={7} className="p-0">
+                    <td colSpan={6} className="p-0">
                       <div
                         className={`grid transition-[grid-template-rows] duration-200 ease-out ${
                           isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
