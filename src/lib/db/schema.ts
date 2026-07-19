@@ -192,6 +192,8 @@ export type BulletinFinalDetail = {
   shots?: number[];
   /** Kumulativni rezultat posle svakog prikazanog hica/faze. */
   cumulative?: number[];
+  /** Plasman posle svakog prikazanog hica/faze, izveden pri importu. */
+  ranks?: Array<number | null>;
 };
 
 export type FinalDetail = ArApFinalDetail | PositionsFinalDetail | BulletinFinalDetail;

@@ -73,6 +73,24 @@ describe("mergeFinalsIntoRows", () => {
     });
   });
 
+  it("stores the rank after each cumulative final score", () => {
+    const rows: ReviewRow[] = [
+      { firstName: "Ana", lastName: "Ilić", teamNoc: "SRB", disciplineCode: "ARW", category: "senior", qualTotal: 627.2 },
+      { firstName: "Mila", lastName: "Jović", teamNoc: "SRB", disciplineCode: "ARW", category: "senior", qualTotal: 626.1 },
+    ];
+    const events: ParsedEvent[] = [{
+      discipline: "ARW", stage: "final", category: "senior", results: [
+        { rank: 2, firstName: "Ana", lastName: "Ilić", teamNoc: "SRB", total: 252.4, cumulative: [52.1, 104.8, 157.6] },
+        { rank: 1, firstName: "Mila", lastName: "Jović", teamNoc: "SRB", total: 253.1, cumulative: [52.4, 104.7, 158.0] },
+      ],
+    }];
+
+    mergeFinalsIntoRows(rows, events, foldName);
+
+    expect(rows[0]?.finalRanks).toEqual([2, 1, 2]);
+    expect(rows[1]?.finalRanks).toEqual([1, 2, 1]);
+  });
+
   it("marks Sport Pistol finals as hit-count scoring", () => {
     const rows: ReviewRow[] = [{
       firstName: "Jelena", lastName: "Marković", teamNoc: "SRB", disciplineCode: "SPW",

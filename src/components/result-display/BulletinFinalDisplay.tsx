@@ -1,6 +1,6 @@
 import type { BulletinFinalDetail } from "@/lib/db/schema";
 
-export function BulletinFinalDisplay({ detail, ranks }: { detail: BulletinFinalDetail; ranks?: Array<number | null> | null }) {
+export function BulletinFinalDisplay({ detail }: { detail: BulletinFinalDetail }) {
   const hasData = detail.series?.length || detail.shots?.length || detail.cumulative?.length;
   const isHitCount = detail.scoring === "hit_count";
   const fmt = (value: number) => isHitCount ? String(value) : value.toFixed(1);
@@ -80,7 +80,7 @@ export function BulletinFinalDisplay({ detail, ranks }: { detail: BulletinFinalD
         </div>
       ) : null}
 
-      {!isHitCount && detail.cumulative?.length && ranks?.some((rank) => rank != null) ? (
+      {!isHitCount && detail.cumulative?.length && detail.ranks?.some((rank) => rank != null) ? (
         <div>
           <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Plasman tokom finala</p>
           <div className="overflow-x-auto">
@@ -89,7 +89,7 @@ export function BulletinFinalDisplay({ detail, ranks }: { detail: BulletinFinalD
                 <div key={index} className="min-w-14 rounded bg-[var(--surface-2)] px-2 py-1 text-center">
                   <div className="text-[0.6rem] font-semibold text-[var(--subtle)]">F{index + 1}</div>
                   <div className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)]">{fmt(value)}</div>
-                  <div className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-semibold tabular-nums text-[var(--muted)]">{ranks[index] != null ? `#${ranks[index]}` : "—"}</div>
+                  <div className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-semibold tabular-nums text-[var(--muted)]">{detail.ranks[index] != null ? `#${detail.ranks[index]}` : "—"}</div>
                 </div>
               ))}
             </div>

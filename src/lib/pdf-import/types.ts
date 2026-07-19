@@ -90,6 +90,21 @@ export const DISCIPLINE_META: Record<DisciplineCode, { apparatus: string; gender
 /** Kodovi disciplina koje uvozimo. */
 export const IMPORTED_DISCIPLINE_CODES = Object.keys(DISCIPLINE_META) as DisciplineCode[];
 
+export function deriveFinalRankProgression(
+  cumulative: readonly number[] | undefined,
+  peerCumulatives: readonly (readonly number[] | undefined)[],
+): Array<number | null> | null {
+  if (!cumulative?.length) return null;
+
+  return cumulative.map((score, index) => {
+    const scores = peerCumulatives.flatMap((values) => {
+      const value = values?.[index];
+      return value == null ? [] : [value];
+    });
+    return scores.length > 1 ? 1 + scores.filter((value) => value > score).length : null;
+  });
+}
+
 export interface ParsedFinalResult {
   rank: number;
   lastName: string;
@@ -157,6 +172,7 @@ export interface ReviewRow {
   finalSeriesLabels?: string[] | null;
   finalShots?: number[] | null;
   finalCumulative?: number[] | null;
+  finalRanks?: Array<number | null> | null;
   finalScoring?: "decimal" | "hit_count";
 
   /** UI controls */
@@ -226,6 +242,10 @@ export function mergeFinalsIntoRows(
       row.finalSeriesLabels = rawResult.seriesLabels ?? null;
       row.finalShots = rawResult.shots ?? null;
       row.finalCumulative = rawResult.cumulative ?? null;
+      row.finalRanks = deriveFinalRankProgression(
+        rawResult.cumulative ?? undefined,
+        (event.results as ParsedFinalResult[]).map((result) => result.cumulative ?? undefined),
+      );
       row.finalScoring = event.discipline === "SPW" ? "hit_count" : "decimal";
       row.qualified = true;
       matchedFinals++;

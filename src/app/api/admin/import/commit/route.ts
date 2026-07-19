@@ -186,6 +186,7 @@ export async function POST(req: NextRequest) {
                 ...(row.finalSeriesLabels ? { seriesLabels: row.finalSeriesLabels } : {}),
                 ...(row.finalShots ? { shots: row.finalShots } : {}),
                 ...(row.finalCumulative ? { cumulative: row.finalCumulative } : {}),
+                ...(row.finalRanks ? { ranks: row.finalRanks } : {}),
               }
             : null,
           source: payload.source ?? "pdf_import",
