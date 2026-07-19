@@ -304,6 +304,15 @@ export function FormaChart({
     setNavDir(null);
   }
 
+  function selectMode(nextMode: "forma" | "nastup") {
+    if (nextMode === mode || isAnimating) return;
+    setPrevSlice({ data, yValues, xExit: -CW });
+    setNavDir("left");
+    setHoverIdx(null);
+    setTooltipPos(null);
+    setMode(nextMode);
+  }
+
   function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
     if (!containerRef.current || isAnimating || !built) return;
     const rect = containerRef.current.getBoundingClientRect();
@@ -391,7 +400,7 @@ export function FormaChart({
             {(["forma", "nastup"] as const).map(m => (
               <button
                 key={m}
-                onClick={() => { setMode(m); setHoverIdx(null); setTooltipPos(null); }}
+                onClick={() => selectMode(m)}
                 className="relative px-2.5 py-0.5 text-xs font-semibold transition-colors font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide"
                 style={mode === m
                   ? { color: "var(--ink)" }
@@ -506,7 +515,7 @@ export function FormaChart({
 
                 {/* Entering new window */}
                 <ChartLayer
-                  key={`${windowStart}-${windowEnd}`}
+                  key={`${mode}-${windowStart}-${windowEnd}`}
                   data={data}
                   built={built}
                   chartWidth={CW}
