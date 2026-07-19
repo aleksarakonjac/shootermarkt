@@ -228,7 +228,7 @@ export function KalendarClient({ competitions }: Props) {
       </div>
 
       {/* ── List panel ────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 w-full lg:w-auto">
         {/* Level filters — desktop only (mobile shown above calendar) */}
         <div className="hidden lg:block mb-5">{filterPills}</div>
 
