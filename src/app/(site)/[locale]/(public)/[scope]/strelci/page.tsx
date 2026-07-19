@@ -437,7 +437,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
             aria-label="Strelci na vrhu forme"
             className="mb-8 bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden"
           >
-            <div className="grid grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
               {(["ARM", "ARW", "APM", "APW"] as const).map((code) => (
                 <DiscPanel
                   key={code}
@@ -446,9 +446,9 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                   show={show}
                   t={t}
                   className={{
-                    ARM: "border-b border-r border-[var(--border)] lg:border-b-0",
+                    ARM: "border-b border-[var(--border)] sm:border-r lg:border-b-0",
                     ARW: "border-b border-[var(--border)] lg:border-r lg:border-b-0",
-                    APM: "border-r border-[var(--border)] lg:border-r",
+                    APM: "border-b border-[var(--border)] sm:border-r sm:border-b-0 lg:border-b-0",
                     APW: "",
                   }[code]}
                 />
