@@ -155,7 +155,7 @@ export function KalendarClient({ competitions }: Props) {
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
-      <style>{`.react-calendar__navigation__label{text-align:center!important;padding-left:0!important}`}</style>
+      <style>{`.react-calendar__navigation__label{text-align:center!important;padding-left:0!important}.react-calendar__navigation__label::before{content:"Septembar 2026";display:block;visibility:hidden;height:0;overflow:hidden;font:inherit}`}</style>
       {/* ── Calendar ──────────────────────────────────────────── */}
       <div className="w-full lg:w-auto lg:shrink-0 lg:sticky lg:top-[88px]">
         <Calendar
