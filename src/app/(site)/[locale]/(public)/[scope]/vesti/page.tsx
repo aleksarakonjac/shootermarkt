@@ -11,6 +11,7 @@ import { buildAlternates } from "@/i18n/alternates";
 import { getLevelLabel } from "@/lib/competition-utils";
 import type { Scope } from "@/lib/scope";
 import { FormaScoreMark } from "@/components/shooter/FormaScoreMark";
+import { trendLabel, trendColor } from "@/lib/forma";
 
 export const revalidate = 300;
 
@@ -198,7 +199,7 @@ export default async function VestiPage({ searchParams }: Props) {
           />
           <TopShootersWidget
             topShooters={topShooters}
-            title={<><span>Top </span><FormaScoreMark size="sm" /></>}
+            title={<><span>Top </span><FormaScoreMark size="md" /></>}
             rankingLabel={locale === "en" ? "Ranking" : "Rangiranje"}
           />
           {tags.length > 0 && <TagsWidget tags={tags} title={t("popularTags")} />}
@@ -519,33 +520,44 @@ function TopShootersWidget({
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
       <WidgetHeader title={title} linkHref="/rangiranje" linkLabel={rankingLabel} />
 
-      <div className="divide-y divide-[var(--border)]">
+      <div className="divide-y divide-[var(--border)] [&>div:last-child]:pb-4">
         {DISC_ORDER.map((code) => {
           const rows = topShooters[code];
-          if (!rows?.length) return null;
           return (
-            <div key={code} className="px-4 py-3">
+            <div key={code} className="px-4 py-2">
               <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--muted)] mb-2">
                 {DISC_LABEL_SR[code] ?? code}
               </div>
-              <ol className="flex flex-col gap-1.5">
-                {rows.map((row, i) => (
-                  <li key={row.shooterId} className="flex items-center gap-2">
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold text-[var(--subtle)] w-4 shrink-0">
-                      {i + 1}
-                    </span>
-                    <ScopedLink
-                      href={`/strelci/${row.shooterId}`}
-                      className="text-[13px] text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors truncate flex-1"
-                    >
-                      {row.firstName} {row.lastName}
-                    </ScopedLink>
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] tabular-nums shrink-0">
-                      {Number(row.bestScore).toFixed(1)}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              {!rows?.length ? (
+                <p className="text-[12px] text-[var(--subtle)]">—</p>
+              ) : (
+                <ol className="flex flex-col gap-1.5">
+                  {rows.map((row, i) => (
+                    <li key={row.shooterId} className="flex items-center gap-2">
+                      <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold text-[var(--subtle)] w-4 shrink-0">
+                        {i + 1}
+                      </span>
+                      <ScopedLink
+                        href={`/strelci/${row.shooterId}`}
+                        className="text-[13px] text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors truncate flex-1"
+                      >
+                        {row.firstName} {row.lastName}
+                      </ScopedLink>
+                      <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] tabular-nums shrink-0">
+                        {Number(row.bestScore).toFixed(1)}
+                      </span>
+                      {row.trend && (
+                        <span
+                          className="text-[11px] font-bold leading-none font-mono shrink-0"
+                          style={{ color: trendColor(row.trend as "up" | "down" | "stable") }}
+                        >
+                          {trendLabel(row.trend as "up" | "down" | "stable")}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
           );
         })}

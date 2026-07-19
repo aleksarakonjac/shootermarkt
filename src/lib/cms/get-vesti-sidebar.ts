@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { competitions, results, shooters, disciplines } from "@/lib/db/schema";
+import { competitions, results, shooters, disciplines, shooterFormaCache } from "@/lib/db/schema";
 import { eq, gte, asc, and, isNotNull, inArray, desc, sql } from "drizzle-orm";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 
@@ -21,6 +21,7 @@ export interface TopShooterRow {
   discCode: string;
   discName: string;
   bestScore: number;
+  trend: string | null;
 }
 
 export async function getUpcomingCompetitions(limit = 5): Promise<UpcomingCompetition[]> {
@@ -56,11 +57,19 @@ export async function getTopShootersByDiscipline(): Promise<Record<string, TopSh
       discCode: disciplines.code,
       discName: disciplines.name,
       bestScore: sql<number>`MAX(${results.qualTotal})`,
+      trend: shooterFormaCache.trend,
     })
     .from(results)
     .innerJoin(shooters, eq(results.shooterId, shooters.id))
     .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
     .innerJoin(competitions, eq(results.competitionId, competitions.id))
+    .leftJoin(
+      shooterFormaCache,
+      and(
+        eq(shooterFormaCache.shooterId, shooters.id),
+        eq(shooterFormaCache.disciplineCode, disciplines.code),
+      ),
+    )
     .where(
       and(
         inArray(shooters.apparatus, [...MVP_APPARATUS]),
@@ -74,6 +83,7 @@ export async function getTopShootersByDiscipline(): Promise<Record<string, TopSh
       shooters.lastName,
       disciplines.code,
       disciplines.name,
+      shooterFormaCache.trend,
     )
     .orderBy(disciplines.code, desc(sql`MAX(${results.qualTotal})`));
 
