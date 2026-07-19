@@ -25,26 +25,32 @@ async function main() {
     category: results.category,
     finalDetail: results.finalDetail,
   }).from(results);
-  const groups = new Map<string, typeof rows>();
+  type DetailedFinalRow = Omit<(typeof rows)[number], "finalDetail"> & {
+    finalDetail: BulletinFinalDetail & { cumulative: number[] };
+  };
+  const groups = new Map<string, DetailedFinalRow[]>();
   let detailedFinals = 0;
 
   for (const row of rows) {
     if (!isBulletinFinal(row.finalDetail) || !row.finalDetail.cumulative?.length) continue;
     detailedFinals++;
     const key = `${row.competitionId}:${row.disciplineId}:${row.category}`;
-    groups.set(key, [...(groups.get(key) ?? []), row]);
+    groups.set(key, [...(groups.get(key) ?? []), {
+      ...row,
+      finalDetail: { ...row.finalDetail, cumulative: row.finalDetail.cumulative },
+    }]);
   }
 
   let updated = 0;
   for (const group of groups.values()) {
-    const cumulative = group.map((row) => row.finalDetail?.cumulative);
+    const cumulative = group.map((row) => row.finalDetail.cumulative);
     for (const row of group) {
-      const ranks = deriveFinalRankProgression(row.finalDetail!.cumulative, cumulative);
-      if (!ranks?.some((rank) => rank != null) || sameRanks(row.finalDetail!.ranks, ranks)) continue;
+      const ranks = deriveFinalRankProgression(row.finalDetail.cumulative, cumulative);
+      if (!ranks?.some((rank) => rank != null) || sameRanks(row.finalDetail.ranks, ranks)) continue;
       updated++;
       if (apply) {
         await db.update(results)
-          .set({ finalDetail: { ...row.finalDetail!, ranks } })
+          .set({ finalDetail: { ...row.finalDetail, ranks } })
           .where(eq(results.id, row.id));
       }
     }

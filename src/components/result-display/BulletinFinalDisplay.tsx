@@ -89,7 +89,7 @@ export function BulletinFinalDisplay({ detail }: { detail: BulletinFinalDetail }
                 <div key={index} className="min-w-14 rounded bg-[var(--surface-2)] px-2 py-1 text-center">
                   <div className="text-[0.6rem] font-semibold text-[var(--subtle)]">F{index + 1}</div>
                   <div className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)]">{fmt(value)}</div>
-                  <div className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-semibold tabular-nums text-[var(--muted)]">{detail.ranks[index] != null ? `#${detail.ranks[index]}` : "—"}</div>
+                  <div className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-semibold tabular-nums text-[var(--muted)]">{detail.ranks?.[index] != null ? `#${detail.ranks[index]}` : "—"}</div>
                 </div>
               ))}
             </div>
