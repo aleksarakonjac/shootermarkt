@@ -125,28 +125,27 @@ function SortIcon({ col, activeSort, activeDir }: { col: SortCol; activeSort: So
   return <span className="ml-1">{activeDir === "asc" ? "↑" : "↓"}</span>;
 }
 
-function DiscPanel({ code, show, t }: { code: string; show: Record<string, FormaEntry[]>; t: TFunc }) {
-  const isMen = code === "ARM" || code === "APM";
+function DiscPanel({ code, label, show, t, className = "" }: { code: string; label: string; show: Record<string, FormaEntry[]>; t: TFunc; className?: string }) {
   const rows = show[code] ?? [];
-  if (rows.length === 0) return null;
   return (
-    <div className="p-5">
-      <div className="flex items-baseline gap-2 mb-4">
+    <div className={`p-3 sm:p-5 ${className}`}>
+      <div className="flex items-baseline gap-1.5 mb-2 sm:mb-4">
         <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[1.05rem] tracking-tight text-[var(--ink)] leading-none">
-          {t(isMen ? "discMen" : "discWomen")}
+          {label}
         </h3>
         <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)] shrink-0">
           {code}
         </span>
-        <span className="text-[0.65rem] text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)] ml-auto shrink-0">
-          {t("onTopForm")}
-        </span>
       </div>
-      <div>
+      {rows.length > 0 ? (
+        <div>
         {rows.map((s, i) => (
           <FormaLeaderRow key={s.id} s={s} rank={i + 1} t={t} />
         ))}
-      </div>
+        </div>
+      ) : (
+        <p className="py-2 text-xs text-[var(--subtle)]">{t("topFormNoData")}</p>
+      )}
     </div>
   );
 }
@@ -436,44 +435,28 @@ export default async function StrelciPage({ params, searchParams }: Props) {
         if (!hasAny) return null;
 
 
-        const hasRifle  = (show.ARM?.length ?? 0) > 0 || (show.ARW?.length ?? 0) > 0;
-        const hasPistol = (show.APM?.length ?? 0) > 0 || (show.APW?.length ?? 0) > 0;
-
         return (
           <section
             aria-label="Strelci na vrhu forme"
             className="mb-8 bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden"
           >
-            {/* Rifle row */}
-            {hasRifle && (
-              <div>
-                <div className="px-5 py-1.5 bg-[var(--surface-2)] border-b border-[var(--border)]">
-                  <span className="text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                    {t("discGroupRifle")}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)]">
-                  <DiscPanel code="ARM" show={show} t={t} />
-                  <DiscPanel code="ARW" show={show} t={t} />
-                </div>
-              </div>
-            )}
-
-            {/* Pistol row */}
-            {hasPistol && (
-              <div className={hasRifle ? "border-t border-[var(--border)]" : undefined}>
-                <div className="px-5 py-1.5 bg-[var(--surface-2)] border-b border-[var(--border)]">
-                  <span className="text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                    {t("discGroupPistol")}
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--border)]">
-                  <DiscPanel code="APM" show={show} t={t} />
-                  <DiscPanel code="APW" show={show} t={t} />
-                </div>
-              </div>
-            )}
-
+            <div className="grid grid-cols-2 lg:grid-cols-4">
+              {(["ARM", "ARW", "APM", "APW"] as const).map((code) => (
+                <DiscPanel
+                  key={code}
+                  code={code}
+                  label={DISC_STYLE[code].label}
+                  show={show}
+                  t={t}
+                  className={{
+                    ARM: "border-b border-r border-[var(--border)] lg:border-b-0",
+                    ARW: "border-b border-[var(--border)] lg:border-r lg:border-b-0",
+                    APM: "border-r border-[var(--border)] lg:border-r",
+                    APW: "",
+                  }[code]}
+                />
+              ))}
+            </div>
           </section>
         );
       })()}
@@ -512,11 +495,11 @@ export default async function StrelciPage({ params, searchParams }: Props) {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse min-w-[520px]">
+          <div>
+            <table className="w-full table-fixed text-sm border-collapse sm:table-auto sm:min-w-[520px]">
               <thead>
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                  <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] w-2/5">
+                  <th scope="col" className="w-[48%] px-3 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-2/5 sm:px-4">
                     <ScopedLink href={sortUrl("name")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
                       {tProfile("shooter")}<SortIcon col="name" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
@@ -526,7 +509,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       {tProfile("birthYear")}<SortIcon col="godiste" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
                   </th>
-                  <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                  <th scope="col" className="w-[21%] px-2 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
                     <ScopedLink href={sortUrl("disc")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
                       {tProfile("discipline")}<SortIcon col="disc" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
@@ -534,13 +517,13 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
                     {locale === "en" ? "Category" : "Kategorija"}
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                  <th scope="col" className="w-[21%] px-2 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
                     {tProfile("form")}
                   </th>
                   <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
                     {tProfile("competitions")}
                   </th>
-                  <th scope="col" className="px-3 py-3 w-8" />
+                  <th scope="col" className="w-8 px-2 py-3 sm:px-3" />
                 </tr>
               </thead>
               <tbody>
@@ -559,8 +542,8 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       className="border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface)] transition-colors group"
                     >
                       {/* Name + club + nationality inline */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
+                      <td className="px-3 py-3 sm:px-4">
+                        <div className="flex min-w-0 items-start gap-2 sm:gap-2.5">
                           {/* Avatar / initials */}
                           <div className="shrink-0 w-7 h-7 rounded-full overflow-hidden bg-[var(--surface-2)] flex items-center justify-center">
                             {s.avatarUrl ? (
@@ -577,15 +560,16 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                               </span>
                             )}
                           </div>
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="min-w-0 flex-1">
                           <ScopedLink
                             href={`/strelci/${s.id}`}
-                            className="font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors leading-snug truncate"
+                            className="block font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors leading-tight"
                           >
-                            {s.lastName} {s.firstName}
+                            <span className="block truncate">{s.lastName}</span>
+                            <span className="block truncate">{s.firstName}</span>
                           </ScopedLink>
                           {s.nationality && (
-                            <span className="inline-flex items-center gap-1 shrink-0">
+                            <span className="mt-1 hidden items-center gap-1 sm:inline-flex">
                               {alpha2 && (
                                 <span
                                   className={`fi fi-${alpha2.toLowerCase()}`}
@@ -599,7 +583,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                           )}
                         </div>
                         {s.clubName && (
-                          <div className="text-xs text-[var(--muted)] mt-0.5 truncate max-w-[200px] leading-none">
+                          <div className="mt-1 hidden max-w-[200px] truncate text-xs leading-none text-[var(--muted)] sm:block">
                             {s.clubName}
                             {s.clubCity && (
                               <span className="text-[var(--subtle)] ml-1">{s.clubCity}</span>
@@ -624,10 +608,11 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       </td>
 
                       {/* Discipline badge */}
-                      <td className="px-4 py-3">
+                      <td className="px-2 py-3 sm:px-4">
                         {disc && discSty ? (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-xs font-semibold leading-none whitespace-nowrap bg-[var(--surface-2)] text-[var(--muted)]">
-                            {discSty.label}
+                          <span className="inline-block rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-xs font-semibold leading-none whitespace-nowrap text-[var(--muted)]">
+                            <span className="sm:hidden">{disc}</span>
+                            <span className="hidden sm:inline">{discSty.label}</span>
                           </span>
                         ) : (
                           <span className="text-[var(--subtle)]">—</span>
@@ -644,7 +629,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       </td>
 
                       {/* Forma + trend */}
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-2 py-3 text-right sm:px-4">
                         {s.forma !== null ? (
                           <div className="inline-flex items-center justify-end gap-1.5">
                             <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] tabular-nums text-sm">
@@ -684,7 +669,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       </td>
 
                       {/* Chevron */}
-                      <td className="px-3 py-3">
+                      <td className="px-2 py-3 sm:px-3">
                         <svg
                           width="12" height="12" viewBox="0 0 12 12"
                           className="text-[var(--border-strong)] group-hover:text-[var(--muted)] transition-colors"

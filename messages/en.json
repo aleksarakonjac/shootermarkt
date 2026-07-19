@@ -156,6 +156,7 @@
     "statPistol": "pistol",
     "previewForma": "preview · form score coming soon",
     "onTopForm": "on top form",
+    "topFormNoData": "Not enough appearances",
     "trendUp": "rising",
     "trendDown": "falling",
     "trendStable": "stable",

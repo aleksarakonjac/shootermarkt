@@ -111,11 +111,11 @@ export function StrelciFilterBar({
   return (
     <div className="space-y-2 mb-6">
 
-      {/* Single row: search + pills + country + reset */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      {/* Search and country stay in the first mobile row. */}
+      <div className="flex items-center gap-1.5">
 
         {/* Search */}
-        <div className="relative min-w-[180px] flex-1 max-w-xs">
+        <div className="relative min-w-0 flex-1 max-w-xs">
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--subtle)] pointer-events-none"
             width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"
@@ -133,8 +133,23 @@ export function StrelciFilterBar({
           />
         </div>
 
-        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
+        {/* Country */}
+        <SearchDropdown
+          value={currentZemlja}
+          onChange={(v) => push({ zemlja: v, page: 1 })}
+          options={nocOptions}
+          placeholder="NOC"
+          emptyLabel={t("allCountries")}
+          searchPlaceholder={t("searchCountry")}
+          labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
+          showSelectedSublabel={false}
+          align="right"
+          className="w-[4.75rem] shrink-0 sm:min-w-[130px]"
+        />
+      </div>
 
+      {/* Filters */}
+      <div className="flex items-center gap-1.5 flex-wrap">
         {/* Apparatus */}
         <div role="group" aria-label="Filter po disciplini" className="contents">
           {APARAT_OPTIONS.map((a) => (
@@ -164,18 +179,6 @@ export function StrelciFilterBar({
         </div>
 
         <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
-
-        {/* Country */}
-        <SearchDropdown
-          value={currentZemlja}
-          onChange={(v) => push({ zemlja: v, page: 1 })}
-          options={nocOptions}
-          placeholder={t("allCountries")}
-          emptyLabel={t("allCountries")}
-          searchPlaceholder={t("searchCountry")}
-          labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
-          className="min-w-[130px]"
-        />
 
         {isFiltered && (
           <button

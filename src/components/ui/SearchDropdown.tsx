@@ -21,6 +21,8 @@ interface Props {
   createNewLabel?: (query: string) => string;
   className?: string;
   labelClassName?: string;
+  showSelectedSublabel?: boolean;
+  align?: "left" | "right";
   disabled?: boolean;
 }
 
@@ -46,6 +48,8 @@ export function SearchDropdown({
   createNewLabel = (q) => `+ Kreiraj "${q}"`,
   className = "",
   labelClassName = "",
+  showSelectedSublabel = true,
+  align = "left",
   disabled = false,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -103,7 +107,7 @@ export function SearchDropdown({
             <>
               {selected.prefix && <span className="shrink-0">{selected.prefix}</span>}
               <span className={`truncate ${labelClassName}`}>{selected.label}</span>
-              {selected.sublabel && (
+              {showSelectedSublabel && selected.sublabel && (
                 <span className="shrink-0 text-[var(--muted)] text-xs">{selected.sublabel}</span>
               )}
             </>
@@ -115,7 +119,7 @@ export function SearchDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 min-w-full w-max max-w-xs rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-lg">
+        <div className={`absolute top-full mt-1 z-50 min-w-full w-max max-w-xs rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-lg ${align === "right" ? "right-0" : "left-0"}`}>
           {searchable && (
             <div className="p-1.5 border-b border-[var(--border)]">
               <input

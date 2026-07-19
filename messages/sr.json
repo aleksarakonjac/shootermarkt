@@ -156,6 +156,7 @@
     "statPistol": "pištolj",
     "previewForma": "preview · FORMAScore uskoro",
     "onTopForm": "na vrhu forme",
+    "topFormNoData": "Nema dovoljno nastupa",
     "trendUp": "u porastu",
     "trendDown": "u padu",
     "trendStable": "stabilno",
