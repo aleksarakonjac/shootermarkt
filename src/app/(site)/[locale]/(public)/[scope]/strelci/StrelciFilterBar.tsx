@@ -104,7 +104,7 @@ export function StrelciFilterBar({
     })
     .sort((a, b) => (a.sublabel ?? "").localeCompare(b.sublabel ?? "", "sr"));
 
-  const pill    = "inline-flex w-full items-center justify-center rounded-md px-1 py-2 text-[0.65rem] font-semibold whitespace-nowrap cursor-pointer transition-colors sm:w-auto sm:px-2.5 sm:text-xs";
+  const pill    = "inline-flex w-full items-center justify-center rounded-md px-1 py-1.5 text-[0.65rem] font-semibold whitespace-nowrap cursor-pointer transition-colors sm:w-auto sm:px-2.5 sm:py-2 sm:text-xs";
   const pillOn  = "bg-[var(--brand-primary)] text-white";
   const pillOff = "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]";
 
@@ -152,11 +152,11 @@ export function StrelciFilterBar({
       <div className="grid grid-cols-6 gap-1 sm:flex sm:items-center sm:flex-wrap sm:gap-1.5">
         {/* Apparatus */}
         <div role="group" aria-label="Filter po disciplini" className="contents">
-          {APARAT_OPTIONS.map((a) => (
+          {APARAT_OPTIONS.map((a, index) => (
             <button
               key={a.value}
               onClick={() => push({ aparat: a.value, page: 1 })}
-              className={`${pill} ${currentAparat === a.value ? pillOn : pillOff}`}
+              className={`${pill} ${index === APARAT_OPTIONS.length - 1 ? "border-r border-[var(--border-strong)] sm:border-r-0" : ""} ${currentAparat === a.value ? pillOn : pillOff}`}
             >
               {a.label}
             </button>
