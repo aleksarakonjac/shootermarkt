@@ -111,7 +111,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
           <span>Top</span>
           <span className="inline-flex items-center gap-1 rounded bg-white/95 px-1.5 py-0.5">
             <FormaScoreMark size="md" />
-            <FormaScoreInfo locale={locale} />
+            <FormaScoreInfo locale={locale} buttonMarginTop={0} />
           </span>
         </h3>
 

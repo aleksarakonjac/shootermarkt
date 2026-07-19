@@ -22,6 +22,8 @@ interface Props {
   options?: ShooterOption[];
   /** Hide one option by id — typically the shooter picked in a paired selector. */
   excludeId?: number | null;
+  /** Fallback display option when value is set but wasn't picked in this session (e.g. URL deep-link). */
+  resolvedOption?: ShooterOption | null;
   placeholder?: string;
   className?: string;
 }
@@ -48,6 +50,7 @@ export function ShooterSearchSelect({
   onChange,
   options,
   excludeId = null,
+  resolvedOption = null,
   placeholder = "Pretraži strelca…",
   className = "",
 }: Props) {
@@ -122,7 +125,8 @@ export function ShooterSearchSelect({
     : value == null
       ? null
       : remoteResults.find((r) => r.id === value) ??
-        (lastPicked?.id === value ? lastPicked : null);
+        (lastPicked?.id === value ? lastPicked : null) ??
+        (resolvedOption?.id === value ? resolvedOption : null);
 
   const selectShooter = (shooter: ShooterOption) => {
     onChange(shooter);
