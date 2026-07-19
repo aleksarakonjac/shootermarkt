@@ -250,8 +250,8 @@ export function FormaChart({
       : "Ostvareni kvalifikacioni rezultati po nastupima",
     metricsTitle: en ? "What do these metrics mean?" : "Šta znače ove metrike?",
     metricsDescription: en
-      ? "Level is the estimated current level without projecting the trend. FORMAScore forecasts the next result by adjusting the level for the trend. Peak shows how close FORMAScore is to the best result, while stability shows how consistent performances are."
-      : "Nivo je procenjeni trenutni nivo bez projekcije trenda. FORMAScore je prognoza sledećeg rezultata: polazi od nivoa i prilagođava ga trendu. Peak pokazuje koliko je FORMAScore blizu najboljeg rezultata, a stabilnost koliko su nastupi ujednačeni.",
+      ? "Level is the estimated current level without projecting the trend. Peak shows how close FORMAScore is to the best result, while stability shows how consistent performances are."
+      : "Nivo je procenjeni trenutni nivo bez projekcije trenda. Peak pokazuje koliko je FORMAScore blizu najboljeg rezultata, a stabilnost koliko su nastupi ujednačeni.",
   };
 
   const CW = svgW > 0 ? svgW - ML - MR : 600;
