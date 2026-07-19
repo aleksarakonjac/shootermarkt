@@ -13,6 +13,7 @@ export type CareerStat = {
   forma: number | null;
   peak: number | null;
   best3: number | null;
+  recent3: number | null;
   season: number | null;
   seasonCount: number;
   improvement: number | null;
@@ -47,12 +48,14 @@ export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: st
     form: "FORMAScore is the forecast of the next result, based on recent performances and their trend.",
     peak: "The best qualification result achieved in this discipline.",
     best3: "The average of the three best qualification results in this discipline.",
+    recent3: "The average of the last three qualification results in this discipline.",
     season: "The average qualification result in the current season. The number after the slash is the number of starts.",
     improvement: "The difference between this season's average and the previous season's average.",
   } : {
     form: "FORMAScore je prognoza sledećeg rezultata, zasnovana na novijim nastupima i njihovom trendu.",
     peak: "Najbolji ostvareni kvalifikacioni rezultat u ovoj disciplini.",
     best3: "Prosek tri najbolja kvalifikaciona rezultata u ovoj disciplini.",
+    recent3: "Prosek poslednja tri kvalifikaciona rezultata u ovoj disciplini.",
     season: "Prosek kvalifikacionih rezultata u tekućoj sezoni. Broj posle kose crte je broj nastupa.",
     improvement: "Razlika između proseka ove i prethodne sezone.",
   };
@@ -73,7 +76,7 @@ export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: st
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-px bg-[var(--border)] sm:grid-cols-5">
+      <div className="grid grid-cols-3 gap-px bg-[var(--border)] lg:grid-cols-6">
         <div className="bg-[var(--surface)] px-4 py-3 sm:col-span-1">
           <StatLabel label={t("form")} description={info.form} locale={locale} align="left" />
           {stat.forma !== null ? (
@@ -92,7 +95,11 @@ export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: st
           <span className={`${valueClass} mt-0.5 block text-base`}>{fmtNum(stat.best3)}</span>
         </div>
         <div className="bg-[var(--surface)] px-4 py-3">
-          <StatLabel label={t("statSezonaProsek")} description={info.season} locale={locale} align="left" />
+          <StatLabel label={locale === "en" ? "Last 3" : "Poslednja 3"} description={info.recent3} locale={locale} align="left" />
+          <span className={`${valueClass} mt-0.5 block text-base`}>{fmtNum(stat.recent3)}</span>
+        </div>
+        <div className="bg-[var(--surface)] px-4 py-3">
+          <StatLabel label={t("statSezonaProsek")} description={info.season} locale={locale} align="center" />
           <div className="mt-0.5 flex items-baseline gap-1">
             <span className={`${valueClass} text-base`}>{fmtNum(stat.season)}</span>
             {stat.season !== null && stat.seasonCount > 0 && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)]">/{stat.seasonCount}</span>}

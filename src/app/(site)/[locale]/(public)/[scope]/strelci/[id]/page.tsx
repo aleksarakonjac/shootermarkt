@@ -189,6 +189,7 @@ export default async function ShooterPage({ params }: Props) {
       forma: cache.forma != null ? Number(cache.forma) : null,
       peak: cache.peakCareer != null ? Number(cache.peakCareer) : null,
       best3: cache.best3Career != null ? Number(cache.best3Career) : null,
+      recent3: cache.recent3Career != null ? Number(cache.recent3Career) : null,
       season: cache.seasonAvg != null ? Number(cache.seasonAvg) : null,
       seasonCount: cache.seasonCount,
       improvement: cache.improvement != null ? Number(cache.improvement) : null,
