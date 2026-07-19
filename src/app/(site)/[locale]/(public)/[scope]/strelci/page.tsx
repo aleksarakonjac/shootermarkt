@@ -396,9 +396,6 @@ export default async function StrelciPage({ params, searchParams }: Props) {
         >
           {t("title")}
         </h1>
-        <p className="text-sm text-[var(--muted)] mt-1">
-          {t("subtitle")}
-        </p>
       </div>
 
       {/* ── Stats bar ── */}
