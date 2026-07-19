@@ -136,7 +136,7 @@ export function StrelciFilterBar({
         {/* Country */}
         <SearchDropdown
           value={currentZemlja}
-          onChange={(v) => push({ zemlja: v, page: 1 })}
+          onChange={(v) => push({ zemlja: v || "all", page: 1 })}
           options={nocOptions}
           placeholder="NOC"
           emptyLabel={t("allCountries")}
@@ -182,7 +182,7 @@ export function StrelciFilterBar({
 
         {isFiltered && (
           <button
-            onClick={() => { setQ(""); router.replace(pathname); }}
+            onClick={() => { setQ(""); router.replace(buildUrl({ q: "", zemlja: "all", pol: "", aparat: "" })); }}
             className="col-span-6 justify-self-end text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] px-2.5 py-2 rounded-md hover:bg-[var(--surface)] transition-colors sm:col-auto"
           >
             {t("reset")}
