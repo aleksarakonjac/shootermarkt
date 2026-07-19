@@ -422,7 +422,7 @@ export function FormaChart({
                 {forma.lowConfidence ? "±?" : forma.reliability > 0 ? `±${forma.reliability.toFixed(1)}` : ""}
               </span>
               {!forma.lowConfidence && (
-                <span className="mr-1 flex h-[0.8125rem] items-center" style={{ color: forma_trend_color }}>
+                <span className="mr-3 flex h-[0.8125rem] items-center" style={{ color: forma_trend_color }}>
                   <TrendArrow trend={forma.trend} />
                 </span>
               )}
