@@ -104,7 +104,7 @@ export function StrelciFilterBar({
     })
     .sort((a, b) => (a.sublabel ?? "").localeCompare(b.sublabel ?? "", "sr"));
 
-  const pill    = "px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer";
+  const pill    = "inline-flex w-full items-center justify-center rounded-md px-1 py-2 text-[0.65rem] font-semibold whitespace-nowrap cursor-pointer transition-colors sm:w-auto sm:px-2.5 sm:text-xs";
   const pillOn  = "bg-[var(--brand-primary)] text-white";
   const pillOff = "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]";
 
@@ -149,7 +149,7 @@ export function StrelciFilterBar({
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="grid grid-cols-6 gap-1 sm:flex sm:items-center sm:flex-wrap sm:gap-1.5">
         {/* Apparatus */}
         <div role="group" aria-label="Filter po disciplini" className="contents">
           {APARAT_OPTIONS.map((a) => (
@@ -163,7 +163,7 @@ export function StrelciFilterBar({
           ))}
         </div>
 
-        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
+        <span className="hidden h-4 w-px shrink-0 bg-[var(--border)] sm:block sm:mx-1" aria-hidden="true" />
 
         {/* Gender */}
         <div role="group" aria-label="Filter po polu" className="contents">
@@ -178,12 +178,12 @@ export function StrelciFilterBar({
           ))}
         </div>
 
-        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
+        <span className="hidden h-4 w-px shrink-0 bg-[var(--border)] sm:block sm:mx-1" aria-hidden="true" />
 
         {isFiltered && (
           <button
             onClick={() => { setQ(""); router.replace(pathname); }}
-            className="shrink-0 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] px-2.5 py-2 rounded-md hover:bg-[var(--surface)] transition-colors"
+            className="col-span-6 justify-self-end text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] px-2.5 py-2 rounded-md hover:bg-[var(--surface)] transition-colors sm:col-auto"
           >
             {t("reset")}
           </button>
