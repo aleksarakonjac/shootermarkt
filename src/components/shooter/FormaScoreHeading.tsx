@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { FormaScoreMark } from "./FormaScoreMark";
 
 interface FormaScoreHeadingProps {
@@ -27,6 +27,7 @@ export function FormaScoreInfo({ locale = "sr", inverted = false, heading, descr
   const panelId = useId();
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const [panelPosition, setPanelPosition] = useState<{ left: number; top: number; width: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -39,16 +40,44 @@ export function FormaScoreInfo({ locale = "sr", inverted = false, heading, descr
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      const button = btnRef.current;
+      const panel = panelRef.current;
+      if (!button || !panel) return;
+      const margin = 8;
+      const width = Math.min(288, window.innerWidth - margin * 2);
+      const height = panel.offsetHeight;
+      const rect = button.getBoundingClientRect();
+      const preferredTop = placement === "top" ? rect.top - height - margin : rect.bottom + margin;
+      const flippedTop = placement === "top" ? rect.bottom + margin : rect.top - height - margin;
+      const maxTop = Math.max(margin, window.innerHeight - height - margin);
+      const top = Math.min(maxTop, Math.max(margin, preferredTop < margin || preferredTop + height > window.innerHeight - margin ? flippedTop : preferredTop));
+      const preferredLeft = align === "right" ? rect.right - width : align === "center" ? rect.left + rect.width / 2 - width / 2 : rect.left;
+      const left = Math.min(window.innerWidth - width - margin, Math.max(margin, preferredLeft));
+      setPanelPosition({ left, top, width });
+    };
+    const frame = requestAnimationFrame(updatePosition);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [align, open, placement]);
+
   return <div
     className={className}
     style={{ position: "relative", display: "flex", alignItems: "center" }}
-    onMouseEnter={() => setOpen(true)}
+    onMouseEnter={() => { setPanelPosition(null); setOpen(true); }}
     onMouseLeave={() => setOpen(false)}
   >
     <button
       ref={btnRef}
       type="button"
-      onClick={() => setOpen((value) => !value)}
+      onClick={() => setOpen((value) => { if (!value) setPanelPosition(null); return !value; })}
       onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
       aria-label={ariaLabel ?? (locale === "en" ? "What is FORMAScore?" : "Šta je FORMAScore?")}
       aria-expanded={open}
@@ -65,7 +94,7 @@ export function FormaScoreInfo({ locale = "sr", inverted = false, heading, descr
       i
     </button>
 
-    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "absolute", ...(placement === "top" ? { bottom: "calc(100% + 8px)" } : { top: "calc(100% + 8px)" }), ...(align === "right" ? { right: 0 } : align === "center" ? { left: "50%", transform: "translateX(-50%)" } : { left: 0 }), width: "min(288px, calc(100vw - 2rem))", zIndex: "var(--z-tooltip)", fontFamily: "var(--font-sans)", textTransform: "none" }}>
+    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "fixed", left: panelPosition?.left ?? 0, top: panelPosition?.top ?? 0, width: panelPosition?.width ?? "min(288px, calc(100vw - 1rem))", visibility: panelPosition ? "visible" : "hidden", zIndex: "var(--z-tooltip)", fontFamily: "var(--font-sans)", textTransform: "none" }}>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
         {heading && <p className="mb-2" style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>{heading}</p>}
         {!heading && <div className="mb-2 flex items-baseline gap-1">

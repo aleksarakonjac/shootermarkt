@@ -329,8 +329,8 @@ export function FormaChart({
   const hovPt = hoverIdx !== null ? data[hoverIdx] : null;
   const hovForma = hoverIdx !== null ? yValues[hoverIdx] : null;
   const TIP_W = 220, TIP_H = mode === "forma" ? 132 : 115;
-  const tipX = tooltipPos ? (tooltipPos.x + 16 + TIP_W > vpW ? tooltipPos.x - TIP_W - 16 : tooltipPos.x + 16) : 0;
-  const tipY = tooltipPos ? Math.max(8, tooltipPos.y - TIP_H / 2) : 0;
+  const tipX = tooltipPos ? Math.min(vpW - TIP_W - 8, Math.max(8, tooltipPos.x + 16 + TIP_W > vpW ? tooltipPos.x - TIP_W - 16 : tooltipPos.x + 16)) : 0;
+  const tipY = tooltipPos ? Math.min(window.innerHeight - TIP_H - 8, Math.max(8, tooltipPos.y - TIP_H / 2)) : 0;
 
   // Entrance direction for new window
   const xEnter = navDir === "right" ? -CW : navDir === "left" ? CW : 0;
