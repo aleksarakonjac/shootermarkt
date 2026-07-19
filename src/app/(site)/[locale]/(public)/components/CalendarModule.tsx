@@ -334,6 +334,9 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                 {hasOneComp ? (
                   <Link
                     href={scopedHref(`/takmicenja/${comps[0].id}`)}
+                    onFocus={() => setSelectedDate(dateStr)}
+                    onMouseEnter={() => setSelectedDate(dateStr)}
+                    aria-describedby={selectedDate === dateStr ? `calendar-events-${dateStr}` : undefined}
                     aria-label={`${dateStr}: ${comps[0].name}`}
                     className={[
                       `relative flex min-h-11 w-full items-center justify-center py-1.5 text-sm font-semibold transition-colors select-none ${roundedClass}`,
