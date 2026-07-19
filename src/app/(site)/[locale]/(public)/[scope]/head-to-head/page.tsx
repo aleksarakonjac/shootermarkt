@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { scope } = await params;
   const [t, locale] = await Promise.all([getTranslations("ranking"), getLocale()]);
   return {
-    title: t("viewH2H") + " — Shootermarkt",
+    title: (locale === "en" ? "Direct Comparison" : "Direktno poređenje") + " — Shootermarkt",
     alternates: buildAlternates(locale, scope, "/head-to-head"),
   };
 }
@@ -182,7 +182,7 @@ export default async function HeadToHeadPage({ params, searchParams }: Props) {
     h2hStat_appearances:  t("h2hStat_appearances"),
   };
 
-  const h2hTitle = locale === "en" ? "Head-to-head" : "Head-to-head";
+  const h2hTitle = locale === "en" ? "Direct Comparison" : "Direktno poređenje";
   const h2hSubtitle = locale === "en"
     ? "Compare two shooters across all their shared competitions"
     : "Uporedi dva strelca na zajedničkim takmičenjima";

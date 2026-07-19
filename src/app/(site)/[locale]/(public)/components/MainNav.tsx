@@ -42,7 +42,7 @@ function buildNav(t: TFn): NavGroup[] {
       label: t("statistics"),
       items: [
         { href: "/rangiranje", label: t("ranking"),        desc: t("rankingDesc") },
-        { href: "/rangiranje?view=h2h", label: t("h2h"),   desc: t("h2hDesc") },
+        { href: "/head-to-head", label: t("h2h"),   desc: t("h2hDesc") },
         { href: "/klubovi",    label: t("clubLeaderboard"),desc: t("clubLeaderboardDesc"), soon: true },
       ],
     },
