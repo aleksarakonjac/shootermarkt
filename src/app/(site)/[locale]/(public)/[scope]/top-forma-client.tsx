@@ -9,7 +9,7 @@ import { trendLabel, trendColor } from "@/lib/forma";
 import { useLocale, useTranslations } from "next-intl";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
-const ROTATE_INTERVAL = 5_000;
+const ROTATE_INTERVAL = 9_000;
 const RESUME_DELAY = 3 * 60 * 1_000;
 
 interface ShooterFormRow {
