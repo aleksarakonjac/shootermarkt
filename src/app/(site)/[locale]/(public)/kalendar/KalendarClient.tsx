@@ -153,9 +153,32 @@ export function KalendarClient({ competitions }: Props) {
   // Key change triggers remount → entrance animation replays
   const listKey = listTitle + "|" + levelFilter;
 
+  const filterPills = (
+    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter po nivou takmičenja">
+      {FILTER_TABS.map((tab) => (
+        <button
+          key={tab.key}
+          onClick={() => setLevelFilter(tab.key)}
+          aria-pressed={levelFilter === tab.key}
+          className={`shrink-0 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${
+            levelFilter === tab.key
+              ? "bg-[var(--brand-primary)] text-white"
+              : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]"
+          }`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start">
       <style>{`.react-calendar__navigation__label{text-align:center!important;padding-left:0!important}.react-calendar__navigation__label::before{content:"Septembar 2026";display:block;visibility:hidden;height:0;overflow:hidden;font:inherit}`}</style>
+
+      {/* Filters — above calendar on mobile only */}
+      <div className="w-full lg:hidden">{filterPills}</div>
+
       {/* ── Calendar ──────────────────────────────────────────── */}
       <div className="w-full lg:w-auto lg:shrink-0 lg:sticky lg:top-[88px]">
         <Calendar
@@ -206,27 +229,8 @@ export function KalendarClient({ competitions }: Props) {
 
       {/* ── List panel ────────────────────────────────────────── */}
       <div className="flex-1 min-w-0">
-        {/* Level filters */}
-        <div
-          className="flex flex-wrap gap-1.5 mb-5"
-          role="group"
-          aria-label="Filter po nivou takmičenja"
-        >
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setLevelFilter(tab.key)}
-              aria-pressed={levelFilter === tab.key}
-              className={`shrink-0 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${
-                levelFilter === tab.key
-                  ? "bg-[var(--brand-primary)] text-white"
-                  : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Level filters — desktop only (mobile shown above calendar) */}
+        <div className="hidden lg:block mb-5">{filterPills}</div>
 
         {/* Title row */}
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 mb-5 sm:flex sm:items-center sm:justify-between">

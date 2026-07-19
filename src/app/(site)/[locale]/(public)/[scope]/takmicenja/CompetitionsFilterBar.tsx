@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 import { ISSF_LEVELS } from "@/lib/scope";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 
 const ALL_LEVEL_VALUES: Array<CompetitionLevel | "all"> = [
   "all", "olympic", "world", "continental", "international", "national", "regional", "club",
@@ -47,6 +48,7 @@ export function CompetitionsFilterBar({
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = useTranslations("competition");
+  const scopedHref = useScopedHref();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [yearOpen, setYearOpen] = useState(false);
   const yearRef = useRef<HTMLDivElement>(null);
@@ -59,7 +61,7 @@ export function CompetitionsFilterBar({
       } else {
         params.set(key, value);
       }
-      router.push(`/takmicenja?${params.toString()}`, { scroll: false });
+      router.push(scopedHref(`/takmicenja?${params.toString()}`), { scroll: false });
     },
     [router, searchParams]
   );
@@ -129,7 +131,7 @@ export function CompetitionsFilterBar({
         </span>
         {hasFilters && (
           <button
-            onClick={() => router.push("/takmicenja", { scroll: false })}
+            onClick={() => router.push(scopedHref("/takmicenja"), { scroll: false })}
             className="shrink-0 text-xs text-[var(--muted)] hover:text-[var(--brand-primary)] transition-colors"
           >
             {t("list.reset")}
