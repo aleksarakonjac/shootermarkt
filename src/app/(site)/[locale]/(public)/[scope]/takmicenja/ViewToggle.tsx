@@ -4,42 +4,55 @@ import { Link } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useScopedHref } from "@/hooks/use-scoped-href";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export function ViewToggle({ activeView }: { activeView: "list" | "cal" }) {
   const sp = useSearchParams();
   const t = useTranslations("competition.list");
   const scopedHref = useScopedHref();
   const [visual, setVisual] = useState(activeView);
+  const [pill, setPill] = useState({ left: 0, width: 0 });
+  const [ready, setReady] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setVisual(activeView); }, [activeView]);
 
-  const makeUrl = (view: "list" | "cal") => {
-    const p = new URLSearchParams(sp.toString());
-    if (view === "list") p.delete("view");
-    else p.set("view", "cal");
-    const str = p.toString();
-    return `/takmicenja${str ? `?${str}` : ""}`;
-  };
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const links = container.querySelectorAll("a");
+    const btn = links[visual === "list" ? 0 : 1] as HTMLElement | null;
+    if (!btn) return;
+    const cr = container.getBoundingClientRect();
+    const br = btn.getBoundingClientRect();
+    setPill({ left: br.left - cr.left, width: br.width });
+    setReady(true);
+  }, [visual]);
+
+  function handleClick(e: React.MouseEvent<HTMLAnchorElement>, view: "list" | "cal") {
+    setVisual(view);
+    const container = containerRef.current;
+    if (!container) return;
+    const cr = container.getBoundingClientRect();
+    const br = e.currentTarget.getBoundingClientRect();
+    setPill({ left: br.left - cr.left, width: br.width });
+  }
 
   const btnBase = "relative z-10 flex flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors duration-150";
 
   return (
-    <div className="relative flex items-center p-1 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
-      {/* Sliding pill */}
+    <div ref={containerRef} className="relative flex items-center p-1 rounded-lg bg-[var(--surface-2)] border border-[var(--border)]">
+      {/* Sliding pill — sized from DOM measurement */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-md bg-[var(--ink)] transition-transform duration-200 ease-out"
-        style={{
-          width: "calc(50% - 0.25rem)",
-          transform: visual === "cal" ? "translateX(100%)" : "translateX(0)",
-        }}
+        className={`pointer-events-none absolute top-1 bottom-1 rounded-md bg-[var(--ink)] ${ready ? "transition-[left,width] duration-200 ease-out" : ""}`}
+        style={{ left: pill.left, width: pill.width }}
       />
       <Link
         href={scopedHref(makeUrl("list"))}
         scroll={false}
         className={`${btnBase} ${visual === "list" ? "text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
-        onClick={() => setVisual("list")}
+        onClick={(e) => handleClick(e, "list")}
       >
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
           <path d="M1.5 3h9M1.5 6h9M1.5 9h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -50,7 +63,7 @@ export function ViewToggle({ activeView }: { activeView: "list" | "cal" }) {
         href={scopedHref(makeUrl("cal"))}
         scroll={false}
         className={`${btnBase} ${visual === "cal" ? "text-[var(--bg)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
-        onClick={() => setVisual("cal")}
+        onClick={(e) => handleClick(e, "cal")}
       >
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
           <rect x="1" y="2" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
@@ -60,4 +73,12 @@ export function ViewToggle({ activeView }: { activeView: "list" | "cal" }) {
       </Link>
     </div>
   );
+
+  function makeUrl(view: "list" | "cal") {
+    const p = new URLSearchParams(sp.toString());
+    if (view === "list") p.delete("view");
+    else p.set("view", "cal");
+    const str = p.toString();
+    return `/takmicenja${str ? `?${str}` : ""}`;
+  }
 }
