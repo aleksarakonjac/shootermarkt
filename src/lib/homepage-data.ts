@@ -29,12 +29,15 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
 
 export async function getHomepageMain(scope: Scope) {
   const today = new Date().toISOString().slice(0, 10);
+  const twoMonthsOut = new Date(`${today}T00:00:00Z`);
+  twoMonthsOut.setUTCMonth(twoMonthsOut.getUTCMonth() + 2);
+  const upcomingDeadline = twoMonthsOut.toISOString().slice(0, 10);
   const competitionScope = buildCompetitionScopeFilter(scope);
   const nationalityFilter = scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined;
   const [recentComps, cacheRows, upcoming] = await Promise.all([
     db.select().from(competitions).where(and(sql`${competitions.date} <= ${today}`, competitionScope)).orderBy(desc(competitions.date)).limit(3),
     db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE), isNotNull(shooterFormaCache.forma))),
-    db.select().from(competitions).where(and(sql`${competitions.date} >= ${today}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
+    db.select().from(competitions).where(and(sql`${competitions.date} >= ${today} AND ${competitions.date} < ${upcomingDeadline}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
   ]);
   const recent = await Promise.all(recentComps.map(async (competition) => {
     // ponytail: fetches all qualifying rows per competition (bounded by event size); result is cached

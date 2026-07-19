@@ -19,15 +19,16 @@ export async function GET(request: NextRequest) {
   const end = `${year}-${String(month + 1).padStart(2, "0")}-01`;
   const startedAt = performance.now();
   const rows = await db
-    .select({ id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, location: competitions.location, level: competitions.level })
+    .select({ id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, dateEnd: competitions.dateEnd, location: competitions.location, level: competitions.level })
     .from(competitions)
-    .where(and(sql`${competitions.date} >= ${start} AND ${competitions.date} < ${end}`, buildCompetitionScopeFilter(scope)))
+    .where(and(sql`${competitions.date} < ${end} AND COALESCE(${competitions.dateEnd}, ${competitions.date}) >= ${start}`, buildCompetitionScopeFilter(scope)))
     .orderBy(asc(competitions.date));
 
   return NextResponse.json(rows.map((competition) => ({
     id: competition.id,
     name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name),
     date: competition.date,
+    endDate: competition.dateEnd ?? null,
     location: competition.location,
     level: competition.level,
   })), {

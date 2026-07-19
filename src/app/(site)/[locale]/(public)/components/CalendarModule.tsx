@@ -10,6 +10,7 @@ interface Competition {
   id: number;
   name: string;
   date: string;
+  endDate?: string | null;
   location: string | null;
   level: string;
 }
@@ -124,8 +125,15 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   const compsByDate = useMemo(() => {
     const map = new Map<string, Competition[]>();
     for (const c of monthCache[`${viewYear}-${viewMonth}`] ?? []) {
-      if (!map.has(c.date)) map.set(c.date, []);
-      map.get(c.date)!.push(c);
+      const endStr = c.endDate ?? c.date;
+      const cur = new Date(c.date + "T00:00:00");
+      const end = new Date(endStr + "T00:00:00");
+      while (cur <= end) {
+        const ds = cur.toISOString().slice(0, 10);
+        if (!map.has(ds)) map.set(ds, []);
+        map.get(ds)!.push(c);
+        cur.setDate(cur.getDate() + 1);
+      }
     }
     return map;
   }, [monthCache, viewMonth, viewYear]);
@@ -285,7 +293,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
         </div>
 
         {/* Day cells */}
-        <div className="grid grid-cols-7 gap-0.5">
+        <div className="grid grid-cols-7 gap-y-0.5">
           {cells.map((day, idx) => {
             if (!day) return <div key={`empty-${idx}`} />;
 
@@ -296,6 +304,23 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
               viewMonth === today.getMonth() &&
               viewYear === today.getFullYear();
             const hasComp = comps.length > 0;
+
+            // Span position + tooltip placement
+            const col = idx % 7;
+            const row = Math.floor(idx / 7);
+            const isFirstInRow = col === 0;
+            const isLastInRow = col === 6;
+            const tooltipH = row === 0 ? "top-full mt-2" : "bottom-full mb-2";
+            const tooltipX = col <= 1 ? "left-0" : col >= 5 ? "right-0" : "left-1/2 -translate-x-1/2";
+            const hasStart = comps.some(c => c.date === dateStr);
+            const hasEnd = comps.some(c => (c.endDate ?? c.date) === dateStr);
+            const roundLeft  = !hasComp || isToday || hasStart || isFirstInRow;
+            const roundRight = !hasComp || isToday || hasEnd   || isLastInRow;
+            const roundedClass =
+              roundLeft && roundRight ? "rounded-md" :
+              roundLeft               ? "rounded-l-md rounded-r-none" :
+              roundRight              ? "rounded-r-md rounded-l-none" :
+                                        "rounded-none";
 
             return (
               <div
@@ -313,7 +338,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                   aria-label={hasComp ? `${dateStr}: ${t("competitionPlural", { count: comps.length })}` : dateStr}
                   disabled={!hasComp}
                   className={[
-                    "relative flex min-h-11 w-full items-center justify-center rounded-md py-1.5 text-sm font-semibold transition-colors select-none",
+                    `relative flex min-h-11 w-full items-center justify-center py-1.5 text-sm font-semibold transition-colors select-none ${roundedClass}`,
                     isToday
                       ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
                     : hasComp
@@ -322,7 +347,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                   ].join(" ")}
                 >
                   {day}
-                  {hasComp && !isToday && (
+                  {hasComp && !isToday && hasStart && (
                     <span
                       className="absolute bottom-1.5 h-1 w-1 rounded-full"
                       style={{ background: getLevelColor(comps[0].level) }}
@@ -334,7 +359,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                 {selectedDate === dateStr && selectedComps.length > 0 && (
                   <div
                     id={`calendar-events-${dateStr}`}
-                    className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-52 -translate-x-1/2 rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white"
+                    className={`pointer-events-none absolute z-50 w-52 rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white ${tooltipH} ${tooltipX}`}
                   >
                     {selectedComps.map((c) => {
                       const levelStyle = LEVEL_STYLE[c.level.toLowerCase()] ?? LEVEL_STYLE.club;

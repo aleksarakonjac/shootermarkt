@@ -357,6 +357,15 @@ export function MainNav() {
 
         {/* Nav links */}
         <nav className="flex-1 overflow-y-auto py-2" aria-label={tCommon("mobileNav")}>
+          <Link
+            href={scopedHref("/")}
+            onClick={() => setMobileOpen(false)}
+            className={`block px-4 py-3 text-sm font-semibold transition-colors hover:bg-[var(--surface-2)] ${
+              unscopedPathname === "/" ? "text-[var(--brand-primary)]" : "text-[var(--ink)]"
+            }`}
+          >
+            {tCommon("home")}
+          </Link>
           {NAV.map((group) => {
             if (group.directHref) {
               const active = unscopedPathname.startsWith(group.directHref);
