@@ -32,7 +32,7 @@ export function ViewToggle({ activeView }: { activeView: "list" | "cal" }) {
         className="pointer-events-none absolute top-1 bottom-1 left-1 rounded-md bg-[var(--ink)] transition-transform duration-200 ease-out"
         style={{
           width: "calc(50% - 0.25rem)",
-          transform: visual === "cal" ? "translateX(calc(100% + 0.25rem))" : "translateX(0)",
+          transform: visual === "cal" ? "translateX(100%)" : "translateX(0)",
         }}
       />
       <Link
