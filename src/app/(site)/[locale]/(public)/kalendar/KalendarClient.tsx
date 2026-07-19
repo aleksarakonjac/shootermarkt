@@ -207,12 +207,11 @@ export function KalendarClient({ competitions }: Props) {
 
       {/* ── List panel ────────────────────────────────────────── */}
       <div className="flex-1 min-w-0">
-        {/* Level filter pills — horizontal scroll on mobile */}
+        {/* Level filters */}
         <div
-          className="flex gap-1.5 mb-5 overflow-x-auto pb-0.5 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap"
+          className="flex flex-wrap gap-1.5 mb-5"
           role="group"
           aria-label="Filter po nivou takmičenja"
-          style={{ scrollbarWidth: "none" }}
         >
           {FILTER_TABS.map((tab) => (
             <button
@@ -318,12 +317,29 @@ export function KalendarClient({ competitions }: Props) {
               const daysUntil = getDaysUntil(comp.date);
               // Countdown chip: only for competitions that haven't started yet, within 30 days
               const showCountdown = !isPast && daysUntil >= 0 && daysUntil <= 30;
+              const countdownChip = showCountdown ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[0.62rem] font-bold font-[family-name:var(--font-jetbrains-mono)] tabular-nums whitespace-nowrap countdown-chip">
+                  {daysUntil === 0
+                    ? t("today")
+                    : daysUntil === 1
+                    ? t("tomorrow")
+                    : t("daysCount", { count: daysUntil })}
+                </span>
+              ) : null;
+              const levelBadge = meta ? (
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded text-[0.62rem] font-bold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide whitespace-nowrap"
+                  style={{ background: meta.bg, color: meta.color }}
+                >
+                  {meta.label}
+                </span>
+              ) : null;
 
               return (
                 <Link
                   key={comp.id}
                   href={scopedHref(`/takmicenja/${comp.id}`)}
-                  className={`group flex items-center gap-3 sm:gap-4 px-4 py-4 transition-colors hover:bg-[var(--surface-2)] kalendar-item ${
+                  className={`group flex items-start gap-2.5 px-3 py-4 transition-colors hover:bg-[var(--surface-2)] sm:items-center sm:gap-4 sm:px-4 kalendar-item ${
                     !isLast ? "border-b border-[var(--border)]" : ""
                   } ${isPast ? "opacity-60" : ""}`}
                   style={{ "--idx": Math.min(idx, 8) } as React.CSSProperties}
@@ -361,27 +377,16 @@ export function KalendarClient({ competitions }: Props) {
                         </span>
                       )}
                     </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 sm:hidden">
+                      {countdownChip}
+                      {levelBadge}
+                    </div>
                   </div>
 
                   {/* Countdown + level badge */}
-                  <div className="shrink-0 flex items-center gap-1.5">
-                    {showCountdown && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[0.62rem] font-bold font-[family-name:var(--font-jetbrains-mono)] tabular-nums whitespace-nowrap countdown-chip">
-                        {daysUntil === 0
-                          ? t("today")
-                          : daysUntil === 1
-                          ? t("tomorrow")
-                          : t("daysCount", { count: daysUntil })}
-                      </span>
-                    )}
-                    {meta && (
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded text-[0.62rem] font-bold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide whitespace-nowrap"
-                        style={{ background: meta.bg, color: meta.color }}
-                      >
-                        {meta.label}
-                      </span>
-                    )}
+                  <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+                    {countdownChip}
+                    {levelBadge}
                   </div>
 
                   {/* Chevron */}
