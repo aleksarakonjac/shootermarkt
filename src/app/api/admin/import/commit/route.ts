@@ -7,6 +7,23 @@ import { DISCIPLINE_META, type CommitPayload } from "@/lib/pdf-import/types";
 import { matchShooter } from "@/lib/name-match";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 
+const DISCIPLINE_DISTANCE_TAGS: Record<string, string> = {
+  ARM: "10m", ARW: "10m", APM: "10m", APW: "10m",
+  R3PM: "MK",  R3PW: "MK",  R3JM: "MK",  R3JW: "MK",
+  SPW: "25m",  RFPM: "25m",
+  FPM: "50m",
+};
+
+function distanceTagsFromCodes(codes: string[]): string[] {
+  const tags = new Set<string>();
+  for (const code of codes) {
+    const t = DISCIPLINE_DISTANCE_TAGS[code];
+    if (t) tags.add(t);
+  }
+  if (tags.has("50m") && tags.has("25m")) tags.add("50/25m");
+  return [...tags];
+}
+
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
 }
@@ -197,6 +214,17 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       errors.push(`${row.lastName} ${row.firstName} (${row.teamNoc}): ${String(err)}`);
     }
+  }
+
+  // Auto-tag competition with distance tags derived from committed disciplines
+  const distanceTags = distanceTagsFromCodes(
+    rows.filter((r) => !r.skip).map((r) => r.disciplineCode)
+  );
+  if (distanceTags.length > 0) {
+    const arrLiteral = `{${distanceTags.map((t) => `"${t}"`).join(",")}}`;
+    await db.update(competitions)
+      .set({ tags: sql`array(SELECT DISTINCT unnest(array_cat(${competitions.tags}, ${sql.raw(`'${arrLiteral}'`)}::varchar[])))` })
+      .where(eq(competitions.id, competitionId));
   }
 
   // Recompute forma cache for all affected shooters
