@@ -77,6 +77,11 @@ export function StrelciFilterBar({
     router.replace(buildUrl(overrides));
   }
 
+  function resetFilters() {
+    setQ("");
+    window.location.assign(buildUrl({ q: "", zemlja: "all", pol: "", aparat: "" }));
+  }
+
   useEffect(() => {
     if (q === currentQ) return;
     clearTimeout(debounceRef.current);
@@ -182,7 +187,7 @@ export function StrelciFilterBar({
 
         {isFiltered && (
           <button
-            onClick={() => { setQ(""); router.replace(buildUrl({ q: "", zemlja: "all", pol: "", aparat: "" })); }}
+            onClick={resetFilters}
             className="col-span-6 justify-self-end text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] px-2.5 py-2 rounded-md hover:bg-[var(--surface)] transition-colors sm:col-auto"
           >
             {t("reset")}
