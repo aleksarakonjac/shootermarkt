@@ -144,7 +144,7 @@ export function StrelciFilterBar({
           labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
           showSelectedSublabel={false}
           align="right"
-          className="w-[4.75rem] shrink-0 sm:min-w-[130px]"
+          className="w-[5.5rem] shrink-0 sm:min-w-[130px]"
         />
       </div>
 
