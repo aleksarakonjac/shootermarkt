@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, KeyboardEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DatePicker } from "@/components/ui/DatePicker";
@@ -17,8 +17,11 @@ interface Competition {
   dateEnd?: string | null;
   location: string | null;
   level: CompetitionLevel;
+  tags: string[];
   resultCount: number;
 }
+
+const TAG_SUGGESTIONS = ["SSS", "ISSF", "ESC", "10m", "MK", "50m", "25m", "50/25m"];
 
 const inputCls = "w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]";
 
@@ -42,9 +45,29 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
     location: competition.location ?? "",
     level: competition.level,
   });
+  const [tags, setTags] = useState<string[]>(competition.tags);
+  const [tagInput, setTagInput] = useState("");
+  const tagInputRef = useRef<HTMLInputElement>(null);
 
   function set(field: string, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  function addTag(value: string) {
+    const v = value.trim();
+    if (!v || tags.includes(v)) { setTagInput(""); return; }
+    setTags((t) => [...t, v]);
+    setTagInput("");
+    tagInputRef.current?.focus();
+  }
+
+  function removeTag(tag: string) {
+    setTags((t) => t.filter((x) => x !== tag));
+  }
+
+  function onTagKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") { e.preventDefault(); addTag(tagInput); }
+    if (e.key === "Backspace" && !tagInput && tags.length) removeTag(tags[tags.length - 1]);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -55,7 +78,7 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
       const res = await fetch(`/api/admin/competitions/${competition.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, tags }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Greška");
@@ -164,6 +187,39 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
               placeholder="npr. Beograd, SC Crvena zvezda"
               className={inputCls}
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Tagovi</label>
+            <div className="flex flex-wrap gap-1.5 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-2 focus-within:border-[var(--brand-primary)] focus-within:ring-1 focus-within:ring-[var(--brand-primary)] transition-colors min-h-[40px]">
+              {tags.map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold bg-[var(--surface-2)] text-[var(--ink)]">
+                  {tag}
+                  <button type="button" onClick={() => removeTag(tag)} aria-label={`Ukloni ${tag}`} className="text-[var(--muted)] hover:text-[var(--ink)] transition-colors leading-none">×</button>
+                </span>
+              ))}
+              <input
+                ref={tagInputRef}
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={onTagKeyDown}
+                onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
+                placeholder={tags.length === 0 ? "Dodaj tag…" : ""}
+                className="flex-1 min-w-[80px] bg-transparent text-sm text-[var(--ink)] placeholder:text-[var(--muted)] outline-none py-0.5"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {TAG_SUGGESTIONS.filter((s) => !tags.includes(s)).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => addTag(s)}
+                  className="px-2 py-0.5 rounded text-[0.7rem] font-semibold bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)] transition-colors"
+                >
+                  + {s}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
