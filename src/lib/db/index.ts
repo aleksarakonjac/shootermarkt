@@ -5,11 +5,9 @@ import * as schema from "./schema";
 const connectionString = process.env.DATABASE_URL!;
 const connectionOptions = {
   prepare: false,
-  // Homepage endpoints load independently; a single local connection turns
-  // those requests into a queue and can exceed the client-side retry window.
-  max: 3,
+  max: 5,
   idle_timeout: 20,
-  connect_timeout: 5,
+  connect_timeout: 15,
 };
 
 // Disable prefetch for Supabase transaction mode pooler
