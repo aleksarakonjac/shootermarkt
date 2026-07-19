@@ -46,8 +46,8 @@ export async function fetchSssEvents(year: number): Promise<CalendarEvent[]> {
 function parseSssDates(raw: string | null, year: number): { dateFrom: string | null; dateTo: string | null } {
   if (!raw) return { dateFrom: null, dateTo: null };
 
-  // "15-18.01." — range within same month (no dot after first day)
-  const sameMonthRange = raw.match(/(\d{1,2})-(\d{1,2})\.(\d{1,2})/);
+  // "15-18.01." or "17 - 18.01." — range within same month, first day has no month
+  const sameMonthRange = raw.match(/(?<![.\d])(\d{1,2})\s*-\s*(\d{1,2})\.(\d{1,2})/);
   const allDmPairs = [...raw.matchAll(/(\d{1,2})\.(\d{1,2})/g)];
 
   if (sameMonthRange && allDmPairs.length <= 1) {

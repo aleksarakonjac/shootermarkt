@@ -24,6 +24,13 @@ interface CommitResult {
 }
 
 const DISCIPLINES = ["ARM", "ARW", "APM", "APW"] as const;
+const DISC_LABEL: Record<string, string> = {
+  ARM: "Air Rifle Men",
+  ARW: "Air Rifle Women",
+  APM: "Air Pistol Men",
+  APW: "Air Pistol Women",
+};
+const COLLAPSE_AT = 10;
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i);
 
@@ -36,6 +43,9 @@ const LEVELS: { value: CompetitionLevel; label: string }[] = [
   { value: "club",          label: "Klubsko (liga)" },
   { value: "olympic",       label: "Olimpijsko" },
 ];
+
+const stickyBg = "bg-[var(--bg)] group-hover:bg-[var(--surface)]";
+const stickyBgHead = "bg-[var(--surface)]";
 
 export function ISSFImportClient() {
   const [step, setStep] = useState<Step>("select");
@@ -51,6 +61,7 @@ export function ISSFImportClient() {
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [eventCount, setEventCount] = useState(0);
   const [nocFilter, setNocFilter] = useState("");
+  const [expandedDiscs, setExpandedDiscs] = useState<Set<string>>(new Set());
 
   const [result, setResult] = useState<CommitResult | null>(null);
 
@@ -85,6 +96,7 @@ export function ISSFImportClient() {
       if (!res.ok) throw new Error(data.error ?? "Import failed");
       setRows(data.rows);
       setEventCount(data.eventCount);
+      setExpandedDiscs(new Set());
       setStep("review");
     } catch (e) {
       setError(String(e));
@@ -131,6 +143,14 @@ export function ISSFImportClient() {
     setRows((prev) => prev.map((r) => (r.teamNoc === noc ? { ...r, skip: true } : r)));
   }
 
+  function toggleDisc(code: string) {
+    setExpandedDiscs((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      return next;
+    });
+  }
+
   function reset() {
     setStep("select");
     setSelectedComp(null);
@@ -138,11 +158,16 @@ export function ISSFImportClient() {
     setResult(null);
     setError(null);
     setNocFilter("");
+    setExpandedDiscs(new Set());
   }
 
   const allNocs = Array.from(new Set(rows.map((r) => r.teamNoc))).sort();
   const filteredRows = nocFilter ? rows.filter((r) => r.teamNoc === nocFilter) : rows;
   const activeCount = rows.filter((r) => !r.skip).length;
+
+  const groupedRows = DISCIPLINES
+    .map((code) => ({ code, rows: filteredRows.filter((r) => r.disciplineCode === code) }))
+    .filter((g) => g.rows.length > 0);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
@@ -154,7 +179,7 @@ export function ISSFImportClient() {
           ISSF Import
         </h1>
         <p className="text-sm mt-1 text-[var(--muted)]">
-          Uvoz rezultata sa issf-sports.org — automatski preuzima PDF-ove i parsira ih
+          Uvoz rezultata sa issf-sports.org — scrapeuje HTML tabele sa sajta
         </p>
       </div>
 
@@ -180,41 +205,27 @@ export function ISSFImportClient() {
       {/* ── Step 1: Select competition ── */}
       {step === "select" && (
         <div className="space-y-6">
-          {/* Year picker + load */}
           <div className="rounded-xl border border-[var(--border)] p-6 space-y-4">
             <h2 className="font-semibold text-[var(--ink)]">Odaberi godinu i nivo</h2>
             <div className="flex flex-wrap gap-4 items-end">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
-                  Godina
-                </label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Godina</label>
                 <select
                   value={year}
-                  onChange={(e) => {
-                    setYear(parseInt(e.target.value));
-                    setCompetitionsLoaded(false);
-                    setCompetitions([]);
-                    setSelectedComp(null);
-                  }}
+                  onChange={(e) => { setYear(parseInt(e.target.value)); setCompetitionsLoaded(false); setCompetitions([]); setSelectedComp(null); }}
                   className="rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
                 >
-                  {YEARS.map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
+                  {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
-                  Nivo
-                </label>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo</label>
                 <select
                   value={compLevel}
                   onChange={(e) => setCompLevel(e.target.value as CompetitionLevel)}
                   className="rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
                 >
-                  {LEVELS.map((l) => (
-                    <option key={l.value} value={l.value}>{l.label}</option>
-                  ))}
+                  {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
                 </select>
               </div>
               <button
@@ -227,7 +238,6 @@ export function ISSFImportClient() {
             </div>
           </div>
 
-          {/* Competition list */}
           {competitionsLoaded && (
             <div className="rounded-xl border border-[var(--border)] overflow-hidden">
               {competitions.length === 0 ? (
@@ -247,20 +257,14 @@ export function ISSFImportClient() {
                           key={c.id}
                           onClick={() => setSelectedComp(isSelected ? null : c)}
                           className="w-full text-left px-4 py-3 flex items-start justify-between gap-4 transition-colors hover:bg-[var(--surface)]"
-                          style={{
-                            background: isSelected ? "var(--brand-primary-light)" : undefined,
-                          }}
+                          style={{ background: isSelected ? "var(--brand-primary-light)" : undefined }}
                         >
                           <div>
                             <p className="font-semibold text-sm text-[var(--ink)]">{c.name}</p>
-                            <p className="text-xs text-[var(--muted)] mt-0.5">
-                              {c.city}, {c.nationName}
-                            </p>
+                            <p className="text-xs text-[var(--muted)] mt-0.5">{c.city}, {c.nationName}</p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
-                              {c.dateFrom.split("T")[0]}
-                            </p>
+                            <p className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{c.dateFrom.split("T")[0]}</p>
                             <p className="text-xs text-[var(--subtle)] mt-0.5">{c.nationCode}</p>
                           </div>
                         </button>
@@ -276,16 +280,19 @@ export function ISSFImportClient() {
             <div className="flex items-center gap-4 p-4 rounded-xl border border-[var(--brand-primary)] bg-[var(--brand-primary-light)]">
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-[var(--ink)]">{selectedComp.name}</p>
-                <p className="text-xs text-[var(--muted)]">
-                  {selectedComp.dateFrom.split("T")[0]} · {selectedComp.city}
-                </p>
+                <p className="text-xs text-[var(--muted)]">{selectedComp.dateFrom.split("T")[0]} · {selectedComp.city}</p>
               </div>
               <button
                 onClick={handleImport}
                 disabled={loading}
                 className="shrink-0 rounded-md px-5 py-2 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
               >
-                {loading ? "Preuzimam PDF-ove..." : "Uvezi rezultate →"}
+                {loading ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-3 rounded-full border border-white border-t-transparent animate-spin" />
+                    Preuzimam rezultate…
+                  </span>
+                ) : "Uvezi rezultate →"}
               </button>
             </div>
           )}
@@ -297,24 +304,14 @@ export function ISSFImportClient() {
         <div className="space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-4 text-sm text-[var(--muted)]">
-              <span>
-                <span className="font-semibold text-[var(--ink)]">{eventCount}</span> discipline
-              </span>
-              <span>
-                <span className="font-semibold text-[var(--ink)]">{activeCount}</span> za unos
-              </span>
-              <span>
-                <span className="font-semibold text-[var(--ink)]">{rows.filter((r) => r.skip).length}</span> preskočeno
-              </span>
+              <span><span className="font-semibold text-[var(--ink)]">{eventCount}</span> discipline</span>
+              <span><span className="font-semibold text-[var(--ink)]">{activeCount}</span> za unos</span>
+              <span><span className="font-semibold text-[var(--ink)]">{rows.filter((r) => r.skip).length}</span> preskočeno</span>
               {rows.filter((r) => r.warning).length > 0 && (
-                <span style={{ color: "var(--warning)" }}>
-                  ⚠ {rows.filter((r) => r.warning).length} novih strelaca
-                </span>
+                <span style={{ color: "var(--warning)" }}>⚠ {rows.filter((r) => r.warning).length} novih strelaca</span>
               )}
             </div>
-            <button onClick={reset} className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
-              ← Nazad
-            </button>
+            <button onClick={reset} className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">← Nazad</button>
           </div>
 
           {/* Country filter */}
@@ -324,10 +321,7 @@ export function ISSFImportClient() {
               <button
                 onClick={() => setNocFilter("")}
                 className="rounded-full px-3 py-1 text-xs font-semibold transition-colors"
-                style={{
-                  background: nocFilter === "" ? "var(--brand-primary)" : "var(--surface)",
-                  color: nocFilter === "" ? "white" : "var(--ink)",
-                }}
+                style={{ background: nocFilter === "" ? "var(--brand-primary)" : "var(--surface)", color: nocFilter === "" ? "white" : "var(--ink)" }}
               >
                 Sve ({rows.length})
               </button>
@@ -339,19 +333,12 @@ export function ISSFImportClient() {
                     <button
                       onClick={() => setNocFilter(nocFilter === noc ? "" : noc)}
                       className="rounded-full px-3 py-1 text-xs font-[family-name:var(--font-jetbrains-mono)] font-semibold transition-colors"
-                      style={{
-                        background: nocFilter === noc ? "var(--brand-accent)" : "var(--surface)",
-                        color: nocFilter === noc ? "white" : "var(--ink)",
-                      }}
+                      style={{ background: nocFilter === noc ? "var(--brand-accent)" : "var(--surface)", color: nocFilter === noc ? "white" : "var(--ink)" }}
                     >
                       {noc} ({count - skipped}/{count})
                     </button>
                     {skipped < count && (
-                      <button
-                        onClick={() => skipByNoc(noc)}
-                        title={`Skip sve ${noc}`}
-                        className="text-[0.65rem] text-[var(--subtle)] hover:text-[var(--brand-primary)] transition-colors"
-                      >
+                      <button onClick={() => skipByNoc(noc)} title={`Skip sve ${noc}`} className="text-[0.65rem] text-[var(--subtle)] hover:text-[var(--brand-primary)] transition-colors">
                         skip sve
                       </button>
                     )}
@@ -361,108 +348,181 @@ export function ISSFImportClient() {
             </div>
           )}
 
-          {/* Table */}
-          <div className="rounded-xl border border-[var(--border)] overflow-auto">
-            <table className="w-full text-sm min-w-[800px]">
-              <thead>
-                <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                  <th className="px-3 py-2.5 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
-                  <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Prezime</th>
-                  <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ime</th>
-                  <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
-                  <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Disc.</th>
-                  <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Rank</th>
-                  <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Total</th>
-                  <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inners</th>
-                  <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {filteredRows.map((row, visIdx) => {
-                  const trueIdx = rows.indexOf(row);
-                  return (
-                    <tr
-                      key={visIdx}
-                      className={`transition-colors ${row.skip ? "opacity-40" : "hover:bg-[var(--surface)]"}`}
-                    >
-                      <td className="px-3 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={!!row.skip}
-                          onChange={(e) => updateRow(trueIdx, { skip: e.target.checked })}
-                          className="accent-[var(--brand-primary)]"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          value={row.lastName}
-                          onChange={(e) => updateRow(trueIdx, { lastName: e.target.value })}
-                          className="w-full bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none text-[var(--ink)] text-sm py-0.5"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          value={row.firstName}
-                          onChange={(e) => updateRow(trueIdx, { firstName: e.target.value })}
-                          className="w-full bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none text-[var(--ink)] text-sm py-0.5"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">
-                          {row.teamNoc}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <select
-                          value={row.disciplineCode}
-                          onChange={(e) =>
-                            updateRow(trueIdx, {
-                              disciplineCode: e.target.value as ReviewRow["disciplineCode"],
-                            })
-                          }
-                          className="bg-transparent text-xs font-[family-name:var(--font-barlow-condensed)] font-semibold text-[var(--ink)] focus:outline-none"
-                        >
-                          {DISCIPLINES.map((d) => (
-                            <option key={d} value={d}>{d}</option>
+          {/* Discipline groups */}
+          <div className="space-y-4">
+            {groupedRows.map(({ code, rows: discRows }) => {
+              const isExpanded = expandedDiscs.has(code);
+              const displayRows = isExpanded ? discRows : discRows.slice(0, COLLAPSE_AT);
+              const hiddenCount = discRows.length - COLLAPSE_AT;
+              const isAP = code.startsWith("AP");
+              const maxSeries = Math.max(0, ...discRows.map((r) => r.qualSeries?.length ?? 0));
+              const seriesCount = maxSeries > 0 ? maxSeries : 0;
+
+              return (
+                <div key={code} className="rounded-xl border border-[var(--border)] overflow-hidden">
+                  {/* Group header */}
+                  <div className="flex items-center justify-between px-4 py-3 bg-[var(--surface)] border-b border-[var(--border)]">
+                    <div className="flex items-center gap-3">
+                      <span className="font-[family-name:var(--font-barlow-condensed)] font-bold text-base uppercase tracking-wider text-[var(--ink)]">
+                        {code}
+                      </span>
+                      <span className="text-sm text-[var(--muted)]">
+                        {DISC_LABEL[code]} · {discRows.filter(r => !r.skip).length}/{discRows.length} strelaca
+                      </span>
+                    </div>
+                    {discRows.length > COLLAPSE_AT && (
+                      <button
+                        onClick={() => toggleDisc(code)}
+                        className="text-xs font-semibold text-[var(--brand-primary)] hover:underline transition-colors"
+                      >
+                        {isExpanded ? "Skupi ↑" : `Prikaži sve ${discRows.length} ↓`}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Scrollable table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm" style={{ minWidth: seriesCount > 0 ? `${480 + seriesCount * 64}px` : "560px" }}>
+                      <thead>
+                        <tr className="border-b border-[var(--border)]">
+                          <th className={`sticky left-0 z-10 w-9 px-2 py-2.5 text-center text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${stickyBgHead}`}>
+                            Skip
+                          </th>
+                          <th className={`sticky left-9 z-10 w-10 px-2 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${stickyBgHead}`}>
+                            #
+                          </th>
+                          <th className={`sticky left-[76px] z-10 min-w-[160px] px-3 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${stickyBgHead}`}>
+                            Strelac
+                          </th>
+                          <th className={`px-3 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${stickyBgHead}`}>
+                            NOC
+                          </th>
+                          {seriesCount > 0 && Array.from({ length: seriesCount }, (_, i) => (
+                            <th key={i} className={`px-2 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${stickyBgHead}`}>
+                              S{i + 1}
+                            </th>
                           ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs">
-                        {row.qualRank != null ? `#${row.qualRank}` : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <input
-                          type="number"
-                          value={row.qualTotal}
-                          onChange={(e) =>
-                            updateRow(trueIdx, { qualTotal: parseFloat(e.target.value) })
-                          }
-                          step="0.1"
-                          className="w-16 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] text-sm py-0.5"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs">
-                        {row.qualInners != null ? `${row.qualInners}x` : "—"}
-                      </td>
-                      <td className="px-3 py-2">
-                        {row.shooterId ? (
-                          <span className="text-xs" style={{ color: "var(--success)" }}>
-                            ✓ Pronađen
-                          </span>
-                        ) : row.warning ? (
-                          <span className="text-xs" style={{ color: "var(--warning)" }}>
-                            ⚠ Novi
-                          </span>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          <th className={`px-3 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${stickyBgHead}`}>
+                            Total
+                          </th>
+                          {isAP && (
+                            <th className={`px-3 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${stickyBgHead}`}>
+                              Inners
+                            </th>
+                          )}
+                          <th className={`px-2 py-2.5 text-center text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${stickyBgHead}`}>
+                            Q
+                          </th>
+                          <th className={`px-3 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${stickyBgHead}`}>
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {displayRows.map((row) => {
+                          const trueIdx = rows.indexOf(row);
+                          return (
+                            <tr
+                              key={trueIdx}
+                              className={`group transition-colors ${row.skip ? "opacity-40" : "hover:bg-[var(--surface)]"}`}
+                            >
+                              <td className={`sticky left-0 z-10 w-9 px-2 py-2 text-center ${stickyBg} transition-colors`}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!row.skip}
+                                  onChange={(e) => updateRow(trueIdx, { skip: e.target.checked })}
+                                  className="accent-[var(--brand-primary)]"
+                                />
+                              </td>
+                              <td className={`sticky left-9 z-10 w-10 px-2 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] ${stickyBg} transition-colors`}>
+                                {row.qualRank != null ? row.qualRank : "—"}
+                              </td>
+                              <td className={`sticky left-[76px] z-10 min-w-[160px] px-3 py-2 ${stickyBg} transition-colors`}>
+                                <div className="flex gap-1">
+                                  <input
+                                    value={row.lastName}
+                                    onChange={(e) => updateRow(trueIdx, { lastName: e.target.value })}
+                                    className="w-[90px] bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none text-[var(--ink)] text-xs font-semibold py-0.5"
+                                  />
+                                  <input
+                                    value={row.firstName}
+                                    onChange={(e) => updateRow(trueIdx, { firstName: e.target.value })}
+                                    className="w-[70px] bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none text-[var(--ink)] text-xs py-0.5"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">
+                                  {row.teamNoc}
+                                </span>
+                              </td>
+                              {seriesCount > 0 && Array.from({ length: seriesCount }, (_, i) => (
+                                <td key={i} className="px-2 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
+                                  {row.qualSeries?.[i] != null
+                                    ? isAP
+                                      ? row.qualSeries[i]
+                                      : row.qualSeries[i].toFixed(1)
+                                    : "—"}
+                                </td>
+                              ))}
+                              <td className="px-3 py-2 text-right">
+                                <input
+                                  type="number"
+                                  value={row.qualTotal}
+                                  onChange={(e) => updateRow(trueIdx, { qualTotal: parseFloat(e.target.value) })}
+                                  step={isAP ? "1" : "0.1"}
+                                  className="w-16 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] text-sm py-0.5"
+                                />
+                              </td>
+                              {isAP && (
+                                <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
+                                  {row.qualInners != null ? `${row.qualInners}x` : "—"}
+                                </td>
+                              )}
+                              <td className="px-2 py-2 text-center">
+                                {row.qualified ? (
+                                  <span className="text-[0.65rem] font-bold text-[var(--brand-primary)]">Q</span>
+                                ) : (
+                                  <span className="text-[0.65rem] text-[var(--subtle)]">—</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                {row.shooterId ? (
+                                  <span className="text-xs" style={{ color: "var(--success)" }}>✓ Pronađen</span>
+                                ) : row.warning ? (
+                                  <span className="text-xs" style={{ color: "var(--warning)" }}>⚠ Novi</span>
+                                ) : null}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Expand footer */}
+                  {!isExpanded && hiddenCount > 0 && (
+                    <button
+                      onClick={() => toggleDisc(code)}
+                      className="w-full px-4 py-2.5 text-xs font-semibold text-[var(--brand-primary)] hover:bg-[var(--surface)] transition-colors border-t border-[var(--border)] text-center"
+                    >
+                      Prikaži još {hiddenCount} strelaca ↓
+                    </button>
+                  )}
+                  {isExpanded && discRows.length > COLLAPSE_AT && (
+                    <button
+                      onClick={() => toggleDisc(code)}
+                      className="w-full px-4 py-2.5 text-xs font-semibold text-[var(--muted)] hover:bg-[var(--surface)] transition-colors border-t border-[var(--border)] text-center"
+                    >
+                      Skupi ↑
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 pt-2">
             <button
               onClick={handleCommit}
               disabled={loading || activeCount === 0}
@@ -484,10 +544,7 @@ export function ISSFImportClient() {
       {step === "done" && result && (
         <div className="space-y-6">
           <div className="rounded-xl border border-[var(--border)] p-8 text-center">
-            <div
-              className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-6xl mb-2"
-              style={{ color: "var(--success)" }}
-            >
+            <div className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-6xl mb-2" style={{ color: "var(--success)" }}>
               {result.inserted}
             </div>
             <p className="text-sm text-[var(--muted)]">
@@ -495,9 +552,7 @@ export function ISSFImportClient() {
             </p>
             {result.errors.length > 0 && (
               <div className="mt-4 text-left rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 space-y-1">
-                {result.errors.map((e, i) => (
-                  <div key={i}>{e}</div>
-                ))}
+                {result.errors.map((e, i) => <div key={i}>{e}</div>)}
               </div>
             )}
           </div>
