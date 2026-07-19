@@ -433,8 +433,8 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
     <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
 
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
           <h1
             className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
             style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
@@ -442,7 +442,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
             {t("list.title")}
           </h1>
         </div>
-        <Suspense fallback={<div className="w-[148px] h-9 rounded-lg bg-[var(--surface-2)]" />}>
+        <Suspense fallback={<div className="w-[148px] h-9 shrink-0 rounded-lg bg-[var(--surface-2)]" />}>
           <ViewToggle activeView={activeView} />
         </Suspense>
       </div>

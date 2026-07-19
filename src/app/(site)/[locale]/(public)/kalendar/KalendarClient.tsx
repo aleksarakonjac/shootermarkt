@@ -231,10 +231,10 @@ export function KalendarClient({ competitions }: Props) {
         </div>
 
         {/* Title row */}
-        <div className="flex items-center justify-between mb-5 gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 mb-5 sm:flex sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 min-w-0">
             <h2
-              className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] shrink-0"
+              className="min-w-0 font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
               style={{ fontSize: "clamp(1.1rem, 2.5vw, 1.5rem)", letterSpacing: "-0.02em" }}
             >
               {listTitle}
@@ -293,7 +293,7 @@ export function KalendarClient({ competitions }: Props) {
               </button>
             )}
           </div>
-          <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] shrink-0">
+          <span className="col-span-2 text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] sm:col-auto shrink-0">
             {t("competitionPlural", { count: listComps.length })}
           </span>
         </div>
