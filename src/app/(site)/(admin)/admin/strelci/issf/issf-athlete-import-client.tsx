@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 
@@ -16,6 +16,7 @@ interface ISSFAthlete {
 }
 
 interface BulkResult { noc: string; inserted: number; skipped: number; total: number }
+interface IssfImportJob { id: number; status: "queued" | "processing" | "completed" | "cancelled" | "failed"; current: number; total: number; currentNoc: string | null; inserted: number; skipped: number; error: string | null }
 
 export function ISSFAthleteImportClient() {
   const [query, setQuery] = useState("");
@@ -69,33 +70,51 @@ export function ISSFAthleteImportClient() {
   // Scan all
   const [scanRunning, setScanRunning] = useState(false);
   const [scanProgress, setScanProgress] = useState<{ current: number; total: number; noc: string } | null>(null);
-  const scanAbortRef = useRef(false);
+  const [scanJobId, setScanJobId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!scanJobId) return;
+    const poll = async () => {
+      const res = await fetch(`/api/admin/issf/import-jobs/${scanJobId}`);
+      const job = await res.json() as IssfImportJob;
+      if (!res.ok) throw new Error(job.error ?? "ISSF import nije pronađen");
+      setScanProgress({ current: job.current, total: job.total, noc: job.currentNoc ?? "" });
+      if (job.status === "completed" || job.status === "cancelled" || job.status === "failed") {
+        if (job.status === "failed") setError(job.error ?? "ISSF import nije uspeo");
+        setScanRunning(false);
+        setScanJobId(null);
+        setScanProgress(null);
+      }
+    };
+    const failPoll = (pollError: unknown) => {
+      setError(String(pollError));
+      setScanRunning(false);
+      setScanJobId(null);
+      setScanProgress(null);
+    };
+    void poll().catch(failPoll);
+    const interval = window.setInterval(() => void poll().catch(failPoll), 1000);
+    return () => window.clearInterval(interval);
+  }, [scanJobId]);
 
   async function handleScanAll() {
-    scanAbortRef.current = false;
-    setScanRunning(true);
-    setScanProgress({ current: 0, total: NOC_LIST.length, noc: "" });
-    for (let i = 0; i < NOC_LIST.length; i++) {
-      if (scanAbortRef.current) break;
-      const { noc } = NOC_LIST[i];
-      setScanProgress({ current: i + 1, total: NOC_LIST.length, noc });
-      try {
-        const res = await fetch("/api/admin/issf/athletes/bulk-nation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ noc }),
-        });
-        const data = await res.json();
-        if (res.ok && data.total > 0) {
-          setBulkResults((prev) => [{ noc, ...data }, ...prev.filter((r) => r.noc !== noc)]);
-        }
-      } catch {
-        // skip failed nations silently
-      }
-      await new Promise((r) => setTimeout(r, 400));
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/issf/import-jobs", { method: "POST" });
+      const job = await res.json() as Pick<IssfImportJob, "id"> & { error?: string };
+      if (!res.ok || !job.id) throw new Error(job.error ?? "Pokretanje ISSF importa nije uspelo");
+      setScanRunning(true);
+      setScanProgress({ current: 0, total: NOC_LIST.length, noc: "" });
+      setScanJobId(job.id);
+    } catch (scanError) {
+      setError(String(scanError));
     }
-    setScanRunning(false);
-    setScanProgress(null);
+  }
+
+  async function stopScan() {
+    if (!scanJobId) return;
+    const res = await fetch(`/api/admin/issf/import-jobs/${scanJobId}`, { method: "PATCH" });
+    if (!res.ok) setError("Zaustavljanje ISSF importa nije uspelo");
   }
 
   async function handleBulkNation(noc: string) {
@@ -266,7 +285,7 @@ export function ISSFAthleteImportClient() {
                 </div>
               </div>
               <button
-                onClick={() => { scanAbortRef.current = true; }}
+                onClick={stopScan}
                 className="shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold border border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
               >
                 Zaustavi

@@ -31,6 +31,9 @@ export const disciplineCodeEnum = pgEnum("discipline_code", [
   "ARW",  // Air Rifle Women
   "APM",  // Air Pistol Men
   "APW",  // Air Pistol Women
+  // 10m Mixed Team
+  "ARMT", // Air Rifle Mixed Team
+  "APMT", // Air Pistol Mixed Team
   // 50m Rifle (MK Puška)
   "R3PM", // Rifle 3-Position Men (3x40 Senior)
   "R3PW", // Rifle 3-Position Women (3x40 Senior)
@@ -509,6 +512,42 @@ export const results = pgTable(
   ]
 );
 
+// ── Mixed Team Results ────────────────────────────────────────────────────────
+
+export const mixedTeamResults = pgTable(
+  "mixed_team_results",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+    disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
+    nocCode: varchar("noc_code", { length: 3 }).notNull(),
+    // Optional links to shooters in our DB
+    shooter1Id: integer("shooter1_id").references(() => shooters.id, { onDelete: "set null" }),
+    shooter2Id: integer("shooter2_id").references(() => shooters.id, { onDelete: "set null" }),
+    // ISSF athlete IDs (for athletes not yet in our DB)
+    shooter1IssfId: varchar("shooter1_issf_id", { length: 50 }),
+    shooter2IssfId: varchar("shooter2_issf_id", { length: 50 }),
+    shooter1Name: varchar("shooter1_name", { length: 200 }),
+    shooter2Name: varchar("shooter2_name", { length: 200 }),
+    // Individual shooter series within the mixed team event (separate from individual discipline results)
+    shooter1Detail: jsonb("shooter1_detail").$type<{ series: number[]; total: number }>(),
+    shooter2Detail: jsonb("shooter2_detail").$type<{ series: number[]; total: number }>(),
+    // Qualification
+    qualRank: integer("qual_rank"),
+    qualTotal: decimal("qual_total", { precision: 7, scale: 1 }),
+    qualified: boolean("qualified"),
+    // Final
+    finalRank: integer("final_rank"),
+    finalTotal: decimal("final_total", { precision: 7, scale: 1 }),
+    source: resultSourceEnum("source").notNull().default("manual"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("mixed_team_results_comp_idx").on(t.competitionId),
+    uniqueIndex("mixed_team_results_comp_disc_noc_unique").on(t.competitionId, t.disciplineId, t.nocCode),
+  ]
+);
+
 // ── PDF Import Jobs ──────────────────────────────────────────────────────────
 
 export const pdfImportJobs = pgTable(
@@ -536,6 +575,25 @@ export const pdfImportJobs = pgTable(
     index("pdf_import_jobs_status_idx").on(t.status),
     index("pdf_import_jobs_competition_idx").on(t.competitionId),
   ]
+);
+
+export const issfImportJobs = pgTable(
+  "issf_import_jobs",
+  {
+    id: serial("id").primaryKey(),
+    status: varchar("status", { length: 20 }).notNull().default("queued"),
+    current: integer("current").notNull().default(0),
+    total: integer("total").notNull(),
+    currentNoc: varchar("current_noc", { length: 3 }),
+    inserted: integer("inserted").notNull().default(0),
+    skipped: integer("skipped").notNull().default(0),
+    error: text("error"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("issf_import_jobs_status_idx").on(t.status)]
 );
 
 
@@ -736,6 +794,13 @@ export const resultRelations = relations(results, ({ one }) => ({
   country: one(countries, { fields: [results.countryId], references: [countries.id] }),
 }));
 
+export const mixedTeamResultRelations = relations(mixedTeamResults, ({ one }) => ({
+  competition: one(competitions, { fields: [mixedTeamResults.competitionId], references: [competitions.id] }),
+  discipline: one(disciplines, { fields: [mixedTeamResults.disciplineId], references: [disciplines.id] }),
+  shooter1: one(shooters, { fields: [mixedTeamResults.shooter1Id], references: [shooters.id] }),
+  shooter2: one(shooters, { fields: [mixedTeamResults.shooter2Id], references: [shooters.id] }),
+}));
+
 // ── Exported Types ────────────────────────────────────────────────────────────
 
 export type Country = typeof countries.$inferSelect;
@@ -782,6 +847,9 @@ export type NewCompetitionScheduleSlot = typeof competitionSchedule.$inferInsert
 
 export type TickerLiveOverride = typeof tickerLiveOverrides.$inferSelect;
 export type NewTickerLiveOverride = typeof tickerLiveOverrides.$inferInsert;
+
+export type MixedTeamResult = typeof mixedTeamResults.$inferSelect;
+export type NewMixedTeamResult = typeof mixedTeamResults.$inferInsert;
 
 export type TickerCustomUpcoming = typeof tickerCustomUpcoming.$inferSelect;
 export type NewTickerCustomUpcoming = typeof tickerCustomUpcoming.$inferInsert;

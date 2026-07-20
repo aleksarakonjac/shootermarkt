@@ -171,10 +171,12 @@ export default async function ShooterPage({ params }: Props) {
 
   // ── Career stats per discipline — from cache ──────────────────────────────────
   const DISC_NAMES: Record<string, { sr: string; en: string }> = {
-    ARM: { sr: "10m vazdušna puška · M", en: "10m Air Rifle · Men" },
-    ARW: { sr: "10m vazdušna puška · Ž", en: "10m Air Rifle · Women" },
-    APM: { sr: "10m vazdušni pištolj · M", en: "10m Air Pistol · Men" },
-    APW: { sr: "10m vazdušni pištolj · Ž", en: "10m Air Pistol · Women" },
+    ARM:  { sr: "10m vazdušna puška · M",         en: "10m Air Rifle · Men" },
+    ARW:  { sr: "10m vazdušna puška · Ž",         en: "10m Air Rifle · Women" },
+    APM:  { sr: "10m vazdušni pištolj · M",        en: "10m Air Pistol · Men" },
+    APW:  { sr: "10m vazdušni pištolj · Ž",        en: "10m Air Pistol · Women" },
+    ARMT: { sr: "10m vazdušna puška · Mešoviti tim", en: "10m Air Rifle · Mixed Team" },
+    APMT: { sr: "10m vazdušni pištolj · Mešoviti tim", en: "10m Air Pistol · Mixed Team" },
   };
 
   const cacheByCode = new Map(cacheRows.map((r) => [r.disciplineCode, r]));

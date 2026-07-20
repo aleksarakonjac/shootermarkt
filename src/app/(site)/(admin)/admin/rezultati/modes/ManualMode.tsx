@@ -34,6 +34,8 @@ const DISC_LABEL: Record<DisciplineCode, string> = {
   ARW:  "10m Air Rifle Women",
   APM:  "10m Air Pistol Men",
   APW:  "10m Air Pistol Women",
+  ARMT: "10m Air Rifle Mixed Team",
+  APMT: "10m Air Pistol Mixed Team",
   R3PM: "50m Rifle 3 Positions Men",
   R3PW: "50m Rifle 3 Positions Women",
   SPW:  "25m Sport Pistol Women",

@@ -1,4 +1,6 @@
-export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "R3PM" | "R3PW" | "SPW";
+export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "ARMT" | "APMT" | "R3PM" | "R3PW" | "SPW";
+export const MIXED_TEAM_CODES = ["ARMT", "APMT"] as const;
+export type MixedTeamCode = typeof MIXED_TEAM_CODES[number];
 
 // Vrednosti moraju odgovarati DB enumu `age_category` (schema.ts).
 export type AgeCategory =
@@ -77,14 +79,16 @@ export interface ParsedShooterResult {
  * apparatus + gender se izvode iz koda (za kreiranje novih strelaca — pol znamo
  * iz discipline, npr. vazdušna puška seniorke → ženско).
  */
-export const DISCIPLINE_META: Record<DisciplineCode, { apparatus: string; gender: "M" | "F"; label: string }> = {
-  ARM: { apparatus: "air_rifle",  gender: "M", label: "Vazdušna puška M" },
-  ARW: { apparatus: "air_rifle",  gender: "F", label: "Vazdušna puška Ž" },
-  APM: { apparatus: "air_pistol", gender: "M", label: "Vazdušni pištolj M" },
-  APW: { apparatus: "air_pistol", gender: "F", label: "Vazdušni pištolj Ž" },
-  R3PM: { apparatus: "rifle",     gender: "M", label: "MK puška trostav M" },
-  R3PW: { apparatus: "rifle",     gender: "F", label: "MK puška trostav Ž" },
-  SPW: { apparatus: "pistol",     gender: "F", label: "Sport pištolj Ž" },
+export const DISCIPLINE_META: Record<DisciplineCode, { apparatus: string; gender: "M" | "F" | null; label: string }> = {
+  ARM:  { apparatus: "air_rifle",  gender: "M",  label: "Vazdušna puška M" },
+  ARW:  { apparatus: "air_rifle",  gender: "F",  label: "Vazdušna puška Ž" },
+  APM:  { apparatus: "air_pistol", gender: "M",  label: "Vazdušni pištolj M" },
+  APW:  { apparatus: "air_pistol", gender: "F",  label: "Vazdušni pištolj Ž" },
+  ARMT: { apparatus: "air_rifle",  gender: null, label: "Vazdušna puška Mešoviti tim" },
+  APMT: { apparatus: "air_pistol", gender: null, label: "Vazdušni pištolj Mešoviti tim" },
+  R3PM: { apparatus: "rifle",      gender: "M",  label: "MK puška trostav M" },
+  R3PW: { apparatus: "rifle",      gender: "F",  label: "MK puška trostav Ž" },
+  SPW:  { apparatus: "pistol",     gender: "F",  label: "Sport pištolj Ž" },
 };
 
 /** Kodovi disciplina koje uvozimo. */
@@ -144,6 +148,8 @@ export interface ReviewRow {
   /** Fuzzy predlog: verovatno isti strelac (drugačiji zapis imena) — admin potvrđuje. */
   suggestedShooterId?: number;
   suggestedName?: string;
+  /** ISSF ID strelca, dostupan kad se uvozi sa ISSF sajta */
+  issfId?: string;
   firstName: string;
   lastName: string;
   /** Country/team IOC code — used as nationality */

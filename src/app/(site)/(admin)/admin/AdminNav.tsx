@@ -39,7 +39,8 @@ const GROUPS: NavGroup[] = [
   {
     label: "Ticker",
     items: [
-      { href: "/admin/ticker", label: "Ticker upravljanje" },
+      { href: "/admin/ticker",          label: "Ticker upravljanje" },
+      { href: "/admin/issf/schedule",   label: "ISSF satnica" },
     ],
   },
 ];

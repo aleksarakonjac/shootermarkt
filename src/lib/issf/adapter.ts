@@ -77,9 +77,9 @@ export function inferApparatus(events: string | undefined | null): "rifle" | "pi
 }
 
 /** Fetch full athlete profile (includes events + full birthday). */
-export async function fetchAthleteProfile(issfId: string): Promise<Partial<ISSFAthlete>> {
+export async function fetchAthleteProfile(issfId: string, signal?: AbortSignal): Promise<Partial<ISSFAthlete>> {
   try {
-    const res = await fetch(`${ISSF_API}/athletes/${issfId}`, { next: { revalidate: 86400 } });
+    const res = await fetch(`${ISSF_API}/athletes/${issfId}`, { next: { revalidate: 86400 }, signal });
     if (!res.ok) return {};
     return res.json();
   } catch {
@@ -143,36 +143,53 @@ export function extractMvpEvents(
 }
 
 const API_LIMIT = 300;
-const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const PREFIX_CONCURRENCY = 8;
 
-async function searchRaw(query: string): Promise<ISSFAthlete[]> {
+async function searchRaw(query: string, signal?: AbortSignal): Promise<ISSFAthlete[]> {
   const res = await fetch(
     `${ISSF_API}/athletes?search=${encodeURIComponent(query)}`,
-    { cache: "no-store" }
+    { cache: "no-store", signal }
   );
   if (!res.ok) throw new Error(`ISSF athlete search failed: ${res.status}`);
   return res.json();
 }
 
-/** Search athletes by NOC. Paginates via alphabet if API limit is hit. */
-export async function searchAthletes(noc: string): Promise<ISSFAthlete[]> {
-  const first = await searchRaw(noc);
+/**
+ * Search athletes by NOC. Uses 2-char prefix pagination to bypass the 300-result API cap.
+ * Single-char suffixes ("SWE M") are treated as stop-words and return 0.
+ * 2-char suffixes ("SWE Ma") work and keep each page well under 300.
+ * Falls back to 3-char if any 2-char prefix still hits 300 (edge case for huge nations).
+ */
+export async function searchAthletes(noc: string, prefix = "", depth = 0, signal?: AbortSignal): Promise<ISSFAthlete[]> {
+  const query = prefix ? `${noc} ${prefix}` : noc;
+  const batch = await searchRaw(query, signal);
 
-  if (first.length < API_LIMIT) return first;
+  // If under limit, or we've hit 3-char depth, return what we have
+  if (batch.length < API_LIMIT || depth >= 2) return batch;
 
-  // Hit limit — fan out A–Z
+  // Hit limit — fan out with next char. Start 2-char on depth 0, 3-char on depth 1.
+  // Depth 0 (root): noc → expand to noc+2char (Aa..Zz)
+  // Depth 1: noc+2char → expand to noc+3char
   const seen = new Set<string>();
   const all: ISSFAthlete[] = [];
 
-  for (const letter of ALPHABET) {
-    const batch = await searchRaw(`${noc} ${letter}`);
-    for (const a of batch) {
-      if (!seen.has(a.issfId)) {
-        seen.add(a.issfId);
-        all.push(a);
+  // At depth 0 we need to jump straight to 2-char prefixes (single chars are stop-words)
+  const nextPrefixes = depth === 0
+    ? Array.from(LETTERS).flatMap((a) => Array.from(LETTERS).map((b) => `${a}${b}`))
+    : Array.from(LETTERS).map((l) => `${prefix}${l}`);
+
+  for (let i = 0; i < nextPrefixes.length; i += PREFIX_CONCURRENCY) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const batches = await Promise.all(nextPrefixes.slice(i, i + PREFIX_CONCURRENCY).map((p) => searchAthletes(noc, p, depth + 1, signal)));
+    for (const batch of batches) {
+      for (const a of batch) {
+        if (!seen.has(a.issfId)) {
+          seen.add(a.issfId);
+          all.push(a);
+        }
       }
     }
-    await new Promise((r) => setTimeout(r, 200));
   }
 
   return all;
@@ -198,6 +215,147 @@ export function mapEventTitleToDiscipline(eventTitle: string): DisciplineCode | 
   if (t.includes("air pistol") && t.includes("men") && !t.includes("women")) return "APM";
   if (t.includes("air pistol") && t.includes("women")) return "APW";
   return null;
+}
+
+// ── Schedule Scraper ──────────────────────────────────────────────────────────
+
+export interface ISSFScheduleEntry {
+  date: string;         // "2026-07-22"
+  dayLabel: string;     // "Wednesday - 22 JUL"
+  startTime: string;    // "09:15" or "" if no time listed
+  endTime: string | null;
+  eventTitle: string;
+  disciplineCode: string | null; // null = not a shooting event we track
+  stage: "qual" | "elimination" | "final" | "training" | "ceremony" | "other";
+  isTraining: boolean;
+  isFinal: boolean;
+  isMedal: boolean;
+  relay: number | null;
+}
+
+const MONTH_MAP: Record<string, number> = {
+  JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6,
+  JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12,
+};
+
+const EVENT_DISCIPLINE_MAP: Array<[RegExp, string]> = [
+  [/10m air pistol mixed team/i, "APMT"],
+  [/10m air rifle mixed team/i,  "ARMT"],
+  [/10m air rifle men/i,          "ARM"],
+  [/10m air rifle women/i,        "ARW"],
+  [/10m air pistol men/i,         "APM"],
+  [/10m air pistol women/i,       "APW"],
+  [/50m rifle 3.positions? men/i, "R3PM"],
+  [/50m rifle 3.positions? women/i,"R3PW"],
+  [/25m rapid fire pistol/i,      "RFPM"],
+  [/25m (?:sport )?pistol women/i,"SPW"],
+  [/50m free pistol/i,            "FPM"],
+];
+
+function mapTitleToDisciplineCode(title: string): string | null {
+  // Strip leading event type prefixes before matching
+  const clean = title
+    .replace(/^final\s+/i, "")
+    .replace(/^pre-event training\s+/i, "")
+    .replace(/^medal ceremony\s*/i, "")
+    .replace(/\s+relay\s+\d+/i, "")
+    .replace(/\s+elimination(?:\s+relay\s+\d+)?/i, "")
+    .trim();
+  for (const [re, code] of EVENT_DISCIPLINE_MAP) {
+    if (re.test(clean)) return code;
+  }
+  return null;
+}
+
+function detectStage(title: string): ISSFScheduleEntry["stage"] {
+  if (/^pre-event training/i.test(title)) return "training";
+  if (/^medal ceremony/i.test(title))     return "ceremony";
+  if (/^final\s/i.test(title))            return "final";
+  if (/elimination/i.test(title))         return "elimination";
+  if (/qual/i.test(title))                return "qual";
+  return "qual"; // default for competition entries with a time
+}
+
+function detectRelay(title: string): number | null {
+  const m = title.match(/relay\s+(\d+)/i);
+  return m ? parseInt(m[1]) : null;
+}
+
+function parseScheduleHtml(html: string, year: number): ISSFScheduleEntry[] {
+  const entries: ISSFScheduleEntry[] = [];
+
+  // Find all h3 day headers and their positions
+  const dayHeaderRe = /<h3[^>]*class="[^"]*font-bold[^"]*"[^>]*>([^<]+)<\/h3>/g;
+  const dayHeaders: Array<{ label: string; index: number; matchLen: number }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = dayHeaderRe.exec(html)) !== null) {
+    dayHeaders.push({ label: m[1].trim(), index: m.index, matchLen: m[0].length });
+  }
+
+  for (let i = 0; i < dayHeaders.length; i++) {
+    const header = dayHeaders[i];
+    const nextIndex = i + 1 < dayHeaders.length ? dayHeaders[i + 1].index : html.length;
+    const dayHtml = html.slice(header.index + header.matchLen, nextIndex);
+
+    // Parse date: "Monday - 20 JUL" or "MONDAY - 20 JUL"
+    const dateMatch = header.label.match(/(\d{1,2})\s+([A-Z]{3})/i);
+    if (!dateMatch) continue;
+    const day = parseInt(dateMatch[1]);
+    const month = MONTH_MAP[dateMatch[2].toUpperCase()];
+    if (!month) continue;
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+    // Find time+event entry pairs within the day block
+    const entryRe = /<div[^>]*class="md:w-1\/3"[^>]*>([\s\S]*?)<\/div>\s*<div[^>]*class="md:w-2\/3"[^>]*>([\s\S]*?)<\/div>/g;
+    while ((m = entryRe.exec(dayHtml)) !== null) {
+      const timeHtml = m[1];
+      const eventHtml = m[2];
+
+      const timeSpans = [...timeHtml.matchAll(/<span>(\d{2}:\d{2})<\/span>/g)].map((s) => s[1]);
+      const startTime = timeSpans[0] ?? "";
+      const endTime = timeSpans[1] ?? null;
+
+      const titleMatch = eventHtml.match(/<p[^>]*>([^<]+)<\/p>/);
+      if (!titleMatch) continue;
+      const eventTitle = titleMatch[1].trim();
+      if (!eventTitle) continue;
+
+      const isTraining = /^pre-event training/i.test(eventTitle);
+      const isFinal   = /^final\s/i.test(eventTitle);
+      const isMedal   = /^medal ceremony/i.test(eventTitle);
+
+      entries.push({
+        date: dateStr,
+        dayLabel: header.label,
+        startTime,
+        endTime,
+        eventTitle,
+        disciplineCode: mapTitleToDisciplineCode(eventTitle),
+        stage: detectStage(eventTitle),
+        isTraining,
+        isFinal,
+        isMedal,
+        relay: detectRelay(eventTitle),
+      });
+    }
+  }
+
+  return entries;
+}
+
+/** Fetch and parse the schedule for a given ISSF competition. */
+export async function fetchScheduleFromHtml(
+  competitionId: number,
+  year: number
+): Promise<ISSFScheduleEntry[]> {
+  const url = `${ISSF_WEB}/competitions/${competitionId}/schedule`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) throw new Error(`ISSF schedule fetch failed: ${res.status} ${url}`);
+  const html = await res.text();
+  return parseScheduleHtml(html, year);
 }
 
 export interface ISSFQualResult {

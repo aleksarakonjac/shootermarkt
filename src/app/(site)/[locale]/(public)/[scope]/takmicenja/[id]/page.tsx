@@ -7,6 +7,7 @@ import {
   shooters,
   clubs,
   disciplines,
+  mixedTeamResults,
 } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -91,6 +92,43 @@ export default async function CompetitionPage({ params }: Props) {
     .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
     .where(eq(results.competitionId, compId))
     .orderBy(asc(results.qualRank));
+
+  // Mixed team results
+  const mixedResults = await db
+    .select({
+      id: mixedTeamResults.id,
+      disciplineCode: disciplines.code,
+      disciplineName: disciplines.name,
+      apparatus: disciplines.apparatus,
+      nocCode: mixedTeamResults.nocCode,
+      shooter1Id: mixedTeamResults.shooter1Id,
+      shooter2Id: mixedTeamResults.shooter2Id,
+      shooter1Name: mixedTeamResults.shooter1Name,
+      shooter2Name: mixedTeamResults.shooter2Name,
+      shooter1Detail: mixedTeamResults.shooter1Detail,
+      shooter2Detail: mixedTeamResults.shooter2Detail,
+      qualRank: mixedTeamResults.qualRank,
+      qualTotal: mixedTeamResults.qualTotal,
+      qualified: mixedTeamResults.qualified,
+      finalRank: mixedTeamResults.finalRank,
+      finalTotal: mixedTeamResults.finalTotal,
+    })
+    .from(mixedTeamResults)
+    .innerJoin(disciplines, eq(mixedTeamResults.disciplineId, disciplines.id))
+    .where(eq(mixedTeamResults.competitionId, compId))
+    .orderBy(asc(mixedTeamResults.qualRank));
+
+  // Group mixed team results by discipline code
+  const mixedGroupOrder: string[] = [];
+  const mixedGroupMap = new Map<string, { code: string; name: string; apparatus: string | null; teams: typeof mixedResults }>();
+  for (const r of mixedResults) {
+    if (!mixedGroupMap.has(r.disciplineCode)) {
+      mixedGroupOrder.push(r.disciplineCode);
+      mixedGroupMap.set(r.disciplineCode, { code: r.disciplineCode, name: r.disciplineName, apparatus: r.apparatus, teams: [] });
+    }
+    mixedGroupMap.get(r.disciplineCode)!.teams.push(r);
+  }
+  const mixedGroups = mixedGroupOrder.map((code) => mixedGroupMap.get(code)!);
 
   // Group by discipline, then by age category, preserving order of first appearance
   const disciplineOrder: string[] = [];
@@ -287,7 +325,7 @@ export default async function CompetitionPage({ params }: Props) {
         >
           {t("detail.results")}
         </h2>
-        <CompetitionResultsClient groups={groups} />
+        <CompetitionResultsClient groups={groups} mixedGroups={mixedGroups} />
       </div>
 
       <RelatedNewsSection type="competition" refId={compId} locale={locale} />

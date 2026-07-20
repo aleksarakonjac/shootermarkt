@@ -10,6 +10,7 @@ import { deriveFinalRankProgression } from "@/lib/pdf-import/types";
 import { db } from "@/lib/db";
 import { shooters } from "@/lib/db/schema";
 import type { ReviewRow } from "@/lib/pdf-import/types";
+import { matchShooter } from "@/lib/name-match";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -59,15 +60,12 @@ export async function POST(req: NextRequest) {
     const discRows: typeof rows = [];
 
     for (const result of qualResults) {
-      const matchedShooter = allShooters.find(
-        (s) =>
-          s.lastName.toLowerCase() === result.lastName.toLowerCase() &&
-          s.firstName.toLowerCase() === result.firstName.toLowerCase() &&
-          (!s.nationality || s.nationality === result.nationCode)
-      );
+      const match = matchShooter(result.firstName, result.lastName, result.nationCode, allShooters);
+      const shooterId = match.kind === "exact" ? match.id : undefined;
 
       discRows.push({
-        shooterId: matchedShooter?.id,
+        shooterId,
+        issfId: result.issfId || undefined,
         firstName: result.firstName,
         lastName: result.lastName,
         teamNoc: result.nationCode,
@@ -80,7 +78,7 @@ export async function POST(req: NextRequest) {
         qualified: result.qualified,
         finalTotal: null,
         finalRank: null,
-        warning: matchedShooter ? undefined : "Novi strelac — biće kreiran",
+        warning: shooterId ? undefined : "Novi strelac — biće kreiran",
       });
     }
 

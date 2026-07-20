@@ -41,6 +41,9 @@ async function seed() {
       // 10m Air Pistol
       { code: "APM", name: "10m Air Pistol Men",   shortName: "AP Men",   gender: "M", distance: 10, apparatus: "air_pistol", maxQualScore: "600"   },
       { code: "APW", name: "10m Air Pistol Women", shortName: "AP Women", gender: "F", distance: 10, apparatus: "air_pistol", maxQualScore: "600"   },
+      // 10m Mixed Team
+      { code: "ARMT", name: "10m Air Rifle Mixed Team",  shortName: "AR Mixed", gender: null, distance: 10, apparatus: "air_rifle",  maxQualScore: "1308.0" },
+      { code: "APMT", name: "10m Air Pistol Mixed Team", shortName: "AP Mixed", gender: null, distance: 10, apparatus: "air_pistol", maxQualScore: "1200"   },
       // 50m Rifle (MK Puška)
       { code: "R3PM", name: "50m Rifle 3-Position Men",          shortName: "R3P Men",      gender: "M", distance: 50, apparatus: "rifle",   maxQualScore: "1308.0" },
       { code: "R3PW", name: "50m Rifle 3-Position Women",        shortName: "R3P Women",    gender: "F", distance: 50, apparatus: "rifle",   maxQualScore: "1308.0" },

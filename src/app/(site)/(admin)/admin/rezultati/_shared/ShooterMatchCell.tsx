@@ -85,30 +85,24 @@ export function ShooterMatchCell({ row, onChange }: Props) {
 
   return (
     <div className="relative" ref={boxRef}>
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center gap-1">
         {row.shooterId ? (
-          <span className="text-xs" style={{ color: "var(--success)" }}>✓ Pronađen</span>
+          <span className="text-sm leading-none" style={{ color: "var(--success)" }} title="Pronađen">✓</span>
         ) : row.suggestedShooterId ? (
-          <>
-            <span className="text-xs" style={{ color: "var(--warning)" }}>
-              ⚠ Možda: {row.suggestedName}
-            </span>
-            <button
-              onClick={acceptSuggestion}
-              className="text-[0.65rem] font-semibold underline text-[var(--brand-primary)]"
-            >
-              prihvati
-            </button>
-          </>
-        ) : row.isNew ? (
-          <span className="text-xs" style={{ color: "var(--muted)" }}>+ Novi strelac</span>
-        ) : null}
+          <button
+            onClick={acceptSuggestion}
+            title={`Možda: ${row.suggestedName} — klikni da prihvatiš`}
+            className="text-sm leading-none"
+            style={{ color: "var(--warning)" }}
+          >⚠</button>
+        ) : (
+          <span className="text-sm leading-none text-[var(--subtle)]" title="Novi strelac">+</span>
+        )}
         <button
           onClick={() => setOpen((v) => !v)}
-          className="text-[0.65rem] text-[var(--subtle)] hover:text-[var(--brand-primary)] underline"
-        >
-          promeni
-        </button>
+          title="Promeni strelca"
+          className="ml-0.5 text-[0.75rem] leading-none text-[var(--subtle)] hover:text-[var(--brand-primary)] transition-colors"
+        >✏</button>
       </div>
 
       {open && (

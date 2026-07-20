@@ -1,6 +1,8 @@
 import { and, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { pdfImportJobs } from "@/lib/db/schema";
+import { issfImportJobs, pdfImportJobs } from "@/lib/db/schema";
+import { importIssfNation } from "@/lib/issf/import-nation";
+import { NOC_LIST } from "@/lib/noc-list";
 import { parsePdfImport } from "@/lib/pdf-import/parse-import";
 import { downloadPdfImport, removePdfImports, uploadPdfImport } from "@/lib/pdf-import/storage";
 import { inngest } from "./client";
@@ -111,5 +113,49 @@ export const cleanupExpiredPdfImports = inngest.createFunction(
     }
 
     return { deleted: jobs.length };
+  }
+);
+
+export const processIssfImport = inngest.createFunction(
+  {
+    id: "process-issf-import",
+    retries: 2,
+    triggers: [{ event: "issf-import/queued" }, { event: "issf-import/next" }],
+    onFailure: async ({ event, error }) => {
+      const jobId = Number(event.data.event.data.jobId);
+      if (Number.isInteger(jobId)) {
+        await db.update(issfImportJobs).set({ status: "failed", error: error.message, completedAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(issfImportJobs.id, jobId), eq(issfImportJobs.status, "processing")));
+      }
+    },
+  },
+  async ({ event }) => {
+    const jobId = event.data.jobId;
+    const [job] = await db.select().from(issfImportJobs).where(eq(issfImportJobs.id, jobId));
+    if (!job || job.status === "cancelled" || job.status === "completed") return { skipped: true };
+
+    const noc = NOC_LIST[job.current]?.noc;
+    if (!noc) {
+      await db.update(issfImportJobs).set({ status: "completed", completedAt: new Date(), updatedAt: new Date() }).where(eq(issfImportJobs.id, jobId));
+      return { completed: true };
+    }
+
+    await db.update(issfImportJobs).set({ status: "processing", currentNoc: noc, startedAt: job.startedAt ?? new Date(), updatedAt: new Date() })
+      .where(and(eq(issfImportJobs.id, jobId), eq(issfImportJobs.status, job.status)));
+    const result = await importIssfNation(noc);
+    const current = job.current + 1;
+    const [updated] = await db.update(issfImportJobs)
+      .set({
+        current,
+        inserted: sql`${issfImportJobs.inserted} + ${result.inserted}`,
+        skipped: sql`${issfImportJobs.skipped} + ${result.skipped}`,
+        status: current === job.total ? "completed" : "processing",
+        completedAt: current === job.total ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(issfImportJobs.id, jobId), eq(issfImportJobs.status, "processing"), eq(issfImportJobs.current, job.current)))
+      .returning({ status: issfImportJobs.status });
+    if (updated?.status === "processing") await inngest.send({ name: "issf-import/next", data: { jobId } });
+    return { noc, current, total: job.total };
   }
 );
