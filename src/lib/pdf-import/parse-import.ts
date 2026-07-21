@@ -36,7 +36,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
         lastName: result.lastName,
         teamNoc: nationality,
         birthYear: result.birthYear ?? null,
-        gender: meta?.gender,
+        gender: meta?.gender ?? undefined,
         apparatus: meta?.apparatus,
         clubAbbr: result.clubName,
         clubId: club?.id,

@@ -117,35 +117,32 @@ function LiveDetail({ item }: { item: TickerItem }) {
 // ── Upper bar (cycles through live + uskoro + custom) ────────────────────────
 
 function UpperBar({ items, live, upcoming, locale }: { items: TickerItem[]; live: string; upcoming: string; locale: string }) {
-  const [idx, setIdx]         = useState(0);
-  const [visible, setVisible] = useState(true);
+  const [idx, setIdx]     = useState(0);
+  const [slide, setSlide] = useState<"in" | "out" | "enter">("in");
 
   useEffect(() => {
     if (items.length <= 1) return;
     const interval = setInterval(() => {
-      setVisible(false);
-      setTimeout(() => { setIdx((i) => (i + 1) % items.length); setVisible(true); }, 400);
+      setSlide("out");
+      setTimeout(() => {
+        setIdx((i) => (i + 1) % items.length);
+        setSlide("enter");
+        requestAnimationFrame(() => requestAnimationFrame(() => setSlide("in")));
+      }, 320);
     }, 6000);
     return () => clearInterval(interval);
   }, [items.length]);
 
-  // idx is clamped in the render below — no reset effect needed
-
   const item = items[Math.min(idx, items.length - 1)];
 
+  const transform = slide === "out" ? "translateY(-32px)" : slide === "enter" ? "translateY(32px)" : "translateY(0)";
+  const transition = slide === "enter" ? "none" : "transform 0.32s ease";
+
   return (
-    <div
-      style={{
-        height:     32,
-        background: "var(--brand-primary)",
-        opacity:    visible ? 1 : 0,
-        transition: "opacity 0.4s ease",
-        overflow:   "hidden",
-      }}
-      role="status"
-      aria-label={`Ticker: ${item.name}`}
-    >
-      <LiveBarInner item={item} live={live} upcoming={upcoming} locale={locale} />
+    <div style={{ height: 32, background: "var(--brand-primary)", overflow: "hidden" }} role="status" aria-label={`Ticker: ${item.name}`}>
+      <div style={{ transform, transition, height: 32 }}>
+        <LiveBarInner item={item} live={live} upcoming={upcoming} locale={locale} />
+      </div>
     </div>
   );
 }
@@ -174,13 +171,13 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
 
       {isUskoro && (
         <span
-          className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5"
-          style={{
-            fontSize: 11, letterSpacing: "0.08em",
-            color: "var(--brand-primary)", background: "white", height: 20,
-            animation: "ticker-pulse 2s ease-in-out infinite",
-          }}
+          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5"
+          style={{ fontSize: 11, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}
         >
+          <span
+            className="rounded-full shrink-0"
+            style={{ width: 5, height: 5, background: "#f59e0b", display: "inline-block", animation: "ticker-pulse 2s ease-in-out infinite" }}
+          />
           {upcoming.toUpperCase()}
         </span>
       )}
@@ -356,9 +353,7 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
 
 function UpcomingItem({ item, locale }: { item: TickerItem; locale: string }) {
   const scopedHref = useScopedHref();
-  const d       = new Date(item.date + "T00:00:00");
-  const localeStr = locale === "en" ? "en-US" : "sr-Latn-RS";
-  const dateStr = d.toLocaleDateString(localeStr, { day: "numeric", month: "short" });
+  const dateStr = formatDateRange(item.date, locale, item.endDate);
 
   const content = (
     <span className="flex items-center gap-1.5">

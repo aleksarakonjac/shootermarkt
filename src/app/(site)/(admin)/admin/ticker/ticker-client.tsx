@@ -802,6 +802,8 @@ function SlotRow({ slot, live, onDelete }: { slot: SlotRow; live: boolean; onDel
 
 // ── AddSlotForm ───────────────────────────────────────────────────────────────
 
+const TICKER_DISCIPLINE_CODES = new Set(["ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "SPW"]);
+
 function AddSlotForm({ disciplines, compDateStart, compDateEnd, onAdd }: {
   disciplines: DisciplineOption[];
   compDateStart: string;
@@ -835,7 +837,7 @@ function AddSlotForm({ disciplines, compDateStart, compDateEnd, onAdd }: {
         <CustomSelect
           value={disciplineId}
           onChange={setDisciplineId}
-          options={disciplines.map((d) => ({ value: String(d.id), label: d.code }))}
+          options={disciplines.filter((d) => TICKER_DISCIPLINE_CODES.has(d.code)).map((d) => ({ value: String(d.id), label: d.code }))}
         />
       </div>
       <div className="flex flex-col gap-1 w-44">

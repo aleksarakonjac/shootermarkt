@@ -169,22 +169,21 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
               {r.lastName} {r.firstName}
             </Link>
             <Sparkline scores={r.recentScores.slice(0, 5)} width={44} height={18} strokeWidth={1.5} />
-            <span className="font-[family-name:var(--font-jetbrains-mono)] text-base font-semibold text-[var(--ink)]">{r.formaScore.toFixed(1)}</span>
-            <span className="w-5 text-center text-base font-bold leading-none font-mono" style={{ color: trendColor(r.trend) }} aria-label={r.trend}>
-              {trendLabel(r.trend)}
+            <span className="flex items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] text-base font-semibold text-[var(--ink)]">
+              {r.formaScore.toFixed(1)}
+              <span className="text-base font-bold leading-none" style={{ color: trendColor(r.trend) }} aria-label={r.trend}>{trendLabel(r.trend)}</span>
             </span>
           </li>
         ))}
       </ol>
 
       <div key={`table-${activeTab}`} className="hidden overflow-x-auto sm:block" role="region" tabIndex={0} aria-label={t("topForm")}>
-          <table className="min-w-[680px] w-full text-sm">
+          <table className="min-w-[600px] w-full text-sm">
             <thead>
               <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                 <th scope="col" className="w-10 px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-[var(--muted)]">#</th>
                 <th scope="col" className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Strelac</th>
                 <th scope="col" className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Klub</th>
-                <th scope="col" className="px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Trend</th>
                 <th scope="col" className="px-3 py-2.5 text-right"><FormaScoreMark size="sm" /></th>
                 <th scope="col" className="px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Peak</th>
               </tr>
@@ -210,18 +209,13 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
                   <td className="px-3 py-2.5 text-[var(--muted)] text-xs truncate max-w-[120px] sm:max-w-none">
                     {r.clubName ?? "—"}
                   </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <span
-                      className="inline-block text-sm font-bold leading-none font-mono"
-                      style={{ color: trendColor(r.trend) }}
-                    >
-                      {trendLabel(r.trend)}
-                    </span>
-                  </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-end gap-2">
                       <Sparkline scores={r.recentScores.slice(0, 5)} width={56} height={20} strokeWidth={1.5} />
-                      <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">{r.formaScore.toFixed(1)}</span>
+                      <span className="flex items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
+                        {r.formaScore.toFixed(1)}
+                        <span className="text-sm font-bold leading-none" style={{ color: trendColor(r.trend) }} aria-label={r.trend}>{trendLabel(r.trend)}</span>
+                      </span>
                     </div>
                   </td>
                   <td className="px-3 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">

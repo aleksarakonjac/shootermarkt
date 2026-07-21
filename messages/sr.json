@@ -286,7 +286,7 @@
     "clickHint": "Klikni naziv meseca za pregled godine",
     "legend": {
       "world": "Svetsko",
-      "continental": "Evropsko",
+      "continental": "Kontinentalno",
       "national": "Državno",
       "other": "Ostalo"
     },

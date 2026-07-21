@@ -8,6 +8,7 @@ import type { Metadata } from "next";
 import { TickerAdminClient } from "./ticker-client";
 import { USKORO_LEAD_DAYS } from "@/app/(site)/[locale]/(public)/ticker";
 import { getPublishedArticles } from "@/lib/cms/get-articles";
+import { isTickerSlotLive } from "@/lib/ticker-schedule";
 
 export const metadata: Metadata = { title: "Admin · Ticker" };
 
@@ -103,9 +104,7 @@ export default async function AdminTickerPage() {
   const now = new Date();
 
   // Auto-detect live slots
-  const liveSlots = allSlots.filter(s =>
-    s.startTime <= now && (s.endTime == null || s.endTime >= now)
-  );
+  const liveSlots = allSlots.filter((slot) => isTickerSlotLive({ ...slot, discCode: slot.disciplineCode }, now));
 
   // Auto-detect USKORO competitions (by level lead-day rules)
   const todayDate = new Date(today + "T00:00:00");

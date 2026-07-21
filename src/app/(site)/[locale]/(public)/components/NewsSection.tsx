@@ -14,7 +14,7 @@ interface ArticleSummary {
 }
 
 function formatDate(iso: string, locale: string) {
-  const localeStr = locale === "en" ? "en-US" : "sr-RS";
+  const localeStr = locale === "en" ? "en-US" : "sr-Latn-RS";
   return new Date(iso).toLocaleDateString(localeStr, {
     day: "numeric",
     month: "long",

@@ -400,19 +400,19 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
         {compsByDate.size === 0 && <p className="py-2 text-center text-sm text-[var(--muted)]">{t("noEvents")}</p>}
 
         {/* Legend */}
-        <div className="flex items-center gap-3 pt-2 border-t border-[var(--border)] flex-wrap">
+        <div className="flex items-center justify-between gap-1 pt-2 border-t border-[var(--border)]">
           {[
             { label: t("legend.world"),       color: LEVEL_DOT_COLOR["world"] },
             { label: t("legend.continental"), color: LEVEL_DOT_COLOR["continental"] },
             { label: t("legend.national"),    color: LEVEL_DOT_COLOR["national"] },
             { label: t("legend.other"),       color: LEVEL_DOT_COLOR["regional"] },
           ].map((l) => (
-            <div key={l.label} className="flex items-center gap-1">
+            <div key={l.label} className="flex items-center gap-1 whitespace-nowrap">
               <span
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ background: l.color }}
               />
-              <span className="text-xs text-[var(--muted)] font-semibold uppercase tracking-wide">
+              <span className="text-xs leading-none text-[var(--muted)] font-semibold">
                 {l.label}
               </span>
             </div>
