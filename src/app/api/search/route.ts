@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
     ilike(competitions.name, `${term}%`),
     ilike(competitions.nameSr, `${term}%`),
     ilike(competitions.nameEn, `${term}%`),
+    ilike(competitions.location, `%${term}%`),
   ));
 
   const shooterQuery = db
