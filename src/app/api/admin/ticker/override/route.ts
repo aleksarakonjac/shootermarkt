@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { tickerLiveOverrides } from "@/lib/db/schema";
+import { revalidatePath } from "next/cache";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -25,5 +26,6 @@ export async function POST(req: NextRequest) {
     href:          href ?? null,
   }).returning();
 
+  revalidatePath("/", "layout");
   return NextResponse.json(override, { status: 201 });
 }

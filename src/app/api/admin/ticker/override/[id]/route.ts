@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { tickerLiveOverrides } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -29,6 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .where(eq(tickerLiveOverrides.id, parseInt(id)))
     .returning();
 
+  revalidatePath("/", "layout");
   return NextResponse.json(updated);
 }
 
@@ -39,5 +41,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params;
   await db.delete(tickerLiveOverrides).where(eq(tickerLiveOverrides.id, parseInt(id)));
+  revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
 }

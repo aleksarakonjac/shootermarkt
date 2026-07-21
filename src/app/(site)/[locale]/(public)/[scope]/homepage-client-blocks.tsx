@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import { Ticker, type TickerItem } from "../ticker";
+import { createClient } from "@/lib/supabase/client";
 import { UpcomingEvents } from "../components/UpcomingEvents";
 import { ScopedLink } from "../components/ScopedLink";
 import { TopFormaClient } from "./top-forma-client";
@@ -13,7 +14,7 @@ import { LEVEL_STYLE } from "@/lib/competition-utils";
 const FALLBACK_LEVEL_STYLE = { background: "var(--level-club-bg)", color: "var(--level-club-fg)" };
 const INTL_LEVELS = new Set(["olympic", "world", "continental", "international"]);
 
-function useHomepageData<T>(path: string) {
+function useHomepageData<T>(path: string, refreshMs?: number) {
   const locale = useLocale();
   const { scope } = useParams<{ scope?: string }>();
   const [data, setData] = useState<T | null>(null);
@@ -48,6 +49,12 @@ function useHomepageData<T>(path: string) {
     return () => window.clearTimeout(timeout);
   }, [locale, path, retry, scope, state]);
 
+  useEffect(() => {
+    if (!refreshMs) return;
+    const interval = window.setInterval(() => setAttempt((value) => value + 1), refreshMs);
+    return () => window.clearInterval(interval);
+  }, [refreshMs]);
+
   return { data, state, retry };
 }
 
@@ -66,11 +73,21 @@ function HomepageError({ retry, compact = false }: { retry: () => void; compact?
 export function HomepageTickerClient() {
   const t = useTranslations("home");
   const common = useTranslations("common");
-  const { data, state, retry } = useHomepageData<{ live: Array<{ id: number; name: string; date: string; level: string; best: { lastName: string; qualTotal: string; discCode: string } | null; nocCode: string | null; countryCode2: string | null }>; upcoming: Array<{ id: number; name: string; date: string; level: string; location: string | null }> }>("/api/homepage/ticker");
+  const { data, state, retry } = useHomepageData<{ live: Array<{ id: number; name: string; date: string; dateEnd: string | null; level: string; detailItems: TickerItem["detailItems"]; nocCode: string | null; countryCode2: string | null; forceStatus: "LIVE" | "USKORO" | null }>; upcoming: Array<{ id: number; name: string; date: string; level: string; location: string | null }> }>("/api/homepage/ticker", 60_000);
+
+  // Realtime: re-fetch immediately when admin changes ticker overrides
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("ticker-overrides-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_live_overrides" }, retry)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [retry]);
   if (state === "loading") return <div aria-busy="true" className="h-10 animate-pulse bg-[var(--surface)]" />;
   if (state === "error" || !data) return <HomepageError retry={retry} compact />;
 
-  const liveItems: TickerItem[] = data.live.map((item) => ({ id: item.id, name: item.name, date: item.date, level: item.level, status: "LIVE", detailText: item.best ? `1. ${item.best.lastName} ${Number(item.best.qualTotal).toFixed(item.best.discCode.startsWith("AP") ? 0 : 1)}` : t("inProgress"), href: `/takmicenja/${item.id}`, nocCode: item.nocCode ?? undefined, countryCode2: item.countryCode2 ?? undefined }));
+  const liveItems: TickerItem[] = data.live.map((item) => ({ id: item.id, name: item.name, date: item.date, endDate: item.dateEnd ?? undefined, level: item.level, status: item.forceStatus ?? "LIVE", detailItems: item.detailItems?.length ? item.detailItems : [{ text: item.forceStatus === "USKORO" ? (item.date) : t("inProgress") }], href: `/takmicenja/${item.id}`, nocCode: item.nocCode ?? undefined, countryCode2: item.countryCode2 ?? undefined }));
   const upcomingItems: TickerItem[] = data.upcoming.map((item) => ({ id: item.id, name: item.name, date: item.date, level: item.level, status: "USKORO", detailText: item.location || common("serbia"), href: `/takmicenja/${item.id}` }));
   return <Ticker liveItems={liveItems} upcomingItems={upcomingItems} />;
 }
@@ -80,7 +97,7 @@ export function HomepageMainClient() {
   const t = useTranslations("home");
   const tComp = useTranslations("competition");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; discResults: Array<{ discCode: string; isJunior: boolean; category: string; hasFinale: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; finalTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
+  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; isLive: boolean; discResults: Array<{ discCode: string; isJunior: boolean; category: string; hasFinale: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; finalTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
   if (state === "loading") return <div aria-busy="true" className="h-48 animate-pulse rounded-xl bg-[var(--surface)]" />;
   if (state === "error" || !data) return <HomepageError retry={retry} />;
 
@@ -176,6 +193,7 @@ export function HomepageMainClient() {
             className="group block rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 hover:border-[var(--brand-primary)] transition-colors no-underline"
           >
             <div className="flex items-center gap-2 flex-wrap">
+              {lead.isLive && <span className="inline-flex items-center gap-1 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white"><span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />{t("inProgress")}</span>}
               <span className="text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
                 {leadLevelLabel}
               </span>
@@ -209,6 +227,7 @@ export function HomepageMainClient() {
                   aria-expanded={isExpanded}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--surface-2)] transition-colors"
                 >
+                  {item.isLive && <span className="inline-flex shrink-0 items-center gap-1 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white"><span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />{t("inProgress")}</span>}
                   <span className="hidden sm:block shrink-0 text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={rowLevelStyle}>
                     {rowLevelLabel}
                   </span>
