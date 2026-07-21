@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { createClient } from "@/lib/supabase/client";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import type { QualDetail, FinalDetail, AgeCategory } from "@/lib/db/schema";
 import { CATEGORY_LABEL } from "@/lib/pdf-import/types";
@@ -58,6 +60,7 @@ type Selection =
 interface Props {
   groups: DisciplineGroup[];
   mixedGroups: MixedTeamGroup[];
+  competitionId: number;
 }
 
 // ── Fade variants ─────────────────────────────────────────────────────────────
@@ -70,8 +73,25 @@ const fadeVariants = {
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
-export function CompetitionResultsClient({ groups, mixedGroups }: Props) {
+export function CompetitionResultsClient({ groups, mixedGroups, competitionId }: Props) {
+  const router = useRouter();
   const [selection, setSelection] = useState<Selection | null>(null);
+
+  const retry = useCallback(() => router.refresh(), [router]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`live-results-comp-${competitionId}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "results",
+        filter: `competition_id=eq.${competitionId}`,
+      }, retry)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [competitionId, retry]);
 
   if (groups.length === 0 && mixedGroups.length === 0) {
     return (
