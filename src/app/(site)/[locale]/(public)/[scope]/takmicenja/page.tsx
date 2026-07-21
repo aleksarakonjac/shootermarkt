@@ -42,7 +42,7 @@ const TAG_STYLE: Record<string, { background: string; color: string }> = {
   esc:  { background: "var(--tag-esc-bg)",  color: "var(--tag-esc-fg)" },
   "10m": { background: "#dbeafe", color: "#1d4ed8" },
   MK: { background: "#fef3c7", color: "#a16207" },
-  "50m": { background: "#dcfce7", color: "#15803d" },
+  "50m": { background: "#fff3cd", color: "#b45309" },
   "25m": { background: "#dcfce7", color: "#15803d" },
   "50/25m": { background: "#fef3c7", color: "#a16207" },
 };
@@ -283,12 +283,12 @@ function CompRow({
 
 interface Props {
   params: Promise<{ scope: Scope }>;
-  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; archiveAll?: string; when?: string }>;
+  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; archiveAll?: string; when?: string; location?: string }>;
 }
 
 export default async function TakmicenjaPage({ params, searchParams }: Props) {
   const { scope } = await params;
-  const { year, level, q, tag, view, archiveAll, when } = await searchParams;
+  const { year, level, q, tag, view, archiveAll, when, location } = await searchParams;
   const [locale, t] = await Promise.all([getLocale(), getTranslations("competition")]);
 
   const defaultYear  = new Date().getFullYear().toString();
@@ -296,8 +296,9 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
   const activeLevel  = level && level !== "all"     ? level : "all";
   const activeQ      = q?.trim() ?? "";
   const activeTag    = tag?.trim() ?? "";
-  const activeView   = view === "cal" ? "cal" : "list";
-  const activeWhen   = when === "past" ? "past" : "upcoming";
+  const activeView     = view === "cal" ? "cal" : "list";
+  const activeWhen     = when === "past" ? "past" : "upcoming";
+  const activeLocation = location?.trim() ?? "";
 
   // Date boundaries
   const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -311,10 +312,11 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
   // SQL filters
   const sqlFilters = [
     scopeFilter,
-    activeQ     ? ilike(competitions.name, `%${activeQ}%`)                          : undefined,
-    activeYear  !== "all" ? ilike(competitions.date, `${activeYear}%`)              : undefined,
-    activeLevel !== "all" ? eq(competitions.level, activeLevel as CompetitionLevel) : undefined,
-    activeTag   ? sql`${competitions.tags} @> ARRAY[${activeTag}]::varchar[]`       : undefined,
+    activeQ        ? ilike(competitions.name, `%${activeQ}%`)                          : undefined,
+    activeYear  !== "all" ? ilike(competitions.date, `${activeYear}%`)               : undefined,
+    activeLevel !== "all" ? eq(competitions.level, activeLevel as CompetitionLevel)  : undefined,
+    activeTag      ? sql`${competitions.tags} @> ARRAY[${activeTag}]::varchar[]`     : undefined,
+    activeLocation ? ilike(competitions.location, `%${activeLocation}%`)             : undefined,
   ].filter(Boolean) as Parameters<typeof and>;
 
   const [rows, yearRows, calRows] = await Promise.all([
@@ -399,20 +401,28 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
     .filter((c) => c.date < recentCutoffStr)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const isFiltered = activeQ || activeYear !== defaultYear || activeLevel !== "all" || activeTag;
+  const isFiltered = activeQ || activeYear !== defaultYear || activeLevel !== "all" || activeTag || activeLocation;
 
-  // Hero: only on unfiltered view
-  const hero =
-    !isFiltered && upcoming.length > 0
-      ? [...upcoming].sort(
-          (a, b) =>
-            (LEVEL_PRIORITY[a.level] ?? 9) - (LEVEL_PRIORITY[b.level] ?? 9) ||
-            a.date.localeCompare(b.date)
-        )[0]
-      : null;
+  // Hero: live comps OR first-date upcoming group, sorted by level
+  const heroItems: (CompItem & { isLive: boolean })[] = !isFiltered
+    ? live.length > 0
+      ? [...live]
+          .sort((a, b) => (LEVEL_PRIORITY[a.level] ?? 9) - (LEVEL_PRIORITY[b.level] ?? 9))
+          .map((c) => ({ ...c, isLive: true }))
+      : upcoming.length > 0
+        ? (() => {
+            const firstDate = upcoming[0].date;
+            return upcoming
+              .filter((c) => c.date === firstDate)
+              .sort((a, b) => (LEVEL_PRIORITY[a.level] ?? 9) - (LEVEL_PRIORITY[b.level] ?? 9))
+              .map((c) => ({ ...c, isLive: false }));
+          })()
+        : []
+    : [];
 
-  // Upcoming grouped by month (hero excluded)
-  const upcomingRest = upcoming.filter((c) => c.id !== hero?.id);
+  // Upcoming grouped by month (hero items excluded)
+  const heroIds = new Set(heroItems.map((c) => c.id));
+  const upcomingRest = upcoming.filter((c) => !heroIds.has(c.id));
   const upcomingByMonth = groupByMonth(upcomingRest);
   const upcomingMonths = [...upcomingByMonth.keys()].sort();
 
@@ -520,121 +530,111 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
             </div>
           )}
 
-          {/* ── LIVE ──────────────────────────────────────────────────── */}
-          {activeWhen === "upcoming" && live.length > 0 && (
-            <section aria-label="Takmičenja u toku">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="relative flex h-2 w-2 shrink-0">
-                  <span
-                    className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                    style={{ background: "var(--live-dot)" }}
-                  />
-                  <span
-                    className="relative inline-flex rounded-full h-2 w-2"
-                    style={{ background: "var(--live-dot)" }}
-                  />
-                </span>
-              <span className="text-xs font-semibold text-[var(--muted)]">{
-                locale === "en" ? "In progress" : "Upravo teku"
-              }</span>
-              </div>
-              <div
-                className="rounded-xl border overflow-hidden"
-                style={{ borderColor: "var(--live-border)", background: "var(--live-bg)" }}
-              >
-                {live.map((c, i) => (
-                  <CompRow key={c.id} comp={c} isLast={i === live.length - 1} showCountdown={false} locale={locale} levelLabel={getLevelLabel(c.level, locale)} animClass="comp-row" animStyle={{ '--row-idx': i } as CSSProperties} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ── UPCOMING ──────────────────────────────────────────────── */}
-          {activeWhen === "upcoming" && upcoming.length > 0 && (
+          {/* ── HERO (live or first upcoming group) + rest ───────────── */}
+          {activeWhen === "upcoming" && (heroItems.length > 0 || upcomingMonths.length > 0) && (
             <section aria-label="Nadolazeća takmičenja">
-  
-              {/* Hero card */}
-              {hero && (
-                <ScopedLink
-                  href={`/takmicenja/${hero.id}`}
-                  className="comp-hero group block rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:shadow-sm transition-all mb-2 overflow-hidden"
-                >
-                  <div className="p-5">
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div className="min-w-0 flex-1">
-                        {/* Badges row */}
-                        <div className="flex items-center gap-2 flex-wrap mb-2.5">
-                          <span
-                            className="inline-flex items-center px-2 py-0.5 rounded text-[0.65rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
-                            style={LEVEL_STYLE[hero.level] ?? FALLBACK_BADGE}
-                          >
-                            {getLevelLabel(hero.level, locale)}
-                          </span>
-                          <span className="text-xs font-semibold text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)]">
-                            {formatCountdown(daysUntil(hero.date), locale)}
-                          </span>
-                          {(hero.tags ?? []).map((t) => {
-                            const ts = TAG_STYLE[t] ?? FALLBACK_BADGE;
-                            return (
+              {heroItems.length > 0 && <div className="space-y-2 mb-2">
+                {heroItems.map((hero) => (
+                  <ScopedLink
+                    key={hero.id}
+                    href={`/takmicenja/${hero.id}`}
+                    className="comp-hero group block rounded-xl border overflow-hidden hover:shadow-sm transition-all"
+                    style={hero.isLive
+                      ? { borderColor: "var(--live-border)", background: "var(--live-bg)" }
+                      : { borderColor: "var(--border)", background: "var(--surface)" }
+                    }
+                  >
+                    <div className="p-5">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="min-w-0 flex-1">
+                          {/* Badges row */}
+                          <div className="flex items-center gap-2 flex-wrap mb-2.5">
+                            {hero.isLive && (
                               <span
-                                key={t}
-                                className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.6rem] uppercase px-1.5 py-0.5 rounded"
-                                style={ts}
+                                className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5"
+                                style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--brand-primary)", background: "white", height: 20, border: "1px solid var(--border)" }}
                               >
-                                {t}
-                              </span>
-                            );
-                          })}
-                        </div>
-
-                        {/* Name */}
-                        <h2
-                          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors leading-tight mb-2"
-                          style={{ fontSize: "clamp(1.15rem, 2.5vw, 1.65rem)", letterSpacing: "-0.02em" }}
-                        >
-                          {hero.name}
-                        </h2>
-
-                        {/* Meta */}
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
-                          <span className="font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
-                            {formatDate(hero.date, hero.dateEnd, locale)}
-                          </span>
-                          {(hero.location || hero.countryCode2) && (
-                            <span className="flex items-center gap-1.5">
-                              {hero.countryCode2 && (
                                 <span
-                                  className={`fi fi-${hero.countryCode2.toLowerCase()} shrink-0`}
-                                  style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }}
+                                  className="rounded-full shrink-0"
+                                  style={{ width: 5, height: 5, background: "var(--brand-primary)", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }}
                                 />
-                              )}
-                              <span>
-                                {hero.location}
-                                {hero.countryName && hero.location ? ` · ${hero.countryName}` : ""}
-                                {hero.countryName && !hero.location ? hero.countryName : ""}
+                                {locale === "en" ? "Live" : "U toku"}
                               </span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Discipline badges */}
-                      {sortDiscs(hero.disciplineCodes ?? []).length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap shrink-0 justify-end pt-0.5">
-                          {sortDiscs(hero.disciplineCodes ?? []).map((code) => (
+                            )}
                             <span
-                              key={code}
-                              className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.65rem] uppercase tracking-wide px-2 py-1 rounded bg-[var(--surface-2)] text-[var(--muted)]"
+                              className="inline-flex items-center px-2 py-0.5 rounded text-[0.65rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
+                              style={LEVEL_STYLE[hero.level] ?? FALLBACK_BADGE}
                             >
-                              {code}
+                              {getLevelLabel(hero.level, locale)}
                             </span>
-                          ))}
+                            {!hero.isLive && (
+                              <span className="text-xs font-semibold text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)]">
+                                {formatCountdown(daysUntil(hero.date), locale)}
+                              </span>
+                            )}
+                            {(hero.tags ?? []).map((tag) => {
+                              const ts = TAG_STYLE[tag] ?? FALLBACK_BADGE;
+                              return (
+                                <span
+                                  key={tag}
+                                  className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.6rem] uppercase px-1.5 py-0.5 rounded"
+                                  style={ts}
+                                >
+                                  {tag}
+                                </span>
+                              );
+                            })}
+                          </div>
+
+                          {/* Name */}
+                          <h2
+                            className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors leading-tight mb-2"
+                            style={{ fontSize: "clamp(1.15rem, 2.5vw, 1.65rem)", letterSpacing: "-0.02em" }}
+                          >
+                            {hero.name}
+                          </h2>
+
+                          {/* Meta */}
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
+                            <span className="font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
+                              {formatDate(hero.date, hero.dateEnd, locale)}
+                            </span>
+                            {(hero.location || hero.countryCode2) && (
+                              <span className="flex items-center gap-1.5">
+                                {hero.countryCode2 && (
+                                  <span
+                                    className={`fi fi-${hero.countryCode2.toLowerCase()} shrink-0`}
+                                    style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }}
+                                  />
+                                )}
+                                <span>
+                                  {hero.location}
+                                  {hero.countryName && hero.location ? ` · ${hero.countryName}` : ""}
+                                  {hero.countryName && !hero.location ? hero.countryName : ""}
+                                </span>
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
+
+                        {/* Discipline badges */}
+                        {sortDiscs(hero.disciplineCodes ?? []).length > 0 && (
+                          <div className="flex items-center gap-1.5 flex-wrap shrink-0 justify-end pt-0.5">
+                            {sortDiscs(hero.disciplineCodes ?? []).map((code) => (
+                              <span
+                                key={code}
+                                className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.65rem] uppercase tracking-wide px-2 py-1 rounded bg-[var(--surface-2)] text-[var(--muted)]"
+                              >
+                                {code}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </ScopedLink>
-              )}
+                  </ScopedLink>
+                ))}
+              </div>}
 
               {/* Rest of upcoming — grouped by month */}
               {upcomingMonths.length > 0 && (

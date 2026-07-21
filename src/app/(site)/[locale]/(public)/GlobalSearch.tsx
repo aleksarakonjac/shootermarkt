@@ -10,6 +10,285 @@ import { useLocale, useTranslations } from "next-intl";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
+// ── Shortcut detection ────────────────────────────────────────────────────────
+
+type Shortcut = {
+  icon: "filter" | "person" | "flag" | "location";
+  label: string;
+  href: string;
+};
+
+function fold(s: string): string {
+  return s.toLowerCase()
+    .replace(/[šś]/g, "s").replace(/[čć]/g, "c")
+    .replace(/ž/g, "z").replace(/đ/g, "dj")
+    .replace(/á|à|ä/g, "a").replace(/é|è|ë/g, "e")
+    .replace(/ó|ö|ő/g, "o").replace(/ú|ü|ű/g, "u")
+    .replace(/ñ/g, "n");
+}
+
+const LEVEL_MAP: Record<string, string> = {
+  olimpijsko:"olympic", olimpijski:"olympic", olimpijska:"olympic", olympic:"olympic",
+  svetsko:"world", svetski:"world", svetska:"world", world:"world",
+  kontinentalno:"continental", kontinentalni:"continental", continental:"continental",
+  medjunarodno:"international", medjunarodni:"international",
+  "medunarodno":"international", international:"international",
+  drzavno:"national", drzavni:"national", national:"national",
+  regionalno:"regional", regionalni:"regional", regional:"regional",
+  klubsko:"club", klupsko:"club", klub:"club", club:"club",
+};
+
+const LEVEL_LABELS: Record<string, { sr: string; en: string }> = {
+  olympic:       { sr: "Olimpijsko",    en: "Olympic" },
+  world:         { sr: "Svetsko",       en: "World" },
+  continental:   { sr: "Kontinentalno", en: "Continental" },
+  international: { sr: "Međunarodno",   en: "International" },
+  national:      { sr: "Državno",       en: "National" },
+  regional:      { sr: "Regionalno",    en: "Regional" },
+  club:          { sr: "Klupsko",       en: "Club" },
+};
+
+const DISC_CODES = new Set(["ARM","ARW","APM","APW","R3PM","R3PW","R3JM","R3JW","SPW","RFPM","FPM"]);
+
+type DiscInfo = { sr: string; en: string; aparat: string; pol: "m" | "f" | null };
+const DISC_LABELS: Record<string, DiscInfo> = {
+  ARM:  { sr: "Vazdušna puška muški",    en: "Air Rifle Men",          aparat:"AR", pol:"m" },
+  ARW:  { sr: "Vazdušna puška ženski",   en: "Air Rifle Women",        aparat:"AR", pol:"f" },
+  APM:  { sr: "Vazdušni pištolj muški",  en: "Air Pistol Men",         aparat:"AP", pol:"m" },
+  APW:  { sr: "Vazdušni pištolj ženski", en: "Air Pistol Women",       aparat:"AP", pol:"f" },
+  R3PM: { sr: "MK puška muški",          en: "50m Rifle 3P Men",       aparat:"AR", pol:"m" },
+  R3PW: { sr: "MK puška ženski",         en: "50m Rifle 3P Women",     aparat:"AR", pol:"f" },
+  R3JM: { sr: "MK puška juniorski",      en: "50m Rifle 3P Junior Men",aparat:"AR", pol:"m" },
+  R3JW: { sr: "MK puška juniork.",       en: "50m Rifle 3P Junior W.", aparat:"AR", pol:"f" },
+  SPW:  { sr: "Sport pištolj ženski",    en: "25m Sport Pistol Women", aparat:"AP", pol:"f" },
+  RFPM: { sr: "Slobodna puška muški",    en: "50m Rifle Prone Men",    aparat:"AR", pol:"m" },
+  FPM:  { sr: "Slobodni pištolj muški",  en: "50m Free Pistol Men",    aparat:"AP", pol:"m" },
+};
+
+const APARAT_LABELS = {
+  AR: { sr: "Puška",    en: "Rifle" },
+  AP: { sr: "Pištolj",  en: "Pistol" },
+};
+
+const NOC_DISPLAY: Record<string, string> = {
+  SRB:"Srbija",MKD:"Makedonija",CRO:"Hrvatska",BIH:"BiH",SLO:"Slovenija",
+  MNE:"Crna Gora",HUN:"Mađarska",ROU:"Rumunija",BUL:"Bugarska",GRE:"Grčka",
+  GER:"Nemačka",FRA:"Francuska",ITA:"Italija",ESP:"Španija",RUS:"Rusija",
+  CHN:"Kina",IND:"Indija",USA:"SAD",GBR:"V. Britanija",AUS:"Australija",
+  JPN:"Japan",KOR:"J. Koreja",AZE:"Azerbejdžan",KAZ:"Kazahstan",
+  UKR:"Ukrajina",POL:"Poljska",CZE:"Češka",SVK:"Slovačka",AUT:"Austrija",
+  SUI:"Švajcarska",NOR:"Norveška",FIN:"Finska",SWE:"Švedska",DEN:"Danska",
+  BEL:"Belgija",NED:"Holandija",POR:"Portugal",TUR:"Turska",EGY:"Egipat",
+  IRI:"Iran",QAT:"Katar",BRA:"Brazil",ARG:"Argentina",CAN:"Kanada",MEX:"Meksiko",
+};
+
+const COUNTRY_NOC: Record<string, [string, string]> = {
+  "bosna i hercegovina":["BIH","BiH"], "severna makedonija":["MKD","S. Makedonija"],
+  "north macedonia":["MKD","S. Makedonija"], "crna gora":["MNE","Crna Gora"],
+  "great britain":["GBR","V. Britanija"], "united kingdom":["GBR","V. Britanija"],
+  "velika britanija":["GBR","V. Britanija"], "juzna koreja":["KOR","J. Koreja"],
+  "south korea":["KOR","J. Koreja"], "united states":["USA","SAD"],
+  "sjedinjene":["USA","SAD"],
+  srbija:["SRB","Srbija"], serbia:["SRB","Srbija"],
+  makedonija:["MKD","Makedonija"], macedonia:["MKD","Makedonija"],
+  hrvatska:["CRO","Hrvatska"], croatia:["CRO","Hrvatska"],
+  bosna:["BIH","BiH"], bih:["BIH","BiH"], bosnia:["BIH","BiH"],
+  slovenija:["SLO","Slovenija"], slovenia:["SLO","Slovenija"],
+  madarska:["HUN","Mađarska"], madjarska:["HUN","Mađarska"], hungary:["HUN","Mađarska"],
+  rumunija:["ROU","Rumunija"], romania:["ROU","Rumunija"],
+  bugarska:["BUL","Bugarska"], bulgaria:["BUL","Bugarska"],
+  grcka:["GRE","Grčka"], greece:["GRE","Grčka"],
+  nemacka:["GER","Nemačka"], germany:["GER","Nemačka"], deutschland:["GER","Nemačka"],
+  francuska:["FRA","Francuska"], france:["FRA","Francuska"],
+  italija:["ITA","Italija"], italy:["ITA","Italija"],
+  spanija:["ESP","Španija"], spain:["ESP","Španija"],
+  rusija:["RUS","Rusija"], russia:["RUS","Rusija"],
+  kina:["CHN","Kina"], china:["CHN","Kina"],
+  indija:["IND","Indija"], india:["IND","Indija"],
+  sad:["USA","SAD"], usa:["USA","SAD"],
+  australija:["AUS","Australija"], australia:["AUS","Australija"],
+  japan:["JPN","Japan"],
+  azerbejdzan:["AZE","Azerbejdžan"], azerbaijan:["AZE","Azerbejdžan"],
+  kazahstan:["KAZ","Kazahstan"], kazakhstan:["KAZ","Kazahstan"],
+  ukrajina:["UKR","Ukrajina"], ukraine:["UKR","Ukrajina"],
+  poljska:["POL","Poljska"], poland:["POL","Poljska"],
+  ceska:["CZE","Češka"], czechia:["CZE","Češka"],
+  slovacka:["SVK","Slovačka"], slovakia:["SVK","Slovačka"],
+  austrija:["AUT","Austrija"], austria:["AUT","Austrija"],
+  svajcarska:["SUI","Švajcarska"], switzerland:["SUI","Švajcarska"],
+  norveska:["NOR","Norveška"], norway:["NOR","Norveška"],
+  finska:["FIN","Finska"], finland:["FIN","Finska"],
+  svedska:["SWE","Švedska"], sweden:["SWE","Švedska"],
+  danska:["DEN","Danska"], denmark:["DEN","Danska"],
+  belgija:["BEL","Belgija"], belgium:["BEL","Belgija"],
+  holandija:["NED","Holandija"], netherlands:["NED","Holandija"],
+  portugal:["POR","Portugal"],
+  turska:["TUR","Turska"], turkey:["TUR","Turska"],
+  iran:["IRI","Iran"],
+  katar:["QAT","Katar"], qatar:["QAT","Katar"],
+  egipat:["EGY","Egipat"], egypt:["EGY","Egipat"],
+  brazil:["BRA","Brazil"],
+  argentina:["ARG","Argentina"],
+  kanada:["CAN","Kanada"], canada:["CAN","Kanada"],
+};
+
+function detectShortcuts(q: string, locale: string, scopedHref: (path: string) => string): Shortcut[] {
+  if (q.length < 2) return [];
+  const f = fold(q);
+  const tokens = f.split(/\s+/).filter(Boolean);
+  const upperTokens = q.toUpperCase().split(/\s+/).filter(Boolean);
+  const isEn = locale === "en";
+  const compsLabel = isEn ? "Competitions" : "Takmičenja";
+  const shootersLabel = isEn ? "Shooters" : "Strelci";
+  const shortcuts: Shortcut[] = [];
+
+  // Year
+  const yearMatch = q.match(/\b(20\d{2})\b/);
+  const year = yearMatch?.[1] ?? null;
+
+  // Level
+  let level: string | null = null;
+  for (const [kw, code] of Object.entries(LEVEL_MAP)) {
+    if (tokens.includes(kw)) { level = code; break; }
+  }
+
+  // Discipline code (exact 3-5 letter uppercase)
+  const discCode = upperTokens.find(t => DISC_CODES.has(t)) ?? null;
+
+  // Apparatus
+  const RIFLE_KW = ["puska","puske","puskom","rifle","karabin"];
+  const PISTOL_KW = ["pistolj","pistoljom","pistolu","pistol"];
+  let apparatus: "AR" | "AP" | null = null;
+  if (tokens.some(t => RIFLE_KW.includes(t))) apparatus = "AR";
+  else if (tokens.some(t => PISTOL_KW.includes(t))) apparatus = "AP";
+
+  // Gender
+  const MALE_KW = ["muski","muski","men","male","muskarci","muskaraca"];
+  const FEMALE_KW = ["zenski","zenska","zene","women","female"];
+  let gender: "m" | "f" | null = null;
+  if (tokens.some(t => MALE_KW.includes(t))) gender = "m";
+  else if (tokens.some(t => FEMALE_KW.includes(t))) gender = "f";
+
+  // Distance tag
+  let distTag: string | null = null;
+  if (/\b10\s*m\b/i.test(q)) distTag = "10m";
+  else if (/\b50\s*m\b/i.test(q)) distTag = "50m";
+  else if (/\b25\s*m\b/i.test(q)) distTag = "25m";
+
+  // Country — multi-word first (longest key first), then single NOC code
+  let country: [string, string] | null = null;
+  const sortedCountries = Object.entries(COUNTRY_NOC).sort((a, b) => b[0].length - a[0].length);
+  for (const [kw, info] of sortedCountries) {
+    const kwParts = kw.split(" ");
+    const matched = kwParts.length > 1 ? f.includes(kw) : tokens.includes(kw);
+    if (matched) { country = info; break; }
+  }
+  if (!country) {
+    const nocToken = upperTokens.find(t => /^[A-Z]{3}$/.test(t) && NOC_DISPLAY[t]);
+    if (nocToken) country = [nocToken, NOC_DISPLAY[nocToken]];
+  }
+
+  // ── Build shortcuts ──────────────────────────────────────────────────────────
+
+  // Level + year (combined first if both present)
+  if (level || year) {
+    const ll = level ? (isEn ? LEVEL_LABELS[level]?.en : LEVEL_LABELS[level]?.sr) ?? level : null;
+    if (level && year) {
+      const p = new URLSearchParams(); p.set("level", level); p.set("year", year);
+      shortcuts.push({ icon:"filter", label:`${compsLabel} · ${ll} · ${year}`, href: scopedHref(`/takmicenja?${p}`) });
+    }
+    const p2 = new URLSearchParams();
+    if (year) p2.set("year", year);
+    if (level) p2.set("level", level);
+    if (!(level && year)) {
+      shortcuts.push({ icon:"filter", label:[compsLabel, ll, year].filter(Boolean).join(" · "), href: scopedHref(`/takmicenja?${p2}`) });
+    } else {
+      const pL = new URLSearchParams(); pL.set("level", level);
+      shortcuts.push({ icon:"filter", label:`${compsLabel} · ${ll}`, href: scopedHref(`/takmicenja?${pL}`) });
+      const pY = new URLSearchParams(); pY.set("year", year);
+      shortcuts.push({ icon:"filter", label:`${compsLabel} · ${year}`, href: scopedHref(`/takmicenja?${pY}`) });
+    }
+  }
+
+  // Disc code → strelci
+  if (discCode && DISC_LABELS[discCode]) {
+    const dl = DISC_LABELS[discCode];
+    const p = new URLSearchParams(); p.set("aparat", dl.aparat); if (dl.pol) p.set("pol", dl.pol);
+    shortcuts.push({ icon:"person", label:`${shootersLabel} · ${isEn ? dl.en : dl.sr}`, href: scopedHref(`/strelci?${p}`) });
+  }
+
+  // Apparatus → strelci (not if a disc code already matched)
+  if (apparatus && !discCode) {
+    const al = APARAT_LABELS[apparatus];
+    const base = new URLSearchParams(); base.set("aparat", apparatus);
+    if (gender) {
+      const p = new URLSearchParams(base); p.set("pol", gender);
+      shortcuts.push({ icon:"person", label:`${shootersLabel} · ${isEn ? al.en : al.sr} ${gender === "m" ? (isEn ? "men" : "muški") : (isEn ? "women" : "ženski")}`, href: scopedHref(`/strelci?${p}`) });
+    } else {
+      shortcuts.push({ icon:"person", label:`${shootersLabel} · ${isEn ? al.en : al.sr} (${isEn ? "all" : "svi"})`, href: scopedHref(`/strelci?${base}`) });
+      const pm = new URLSearchParams(base); pm.set("pol","m");
+      shortcuts.push({ icon:"person", label:`${shootersLabel} · ${isEn ? al.en : al.sr} ${isEn ? "men" : "muški"}`, href: scopedHref(`/strelci?${pm}`) });
+      const pf = new URLSearchParams(base); pf.set("pol","f");
+      shortcuts.push({ icon:"person", label:`${shootersLabel} · ${isEn ? al.en : al.sr} ${isEn ? "women" : "ženski"}`, href: scopedHref(`/strelci?${pf}`) });
+    }
+  }
+
+  // Distance tag
+  if (distTag) {
+    const p = new URLSearchParams(); p.set("tag", distTag);
+    shortcuts.push({ icon:"filter", label:`${compsLabel} · ${distTag}`, href: scopedHref(`/takmicenja?${p}`) });
+  }
+
+  // Country
+  if (country) {
+    const [noc, display] = country;
+    const ps = new URLSearchParams(); ps.set("zemlja", noc);
+    shortcuts.push({ icon:"flag", label:`${shootersLabel} · ${display} (${noc})`, href: scopedHref(`/strelci?${ps}`) });
+    const pc = new URLSearchParams(); pc.set("location", display);
+    shortcuts.push({ icon:"location", label:`${compsLabel} · ${display} (${isEn ? "location" : "lokacija"})`, href: scopedHref(`/takmicenja?${pc}`) });
+  }
+
+  return shortcuts.slice(0, 7);
+}
+
+// ── Shortcut icons ────────────────────────────────────────────────────────────
+
+function FilterIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+      <path d="M1 2h11M3 6h7M5.5 10h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function PersonGroupIcon() {
+  return (
+    <svg width="14" height="13" viewBox="0 0 14 13" fill="none" aria-hidden="true">
+      <circle cx="5.5" cy="4" r="2.3" stroke="currentColor" strokeWidth="1.3"/>
+      <path d="M1 11c0-2.485 2.015-4.5 4.5-4.5S10 8.515 10 11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+      <circle cx="10.5" cy="3.5" r="1.7" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M13 10.5c0-1.657-1.12-3-2.5-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function FlagIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+      <path d="M2 1v11M2 1h8.5L8 5h2.5L8 9H2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function LocationIcon() {
+  return (
+    <svg width="12" height="13" viewBox="0 0 12 13" fill="none" aria-hidden="true">
+      <path d="M6 1C3.79 1 2 2.79 2 5c0 3.25 4 7 4 7s4-3.75 4-7c0-2.21-1.79-4-4-4Z" stroke="currentColor" strokeWidth="1.3"/>
+      <circle cx="6" cy="5" r="1.3" fill="currentColor"/>
+    </svg>
+  );
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type SearchShooter = {
@@ -234,8 +513,9 @@ export function GlobalSearch() {
 
   const filteredShooters = results.shooters;
   const filteredComps = results.competitions;
+  const shortcuts = q.length >= 2 ? detectShortcuts(q, locale, scopedHref) : [];
 
-  const total = filteredShooters.length + filteredComps.length;
+  const total = shortcuts.length + filteredShooters.length + filteredComps.length;
 
   // Keyboard nav within modal
   function onInputKeyDown(e: React.KeyboardEvent) {
@@ -248,11 +528,16 @@ export function GlobalSearch() {
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (total === 0) return;
-      const shooter = filteredShooters[activeIndex];
+      if (activeIndex < shortcuts.length) {
+        router.push(shortcuts[activeIndex].href);
+        closeModal(); return;
+      }
+      const si = activeIndex - shortcuts.length;
+      const shooter = filteredShooters[si];
       if (shooter) {
         router.push(scopedHref(`/strelci/${shooter.id}`));
       } else {
-        const c = filteredComps[activeIndex - filteredShooters.length];
+        const c = filteredComps[si - filteredShooters.length];
         if (c) router.push(scopedHref(`/takmicenja/${c.id}`));
       }
       closeModal();
@@ -344,6 +629,45 @@ export function GlobalSearch() {
             </div>
           ) : (
             <>
+              {/* Shortcuts section */}
+              {shortcuts.length > 0 && (
+                <div className={filteredShooters.length > 0 || filteredComps.length > 0 ? "border-b border-[var(--border)]" : ""}>
+                  <div className="px-4 pt-3 pb-1">
+                    <span className="text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)]">
+                      {locale === "en" ? "Filters" : "Prečice"}
+                    </span>
+                  </div>
+                  {shortcuts.map((sc, i) => {
+                    const active = activeIndex === i;
+                    return (
+                      <Link
+                        key={sc.href}
+                        href={sc.href}
+                        onClick={closeModal}
+                        onMouseEnter={() => setActiveIndex(i)}
+                        className="flex items-center gap-3 px-4 py-2.5 transition-colors"
+                        style={{ background: active ? "var(--surface-2)" : "transparent" }}
+                      >
+                        <span
+                          className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center"
+                          style={{ background: "var(--surface-2)", color: "var(--brand-primary)" }}
+                          aria-hidden="true"
+                        >
+                          {sc.icon === "filter"   && <FilterIcon />}
+                          {sc.icon === "person"   && <PersonGroupIcon />}
+                          {sc.icon === "flag"     && <FlagIcon />}
+                          {sc.icon === "location" && <LocationIcon />}
+                        </span>
+                        <span className="flex-1 min-w-0 text-sm font-medium text-[var(--ink)] truncate">
+                          {sc.label}
+                        </span>
+                        {active && <ArrowIcon />}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Shooters section */}
               {filteredShooters.length > 0 && (
                 <div>
@@ -353,13 +677,14 @@ export function GlobalSearch() {
                     </span>
                   </div>
                   {filteredShooters.map((s, i) => {
-                    const active = activeIndex === i;
+                    const globalIdx = shortcuts.length + i;
+                    const active = activeIndex === globalIdx;
                     return (
                       <Link
                         key={s.id}
                         href={scopedHref(`/strelci/${s.id}`)}
                         onClick={closeModal}
-                        onMouseEnter={() => setActiveIndex(i)}
+                        onMouseEnter={() => setActiveIndex(globalIdx)}
                         className="flex items-center gap-3 px-4 py-2.5 transition-colors"
                         style={{ background: active ? "var(--surface-2)" : "transparent" }}
                       >
@@ -396,7 +721,7 @@ export function GlobalSearch() {
                     </span>
                   </div>
                   {filteredComps.map((c, i) => {
-                    const globalIdx = filteredShooters.length + i;
+                    const globalIdx = shortcuts.length + filteredShooters.length + i;
                     const active = activeIndex === globalIdx;
                     const levelStyle = LEVEL_STYLE[c.level] ?? LEVEL_STYLE.club;
                     const levelLabel = LEVEL_LABEL[c.level] ?? c.level;
