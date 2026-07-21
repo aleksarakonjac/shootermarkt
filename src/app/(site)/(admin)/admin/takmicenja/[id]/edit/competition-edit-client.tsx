@@ -17,6 +17,7 @@ interface Competition {
   dateEnd?: string | null;
   location: string | null;
   level: CompetitionLevel;
+  issfId?: string | null;
   tags: string[];
   resultCount: number;
 }
@@ -44,6 +45,7 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
     dateEnd: competition.dateEnd ?? "",
     location: competition.location ?? "",
     level: competition.level,
+    issfId: competition.issfId ?? "",
   });
   const [tags, setTags] = useState<string[]>(competition.tags);
   const [tagInput, setTagInput] = useState("");
@@ -187,6 +189,17 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
               placeholder="npr. Beograd, SC Crvena zvezda"
               className={inputCls}
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">ISSF ID</label>
+            <input
+              value={form.issfId}
+              onChange={(e) => set("issfId", e.target.value)}
+              placeholder="npr. 3277"
+              className={inputCls}
+            />
+            <p className="mt-1 text-[11px] text-[var(--muted)]">Broj iz URL-a na issf-sports.org/competitions/<strong>{form.issfId || "3277"}</strong> — koristi se za live fetch rezultata.</p>
           </div>
 
           <div>

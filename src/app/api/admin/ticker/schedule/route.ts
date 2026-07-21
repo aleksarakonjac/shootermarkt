@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { competitionSchedule, competitions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -47,5 +48,6 @@ export async function POST(req: NextRequest) {
     endTime: endTime ? new Date(endTime) : null,
   }).returning();
 
+  revalidatePath("/", "layout");
   return NextResponse.json(slot, { status: 201 });
 }

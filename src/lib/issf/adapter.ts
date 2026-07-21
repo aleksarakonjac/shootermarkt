@@ -382,12 +382,13 @@ export interface ISSFQualResult {
  */
 export async function fetchQualResultsFromHtml(
   competitionId: number,
-  resultKey: string
+  resultKey: string,
+  noCache = false
 ): Promise<ISSFQualResult[]> {
   const url = `${ISSF_WEB}/competitions/${competitionId}/results/${resultKey}`;
   const res = await fetch(url, {
     headers: { "User-Agent": "Mozilla/5.0" },
-    next: { revalidate: 3600 },
+    ...(noCache ? { cache: "no-store" as const } : { next: { revalidate: 3600 } }),
   });
   if (!res.ok) throw new Error(`ISSF HTML fetch failed: ${res.status} ${url}`);
   const html = await res.text();

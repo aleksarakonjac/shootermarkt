@@ -79,8 +79,10 @@ export function HomepageTickerClient() {
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel("ticker-overrides-realtime")
+      .channel("ticker-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "ticker_live_overrides" }, retry)
+      .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, retry)
+      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_custom_upcoming" }, retry)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [retry]);
@@ -98,6 +100,16 @@ export function HomepageMainClient() {
   const tComp = useTranslations("competition");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; isLive: boolean; discResults: Array<{ discCode: string; isJunior: boolean; category: string; hasFinale: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; finalTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("live-results-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "results" }, retry)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [retry]);
+
   if (state === "loading") return <div aria-busy="true" className="h-48 animate-pulse rounded-xl bg-[var(--surface)]" />;
   if (state === "error" || !data) return <HomepageError retry={retry} />;
 

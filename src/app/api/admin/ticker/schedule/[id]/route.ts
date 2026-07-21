@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { competitionSchedule, competitions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -41,6 +42,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     .where(eq(competitionSchedule.id, parseInt(id)))
     .returning();
 
+  revalidatePath("/", "layout");
   return NextResponse.json(updated);
 }
 
@@ -51,5 +53,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params;
   await db.delete(competitionSchedule).where(eq(competitionSchedule.id, parseInt(id)));
+  revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
 }

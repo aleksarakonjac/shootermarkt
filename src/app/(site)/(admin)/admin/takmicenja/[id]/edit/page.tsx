@@ -35,6 +35,7 @@ export default async function CompetitionEditPage({
         dateEnd: comp.dateEnd,
         location: comp.location,
         level: comp.level as CompetitionLevel,
+        issfId: comp.issfId,
         tags: comp.tags ?? [],
         resultCount,
       }}
