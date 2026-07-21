@@ -16,6 +16,18 @@ type Shortcut = {
   icon: "filter" | "person" | "flag" | "location";
   label: string;
   href: string;
+  countryCode2?: string;
+};
+
+const NOC_TO_CODE2: Record<string, string> = {
+  SRB:"rs", MKD:"mk", CRO:"hr", BIH:"ba", SLO:"si", MNE:"me",
+  HUN:"hu", ROU:"ro", BUL:"bg", GRE:"gr", GER:"de", FRA:"fr",
+  ITA:"it", ESP:"es", RUS:"ru", CHN:"cn", IND:"in", USA:"us",
+  GBR:"gb", AUS:"au", JPN:"jp", KOR:"kr", AZE:"az", KAZ:"kz",
+  UKR:"ua", POL:"pl", CZE:"cz", SVK:"sk", AUT:"at", SUI:"ch",
+  NOR:"no", FIN:"fi", SWE:"se", DEN:"dk", BEL:"be", NED:"nl",
+  POR:"pt", TUR:"tr", EGY:"eg", IRI:"ir", QAT:"qa", BRA:"br",
+  ARG:"ar", CAN:"ca", MEX:"mx", RSA:"za",
 };
 
 function fold(s: string): string {
@@ -242,10 +254,11 @@ function detectShortcuts(q: string, locale: string, scopedHref: (path: string) =
   // Country
   if (country) {
     const [noc, display] = country;
+    const code2 = NOC_TO_CODE2[noc];
     const ps = new URLSearchParams(); ps.set("zemlja", noc);
-    shortcuts.push({ icon:"flag", label:`${shootersLabel} · ${display} (${noc})`, href: scopedHref(`/strelci?${ps}`) });
+    shortcuts.push({ icon:"flag", label:`${shootersLabel} · ${display} (${noc})`, href: scopedHref(`/strelci?${ps}`), countryCode2: code2 });
     const pc = new URLSearchParams(); pc.set("location", display);
-    shortcuts.push({ icon:"location", label:`${compsLabel} · ${display} (${isEn ? "location" : "lokacija"})`, href: scopedHref(`/takmicenja?${pc}`) });
+    shortcuts.push({ icon:"location", label:`${compsLabel} · ${display} (${isEn ? "location" : "lokacija"})`, href: scopedHref(`/takmicenja?${pc}`), countryCode2: code2 });
   }
 
   return shortcuts.slice(0, 7);
@@ -649,14 +662,16 @@ export function GlobalSearch() {
                         style={{ background: active ? "var(--surface-2)" : "transparent" }}
                       >
                         <span
-                          className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center"
+                          className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center overflow-hidden"
                           style={{ background: "var(--surface-2)", color: "var(--brand-primary)" }}
                           aria-hidden="true"
                         >
-                          {sc.icon === "filter"   && <FilterIcon />}
-                          {sc.icon === "person"   && <PersonGroupIcon />}
-                          {sc.icon === "flag"     && <FlagIcon />}
-                          {sc.icon === "location" && <LocationIcon />}
+                          {sc.countryCode2
+                            ? <span className={`fi fi-${sc.countryCode2}`} style={{ fontSize: 20, borderRadius: 2 }} />
+                            : sc.icon === "filter"   ? <FilterIcon />
+                            : sc.icon === "person"   ? <PersonGroupIcon />
+                            : sc.icon === "flag"     ? <FlagIcon />
+                            : <LocationIcon />}
                         </span>
                         <span className="flex-1 min-w-0 text-sm font-medium text-[var(--ink)] truncate">
                           {sc.label}
