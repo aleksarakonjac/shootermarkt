@@ -194,7 +194,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2.5 w-full text-left group mb-0"
+        className="flex items-baseline gap-2.5 w-full text-left group mb-0"
         aria-expanded={open}
       >
         <h2
@@ -227,7 +227,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
           </span>
         )}
 
-        <span className="ml-auto text-[var(--subtle)] group-hover:text-[var(--muted)] transition-colors shrink-0">
+        <span className="ml-auto self-center text-[var(--subtle)] group-hover:text-[var(--muted)] transition-colors shrink-0">
           <svg
             width="14"
             height="14"
