@@ -127,6 +127,20 @@
       "when": 1784563859000,
       "tag": "0017_mixed_team_disciplines",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1784679773758,
+      "tag": "0018_add_sius_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784679800983,
+      "tag": "0019_add_scius_id",
+      "breakpoints": true
     }
   ]
 }

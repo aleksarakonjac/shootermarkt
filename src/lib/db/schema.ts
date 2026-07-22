@@ -425,6 +425,7 @@ export const competitions = pgTable(
     formaWeight: decimal("forma_weight", { precision: 3, scale: 2 }).notNull().default("0.35"),
     sourcePdfUrl: text("source_pdf_url"),
     issfId: varchar("issf_id", { length: 50 }).unique(),
+    siusId: varchar("scius_id", { length: 50 }).unique(),
     externalId: varchar("external_id", { length: 300 }),
     tags: varchar("tags", { length: 20 }).array().notNull().default([]),
     createdAt: timestamp("created_at").notNull().defaultNow(),

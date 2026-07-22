@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { competitions, competitionSchedule, disciplines, results, shooters } from "@/lib/db/schema";
+import type { AgeCategory } from "@/lib/db/schema";
 import { and, eq, isNotNull, lte, or, sql } from "drizzle-orm";
 import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml } from "@/lib/issf/adapter";
+import { fetchLiveSiusResults, type SiusLiveResult } from "@/lib/sius/public-adapter";
 import { matchShooter } from "@/lib/name-match";
 
 export const maxDuration = 30;
@@ -23,6 +25,7 @@ export async function GET(req: NextRequest) {
       stage: competitionSchedule.stage,
       category: competitionSchedule.category,
       issfId: competitions.issfId,
+      siusId: competitions.siusId,
       disciplineCode: disciplines.code,
     })
     .from(competitionSchedule)
@@ -30,7 +33,7 @@ export async function GET(req: NextRequest) {
     .innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id))
     .where(
       and(
-        isNotNull(competitions.issfId),
+        or(isNotNull(competitions.issfId), isNotNull(competitions.siusId)),
         lte(competitionSchedule.startTime, now),
         or(
           sql`${competitionSchedule.endTime} >= ${now}`,
@@ -59,7 +62,7 @@ export async function GET(req: NextRequest) {
 
   let totalUpserted = 0;
 
-  // Group by competition to avoid redundant ISSF API calls
+  // Group slots by competition
   const byComp = new Map<number, typeof activeSlots>();
   for (const slot of activeSlots) {
     const list = byComp.get(slot.competitionId) ?? [];
@@ -68,61 +71,67 @@ export async function GET(req: NextRequest) {
   }
 
   for (const [competitionId, slots] of byComp) {
-    const issfCompId = parseInt(slots[0].issfId!);
-    if (isNaN(issfCompId)) continue;
-
-    let groups;
-    try {
-      groups = await fetchCompetitionResults(issfCompId);
-    } catch {
-      continue;
-    }
-
-    const mvpEvents = extractMvpEvents(groups);
+    const { siusId, issfId } = slots[0];
     const rows: Array<typeof results.$inferInsert> = [];
 
-    for (const slot of slots) {
-      const isQual = slot.stage.startsWith("qual");
-      const event = mvpEvents.find(
-        (e) => e.disciplineCode === slot.disciplineCode && e.category === slot.category
-      );
-      if (!event) continue;
+    if (siusId) {
+      // ── SIUS primary source ───────────────────────────────────────────────
+      const disciplineCodes = slots
+        .filter((s) => s.stage.startsWith("qual"))
+        .map((s) => s.disciplineCode);
 
-      const phase = isQual ? event.qualPhase : event.finalPhase;
-      if (!phase?.resultKey) continue;
-
-      let issfResults;
+      let siusResults: Map<string, SiusLiveResult[]> = new Map();
       try {
-        issfResults = await fetchQualResultsFromHtml(issfCompId, phase.resultKey, true);
+        siusResults = await fetchLiveSiusResults(siusId, disciplineCodes);
       } catch {
-        continue;
+        // fall through to ISSF below
       }
 
-      if (issfResults.length === 0) continue;
+      for (const slot of slots) {
+        if (!slot.stage.startsWith("qual")) continue;
+        const eventResults = siusResults.get(slot.disciplineCode);
+        if (!eventResults?.length) continue;
 
-      for (const r of issfResults) {
-        let shooterId: number | undefined;
-        if (r.issfId && shooterByIssfId.has(r.issfId)) {
-          shooterId = shooterByIssfId.get(r.issfId)!;
-        } else {
-          const match = matchShooter(r.firstName, r.lastName, r.nationCode, allShooters);
-          if (match.kind === "exact") shooterId = match.id;
+        for (const r of eventResults) {
+          const match = matchShooter(r.firstName, r.lastName, r.nation, allShooters);
+          if (match.kind !== "exact") continue;
+
+          rows.push({
+            shooterId: match.id,
+            competitionId,
+            disciplineId: slot.disciplineId,
+            category: slot.category,
+            qualTotal: r.total.toFixed(1),
+            qualInners: r.inners ?? null,
+            qualRank: r.rank,
+            qualified: null,
+            ...(r.series.length > 0 ? { qualDetail: { series: r.series } } : {}),
+            source: "issf_import",
+          });
         }
-        if (!shooterId) continue;
-
-        rows.push({
-          shooterId,
-          competitionId,
-          disciplineId: slot.disciplineId,
-          category: slot.category,
-          qualTotal: r.total.toString(),
-          qualInners: r.inners ?? null,
-          qualRank: r.rank,
-          qualified: r.qualified,
-          ...(r.series.length > 0 ? { qualDetail: { series: r.series } } : {}),
-          source: "issf_import",
-        });
       }
+
+      // if SIUS returned nothing (e.g. event not yet public), fall back to ISSF
+      if (rows.length === 0 && issfId) {
+        await fetchFromIssf(
+          parseInt(issfId),
+          slots,
+          competitionId,
+          allShooters,
+          shooterByIssfId,
+          rows
+        );
+      }
+    } else if (issfId) {
+      // ── ISSF fallback ─────────────────────────────────────────────────────
+      await fetchFromIssf(
+        parseInt(issfId),
+        slots,
+        competitionId,
+        allShooters,
+        shooterByIssfId,
+        rows
+      );
     }
 
     if (rows.length === 0) continue;
@@ -145,4 +154,70 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, active: activeSlots.length, upserted: totalUpserted });
+}
+
+// ── ISSF HTML scraper (unchanged logic, extracted to helper) ──────────────────
+
+async function fetchFromIssf(
+  issfCompId: number,
+  slots: Array<{ disciplineCode: string; stage: string; disciplineId: number; category: AgeCategory }>,
+  competitionId: number,
+  allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>,
+  shooterByIssfId: Map<string, number>,
+  rows: Array<typeof results.$inferInsert>
+) {
+  if (isNaN(issfCompId)) return;
+
+  let groups;
+  try {
+    groups = await fetchCompetitionResults(issfCompId);
+  } catch {
+    return;
+  }
+
+  const mvpEvents = extractMvpEvents(groups);
+
+  for (const slot of slots) {
+    const isQual = slot.stage.startsWith("qual");
+    const event = mvpEvents.find(
+      (e) => e.disciplineCode === slot.disciplineCode && e.category === slot.category
+    );
+    if (!event) continue;
+
+    const phase = isQual ? event.qualPhase : event.finalPhase;
+    if (!phase?.resultKey) continue;
+
+    let issfResults;
+    try {
+      issfResults = await fetchQualResultsFromHtml(issfCompId, phase.resultKey, true);
+    } catch {
+      continue;
+    }
+
+    if (issfResults.length === 0) continue;
+
+    for (const r of issfResults) {
+      let shooterId: number | undefined;
+      if (r.issfId && shooterByIssfId.has(r.issfId)) {
+        shooterId = shooterByIssfId.get(r.issfId)!;
+      } else {
+        const match = matchShooter(r.firstName, r.lastName, r.nationCode, allShooters);
+        if (match.kind === "exact") shooterId = match.id;
+      }
+      if (!shooterId) continue;
+
+      rows.push({
+        shooterId,
+        competitionId,
+        disciplineId: slot.disciplineId,
+        category: slot.category,
+        qualTotal: r.total.toString(),
+        qualInners: r.inners ?? null,
+        qualRank: r.rank,
+        qualified: r.qualified,
+        ...(r.series.length > 0 ? { qualDetail: { series: r.series } } : {}),
+        source: "issf_import",
+      });
+    }
+  }
 }
