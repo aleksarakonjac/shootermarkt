@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
       )
     );
 
+  console.log("[cron] active slots:", JSON.stringify(activeSlots.map((s) => ({ compId: s.competitionId, code: s.disciplineCode, stage: s.stage, siusId: s.siusId?.slice(0, 8), issfId: s.issfId }))));
   if (activeSlots.length === 0) {
     return NextResponse.json({ ok: true, active: 0, upserted: 0 });
   }
@@ -83,10 +84,13 @@ export async function GET(req: NextRequest) {
         .filter((s) => s.stage.startsWith("qual"))
         .map((s) => s.disciplineCode);
 
+      console.log("[cron] SIUS disciplineCodes:", disciplineCodes);
       let siusResults: Map<string, SiusLiveResult[]> = new Map();
       try {
         siusResults = await fetchLiveSiusResults(siusId, disciplineCodes);
-      } catch {
+        console.log("[cron] SIUS results keys:", [...siusResults.keys()], "sizes:", [...siusResults.values()].map((v) => v.length));
+      } catch (e) {
+        console.error("[cron] SIUS fetch failed:", e);
         // fall through to ISSF below
       }
 
@@ -160,6 +164,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    console.log(`[cron] comp ${competitionId}: ${rows.length} rows to upsert`);
     if (rows.length === 0) continue;
 
     await db
