@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { competitions, competitionSchedule, disciplines, results, shooters } from "@/lib/db/schema";
 import type { AgeCategory } from "@/lib/db/schema";
-import { and, eq, gte, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml } from "@/lib/issf/adapter";
 import { fetchLiveSiusResults, type SiusLiveResult } from "@/lib/sius/public-adapter";
 import { matchShooter } from "@/lib/name-match";
