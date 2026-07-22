@@ -318,6 +318,7 @@ export const shooters = pgTable(
     avatarUrl: text("avatar_url"),
     supabaseUserId: text("supabase_user_id").unique(),
     issfId: varchar("issf_id", { length: 50 }).unique(),
+    siusAthleteId: varchar("sius_athlete_id", { length: 50 }).unique(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [

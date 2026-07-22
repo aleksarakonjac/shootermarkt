@@ -97,10 +97,33 @@ export async function GET(req: NextRequest) {
 
         for (const r of eventResults) {
           const match = matchShooter(r.firstName, r.lastName, r.nation, allShooters);
-          if (match.kind !== "exact") continue;
+          let shooterId: number;
+          if (match.kind === "exact") {
+            shooterId = match.id;
+          } else if (r.siusAthleteId) {
+            const [created] = await db
+              .insert(shooters)
+              .values({
+                firstName: r.firstName,
+                lastName: r.lastName,
+                nationality: r.nation || null,
+                verified: false,
+                createdBySelf: false,
+                siusAthleteId: r.siusAthleteId,
+              })
+              .onConflictDoUpdate({
+                target: [shooters.siusAthleteId],
+                set: { firstName: r.firstName, lastName: r.lastName, nationality: r.nation || null },
+              })
+              .returning({ id: shooters.id });
+            shooterId = created.id;
+            allShooters.push({ id: created.id, firstName: r.firstName, lastName: r.lastName, nationality: r.nation, issfId: null });
+          } else {
+            continue;
+          }
 
           rows.push({
-            shooterId: match.id,
+            shooterId,
             competitionId,
             disciplineId: slot.disciplineId,
             category: slot.category,
