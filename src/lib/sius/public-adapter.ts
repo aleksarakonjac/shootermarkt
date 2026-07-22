@@ -80,13 +80,14 @@ export async function fetchSiusSeries(
   eventUuid: string,
   subEventUuid: string
 ): Promise<SiusLiveResult[]> {
-  const data = await pub<RawSeries>(
+  const raw = await pub<RawSeries | RawSeries[]>(
     `/series?runningCompetitionId=${compUuid}` +
       `&runningCompetitionEventId=${eventUuid}` +
       `&subEventId=${subEventUuid}` +
       `&shooterGroup=Regulars&teamKind=Individual`
   );
 
+  const data: RawSeries = Array.isArray(raw) ? (raw[0] ?? {}) : raw;
   const rows = data["Series-Individual"] ?? [];
   return rows.flatMap((row) => {
     const rank = parseInt(row.Rank?.DisplayText ?? "", 10);
