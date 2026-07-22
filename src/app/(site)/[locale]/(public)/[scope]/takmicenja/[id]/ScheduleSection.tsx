@@ -40,10 +40,13 @@ const CATEGORY_SHORT: Record<string, Record<string, string>> = {
   en: { junior: "Jun.", youth: "Yth.", cadet: "Cad." },
 };
 
-function slotStatus(slot: ScheduleSlot, now: Date): "active" | "upcoming" | "past" | "future" {
+function slotStatus(slot: ScheduleSlot, now: Date): "active" | "imminent" | "upcoming" | "past" | "future" {
   const start = new Date(slot.startTime);
   if (start > now) {
-    return start.getTime() - now.getTime() < 2 * 60 * 60 * 1000 ? "upcoming" : "future";
+    const diff = start.getTime() - now.getTime();
+    if (diff < 60 * 60 * 1000) return "imminent";
+    if (diff < 2 * 60 * 60 * 1000) return "upcoming";
+    return "future";
   }
   const end = getTickerSlotEnd({
     discCode: slot.disciplineCode,
@@ -130,7 +133,7 @@ function pickDefaultDay(dateKeys: string[], byDate: Map<string, ScheduleSlot[]>,
   for (const dk of dateKeys) {
     if (byDate.get(dk)!.some((s) => {
       const st = slotStatus(s, now);
-      return st === "active" || st === "upcoming";
+      return st === "active" || st === "imminent" || st === "upcoming";
     })) return dk;
   }
   // Else today if it's in the list
@@ -174,7 +177,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
 
   const hasLive = slots.some((s) => {
     const st = slotStatus(s, now);
-    return st === "active" || st === "upcoming";
+    return st === "active" || st === "imminent" || st === "upcoming";
   });
 
   const [open, setOpen] = useState(hasLive);
@@ -193,10 +196,14 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
   const nextSlot = activeSlot
     ? null
     : slots
-        .filter((s) => slotStatus(s, now) === "upcoming" || slotStatus(s, now) === "future")
+        .filter((s) => {
+          const st = slotStatus(s, now);
+          return st === "imminent" || st === "upcoming" || st === "future";
+        })
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0] ?? null;
   const liveHint = activeSlot ?? nextSlot;
   const liveHintIsNext = !activeSlot && !!nextSlot;
+  const isImminent = !activeSlot && !!nextSlot && slotStatus(nextSlot, now) === "imminent";
 
   const visibleDays = usePills ? [selectedDay] : dateKeys;
 
@@ -226,11 +233,26 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
           </span>
         )}
 
+        {isImminent && (
+          <span className="flex items-center gap-1.5 text-[0.68rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--ink)] bg-[var(--surface-2)] px-2 py-0.5 rounded-sm">
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0"
+              style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }}
+            />
+            {locale === "sr" ? "Uskoro" : "Soon"}
+          </span>
+        )}
+
         {liveHint && (
           <span className="text-xs font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] whitespace-nowrap translate-y-[2px]">
-            {liveHintIsNext && (
+            {liveHintIsNext && !isImminent && (
               <span className="text-[var(--subtle)] mr-1">
                 {locale === "sr" ? "Sledeće:" : "Next:"}
+              </span>
+            )}
+            {liveHintIsNext && isImminent && (
+              <span className="text-[var(--subtle)] mr-1">
+                {locale === "sr" ? "Uskoro:" : "Soon:"}
               </span>
             )}
             <span className="font-bold text-[var(--ink)]">{liveHint.disciplineCode}</span>
@@ -327,6 +349,8 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
                             <span className="flex items-center justify-center w-4">
                               {st === "active" ? (
                                 <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }} />
+                              ) : st === "imminent" ? (
+                                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }} />
                               ) : st === "upcoming" ? (
                                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--ink)] shrink-0" />
                               ) : st === "past" ? (
