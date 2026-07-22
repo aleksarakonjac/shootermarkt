@@ -227,7 +227,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
         )}
 
         {liveHint && (
-          <span className="text-xs font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] whitespace-nowrap">
+          <span className="text-xs font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] whitespace-nowrap translate-y-[2px]">
             {liveHintIsNext && (
               <span className="text-[var(--subtle)] mr-1">
                 {locale === "sr" ? "Sledeće:" : "Next:"}
