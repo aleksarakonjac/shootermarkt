@@ -146,10 +146,11 @@ export async function fetchLiveSiusResults(
         return;
       }
 
-      // prefer InCompetition, fall back to most recent non-hidden
+      // prefer InCompetition qual round; fall back to first non-Planned (Order 1 = Qualification)
       const activeSubEvent =
+        subEvents.find((s) => s.state === "InCompetition" && !s.name.toLowerCase().includes("final")) ??
         subEvents.find((s) => s.state === "InCompetition") ??
-        subEvents.filter((s) => s.state !== "Planned").at(-1);
+        subEvents.filter((s) => s.state !== "Planned").at(0);
 
       if (!activeSubEvent) return;
 
