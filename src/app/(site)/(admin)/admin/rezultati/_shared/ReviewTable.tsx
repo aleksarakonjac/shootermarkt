@@ -9,9 +9,12 @@ const COLLAPSE_AT = 10;
 
 const ALL_DISCIPLINES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW"] as const;
 
-const isDecimalDisc = (code: string) => code.startsWith("AR") || code.startsWith("R3P");
+const isQualDecimal = (code: string) => code.startsWith("AR");
+const isFinalDecimal = (code: string) => code.startsWith("AR") || code.startsWith("R3P");
 const fmtScore = (v: number, code: string) =>
-  isDecimalDisc(code) ? v.toFixed(1) : String(Math.round(v));
+  isQualDecimal(code) ? v.toFixed(1) : String(Math.round(v));
+const fmtFinal = (v: number, code: string) =>
+  isFinalDecimal(code) ? v.toFixed(1) : String(Math.round(v));
 const CATEGORY_OPTIONS = (Object.keys(CATEGORY_LABEL) as AgeCategory[]).map((value) => ({ value, label: CATEGORY_LABEL[value] }));
 
 interface Props {
@@ -137,7 +140,7 @@ function FinalsTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: P
                 <td className="px-3 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.teamNoc}</td>
                 <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.qualRank ?? "—"}</td>
                 <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.qualTotal != null ? fmtScore(row.qualTotal, row.disciplineCode) : "—"}</td>
-                {Array.from({ length: intermediateCount }, (_, valueIndex) => isHitCountFinal ? <td key={valueIndex} className="px-3 py-1 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums"><div className="font-bold text-[var(--ink)]">{row.finalCumulative?.[valueIndex] ?? "—"}</div><div className="text-[var(--muted)]">{row.finalSeries?.[valueIndex] != null ? fmtScore(row.finalSeries[valueIndex], row.disciplineCode) : "—"}</div></td> : <td key={valueIndex} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{values[valueIndex] != null ? fmtScore(values[valueIndex], row.disciplineCode) : "—"}</td>)}
+                {Array.from({ length: intermediateCount }, (_, valueIndex) => isHitCountFinal ? <td key={valueIndex} className="px-3 py-1 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums"><div className="font-bold text-[var(--ink)]">{row.finalCumulative?.[valueIndex] ?? "—"}</div><div className="text-[var(--muted)]">{row.finalSeries?.[valueIndex] != null ? fmtFinal(row.finalSeries[valueIndex], row.disciplineCode) : "—"}</div></td> : <td key={valueIndex} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{values[valueIndex] != null ? fmtFinal(values[valueIndex], row.disciplineCode) : "—"}</td>)}
                 {!isHitCountFinal ? <td className="px-3 py-2"><ShotBreakdown groups={row.finalShotsByStage ?? (row.finalShots ? [row.finalShots] : null)} prefix="F" /></td> : null}
                 <td className={`${stickyCell} ${stickyDivider} right-0 w-24 px-3 py-2`}><input type="number" value={row.finalTotal ?? ""} onChange={(event) => onRowChange(index, { finalTotal: event.target.value ? parseFloat(event.target.value) : null })} step="0.1" placeholder="—" className="w-16 border-b border-transparent bg-transparent py-0.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)] hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none" /></td>
               </tr>;

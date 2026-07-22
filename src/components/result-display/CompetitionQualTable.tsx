@@ -75,8 +75,7 @@ export function CompetitionQualTable({ results }: Props) {
 
   const hasDecimals =
     results[0]?.apparatus === "air_rifle" ||
-    (results[0]?.disciplineCode?.startsWith("AR") ?? false) ||
-    (results[0]?.disciplineCode?.startsWith("R3P") ?? false);
+    (results[0]?.disciplineCode?.startsWith("AR") ?? false);
 
   // Detect display type from first result with qualDetail
   const firstWithDetail = results.find((r) => r.qualDetail != null);
