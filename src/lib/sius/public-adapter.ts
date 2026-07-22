@@ -180,12 +180,12 @@ export async function fetchLiveSiusResults(
 function parseSeriesTotals(
   seriesRaw: Array<Array<{ Value: string }>>
 ): number[] {
-  return seriesRaw.map((shots) =>
-    shots.reduce((sum, s) => {
-      const v = parseFloat(s.Value);
-      return sum + (isNaN(v) ? 0 : v);
-    }, 0)
-  );
+  // SIUS: [[{Value:"106.3"}, {Value:"105.9"}, ...]] — outer array is always len 1,
+  // inner array holds one entry per series (already totalled by SIUS)
+  return seriesRaw
+    .flatMap((group) => group)
+    .map((s) => parseFloat(s.Value))
+    .filter((v) => !isNaN(v));
 }
 
 /** SIUS: "HRBEKOVA Danka" → { lastName: "HRBEKOVA", firstName: "Danka" } */
