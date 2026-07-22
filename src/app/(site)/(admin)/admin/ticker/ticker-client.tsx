@@ -68,6 +68,12 @@ interface ArticleOption {
   publishedAt: string | null;
 }
 
+interface AutoTickerItem {
+  id: number;
+  name: string;
+  detailItems: Array<{ label?: string; text: string; href?: string }>;
+}
+
 interface Props {
   competitions: CompetitionRow[];
   slots: SlotRow[];
@@ -77,6 +83,7 @@ interface Props {
   liveSlotIds: number[];
   uskoroCompIds: number[];
   recentArticles: ArticleOption[];
+  autoTickerItems: AutoTickerItem[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -268,17 +275,40 @@ export function TickerAdminClient({
   liveSlotIds,
   uskoroCompIds,
   recentArticles,
+  autoTickerItems,
 }: Props) {
   const router                  = useRouter();
   const [, startTransition]     = useTransition();
   const refresh                 = () => startTransition(() => router.refresh());
 
-  const liveSlots        = slots.filter((s) => liveSlotIds.includes(s.id));
   const activeOverrides  = overrides.filter((o) => o.isActive);
-  const isAnythingLive   = liveSlots.length > 0 || activeOverrides.some(o => o.type === "live" || o.type === "uskoro" || o.type === "article" || o.type === "custom");
+  const linkedItems      = overrides.filter((o) => o.type === "linked");
+  const forcedOverrides  = overrides.filter((o) => o.type !== "linked");
+  const isAnythingLive   = autoTickerItems.length > 0 || activeOverrides.some(o => o.type === "live" || o.type === "uskoro" || o.type === "article" || o.type === "custom");
 
   // Auto-detected uskoro comps (from server)
   const uskoroAutoComps  = competitions.filter(c => uskoroCompIds.includes(c.id));
+
+  const addLinkedItem = async (competitionId: number, payload: { label: string; href: string | null; customSlides: Array<{ text: string }> }) => {
+    await fetch("/api/admin/ticker/override", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...payload, competitionId, type: "linked" }),
+    });
+    refresh();
+  };
+  const toggleLinkedItem = async (item: Override) => {
+    await fetch(`/api/admin/ticker/override/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: !item.isActive }),
+    });
+    refresh();
+  };
+  const deleteLinkedItem = async (item: Override) => {
+    await fetch(`/api/admin/ticker/override/${item.id}`, { method: "DELETE" });
+    refresh();
+  };
 
   return (
     <div className="space-y-10">
@@ -291,70 +321,29 @@ export function TickerAdminClient({
           live={isAnythingLive}
         />
 
-        {/* Auto-detected LIVE from schedule */}
-        {liveSlots.length > 0 && (
-          <div className="mb-3 rounded-lg border border-[var(--brand-primary)] bg-red-50 dark:bg-red-950/20 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-[var(--brand-primary)] mb-3 flex items-center gap-2">
-              <LiveDot /> Auto · Aktivna satnica
-            </p>
-            <div className="space-y-1.5">
-              {liveSlots.map((s) => {
-                const comp = competitions.find((c) => c.id === s.competitionId);
-                return (
-                  <div key={s.id} className="flex items-center gap-3 text-xs text-[var(--ink)]">
-                    <span className="font-mono font-bold text-[var(--brand-primary)] w-12 shrink-0">{s.disciplineCode}</span>
-                    <span className="font-medium">{STAGE_LABEL[s.stage] ?? s.stage}</span>
-                    <span className="text-[var(--muted)]">·</span>
-                    <span className="truncate">{comp?.name ?? `Takmičenje #${s.competitionId}`}</span>
-                    <span className="text-[var(--subtle)] shrink-0">{fmtDatetime(s.startTime)}{s.endTime && ` → ${fmtDatetime(s.endTime)}`}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Auto-detected USKORO */}
-        {uskoroAutoComps.length > 0 && (
-          <div className="mb-3 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-950/20 p-4">
-            <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400 mb-3">
-              Auto · Uskoro (po nivou)
-            </p>
-            <div className="space-y-1.5">
-              {uskoroAutoComps.map((comp) => {
-                const levelStyle = LEVEL_STYLE[comp.level] ?? { background: "var(--surface-2)", color: "var(--muted)" };
-                return (
-                  <div key={comp.id} className="flex items-center gap-3 text-xs text-[var(--ink)]">
-                    <span
-                      className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase shrink-0"
-                      style={{ background: levelStyle.background, color: levelStyle.color }}
-                    >
-                      {LEVEL_LABEL[comp.level] ?? comp.level}
-                    </span>
-                    <span className="truncate font-medium">{comp.name}</span>
-                    <span className="text-[var(--muted)] shrink-0">{formatDateRange(comp.date, comp.dateEnd)}</span>
-                    {comp.location && <span className="text-[var(--subtle)] shrink-0">{comp.location}</span>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <AutoTickerPreview
+          items={autoTickerItems}
+          linkedItems={linkedItems}
+          articles={recentArticles}
+          onAdd={addLinkedItem}
+          onToggle={toggleLinkedItem}
+          onDelete={deleteLinkedItem}
+        />
 
         {/* All upper ticker overrides (live, uskoro, article, custom) */}
         <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
             <span className="text-xs font-semibold text-[var(--ink)]">Forsiran sadržaj gornjeg tickera</span>
-            <span className="text-xs text-[var(--muted)]">{activeOverrides.length} aktivnih</span>
+            <span className="text-xs text-[var(--muted)]">{forcedOverrides.filter((override) => override.isActive).length} aktivnih</span>
           </div>
 
-          {overrides.length === 0 ? (
+          {forcedOverrides.length === 0 ? (
             <div className="px-4 py-6 text-center text-xs text-[var(--subtle)]">
               Nema forsiranog sadržaja. Dodaj ispod ili koristi &ldquo;Forsirati live/uskoro&rdquo; na takmičenju.
             </div>
           ) : (
             <div className="divide-y divide-[var(--border)]">
-              {overrides.map((o) => {
+              {forcedOverrides.map((o) => {
                 const comp = competitions.find((c) => c.id === o.competitionId);
                 return (
                   <OverrideRow
@@ -508,6 +497,143 @@ export function TickerAdminClient({
 }
 
 // ── SectionHeader ─────────────────────────────────────────────────────────────
+
+function AutoTickerPreview({ items, linkedItems, articles, onAdd, onToggle, onDelete }: {
+  items: AutoTickerItem[];
+  linkedItems: Override[];
+  articles: ArticleOption[];
+  onAdd: (competitionId: number, payload: { label: string; href: string | null; customSlides: Array<{ text: string }> }) => Promise<void>;
+  onToggle: (item: Override) => Promise<void>;
+  onDelete: (item: Override) => Promise<void>;
+}) {
+  return (
+    <div className="mb-3 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+        <span className="text-xs font-semibold text-[var(--ink)]">Automatski prikaz</span>
+        <span className="text-xs text-[var(--muted)]">Tačna rotacija gornjeg tickera</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="px-4 py-5 text-center text-xs text-[var(--subtle)]">Trenutno nema automatskog sadržaja u gornjem tickeru.</p>
+      ) : (
+        <div className="divide-y divide-[var(--border)]">
+          {items.map((item) => (
+            <div key={item.id}>
+              <div className="px-4 py-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-[var(--ink)]">
+                <LiveDot />
+                <span className="truncate">{item.name}</span>
+              </div>
+              <div className="space-y-1.5 pl-4">
+                {item.detailItems.length ? item.detailItems.map((detail, index) => (
+                  <div key={`${detail.label ?? "auto"}-${index}`} className="flex items-baseline gap-2 text-xs">
+                    <span className="w-16 shrink-0 font-mono text-[0.65rem] font-bold uppercase tracking-wide text-[var(--muted)]">{detail.label ?? "AUTO"}</span>
+                    <span className="min-w-0 text-[var(--ink)]">{detail.text}</span>
+                    {detail.href && <span className="shrink-0 text-[var(--subtle)]">↗</span>}
+                  </div>
+                )) : (
+                  <p className="text-xs text-[var(--muted)]">U toku</p>
+                )}
+              </div>
+              </div>
+              <LinkedTickerItems
+                items={linkedItems.filter((linkedItem) => linkedItem.competitionId === item.id)}
+                articles={articles}
+                onAdd={(payload) => onAdd(item.id, payload)}
+                onToggle={onToggle}
+                onDelete={onDelete}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LinkedTickerItems({ items, articles, onAdd, onToggle, onDelete }: {
+  items: Override[];
+  articles: ArticleOption[];
+  onAdd: (payload: { label: string; href: string | null; customSlides: Array<{ text: string }> }) => Promise<void>;
+  onToggle: (item: Override) => Promise<void>;
+  onDelete: (item: Override) => Promise<void>;
+}) {
+  const [type, setType] = useState<"article" | "custom">("custom");
+  const [articleSlug, setArticleSlug] = useState("");
+  const [text, setText] = useState("");
+  const [href, setHref] = useState("");
+  const [loading, setLoading] = useState(false);
+  const articleOptions = articles.map((article) => ({
+    value: article.slug,
+    label: article.title,
+    sublabel: article.publishedAt ? new Date(article.publishedAt).toLocaleDateString("sr-Latn-RS", { day: "numeric", month: "short", year: "numeric" }) : undefined,
+  }));
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const title = text.trim() || (type === "article" ? articles.find((article) => article.slug === articleSlug)?.title : "");
+    if (!title) return;
+    setLoading(true);
+    await onAdd({
+      label: type === "article" ? "VEST" : "INFO",
+      href: type === "article" ? `/vesti/${articleSlug}` : (href.trim() || null),
+      customSlides: [{ text: title }],
+    });
+    setLoading(false);
+    setArticleSlug(""); setText(""); setHref("");
+  }
+
+  return (
+    <div className="border-t border-[var(--border)]">
+      <div className="px-6 py-3">
+        <p className="text-xs font-semibold text-[var(--ink)]">Vezane stavke u automatskoj rotaciji</p>
+        <p className="mt-0.5 text-xs text-[var(--muted)]">Prikazuju se samo dok je ovo takmičenje automatski aktivno u gornjem tickeru.</p>
+      </div>
+      {items.length > 0 && (
+        <div className="divide-y divide-[var(--border)] border-t border-[var(--border)]">
+          {items.map((item) => (
+            <div key={item.id} className="flex items-center gap-3 px-6 py-2.5 text-xs">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${item.isActive ? "bg-[var(--brand-primary)]" : "bg-[var(--border-strong)]"}`} />
+              <span className="w-12 shrink-0 font-mono text-[0.65rem] font-bold text-[var(--muted)]">{item.label ?? "INFO"}</span>
+              <span className="min-w-0 flex-1 truncate text-[var(--ink)]">{item.customSlides?.[0]?.text ?? item.label}</span>
+              <button type="button" onClick={() => onToggle(item)} className={btnGhost}>{item.isActive ? "Pauziraj" : "Aktiviraj"}</button>
+              <button type="button" onClick={() => onDelete(item)} className={btnDanger}>Ukloni</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-3 border-t border-dashed border-[var(--border)] px-6 py-3">
+        <div className="flex w-32 flex-col gap-1">
+          <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Tip</label>
+          <CustomSelect value={type} onChange={(value) => setType(value as "article" | "custom")} options={[{ value: "custom", label: "Custom tekst" }, { value: "article", label: "Članak / vest" }]} />
+        </div>
+        {type === "article" ? (
+          <>
+            <div className="flex min-w-[220px] flex-1 flex-col gap-1">
+              <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Članak</label>
+              <CustomSelect value={articleSlug} onChange={(slug) => { setArticleSlug(slug); setText(articles.find((article) => article.slug === slug)?.title ?? ""); }} options={articleOptions} placeholder="Pretraži sve članke…" searchable />
+            </div>
+            <div className="flex min-w-[180px] flex-1 flex-col gap-1">
+              <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Naslov u tickeru</label>
+              <input value={text} onChange={(event) => setText(event.target.value)} placeholder="Preuzima se naslov članka" className={inputCls} />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex min-w-[180px] flex-1 flex-col gap-1">
+              <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Tekst</label>
+              <input value={text} onChange={(event) => setText(event.target.value)} placeholder="npr. Eliminacije počinju u 14 h" className={inputCls} />
+            </div>
+            <div className="flex min-w-[160px] flex-1 flex-col gap-1">
+              <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Link (opciono)</label>
+              <input value={href} onChange={(event) => setHref(event.target.value)} placeholder="/vesti/..." className={inputCls} />
+            </div>
+          </>
+        )}
+        <button type="submit" disabled={loading || (type === "article" ? !articleSlug : !text.trim())} className={`${btnPrimary} self-end disabled:opacity-40`}>Dodaj u rotaciju</button>
+      </form>
+    </div>
+  );
+}
 
 function SectionHeader({ title, subtitle, live }: { title: string; subtitle: string; live?: boolean }) {
   return (

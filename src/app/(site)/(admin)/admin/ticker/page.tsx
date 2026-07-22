@@ -3,12 +3,13 @@ import {
   competitions, competitionSchedule, disciplines,
   tickerLiveOverrides, tickerCustomUpcoming, countries,
 } from "@/lib/db/schema";
-import { gte, lte, and, eq, asc } from "drizzle-orm";
+import { gte, lte, and, eq, asc, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import { TickerAdminClient } from "./ticker-client";
 import { USKORO_LEAD_DAYS } from "@/app/(site)/[locale]/(public)/ticker";
 import { getPublishedArticles } from "@/lib/cms/get-articles";
 import { isTickerSlotLive } from "@/lib/ticker-schedule";
+import { getHomepageTicker } from "@/lib/homepage-data";
 
 export const metadata: Metadata = { title: "Admin · Ticker" };
 
@@ -20,8 +21,10 @@ export default async function AdminTickerPage() {
   // eslint-disable-next-line react-hooks/purity
   const in5days  = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-  const [upcomingComps, allSlots, allDisciplines, overrides, customUpcoming, uskoro5days, recentArticles] = await Promise.all([
-    // Competitions in next 30 days
+  const activeOrUpcoming = and(sql`coalesce(${competitions.dateEnd}, ${competitions.date}) >= ${today}`, lte(competitions.date, in30days));
+
+  const [upcomingComps, allSlots, allDisciplines, overrides, customUpcoming, uskoro5days, articles, homepageTicker] = await Promise.all([
+    // Current and upcoming competitions in the next 30 days
     db.select({
       id: competitions.id,
       name: competitions.name,
@@ -34,7 +37,7 @@ export default async function AdminTickerPage() {
     })
       .from(competitions)
       .leftJoin(countries, eq(competitions.countryId, countries.id))
-      .where(and(gte(competitions.date, today), lte(competitions.date, in30days)))
+      .where(activeOrUpcoming)
       .orderBy(asc(competitions.date)),
 
     // All schedule slots for those competitions
@@ -52,7 +55,7 @@ export default async function AdminTickerPage() {
       .from(competitionSchedule)
       .innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id))
       .innerJoin(competitions, eq(competitionSchedule.competitionId, competitions.id))
-      .where(and(gte(competitions.date, today), lte(competitions.date, in30days)))
+      .where(activeOrUpcoming)
       .orderBy(asc(competitionSchedule.startTime)),
 
     // All disciplines (for add-slot form)
@@ -97,8 +100,11 @@ export default async function AdminTickerPage() {
       .where(and(gte(competitions.date, today), lte(competitions.date, in5days)))
       .orderBy(asc(competitions.date)),
 
-    // 10 most recent articles from Payload CMS (for article ticker picker)
-    getPublishedArticles({ limit: 10 }).catch(() => []),
+    // All published articles are searchable in the linked ticker form.
+    getPublishedArticles({ limit: 200 }).catch(() => []),
+
+    // Reuse the public assembly so admin sees the exact automatic upper-ticker rotation.
+    getHomepageTicker("all", "sr").catch(() => ({ live: [], upcoming: [], today })),
   ]);
 
   const now = new Date();
@@ -150,12 +156,15 @@ export default async function AdminTickerPage() {
         customUpcoming={customUpcoming.map(c => ({ ...c, createdAt: c.createdAt.toISOString() }))}
         liveSlotIds={liveSlots.map(s => s.id)}
         uskoroCompIds={uskoroComps.map(c => c.id)}
-        recentArticles={recentArticles.map(a => ({
+        recentArticles={articles.map(a => ({
           id:          a.id,
           title:       a.title,
           slug:        a.slug,
           publishedAt: a.publishedAt,
         }))}
+        autoTickerItems={homepageTicker.live
+          .filter((item) => item.forceStatus === null)
+          .map((item) => ({ id: item.id, name: item.name, detailItems: item.detailItems }))}
       />
     </div>
   );

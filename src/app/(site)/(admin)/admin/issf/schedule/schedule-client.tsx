@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useId } from "react";
 import type { ISSFScheduleEntry } from "@/lib/issf/adapter";
+import { SearchDropdown } from "@/components/ui/SearchDropdown";
 
 interface CompOption { id: number; name: string; date: string; dateEnd: string | null; nocCode: string | null; }
 interface DiscOption  { id: number; code: string; name: string; }
@@ -151,19 +152,21 @@ export function ISSFScheduleImportClient({ competitions, disciplines }: Props) {
           <label htmlFor={`${uid}-comp`} className="block text-xs font-medium text-[var(--muted)] mb-1">
             Takmičenje u bazi (za koje se importuje satnica)
           </label>
-          <select
+          <SearchDropdown
             id={`${uid}-comp`}
-            value={dbCompId}
-            onChange={(e) => setDbCompId(e.target.value ? parseInt(e.target.value) : "")}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)]"
-          >
-            <option value="">— Izaberi takmičenje —</option>
-            {competitions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.date} · {c.name}
-              </option>
-            ))}
-          </select>
+            value={String(dbCompId)}
+            onChange={(value) => setDbCompId(value ? parseInt(value) : "")}
+            options={competitions.map((competition) => ({
+              value: String(competition.id),
+              label: competition.name,
+              sublabel: competition.dateEnd
+                ? `${competition.date} – ${competition.dateEnd}`
+                : competition.date,
+            }))}
+            placeholder="— Izaberi takmičenje —"
+            emptyLabel="— Izaberi takmičenje —"
+            searchPlaceholder="Pretraži takmičenja..."
+          />
         </div>
 
         <div className="flex items-center gap-3 pt-1">

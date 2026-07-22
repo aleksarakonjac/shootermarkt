@@ -10,6 +10,7 @@ export interface DropdownOption {
 }
 
 interface Props {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   options: DropdownOption[];
@@ -37,6 +38,7 @@ const Chevron = ({ open }: { open: boolean }) => (
 );
 
 export function SearchDropdown({
+  id,
   value,
   onChange,
   options,
@@ -97,6 +99,7 @@ export function SearchDropdown({
   return (
     <div className={`relative ${className}`} ref={ref}>
       <button
+        id={id}
         type="button"
         disabled={disabled}
         onClick={() => { setOpen((v) => !v); setSearch(""); }}

@@ -6,7 +6,7 @@ import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { useTranslations, useLocale } from "next-intl";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
-export interface TickerDetailItem { label?: string; text: string; }
+export interface TickerDetailItem { label?: string; text: string; href?: string; }
 
 export interface TickerItem {
   id: number;
@@ -78,6 +78,7 @@ function formatDateRange(start: string, locale: string, end?: string): string {
 // ── Live detail rotator ───────────────────────────────────────────────────────
 
 function LiveDetail({ item }: { item: TickerItem }) {
+  const scopedHref = useScopedHref();
   const items: TickerDetailItem[] = item.detailItems?.length
     ? item.detailItems
     : item.detailText ? [{ text: item.detailText }] : [];
@@ -97,7 +98,7 @@ function LiveDetail({ item }: { item: TickerItem }) {
   if (items.length === 0) return null;
   const current = items[idx];
 
-  return (
+  const detail = (
     <span
       className="shrink-0 flex items-center gap-1.5"
       style={{ opacity: visible ? 1 : 0, transition: "opacity 0.3s ease", minWidth: 80 }}
@@ -112,6 +113,7 @@ function LiveDetail({ item }: { item: TickerItem }) {
       </span>
     </span>
   );
+  return current.href ? <Link href={scopedHref(current.href)} className="hover:opacity-75 transition-opacity">{detail}</Link> : detail;
 }
 
 // ── Upper bar (cycles through live + uskoro + custom) ────────────────────────
@@ -256,7 +258,8 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
     </div>
   );
 
-  return item.href ? (
+  const hasLinkedDetail = item.detailItems?.some((detail) => detail.href);
+  return item.href && !hasLinkedDetail ? (
     <Link href={scopedHref(item.href)} className="block h-full hover:opacity-90 transition-opacity">{inner}</Link>
   ) : inner;
 }

@@ -76,12 +76,15 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
   const [liveRows, futureRows, activeOverrides] = await Promise.all([
     db.select(fields).from(competitions).leftJoin(countries, eq(competitions.countryId, countries.id)).where(and(sql`${competitions.date} <= ${today} AND COALESCE(${competitions.dateEnd}, ${competitions.date}) >= ${today}`, scopeFilter)).orderBy(competitions.date),
     db.select(fields).from(competitions).leftJoin(countries, eq(competitions.countryId, countries.id)).where(and(sql`${competitions.date} > ${today}`, scopeFilter)).orderBy(competitions.date).limit(8),
-    db.select({ type: tickerLiveOverrides.type, competitionId: tickerLiveOverrides.competitionId }).from(tickerLiveOverrides).where(eq(tickerLiveOverrides.isActive, true)),
+    db.select({ type: tickerLiveOverrides.type, competitionId: tickerLiveOverrides.competitionId, label: tickerLiveOverrides.label, href: tickerLiveOverrides.href, customSlides: tickerLiveOverrides.customSlides }).from(tickerLiveOverrides).where(eq(tickerLiveOverrides.isActive, true)),
   ]);
   const liveIds = liveRows.map((competition) => competition.id);
 
   // Fetch competition data for active overrides that reference a competition not already live
-  const overrideCompIds = activeOverrides.map((o) => o.competitionId).filter((id): id is number => id != null && !liveIds.includes(id));
+  const overrideCompIds = activeOverrides
+    .filter((override) => override.type === "live" || override.type === "uskoro")
+    .map((override) => override.competitionId)
+    .filter((id): id is number => id != null && !liveIds.includes(id));
   const overrideComps = overrideCompIds.length
     ? await db.select(fields).from(competitions).leftJoin(countries, eq(competitions.countryId, countries.id)).where(inArray(competitions.id, overrideCompIds))
     : [];
@@ -110,7 +113,15 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
           ...(nextPhase ? [{ label: locale === "en" ? "NEXT" : "SLEDEĆE", text: nextPhase }] : []),
           ...(completedPhase && completedTopThree ? [{ label: locale === "en" ? "RESULTS" : "REZULTATI", text: `${completedPhase} · ${completedTopThree}` }] : []),
         ];
-    return { ...competition, name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name), detailItems, forceStatus: null as "LIVE" | "USKORO" | null };
+    const linkedItems = activeOverrides
+      .filter((override) => override.type === "linked" && override.competitionId === competition.id)
+      .map((override) => ({
+        label: override.label ?? (locale === "en" ? "RELATED" : "VEZANO"),
+        text: override.customSlides?.[0]?.text ?? override.label ?? "",
+        href: override.href ?? undefined,
+      }))
+      .filter((item) => item.text);
+    return { ...competition, name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name), detailItems: [...detailItems, ...linkedItems], forceStatus: null as "LIVE" | "USKORO" | null };
   });
 
   // Inject forced overrides (competitions not currently live) into the live array
