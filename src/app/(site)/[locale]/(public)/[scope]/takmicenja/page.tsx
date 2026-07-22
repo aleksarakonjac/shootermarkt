@@ -130,6 +130,8 @@ interface CompItem {
   date: string;
   dateEnd: string | null;
   location: string | null;
+  locationSr: string | null;
+  locationEn: string | null;
   level: string;
   tags: string[] | null;
   countryCode2: string | null;
@@ -201,7 +203,7 @@ function CompRow({
                 />
               )}
               <span className="truncate">
-                {comp.location}
+                {(() => { const loc = locale === "en" ? (comp.locationEn ?? comp.location) : (comp.locationSr ?? comp.location); return loc; })()}
                 {comp.countryName && comp.location ? ` · ${comp.countryName}` : ""}
                 {comp.countryName && !comp.location ? comp.countryName : ""}
               </span>
@@ -329,6 +331,8 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
         date:            competitions.date,
         dateEnd:         competitions.dateEnd,
         location:        competitions.location,
+        locationSr:      competitions.locationSr,
+        locationEn:      competitions.locationEn,
         level:           competitions.level,
         tags:            competitions.tags,
         countryCode2:    countries.code2,
@@ -608,7 +612,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
                                   />
                                 )}
                                 <span>
-                                  {hero.location}
+                                  {locale === "en" ? (hero.locationEn ?? hero.location) : (hero.locationSr ?? hero.location)}
                                   {hero.countryName && hero.location ? ` · ${hero.countryName}` : ""}
                                   {hero.countryName && !hero.location ? hero.countryName : ""}
                                 </span>

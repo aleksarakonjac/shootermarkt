@@ -6,6 +6,7 @@ export type CompResultRow = {
   id: number;
   shooterId: number;
   name: string;
+  birthYear: number | null | undefined;
   clubDisplay: string;
   nationality: string | null;
   qualTotal: string | null;
@@ -13,8 +14,51 @@ export type CompResultRow = {
   qualInners: number | null;
   qualified: boolean | null;
   qualDetail: QualDetail | null;
+  remark: string | null | undefined;
+  disciplineCode: string | undefined;
   apparatus: string | null;
 };
+
+const REMARK_STYLE: Record<string, { bg: string; color: string; border: string }> = {
+  RPO: {
+    bg:     "color-mix(in oklch, oklch(0.75 0.16 75) 15%, transparent)",
+    color:  "oklch(0.52 0.16 75)",
+    border: "color-mix(in oklch, oklch(0.75 0.16 75) 30%, transparent)",
+  },
+  DSQ: {
+    bg:     "color-mix(in oklch, oklch(0.62 0.22 25) 12%, transparent)",
+    color:  "oklch(0.48 0.22 25)",
+    border: "color-mix(in oklch, oklch(0.62 0.22 25) 25%, transparent)",
+  },
+  DNS: {
+    bg:     "color-mix(in oklch, var(--muted) 10%, transparent)",
+    color:  "var(--muted)",
+    border: "color-mix(in oklch, var(--muted) 20%, transparent)",
+  },
+  DNF: {
+    bg:     "color-mix(in oklch, var(--muted) 10%, transparent)",
+    color:  "var(--muted)",
+    border: "color-mix(in oklch, var(--muted) 20%, transparent)",
+  },
+  SO: {
+    bg:     "color-mix(in oklch, oklch(0.60 0.18 240) 12%, transparent)",
+    color:  "oklch(0.48 0.18 240)",
+    border: "color-mix(in oklch, oklch(0.60 0.18 240) 25%, transparent)",
+  },
+};
+
+function RemarkBadge({ remark }: { remark: string }) {
+  const style = REMARK_STYLE[remark] ?? REMARK_STYLE.DNS;
+  return (
+    <span
+      className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[0.58rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)] shrink-0 leading-none"
+      style={{ background: style.bg, color: style.color, border: `1px solid ${style.border}` }}
+      title={remark}
+    >
+      {remark}
+    </span>
+  );
+}
 
 interface Props {
   results: CompResultRow[];
@@ -29,7 +73,10 @@ export function CompetitionQualTable({ results }: Props) {
     );
   }
 
-  const hasDecimals = results[0]?.apparatus === "air_rifle";
+  const hasDecimals =
+    results[0]?.apparatus === "air_rifle" ||
+    (results[0]?.disciplineCode?.startsWith("AR") ?? false) ||
+    (results[0]?.disciplineCode?.startsWith("R3P") ?? false);
 
   // Detect display type from first result with qualDetail
   const firstWithDetail = results.find((r) => r.qualDetail != null);
@@ -96,17 +143,17 @@ export function CompetitionQualTable({ results }: Props) {
                 </>
               )}
 
+              {/* Total */}
+              <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--ink)] w-20">
+                Σ
+              </th>
+
               {/* Inners */}
               {showInners && (
                 <th className="px-3 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] w-12">
                   ×
                 </th>
               )}
-
-              {/* Total */}
-              <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--ink)] w-20">
-                Σ
-              </th>
 
               {/* Qualified */}
               <th className="px-3 py-3 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] w-10">
@@ -157,12 +204,20 @@ export function CompetitionQualTable({ results }: Props) {
 
                   {/* Name */}
                   <td className="px-4 py-2.5">
-                    <Link
-                      href={`/strelci/${r.shooterId}`}
-                      className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
-                    >
-                      {r.name}
-                    </Link>
+                    <span className="inline-flex items-center gap-1.5 flex-wrap">
+                      <Link
+                        href={`/strelci/${r.shooterId}`}
+                        className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
+                      >
+                        {r.name}
+                      </Link>
+                      {r.birthYear != null && (
+                        <span className="text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] tabular-nums translate-y-px">
+                          {r.birthYear}
+                        </span>
+                      )}
+                      {r.remark && <RemarkBadge remark={r.remark} />}
+                    </span>
                   </td>
 
                   {/* Club / NOC */}
@@ -224,6 +279,13 @@ export function CompetitionQualTable({ results }: Props) {
                     </>
                   )}
 
+                  {/* Total */}
+                  <td className="px-4 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)]">
+                    {r.qualTotal != null
+                      ? fmt(parseFloat(r.qualTotal))
+                      : <span className="font-normal text-[var(--subtle)]">—</span>}
+                  </td>
+
                   {/* Inners */}
                   {showInners && (
                     <td className="px-3 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">
@@ -235,10 +297,6 @@ export function CompetitionQualTable({ results }: Props) {
                     </td>
                   )}
 
-                  {/* Total */}
-                  <td className="px-4 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)]">
-                    {r.qualTotal ?? <span className="font-normal text-[var(--subtle)]">—</span>}
-                  </td>
 
                   {/* Qualified mark */}
                   <td className="px-3 py-2.5 text-center">

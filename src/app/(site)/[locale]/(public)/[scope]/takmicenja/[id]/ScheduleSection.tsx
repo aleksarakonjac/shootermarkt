@@ -40,6 +40,31 @@ const CATEGORY_SHORT: Record<string, Record<string, string>> = {
   en: { junior: "Jun.", youth: "Yth.", cadet: "Cad." },
 };
 
+const DISCIPLINE_NAMES: Record<string, { sr: string; en: string }> = {
+  ARM:  { sr: "Vazdušna puška M",  en: "Air rifle M" },
+  ARW:  { sr: "Vazdušna puška Ž",  en: "Air rifle W" },
+  APM:  { sr: "Vazdušni pištolj M", en: "Air pistol M" },
+  APW:  { sr: "Vazdušni pištolj Ž", en: "Air pistol W" },
+  R3PM: { sr: "3×20 puška M",       en: "3×20 rifle M" },
+  R3PW: { sr: "3×20 puška Ž",       en: "3×20 rifle W" },
+  APMT: { sr: "10m pištolj miks",   en: "10m pistol mixed" },
+  ARMT: { sr: "10m puška miks",     en: "10m rifle mixed" },
+  SPW:  { sr: "Sport pištolj Ž",    en: "Sport pistol W" },
+};
+
+function fmtCountdown(ms: number, locale: string): string {
+  if (ms <= 0) return "";
+  const totalMins = Math.floor(ms / 60_000);
+  const h = Math.floor(totalMins / 60);
+  const min = totalMins % 60;
+  const d = Math.floor(h / 24);
+  const hRem = h % 24;
+  const pre = locale === "sr" ? "za " : "in ";
+  if (d > 0) return hRem > 0 ? `${pre}${d}d ${hRem}h` : `${pre}${d}d`;
+  if (h > 0) return min > 0 ? `${pre}${h}h ${min}min` : `${pre}${h}h`;
+  return `${pre}${totalMins}min`;
+}
+
 function slotStatus(slot: ScheduleSlot, now: Date): "active" | "imminent" | "upcoming" | "past" | "future" {
   const start = new Date(slot.startTime);
   if (start > now) {
@@ -213,38 +238,56 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2.5 w-full text-left group mb-0"
+        className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3 w-full text-left group mb-0"
         aria-expanded={open}
       >
-        <h2
-          className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase tracking-tight text-[var(--ink)] m-0 leading-none"
-          style={{ fontSize: "1.25rem", letterSpacing: "-0.02em" }}
-        >
-          {title}
-        </h2>
+        <div className="flex items-center gap-2.5">
+          <h2
+            className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase tracking-tight text-[var(--ink)] m-0 leading-none"
+            style={{ fontSize: "1.25rem", letterSpacing: "-0.02em" }}
+          >
+            {title}
+          </h2>
 
-        {liveCount > 0 && (
-          <span className="flex items-center gap-1.5 text-[0.68rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--ink)] bg-[var(--surface-2)] px-2 py-0.5 rounded-sm">
-            <span
-              className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"
-              style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }}
-            />
-            {locale === "sr" ? "Uživo" : "Live"}
+          <span className="self-center text-[var(--subtle)] group-hover:text-[var(--muted)] transition-colors shrink-0">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              aria-hidden="true"
+              style={{
+                transform: open ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 200ms ease",
+              }}
+            >
+              <path d="M2.5 5l4.5 4 4.5-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </span>
-        )}
 
-        {isImminent && (
-          <span className="flex items-center gap-1.5 text-[0.68rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--ink)] bg-[var(--surface-2)] px-2 py-0.5 rounded-sm">
-            <span
-              className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0"
-              style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }}
-            />
-            {locale === "sr" ? "Uskoro" : "Soon"}
-          </span>
-        )}
+          {liveCount > 0 && (
+            <span className="flex items-center gap-1.5 text-[0.68rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--ink)] bg-[var(--surface-2)] px-2 py-0.5 rounded-sm">
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"
+                style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }}
+              />
+              {locale === "sr" ? "Uživo" : "Live"}
+            </span>
+          )}
+
+          {isImminent && (
+            <span className="flex items-center gap-1.5 text-[0.68rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--ink)] bg-[var(--surface-2)] px-2 py-0.5 rounded-sm">
+              <span
+                className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0"
+                style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }}
+              />
+              {locale === "sr" ? "Uskoro" : "Soon"}
+            </span>
+          )}
+        </div>
 
         {liveHint && (
-          <span className="text-xs font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] whitespace-nowrap translate-y-[2px]">
+          <span className="text-xs font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] translate-y-px">
             {liveHintIsNext && !isImminent && (
               <span className="text-[var(--subtle)] mr-1">
                 {locale === "sr" ? "Sledeće:" : "Next:"}
@@ -256,26 +299,20 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
               </span>
             )}
             <span className="font-bold text-[var(--ink)]">{liveHint.disciplineCode}</span>
+            {" "}
+            <span className="text-[var(--muted)]">
+              {(DISCIPLINE_NAMES[liveHint.disciplineCode]?.[locale as "sr" | "en"] ?? DISCIPLINE_NAMES[liveHint.disciplineCode]?.en)}
+            </span>
             {" · "}
             {lang[liveHint.stage] ?? liveHint.stage}
+            {liveHintIsNext && (() => {
+              const ms = new Date(liveHint.startTime).getTime() - now.getTime();
+              const cd = fmtCountdown(ms, locale);
+              return cd ? <span className="text-[var(--subtle)] ml-1">· {cd}</span> : null;
+            })()}
           </span>
         )}
 
-        <span className="ml-auto self-center text-[var(--subtle)] group-hover:text-[var(--muted)] transition-colors shrink-0">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            aria-hidden="true"
-            style={{
-              transform: open ? "rotate(180deg)" : "rotate(0deg)",
-              transition: "transform 200ms ease",
-            }}
-          >
-            <path d="M2.5 5l4.5 4 4.5-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
       </button>
 
       {/* Collapsible body */}

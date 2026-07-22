@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ManualMode } from "./modes/ManualMode";
-import { PdfMode }    from "./modes/PdfMode";
-import { SssMode }    from "./modes/SssMode";
-import { IssfMode }   from "./modes/IssfMode";
-import { SiusMode }   from "./modes/SiusMode";
-import { ExcelMode }  from "./modes/ExcelMode";
-
+import { ManualMode }     from "./modes/ManualMode";
+import { PdfMode }        from "./modes/PdfMode";
+import { SssMode }        from "./modes/SssMode";
+import { IssfMode }       from "./modes/IssfMode";
+import { SiusMode }       from "./modes/SiusMode";
+import { ExcelMode }      from "./modes/ExcelMode";
 type Mode = "manual" | "excel" | "pdf" | "sss" | "issf" | "sius";
 
 interface ModeConfig {
@@ -76,7 +75,7 @@ const MODES: ModeConfig[] = [
   {
     id: "sius",
     label: "SIUS",
-    description: "PDF-ovi sa results.sius.com",
+    description: "SIUS Public API (8 disciplina)",
     icon: (
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
         <rect x="2" y="3" width="14" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
@@ -131,6 +130,7 @@ export function RezultatiHub({ initialMode = "manual" }: { initialMode?: Mode })
       {mode === "sss"    && <SssMode />}
       {mode === "issf"   && <IssfMode />}
       {mode === "sius"   && <SiusMode />}
+
     </div>
   );
 }

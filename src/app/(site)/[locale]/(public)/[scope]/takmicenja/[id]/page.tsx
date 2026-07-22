@@ -70,6 +70,7 @@ export default async function CompetitionPage({ params }: Props) {
       shooterId: results.shooterId,
       firstName: shooters.firstName,
       lastName: shooters.lastName,
+      birthYear: shooters.birthYear,
       nationality: shooters.nationality,
       clubId: results.clubId,
       clubName: clubs.name,
@@ -87,6 +88,7 @@ export default async function CompetitionPage({ params }: Props) {
       qualInners: results.qualInners,
       qualified: results.qualified,
       qualDetail: results.qualDetail,
+      remark: results.remark,
       finalTotal: results.finalTotal,
       finalRank: results.finalRank,
       finalDetail: results.finalDetail,
@@ -190,6 +192,7 @@ export default async function CompetitionPage({ params }: Props) {
       shooterId: r.shooterId,
       firstName: r.firstName,
       lastName: r.lastName,
+      birthYear: r.birthYear,
       nationality: r.nationality,
       clubName: r.clubName ?? null,
       clubNocCode: r.clubNocCode ?? null,
@@ -201,6 +204,7 @@ export default async function CompetitionPage({ params }: Props) {
       qualInners: r.qualInners,
       qualified: r.qualified,
       qualDetail: r.qualDetail,
+      remark: r.remark,
       finalTotal: r.finalTotal,
       finalRank: r.finalRank,
       finalDetail: r.finalDetail,
@@ -217,9 +221,13 @@ export default async function CompetitionPage({ params }: Props) {
   });
 
   // ── Date display ────────────────────────────────────────────────
+  function fmtDate(d: string) {
+    const [y, m, day] = d.split("-");
+    return `${day}.${m}.${y}.`;
+  }
   const dateDisplay = comp.dateEnd && comp.dateEnd !== comp.date
-    ? `${comp.date} – ${comp.dateEnd}`
-    : comp.date;
+    ? `${fmtDate(comp.date)} – ${fmtDate(comp.dateEnd)}`
+    : fmtDate(comp.date);
 
   const levelStyle = LEVEL_STYLE[comp.level] ?? { background: "#f3f4f6", color: "#4b5563" };
   const levelLabel = getLevelLabel(comp.level, locale);
@@ -311,7 +319,7 @@ export default async function CompetitionPage({ params }: Props) {
               <rect x="1" y="2" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
               <path d="M1 6h12M4.5 1v2M9.5 1v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
             </svg>
-            <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs">
+            <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs translate-y-0.5">
               {dateDisplay}
             </span>
           </span>
@@ -327,7 +335,7 @@ export default async function CompetitionPage({ params }: Props) {
                   style={{ width: "16px", height: "11px", borderRadius: "2px", display: "inline-block" }}
                 />
               )}
-              {comp.location && <span>{comp.location}</span>}
+              {comp.location && <span>{(locale === "en" ? (comp.locationEn ?? comp.location) : (comp.locationSr ?? comp.location))}</span>}
               {comp.country && comp.location && (
                 <span className="text-[var(--subtle)]">· {comp.country.name}</span>
               )}
@@ -356,11 +364,11 @@ export default async function CompetitionPage({ params }: Props) {
       <div>
         <h2
           className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase tracking-tight text-[var(--ink)] mb-5"
-          style={{ fontSize: "1.25rem", letterSpacing: "-0.02em" }}
+          style={{ fontSize: "1.5rem", letterSpacing: "-0.02em" }}
         >
           {t("detail.results")}
         </h2>
-        <CompetitionResultsClient groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} />
+        <CompetitionResultsClient groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} />
       </div>
 
       <RelatedNewsSection type="competition" refId={compId} locale={locale} />

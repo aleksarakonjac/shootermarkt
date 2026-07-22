@@ -189,8 +189,14 @@ export async function POST(req: NextRequest) {
           qualTotal: row.qualTotal.toString(),
           qualInners: row.qualInners ?? null,
           qualRank: row.qualRank ?? null,
-          qualDetail: row.qualSeries ? { series: row.qualSeries } : null,
+          qualDetail: row.qualPositions
+            ? { kneeling: row.qualPositions.kneeling, prone: row.qualPositions.prone, standing: row.qualPositions.standing }
+            : row.qualSeries ? { series: row.qualSeries }
+            : null,
           qualified: row.qualified ?? null,
+          elimRound: row.elimRound ?? null,
+          elimTotal: row.elimTotal ?? null,
+          elimRank: row.elimRank ?? null,
           finalTotal: row.finalTotal?.toString() ?? null,
           finalRank: row.finalRank ?? null,
           finalDetail: row.finalSeries || row.finalShots || row.finalCumulative || row.finalShotsByStage
@@ -206,6 +212,7 @@ export async function POST(req: NextRequest) {
                 ...(row.finalShootOff ? { shootOff: true } : {}),
               }
             : null,
+          remark: row.remark ?? null,
           source: payload.source ?? "pdf_import",
         })
         .onConflictDoNothing();

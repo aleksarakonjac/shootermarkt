@@ -103,7 +103,8 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
             {filtered.map((r) => {
               const isExpanded = expanded.has(r.id);
               const canExpand = r.qualDetail != null || r.finalDetail != null;
-              const hasDecimals = r.disciplineCode === "ARM" || r.disciplineCode === "ARW";
+              const hasDecimals = r.disciplineCode.startsWith("AR") || r.disciplineCode.startsWith("R3P");
+              const fmt = (v: string) => hasDecimals ? parseFloat(v).toFixed(1) : Math.round(parseFloat(v)).toString();
 
               return (
                 <Fragment key={r.id}>
@@ -137,7 +138,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                     <td className="whitespace-nowrap px-1 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] sm:px-4 sm:py-3">
                       {r.qualTotal != null ? (
                         <>
-                          {r.qualTotal}
+                          {fmt(r.qualTotal)}
                           {r.qualInners != null && (
                             <span className="ml-0.5 text-[0.65rem] text-[var(--muted)] sm:ml-1 sm:text-xs">{r.qualInners}×</span>
                           )}
@@ -158,7 +159,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                     </td>
                     <td className="whitespace-nowrap px-1 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] sm:px-4 sm:py-3">
                       <span className="inline-flex items-center gap-1">
-                        {r.finalTotal ?? <span className="text-[var(--subtle)]">—</span>}
+                        {r.finalTotal != null ? fmt(r.finalTotal) : <span className="text-[var(--subtle)]">—</span>}
                         {canExpand && (
                         <ChevronDown
                           size={14}

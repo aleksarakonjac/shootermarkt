@@ -31,6 +31,7 @@ export type DisciplineGroup = {
       shooterId: number;
       firstName: string;
       lastName: string;
+      birthYear: number | null;
       nationality: string | null;
       clubName: string | null;
       clubNocCode: string | null;
@@ -42,6 +43,7 @@ export type DisciplineGroup = {
       qualInners: number | null;
       qualified: boolean | null;
       qualDetail: QualDetail | null;
+      remark: string | null;
       finalTotal: string | null;
       finalRank: number | null;
       finalDetail: FinalDetail | null;
@@ -66,6 +68,7 @@ interface Props {
   groups: DisciplineGroup[];
   mixedGroups: MixedTeamGroup[];
   competitionId: number;
+  locale: string;
 }
 
 // ── Fade variants ─────────────────────────────────────────────────────────────
@@ -76,17 +79,39 @@ const fadeVariants = {
   exit:   { opacity: 0, y: -4, transition: { duration: 0.12, ease: "easeIn" as const } },
 };
 
+// ── Discipline names ──────────────────────────────────────────────────────────
+
+const DISCIPLINE_NAMES: Record<string, { sr: string; en: string }> = {
+  ARM:  { sr: "Vazdušna puška M",    en: "Air rifle M" },
+  ARW:  { sr: "Vazdušna puška Ž",    en: "Air rifle W" },
+  APM:  { sr: "Vazdušni pištolj M",  en: "Air pistol M" },
+  APW:  { sr: "Vazdušni pištolj Ž",  en: "Air pistol W" },
+  R3PM: { sr: "3×20 puška M",        en: "3×20 rifle M" },
+  R3PW: { sr: "3×20 puška Ž",        en: "3×20 rifle W" },
+  APMT: { sr: "10m pištolj miks",    en: "10m pistol mixed" },
+  ARMT: { sr: "10m puška miks",      en: "10m rifle mixed" },
+  SPW:  { sr: "Sport pištolj Ž",     en: "Sport pistol W" },
+  RFPM: { sr: "Brza vatra M",        en: "Rapid fire M" },
+  R3JM: { sr: "3×20 puška jr. M",    en: "3×20 rifle jr. M" },
+  R3JW: { sr: "3×20 puška jr. Ž",    en: "3×20 rifle jr. W" },
+};
+
+function disciplineName(code: string, locale: string): string {
+  const entry = DISCIPLINE_NAMES[code];
+  if (!entry) return code;
+  return locale === "en" ? entry.en : entry.sr;
+}
+
 // ── Phase labels ──────────────────────────────────────────────────────────────
 
-const PHASE_LABEL: Record<string, string> = {
-  elim: "Eliminacije",
-  qual: "Kvalifikacije",
-  final: "Finale",
+const PHASE_LABELS: Record<string, Record<string, string>> = {
+  sr: { elim: "Eliminacije", qual: "Kvalifikacije", final: "Finale" },
+  en: { elim: "Elimination", qual: "Qualification", final: "Final" },
 };
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
-export function CompetitionResultsClient({ groups, mixedGroups, competitionId }: Props) {
+export function CompetitionResultsClient({ groups, mixedGroups, competitionId, locale }: Props) {
   const router = useRouter();
   const [selection, setSelection] = useState<Selection | null>(null);
 
@@ -110,10 +135,10 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId }:
     return (
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 text-center">
         <p className="mx-auto text-sm font-medium text-[var(--muted)]">
-          Nema unetih rezultata za ovo takmičenje.
+          {locale === "en" ? "No results entered for this competition." : "Nema unetih rezultata za ovo takmičenje."}
         </p>
         <p className="mx-auto text-xs text-[var(--subtle)] mt-1">
-          Admin može uvesti rezultate iz PDF biltena ili ISSF-a.
+          {locale === "en" ? "Admin can import results from a PDF bulletin or ISSF." : "Admin može uvesti rezultate iz PDF biltena ili ISSF-a."}
         </p>
       </div>
     );
@@ -126,6 +151,7 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId }:
           <CompetitionOverview
             groups={groups}
             mixedGroups={mixedGroups}
+            locale={locale}
             onSelectIndividual={(code, category, stage, elimRound) =>
               setSelection({ kind: "individual", disciplineCode: code, category, stage, elimRound })
             }
@@ -140,6 +166,7 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId }:
             groups={groups}
             mixedGroups={mixedGroups}
             selection={selection}
+            locale={locale}
             onBack={() => setSelection(null)}
             onStageChange={(stage, elimRound) =>
               setSelection((s) => s ? { ...s, stage: stage as Stage, elimRound } : s)
@@ -156,11 +183,13 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId }:
 function CompetitionOverview({
   groups,
   mixedGroups,
+  locale,
   onSelectIndividual,
   onSelectMixed,
 }: {
   groups: DisciplineGroup[];
   mixedGroups: MixedTeamGroup[];
+  locale: string;
   onSelectIndividual: (code: string, category: AgeCategory, stage: Stage, elimRound?: number) => void;
   onSelectMixed: (code: string) => void;
 }) {
@@ -181,9 +210,9 @@ function CompetitionOverview({
               >
                 {g.code}
               </span>
-              <span className="text-sm font-semibold text-[var(--ink)]">{g.name}</span>
+              <span className="text-sm font-semibold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
               <span className="text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
-                {totalShooters} str.
+                {totalShooters} {locale === "en" ? "athletes" : "strelaca"}
               </span>
             </div>
 
@@ -192,6 +221,7 @@ function CompetitionOverview({
                 /* Single category: show phase rows directly */
                 <SingleCatRows
                   catData={singleCatData}
+                  locale={locale}
                   onSelect={(stage, elimRound) => onSelectIndividual(g.code, singleCatData.category, stage, elimRound)}
                 />
               ) : (
@@ -209,13 +239,13 @@ function CompetitionOverview({
                         <span className="text-sm font-semibold text-[var(--ink)] truncate">
                           {CATEGORY_LABEL[cat.category]}
                         </span>
-                        <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">
+                        <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">
                           {cat.results.length}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {hasElim && <PhaseBadge label="E" elim />}
-                        <PhaseBadge label="KV" active />
+                        <PhaseBadge label="Q" active />
                         {hasFinal && <PhaseBadge label="F" accent />}
                         <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150 ml-0.5" aria-hidden="true" />
                       </div>
@@ -238,9 +268,9 @@ function CompetitionOverview({
             >
               {g.code}
             </span>
-            <span className="text-sm font-semibold text-[var(--ink)]">{g.name}</span>
+            <span className="text-sm font-semibold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
             <span className="text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
-              {g.teams.length} tim.
+              {g.teams.length} {locale === "en" ? "teams" : "timova"}
             </span>
           </div>
 
@@ -250,13 +280,13 @@ function CompetitionOverview({
               className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-sm font-semibold text-[var(--ink)]">Mešoviti tim</span>
-                <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">
+                <span className="text-sm font-semibold text-[var(--ink)]">{locale === "en" ? "Mixed team" : "Mešoviti tim"}</span>
+                <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">
                   {g.teams.length}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <PhaseBadge label="KV" active />
+                <PhaseBadge label="Q" active />
                 {g.teams.some((t) => t.finalRank != null || t.finalTotal != null) && (
                   <PhaseBadge label="F" accent />
                 )}
@@ -274,9 +304,11 @@ function CompetitionOverview({
 
 function SingleCatRows({
   catData,
+  locale,
   onSelect,
 }: {
   catData: DisciplineGroup["categories"][number];
+  locale: string;
   onSelect: (stage: Stage, elimRound?: number) => void;
 }) {
   const hasElim = catData.results.some((r) => r.elimRound != null);
@@ -301,9 +333,9 @@ function SingleCatRows({
             <div className="flex items-center gap-2.5 min-w-0">
               <PhaseBadge label="E" elim />
               <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                {PHASE_LABEL.elim} R{rnd}
+                {(PHASE_LABELS[locale] ?? PHASE_LABELS.en).elim} R{rnd}
               </span>
-              <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">
+              <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">
                 {count}
               </span>
             </div>
@@ -318,11 +350,11 @@ function SingleCatRows({
         className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <PhaseBadge label="KV" active />
+          <PhaseBadge label="Q" active />
           <span className="text-sm font-semibold text-[var(--ink)] truncate">
-            {PHASE_LABEL.qual}
+            {(PHASE_LABELS[locale] ?? PHASE_LABELS.en).qual}
           </span>
-          <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">
+          <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">
             {catData.results.length}
           </span>
         </div>
@@ -338,7 +370,7 @@ function SingleCatRows({
           <div className="flex items-center gap-2.5 min-w-0">
             <PhaseBadge label="F" accent />
             <span className="text-sm font-semibold text-[var(--ink)] truncate">
-              {PHASE_LABEL.final}
+              {(PHASE_LABELS[locale] ?? PHASE_LABELS.en).final}
             </span>
           </div>
           <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
@@ -392,7 +424,7 @@ function PhaseBadge({
   if (active) {
     return (
       <span
-        className="inline-flex items-center px-1.5 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
+        className="inline-flex items-center px-1.5 rounded text-[1rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
         style={{
           background: "color-mix(in oklch, var(--success) 12%, transparent)",
           color: "var(--success)",
@@ -416,12 +448,14 @@ function CompetitionDetail({
   groups,
   mixedGroups,
   selection,
+  locale,
   onBack,
   onStageChange,
 }: {
   groups: DisciplineGroup[];
   mixedGroups: MixedTeamGroup[];
   selection: Selection;
+  locale: string;
   onBack: () => void;
   onStageChange: (stage: string, elimRound?: number) => void;
 }) {
@@ -435,11 +469,11 @@ function CompetitionDetail({
           <button
             onClick={onBack}
             className="mt-0.5 shrink-0 flex items-center gap-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] transition-colors duration-150"
-            aria-label="Nazad na pregled disciplina"
+            aria-label={locale === "en" ? "Back to disciplines" : "Nazad na pregled disciplina"}
           >
             <ChevronLeft size={14} aria-hidden="true" />
-            Nazad
-          </button>
+            {locale === "en" ? "Back" : "Nazad"}
+</button>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <span
@@ -449,14 +483,14 @@ function CompetitionDetail({
                 {selection.disciplineCode}
               </span>
               <span className="text-[0.72rem] font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Mešoviti tim
+                {locale === "en" ? "Mixed team" : "Mešoviti tim"}
               </span>
             </div>
             <h3
               className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase truncate"
               style={{ fontSize: "1.1rem", letterSpacing: "-0.02em", lineHeight: 1.2 }}
             >
-              {mixedGroup?.name}
+              {mixedGroup ? disciplineName(mixedGroup.code, locale) : ""}
             </h3>
           </div>
         </div>
@@ -472,9 +506,9 @@ function CompetitionDetail({
                 }`}
               >
                 {s === "qual" ? (
-                  <><PhaseBadge label="KV" active={selection.stage === "qual"} />Kvalifikacija</>
+                  <><PhaseBadge label="Q" active={selection.stage === "qual"} />{(PHASE_LABELS[locale] ?? PHASE_LABELS.en).qual}</>
                 ) : (
-                  <><PhaseBadge label="F" accent={selection.stage === "final"} />Finale</>
+                  <><PhaseBadge label="F" accent={selection.stage === "final"} />{(PHASE_LABELS[locale] ?? PHASE_LABELS.en).final}</>
                 )}
               </button>
             ))}
@@ -509,6 +543,7 @@ function CompetitionDetail({
       id: r.id,
       shooterId: r.shooterId,
       name: `${r.lastName} ${r.firstName}`,
+      birthYear: r.birthYear,
       clubDisplay: r.clubName ?? r.clubNocCode ?? "",
       nationality: r.nationality,
       qualTotal: r.qualTotal,
@@ -516,6 +551,8 @@ function CompetitionDetail({
       qualInners: r.qualInners,
       qualified: r.qualified,
       qualDetail: r.qualDetail,
+      remark: r.remark,
+      disciplineCode: group?.code ?? "",
       apparatus: group?.apparatus ?? null,
     })) ?? [];
 
@@ -549,10 +586,11 @@ function CompetitionDetail({
 
   // Build stage toggle options in correct order: Elim → Qual → Final
   type StageOption = { key: Stage; label: string; badge: React.ReactNode };
+  const phaseL = PHASE_LABELS[locale] ?? PHASE_LABELS.en;
   const stageOptions: StageOption[] = [
-    ...(hasElim ? [{ key: "elim" as Stage, label: "Eliminacije", badge: <PhaseBadge label="E" elim={selection.stage === "elim"} /> }] : []),
-    { key: "qual" as Stage, label: "Kvalifikacije", badge: <PhaseBadge label="KV" active={selection.stage === "qual"} /> },
-    ...(hasFinal ? [{ key: "final" as Stage, label: "Finale", badge: <PhaseBadge label="F" accent={selection.stage === "final"} /> }] : []),
+    ...(hasElim ? [{ key: "elim" as Stage, label: phaseL.elim, badge: <PhaseBadge label="E" elim={selection.stage === "elim"} /> }] : []),
+    { key: "qual" as Stage, label: phaseL.qual, badge: <PhaseBadge label="Q" active={selection.stage === "qual"} /> },
+    ...(hasFinal ? [{ key: "final" as Stage, label: phaseL.final, badge: <PhaseBadge label="F" accent={selection.stage === "final"} /> }] : []),
   ];
 
   return (
@@ -562,32 +600,30 @@ function CompetitionDetail({
         <button
           onClick={onBack}
           className="mt-0.5 shrink-0 flex items-center gap-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] transition-colors duration-150"
-          aria-label="Nazad na pregled disciplina"
+          aria-label={locale === "en" ? "Back to disciplines" : "Nazad na pregled disciplina"}
         >
           <ChevronLeft size={14} aria-hidden="true" />
           Nazad
         </button>
 
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <span
-              className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded shrink-0"
-              style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
-            >
-              {selection.disciplineCode}
-            </span>
-            {showCategory && (
-              <span className="text-[0.72rem] font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                {CATEGORY_LABEL[selection.category]}
-              </span>
-            )}
-          </div>
+        <div className="min-w-0 flex items-center gap-2 flex-wrap">
+          <span
+            className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded shrink-0"
+            style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
+          >
+            {selection.disciplineCode}
+          </span>
           <h3
-            className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase truncate"
+            className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase"
             style={{ fontSize: "1.1rem", letterSpacing: "-0.02em", lineHeight: 1.2 }}
           >
-            {group?.name}
+            {disciplineName(selection.disciplineCode, locale)}
           </h3>
+          {showCategory && (
+            <span className="text-[0.72rem] font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
+              {CATEGORY_LABEL[selection.category]}
+            </span>
+          )}
         </div>
       </div>
 
@@ -639,7 +675,7 @@ function CompetitionDetail({
             animate={{ opacity: 1, transition: { duration: 0.15 } }}
             exit={{ opacity: 0, transition: { duration: 0.1 } }}
           >
-            <ElimTable rows={elimRows} />
+            <ElimTable rows={elimRows} locale={locale} />
           </motion.div>
         ) : selection.stage === "qual" ? (
           <motion.div
@@ -678,11 +714,11 @@ type ElimRow = {
   qualified: boolean | null;
 };
 
-function ElimTable({ rows }: { rows: ElimRow[] }) {
+function ElimTable({ rows, locale }: { rows: ElimRow[]; locale: string }) {
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-10 text-center">
-        <p className="text-sm text-[var(--muted)]">Nema podataka za ovu rundu.</p>
+        <p className="text-sm text-[var(--muted)]">{locale === "en" ? "No data for this round." : "Nema podataka za ovu rundu."}</p>
       </div>
     );
   }
@@ -693,7 +729,7 @@ function ElimTable({ rows }: { rows: ElimRow[] }) {
         <thead>
           <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
             <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] w-8">#</th>
-            <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">Strelac</th>
+            <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">{locale === "en" ? "Athlete" : "Strelac"}</th>
             <th className="py-2 px-3 text-right text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">Σ</th>
             <th className="py-2 px-3 text-center text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] w-8">→</th>
           </tr>

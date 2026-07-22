@@ -16,6 +16,8 @@ interface Competition {
   date: string;
   dateEnd?: string | null;
   location: string | null;
+  locationSr?: string | null;
+  locationEn?: string | null;
   level: CompetitionLevel;
   issfId?: string | null;
   siusId?: string | null;
@@ -45,6 +47,8 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
     date: competition.date,
     dateEnd: competition.dateEnd ?? "",
     location: competition.location ?? "",
+    locationSr: competition.locationSr ?? "",
+    locationEn: competition.locationEn ?? "",
     level: competition.level,
     issfId: competition.issfId ?? "",
     siusId: competition.siusId ?? "",
@@ -191,6 +195,27 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
               placeholder="npr. Beograd, SC Crvena zvezda"
               className={inputCls}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija (SR)</label>
+              <input
+                value={form.locationSr}
+                onChange={(e) => set("locationSr", e.target.value)}
+                placeholder="Srpski naziv"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija (EN)</label>
+              <input
+                value={form.locationEn}
+                onChange={(e) => set("locationEn", e.target.value)}
+                placeholder="English name"
+                className={inputCls}
+              />
+            </div>
           </div>
 
           <div>

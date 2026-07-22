@@ -171,7 +171,15 @@ export interface ReviewRow {
   qualInners?: number | null;
   qualRank?: number;
   qualSeries?: number[];
+  qualPositions?: {
+    kneeling: { series: number[][]; total: number };
+    prone:    { series: number[][]; total: number };
+    standing: { series: number[][]; total: number };
+  };
   qualified?: boolean | null;
+  elimRound?: number | null;
+  elimTotal?: number | null;
+  elimRank?: number | null;
   finalTotal?: number | null;
   finalRank?: number | null;
   finalSeries?: number[] | null;
@@ -184,6 +192,9 @@ export interface ReviewRow {
   finalShotsByStage?: number[][] | null;
   /** Strelac je bio u shoot-off-u. */
   finalShootOff?: boolean | null;
+
+  /** ISSF/SIUS remark: RPO, DSQ, DNS, DNF, SO */
+  remark?: string | null;
 
   /** UI controls */
   skip?: boolean;

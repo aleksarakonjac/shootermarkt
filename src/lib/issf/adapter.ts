@@ -1,13 +1,25 @@
 const ISSF_API = "https://api.issf-sports.org/api/v01";
 const ISSF_WEB = "https://www.issf-sports.org";
 
-export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW";
+export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "R3PM" | "R3PW";
+export type MixedTeamDisciplineCode = "APMT" | "ARMT";
 
 const ISSF_EVENT_MAP: Record<string, DisciplineCode> = {
-  ARM: "ARM",
-  ARW: "ARW",
-  APM: "APM",
-  APW: "APW",
+  ARM:  "ARM",
+  ARW:  "ARW",
+  APM:  "APM",
+  APW:  "APW",
+  R3PM: "R3PM",
+  R3PW: "R3PW",
+};
+
+// ISSF may use various codes for mixed team events
+const ISSF_MIXED_TEAM_MAP: Record<string, MixedTeamDisciplineCode> = {
+  APMT: "APMT",
+  ARMT: "ARMT",
+  // Some ISSF events use longer codes
+  "10MAPM": "APMT",
+  "10MARM": "ARMT",
 };
 
 export interface ISSFCompetitionType {
@@ -134,11 +146,19 @@ export function extractMvpEvents(
       if (!dc) continue;
 
       const phases = event.competitionResultPhases;
-      const qualPhase = phases.find((p) => p.title === "Qualification") ?? null;
-      const finalPhase = phases.find((p) => p.title === "Final") ?? null;
+      const qualPhase =
+        phases.find((p) => /^qualification$/i.test(p.title)) ??
+        phases.find((p) => /qual/i.test(p.title) && !/final/i.test(p.title)) ??
+        null;
+      const finalPhase =
+        phases.find((p) => /^finals?$/i.test(p.title)) ??
+        phases.find((p) => /final/i.test(p.title)) ??
+        null;
 
-      // Elimination phases: "Elimination Relay 1", "Elimination Relay 2", etc.
-      const rawElim = phases.filter((p) => /elimination/i.test(p.title));
+      // Relay phases for R3P: "Elimination Relay N", "Qualification Relay N", "Relay N"
+      const rawElim = phases.filter(
+        (p) => /elimination|relay/i.test(p.title) && !/^finals?$/i.test(p.title)
+      );
       const elimPhases = rawElim.map((p, i) => {
         const m = p.title.match(/(\d+)\s*$/);
         return { round: m ? parseInt(m[1]) : i + 1, phase: p };
@@ -388,6 +408,8 @@ export interface ISSFQualResult {
   total: number;
   inners: number | null;
   qualified: boolean;
+  /** RPO, DSQ, DNS, DNF, SO — null when no remark */
+  remark: string | null;
 }
 
 /**
@@ -417,7 +439,7 @@ export async function fetchQualResultsFromHtml(
 
   // Match each result row: starts with a rank td, has athlete link, NOC, series, total
   const rowRe =
-    /<tr>\s*<td[^>]*>(\d+)<\/td>\s*<td[^>]*>\d+<\/td>\s*<td[^>]*><a href="\/athletes\/([^"]+)">([^<]+)<\/a><\/td>\s*<td[^>]*>([A-Z]{3})<\/td>((?:\s*<td[^>]*>[^<]*<\/td>)+)\s*<td[^>]*>([^<]*)<\/td>\s*<td[^>]*>(Q)?[^<]*<\/td>/g;
+    /<tr>\s*<td[^>]*>(\d+)<\/td>\s*<td[^>]*>\d+<\/td>\s*<td[^>]*><a href="\/athletes\/([^"]+)">([^<]+)<\/a><\/td>\s*<td[^>]*>([A-Z]{3})<\/td>((?:\s*<td[^>]*>[^<]*<\/td>)+)\s*<td[^>]*>([^<]*)<\/td>\s*<td[^>]*>([^<]*)<\/td>/g;
 
   let m: RegExpExecArray | null;
   while ((m = rowRe.exec(html)) !== null) {
@@ -430,7 +452,9 @@ export async function fetchQualResultsFromHtml(
     const nationCode = m[4];
     const seriesCells = m[5];
     const totalCell = m[6].trim();
-    const qualified = m[7] === "Q";
+    const remarkRaw = m[7].trim();
+    const qualified = remarkRaw === "Q";
+    const remark = (remarkRaw && remarkRaw !== "Q") ? remarkRaw : null;
 
     // Extract series values from cells
     const seriesRe = /<td[^>]*>([\d.]+)<\/td>/g;
@@ -453,7 +477,115 @@ export async function fetchQualResultsFromHtml(
 
     if (isNaN(total)) continue;
 
-    results.push({ rank, issfId, lastName, firstName, nationCode, series, total, inners, qualified });
+    results.push({ rank, issfId, lastName, firstName, nationCode, series, total, inners, qualified, remark });
+  }
+
+  return results;
+}
+
+export interface ISSFThreePResult {
+  rank: number;
+  issfId: string;
+  lastName: string;
+  firstName: string;
+  nationCode: string;
+  kneeling: { series: number[][]; total: number };
+  prone:    { series: number[][]; total: number };
+  standing: { series: number[][]; total: number };
+  total: number;
+  inners: number | null;
+  qualified: boolean;
+  remark: string | null;
+}
+
+function extractCells(trHtml: string): string[] {
+  const cells: string[] = [];
+  const cellRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = cellRe.exec(trHtml)) !== null) {
+    cells.push(m[1].replace(/<[^>]+>/g, "").replace(/&nbsp;/gi, " ").trim());
+  }
+  return cells;
+}
+
+/**
+ * Scrape 50m 3-Position results HTML (qualification relay or elimination relay).
+ * Each athlete spans 3 consecutive rows: Kneeling / Prone / Standing.
+ * The athlete link (with ISSF ID + name) appears only in the Kneeling row.
+ * Total + inners appear in the Standing row as "590 - 31x".
+ */
+export async function fetchR3PResultsFromHtml(
+  competitionId: number,
+  resultKey: string,
+  noCache = false
+): Promise<ISSFThreePResult[]> {
+  const url = `${ISSF_WEB}/competitions/${competitionId}/results/${resultKey}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    ...(noCache ? { cache: "no-store" as const } : { next: { revalidate: 3600 } }),
+  });
+  if (!res.ok) throw new Error(`ISSF HTML fetch failed: ${res.status} ${url}`);
+  const html = await res.text();
+
+  const results: ISSFThreePResult[] = [];
+
+  const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const trs: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = trRe.exec(html)) !== null) trs.push(m[1]);
+
+  for (let i = 0; i < trs.length; i++) {
+    const tr = trs[i];
+    const athleteMatch = tr.match(/<a\s+href="\/athletes\/([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+    if (!athleteMatch) continue;
+
+    const issfId   = athleteMatch[1].trim();
+    const rawName  = athleteMatch[2].replace(/&nbsp;/gi, " ").replace(/ /g, " ").replace(/<[^>]+>/g, "").trim();
+    const spaceIdx = rawName.indexOf(" ");
+    const lastName  = spaceIdx > 0 ? rawName.slice(0, spaceIdx) : rawName;
+    const firstName = spaceIdx > 0 ? rawName.slice(spaceIdx + 1) : "";
+
+    const knCells = extractCells(tr);
+    const rank       = parseInt(knCells[0]) || 0;
+    const nationCode = knCells[3] ?? "";
+    const knS1       = parseFloat(knCells[5]) || 0;
+    const knS2       = parseFloat(knCells[6]) || 0;
+    const knTotal    = parseFloat(knCells[7]) || 0;
+
+    const prCells = extractCells(trs[i + 1] ?? "");
+    const prS1    = parseFloat(prCells[5]) || 0;
+    const prS2    = parseFloat(prCells[6]) || 0;
+    const prTotal = parseFloat(prCells[7]) || 0;
+
+    const stCells   = extractCells(trs[i + 2] ?? "");
+    const stS1      = parseFloat(stCells[5]) || 0;
+    const stS2      = parseFloat(stCells[6]) || 0;
+    const stTotal   = parseFloat(stCells[7]) || 0;
+    const totalRaw  = stCells[8] ?? "";
+
+    const totalMatch = totalRaw.match(/(\d+)\s*[-–]\s*(\d+)x/i);
+    const total  = totalMatch ? parseInt(totalMatch[1]) : (knTotal + prTotal + stTotal);
+    const inners = totalMatch ? parseInt(totalMatch[2]) : null;
+
+    // Q marker may be in index 9 or 10 of the standing row
+    const qCandidates = [stCells[9] ?? "", stCells[10] ?? ""];
+    const qualified = qCandidates.some((s) => /^Q/.test(s.trim()));
+    const remark    = qCandidates.find((s) => s.trim() && !/^Q$/.test(s.trim()) && s.trim() !== "") ?? null;
+
+    results.push({
+      rank,
+      issfId,
+      lastName,
+      firstName,
+      nationCode,
+      kneeling: { series: [[knS1, knS2]], total: knTotal },
+      prone:    { series: [[prS1, prS2]], total: prTotal },
+      standing: { series: [[stS1, stS2]], total: stTotal },
+      total,
+      inners,
+      qualified,
+      remark: remark || null,
+    });
   }
 
   return results;
@@ -587,6 +719,256 @@ export async function fetchFinalResultsFromHtml(
       total: entry.total,
       shotsByStage: shotCols,
       shootOff: entry.shootOff,
+    });
+  }
+
+  return results;
+}
+
+// ── Mixed Team (APMT / ARMT) ─────────────────────────────────────────────────
+
+export function extractMixedTeamEvents(
+  groups: ISSFResultGroup[]
+): Array<{
+  disciplineCode: MixedTeamDisciplineCode;
+  qualPhase: ISSFResultPhase | null;
+  finalPhase: ISSFResultPhase | null;
+}> {
+  const out = [];
+  for (const group of groups) {
+    for (const event of group.competitionResultEvents) {
+      let dc: MixedTeamDisciplineCode | null = ISSF_MIXED_TEAM_MAP[event.eventCode] ?? null;
+      if (!dc) {
+        const t = event.title.toLowerCase();
+        if (t.includes("air pistol") && t.includes("mixed")) dc = "APMT";
+        else if (t.includes("air rifle") && t.includes("mixed")) dc = "ARMT";
+      }
+      if (!dc) continue;
+
+      const phases = event.competitionResultPhases;
+      const qualPhase  = phases.find((p) => /qual/i.test(p.title)) ?? null;
+      const finalPhase = phases.find((p) => /final/i.test(p.title)) ?? null;
+
+      out.push({ disciplineCode: dc, qualPhase, finalPhase });
+    }
+  }
+  return out;
+}
+
+export interface ISSFMixedTeamQualEntry {
+  rank: number;
+  nocCode: string;
+  mIssfId: string | null;
+  mLastName: string;
+  mFirstName: string;
+  mSeries: number[];
+  mTotal: number;
+  fIssfId: string | null;
+  fLastName: string;
+  fFirstName: string;
+  fSeries: number[];
+  fTotal: number;
+  total: number;
+  inners: number | null;
+  qualified: boolean;
+}
+
+export interface ISSFMixedTeamFinalEntry {
+  rank: number;
+  nocCode: string;
+  mIssfId: string | null;
+  mLastName: string;
+  mFirstName: string;
+  fIssfId: string | null;
+  fLastName: string;
+  fFirstName: string;
+  stageCumulatives: number[];
+  total: number;
+  shootOff: boolean;
+}
+
+function parseAthleteLink(html: string): { issfId: string; lastName: string; firstName: string } | null {
+  const m = html.match(/<a\s+href="\/athletes\/([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+  if (!m) return null;
+  const issfId  = m[1].trim();
+  const rawName = m[2].replace(/&nbsp;/gi, " ").replace(/ /g, " ").replace(/<[^>]+>/g, "").trim();
+  const sp = rawName.indexOf(" ");
+  return {
+    issfId,
+    lastName:  sp > 0 ? rawName.slice(0, sp) : rawName,
+    firstName: sp > 0 ? rawName.slice(sp + 1) : "",
+  };
+}
+
+/**
+ * Scrape ISSF mixed team qualification results.
+ *
+ * Format: 3-row groups per team:
+ *   Row 0 — team row:   rank | bib | NOC | total | Q  (no athlete link)
+ *   Row 1 — male:       (empty) | <a>Athlete</a> | NOC | series... | total
+ *   Row 2 — female:     (empty) | <a>Athlete</a> | NOC | series... | total
+ */
+export async function fetchMixedTeamQualFromHtml(
+  competitionId: number,
+  resultKey: string,
+  noCache = false
+): Promise<ISSFMixedTeamQualEntry[]> {
+  const url = `${ISSF_WEB}/competitions/${competitionId}/results/${resultKey}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    ...(noCache ? { cache: "no-store" as const } : { next: { revalidate: 3600 } }),
+  });
+  if (!res.ok) throw new Error(`ISSF mixed team qual fetch failed: ${res.status} ${url}`);
+  const html = await res.text();
+
+  const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const trs: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = trRe.exec(html)) !== null) trs.push(m[1]);
+
+  const results: ISSFMixedTeamQualEntry[] = [];
+
+  for (let i = 0; i < trs.length; i++) {
+    const tr = trs[i];
+    if (/<a\s+href="\/athletes\//i.test(tr)) continue; // skip athlete rows
+    const cells = extractCells(tr);
+    const rank = parseInt(cells[0]);
+    if (isNaN(rank) || rank <= 0) continue;
+
+    const nocIdx = cells.findIndex((c) => /^[A-Z]{3}$/.test(c));
+    if (nocIdx < 0) continue;
+    const nocCode = cells[nocIdx];
+
+    const numericCells = cells.slice(nocIdx + 1).filter((c) => /^\d/.test(c));
+    const totalRaw = numericCells[numericCells.length - 1] ?? "";
+    const lastTotalMatch = totalRaw.match(/^(\d+)\s*(?:-\s*(\d+)x\s*)?$/);
+    const total  = lastTotalMatch ? parseInt(lastTotalMatch[1]) : NaN;
+    const inners = lastTotalMatch?.[2] ? parseInt(lastTotalMatch[2]) : null;
+    if (isNaN(total)) continue;
+
+    const remarkCells = cells.slice(nocIdx + 1);
+    const qualified = remarkCells.some((c) => /^Q/.test(c.trim()));
+
+    let mInfo: { issfId: string; lastName: string; firstName: string } | null = null;
+    let mSeries: number[] = [], mTotal = 0;
+    let fInfo: { issfId: string; lastName: string; firstName: string } | null = null;
+    let fSeries: number[] = [], fTotal = 0;
+
+    for (let j = i + 1; j <= i + 2 && j < trs.length; j++) {
+      const subTr = trs[j];
+      const ath = parseAthleteLink(subTr);
+      if (!ath) break;
+
+      // Cells: [empty, bib, name, empty, s1, s2, s3, "total-innersx", ...]
+      const subCells = extractCells(subTr);
+      const s1 = parseFloat(subCells[4] ?? "") || 0;
+      const s2 = parseFloat(subCells[5] ?? "") || 0;
+      const s3 = parseFloat(subCells[6] ?? "") || 0;
+      const subTotalRaw = subCells[7] ?? "";
+      const subTotalMatch = subTotalRaw.match(/^(\d+)\s*(?:-\s*(\d+)x\s*)?$/);
+      const subTotal = subTotalMatch ? parseInt(subTotalMatch[1]) : 0;
+      const series = [s1, s2, s3].filter((n) => n > 0);
+
+      // Gender from ISSF ID: SH{NOC3}{G}... → index 5 is M/W/F
+      const genderChar = ath.issfId[5]?.toUpperCase();
+      if (!mInfo && genderChar === "M") {
+        mInfo = ath; mSeries = series; mTotal = subTotal;
+      } else if (!fInfo && (genderChar === "W" || genderChar === "F")) {
+        fInfo = ath; fSeries = series; fTotal = subTotal;
+      } else if (!mInfo) {
+        mInfo = ath; mSeries = series; mTotal = subTotal;
+      } else {
+        fInfo = ath; fSeries = series; fTotal = subTotal;
+      }
+    }
+
+    results.push({
+      rank, nocCode,
+      mIssfId: mInfo?.issfId ?? null, mLastName: mInfo?.lastName ?? "", mFirstName: mInfo?.firstName ?? "",
+      mSeries, mTotal,
+      fIssfId: fInfo?.issfId ?? null, fLastName: fInfo?.lastName ?? "", fFirstName: fInfo?.firstName ?? "",
+      fSeries, fTotal,
+      total, inners, qualified,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Scrape ISSF mixed team final results (elimination format).
+ *
+ * Row 0 — team row:   rank | bib | NOC | cumulative... | total | remarks
+ * Row 1 — male:       athlete link + shot columns
+ * Row 2 — female:     athlete link + shot columns
+ */
+export async function fetchMixedTeamFinalFromHtml(
+  competitionId: number,
+  resultKey: string,
+  noCache = false
+): Promise<ISSFMixedTeamFinalEntry[]> {
+  const url = `${ISSF_WEB}/competitions/${competitionId}/results/${resultKey}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    ...(noCache ? { cache: "no-store" as const } : { next: { revalidate: 3600 } }),
+  });
+  if (!res.ok) throw new Error(`ISSF mixed team final fetch failed: ${res.status} ${url}`);
+  const html = await res.text();
+
+  const trRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const trs: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = trRe.exec(html)) !== null) trs.push(m[1]);
+
+  const results: ISSFMixedTeamFinalEntry[] = [];
+
+  for (let i = 0; i < trs.length; i++) {
+    const tr = trs[i];
+    if (/<a\s+href="\/athletes\//i.test(tr)) continue;
+
+    const cells = extractCells(tr);
+    const rank = parseInt(cells[0]);
+    if (isNaN(rank) || rank <= 0) continue;
+
+    const nocIdx = cells.findIndex((c) => /^[A-Z]{3}$/.test(c));
+    if (nocIdx < 0) continue;
+    const nocCode = cells[nocIdx];
+
+    const boldRe = /<td[^>]*class="bold black"[^>]*>([\d.]+)<\/td>/g;
+    const boldVals: number[] = [];
+    let bm: RegExpExecArray | null;
+    while ((bm = boldRe.exec(tr)) !== null) {
+      const v = parseFloat(bm[1]);
+      if (!isNaN(v)) boldVals.push(v);
+    }
+    if (boldVals.length < 2) {
+      const nums = cells.slice(nocIdx + 1).filter((c) => /^\d+(\.\d+)?$/.test(c)).map(Number);
+      if (nums.length < 2) continue;
+      boldVals.push(...nums);
+    }
+
+    const total = boldVals[boldVals.length - 1];
+    const stageCumulatives = boldVals.slice(0, -1);
+    const shootOff = />\s*SO\s*</.test(tr);
+
+    let mInfo: { issfId: string; lastName: string; firstName: string } | null = null;
+    let fInfo: { issfId: string; lastName: string; firstName: string } | null = null;
+
+    for (let j = i + 1; j <= i + 2 && j < trs.length; j++) {
+      const ath = parseAthleteLink(trs[j]);
+      if (!ath) break;
+      const genderChar = ath.issfId[5]?.toUpperCase();
+      if (!mInfo && genderChar === "M") mInfo = ath;
+      else if (!fInfo && (genderChar === "W" || genderChar === "F")) fInfo = ath;
+      else if (!mInfo) mInfo = ath;
+      else fInfo = ath;
+    }
+
+    results.push({
+      rank, nocCode,
+      mIssfId: mInfo?.issfId ?? null, mLastName: mInfo?.lastName ?? "", mFirstName: mInfo?.firstName ?? "",
+      fIssfId: fInfo?.issfId ?? null, fLastName: fInfo?.lastName ?? "", fFirstName: fInfo?.firstName ?? "",
+      stageCumulatives, total, shootOff,
     });
   }
 

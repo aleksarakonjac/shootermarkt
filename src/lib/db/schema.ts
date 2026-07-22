@@ -414,6 +414,8 @@ export const competitions = pgTable(
     date: varchar("date", { length: 10 }).notNull(),     // YYYY-MM-DD start date
     dateEnd: varchar("date_end", { length: 10 }),        // YYYY-MM-DD, null = single day
     location: varchar("location", { length: 200 }),
+    locationSr: varchar("location_sr", { length: 200 }),
+    locationEn: varchar("location_en", { length: 200 }),
     countryId: integer("country_id").references(() => countries.id), // null = ISSF/international
     level: competitionLevelEnum("level").notNull(),
     eventType: eventTypeEnum("event_type").notNull().default("other"),
@@ -502,6 +504,9 @@ export const results = pgTable(
 
     // Snapshot of competition forma_weight at time of recording (for audit/history)
     formaWeightSnapshot: decimal("forma_weight_snapshot", { precision: 3, scale: 2 }),
+
+    // ISSF/SIUS remark code: RPO, DSQ, DNS, DNF, SO — null = no remark
+    remark: varchar("remark", { length: 10 }),
 
     source: resultSourceEnum("source").notNull().default("manual"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

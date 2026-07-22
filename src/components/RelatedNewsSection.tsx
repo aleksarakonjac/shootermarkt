@@ -105,19 +105,19 @@ export async function RelatedNewsSection({ type, refId, locale }: Props) {
           className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-tight text-[var(--ink)]"
           style={{ letterSpacing: "-0.02em" }}
         >
-          Povezane vesti
+          {locale === "en" ? "Related news" : "Povezane vesti"}
         </h2>
         <ScopedLink
           href="/vesti"
           className="text-xs font-semibold text-[var(--brand-primary)] hover:underline shrink-0"
         >
-          Sve vesti →
+          {locale === "en" ? "All news →" : "Sve vesti →"}
         </ScopedLink>
       </div>
 
       {articles.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">
-          Još nema vesti vezanih za ovu stavku.
+          {locale === "en" ? "No related news for this entry yet." : "Još nema vesti vezanih za ovu stavku."}
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

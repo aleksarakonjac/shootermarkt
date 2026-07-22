@@ -106,6 +106,13 @@ type Step = "select" | "review" | "done";
 
 interface ISSFComp { id: number; name: string; dateFrom: string; dateTo: string; city: string; nationCode: string; nationName: string }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
+interface MixedEntry {
+  skip: boolean; nocCode: string; disciplineCode: string;
+  qualRank: number | null; qualTotal: number | null; inners: number | null;
+  qualified: boolean; finalRank: number | null; finalTotal: number | null;
+  mIssfId: string | null; mLastName: string; mFirstName: string; m_series: number[]; mTotal: number;
+  fIssfId: string | null; fLastName: string; fFirstName: string; f_series: number[]; fTotal: number;
+}
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i);
@@ -125,6 +132,7 @@ export function IssfMode() {
   const [linkedDbCompId, setLinkedDbCompId] = useState<number | null>(null);
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
+  const [mixedEntries, setMixedEntries] = useState<MixedEntry[]>([]);
   const [eventCount, setEventCount] = useState(0);
   const [nocFilter, setNocFilter] = useState("");
   const [result, setResult] = useState<CommitResult | null>(null);
@@ -158,7 +166,10 @@ export function IssfMode() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Import failed");
-      setRows(data.rows); setEventCount(data.eventCount); setStep("review");
+      setRows(data.rows);
+      setMixedEntries(data.mixedEntries ?? []);
+      setEventCount(data.eventCount);
+      setStep("review");
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }
@@ -178,6 +189,7 @@ export function IssfMode() {
           rows,
         };
     try {
+      // 1. Commit individual results
       const res = await fetch("/api/admin/import/commit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -185,6 +197,49 @@ export function IssfMode() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Commit error");
+
+      const resolvedCompId: number = data.competitionId;
+
+      // 2. Commit mixed team entries (per discipline)
+      const activeMixed = mixedEntries.filter((e) => !e.skip);
+      if (activeMixed.length > 0) {
+        const byDisc = new Map<string, MixedEntry[]>();
+        for (const e of activeMixed) {
+          if (!byDisc.has(e.disciplineCode)) byDisc.set(e.disciplineCode, []);
+          byDisc.get(e.disciplineCode)!.push(e);
+        }
+        for (const [disc, discEntries] of byDisc) {
+          await fetch("/api/admin/import/commit-mixed", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              competitionId: resolvedCompId,
+              discipline: disc,
+              isFinals: false,
+              entries: discEntries.map((e) => ({
+                skip: e.skip, nocCode: e.nocCode,
+                qualRank: e.qualRank, qualTotal: e.qualTotal, qualified: e.qualified,
+                m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mTotal: e.mTotal,
+                f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fTotal: e.fTotal,
+              })),
+            }),
+          });
+          const finalists = discEntries.filter((e) => e.finalRank != null);
+          if (finalists.length > 0) {
+            await fetch("/api/admin/import/commit-mixed", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                competitionId: resolvedCompId,
+                discipline: disc,
+                isFinals: true,
+                entries: finalists.map((e) => ({ nocCode: e.nocCode, finalRank: e.finalRank, finalTotal: e.finalTotal })),
+              }),
+            });
+          }
+        }
+      }
+
       setResult(data); setStep("done");
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
@@ -196,11 +251,12 @@ export function IssfMode() {
 
   function reset() {
     setStep("select"); setSelected(null); setRows([]);
-    setResult(null); setError(null); setNocFilter("");
-    setLinkedDbCompId(null);
+    setMixedEntries([]); setResult(null); setError(null);
+    setNocFilter(""); setLinkedDbCompId(null);
   }
 
   const activeCount = rows.filter((r) => !r.skip).length;
+  const activeMixedCount = mixedEntries.filter((e) => !e.skip).length;
 
   if (step === "done" && result) {
     return <DonePanel result={result} onReset={reset} resetLabel="Uvezi još jedno takmičenje" />;
@@ -330,9 +386,52 @@ export function IssfMode() {
 
           <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))} />
 
+          {/* Mixed team review */}
+          {mixedEntries.length > 0 && (
+            <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+              <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between">
+                <span className="text-xs font-semibold text-[var(--muted)]">Mešoviti tim · {activeMixedCount} za unos</span>
+                <span className="text-xs text-[var(--subtle)]">{mixedEntries.filter(e => e.skip).length} preskočeno</span>
+              </div>
+              <div className="divide-y divide-[var(--border)]">
+                {mixedEntries.map((e, idx) => (
+                  <div key={idx} className={`px-4 py-3 flex items-center gap-3 ${e.skip ? "opacity-40" : ""}`}>
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--muted)] w-12 shrink-0">{e.nocCode}</span>
+                    <span className="text-[0.7rem] font-semibold text-[var(--subtle)] w-16 shrink-0">{e.disciplineCode}</span>
+                    <div className="flex-1 min-w-0 text-sm text-[var(--ink)]">
+                      <span>{e.mLastName} {e.mFirstName}</span>
+                      <span className="text-[var(--subtle)] mx-1.5">/</span>
+                      <span>{e.fLastName} {e.fFirstName}</span>
+                    </div>
+                    {e.qualTotal != null && (
+                      <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] shrink-0">
+                        {e.qualTotal}{e.inners != null ? ` (${e.inners}x)` : ""}
+                      </span>
+                    )}
+                    {e.qualRank != null && (
+                      <span className="text-xs text-[var(--subtle)] shrink-0">#{e.qualRank}</span>
+                    )}
+                    <button
+                      onClick={() => setMixedEntries(prev => prev.map((m, i) => i === idx ? { ...m, skip: !m.skip } : m))}
+                      className="shrink-0 text-xs px-2 py-0.5 rounded border transition-colors"
+                      style={e.skip
+                        ? { borderColor: "var(--border)", color: "var(--subtle)" }
+                        : { borderColor: "var(--border-strong)", color: "var(--ink)" }
+                      }
+                    >
+                      {e.skip ? "uključi" : "preskoči"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3">
-            <button onClick={handleCommit} disabled={loading || activeCount === 0} className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50">
-              {loading ? "Unosim…" : `Potvrdi i unesi ${activeCount} rezultata →`}
+            <button onClick={handleCommit} disabled={loading || (activeCount === 0 && activeMixedCount === 0)} className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50">
+              {loading ? "Unosim…" : activeMixedCount > 0
+                ? `Potvrdi i unesi ${activeCount} + ${activeMixedCount} mešovitih →`
+                : `Potvrdi i unesi ${activeCount} rezultata →`}
             </button>
             <button onClick={reset} className="rounded-md border border-[var(--border-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors">Otkaži</button>
           </div>

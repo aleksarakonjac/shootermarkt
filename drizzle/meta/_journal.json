@@ -148,6 +148,20 @@
       "when": 1784724498279,
       "tag": "0020_add_elim_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1784742285179,
+      "tag": "0021_third_xavin",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1784761035848,
+      "tag": "0022_add_competition_location_i18n",
+      "breakpoints": true
     }
   ]
 }

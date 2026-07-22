@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
-import { disciplines, mixedTeamResults } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { competitions, disciplines, mixedTeamResults } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
+import type { CompetitionLevel, EventType } from "@/lib/pdf-import/types";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -15,13 +16,67 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { competitionId, discipline: code, isFinals, entries } = await req.json();
+  interface QualEntry {
+    skip?: boolean;
+    nocCode: string;
+    qualRank?: number | null;
+    qualTotal?: number | null;
+    qualified?: boolean | null;
+    m_lastName?: string;
+    m_firstName?: string;
+    m_series?: number[];
+    mTotal?: number;
+    f_lastName?: string;
+    f_firstName?: string;
+    f_series?: number[];
+    fTotal?: number;
+    finalRank?: number | null;
+    finalTotal?: number | null;
+  }
 
-  if (!competitionId || !code || !Array.isArray(entries)) {
+  const body = await req.json();
+  const { discipline: code, isFinals, entries } = body as {
+    discipline: string;
+    isFinals: boolean;
+    entries: QualEntry[];
+    competitionId?: number;
+    competition?: { name: string; date: string; location?: string; level: CompetitionLevel; eventType?: EventType };
+  };
+
+  if (!code || !Array.isArray(entries)) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const disc = await db.query.disciplines.findFirst({ where: eq(disciplines.code, code) });
+  // Resolve or create competition
+  let competitionId: number | undefined = body.competitionId;
+  if (!competitionId && body.competition) {
+    const comp = body.competition;
+    const existing = await db.query.competitions.findFirst({
+      where: and(eq(competitions.name, comp.name), eq(competitions.date, comp.date)),
+    });
+    if (existing) {
+      competitionId = existing.id;
+    } else {
+      const [ins] = await db
+        .insert(competitions)
+        .values({
+          name: comp.name,
+          date: comp.date,
+          location: comp.location,
+          level: comp.level,
+          eventType: comp.eventType ?? "other",
+        })
+        .returning({ id: competitions.id });
+      competitionId = ins.id;
+    }
+  }
+
+  if (!competitionId) {
+    return NextResponse.json({ error: "competitionId or competition required" }, { status: 400 });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const disc = await db.query.disciplines.findFirst({ where: eq(disciplines.code, code as any) });
   if (!disc) return NextResponse.json({ error: "Discipline not found" }, { status: 404 });
 
   let inserted = 0, skipped = 0;
@@ -57,8 +112,8 @@ export async function POST(req: NextRequest) {
             nocCode: e.nocCode,
             shooter1Name: `${e.m_lastName} ${e.m_firstName}`.trim() || null,
             shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
-            shooter1Detail: { series: e.m_series, total: e.mTotal },
-            shooter2Detail: { series: e.f_series, total: e.fTotal },
+            shooter1Detail: { series: e.m_series ?? [], total: e.mTotal ?? 0 },
+            shooter2Detail: { series: e.f_series ?? [], total: e.fTotal ?? 0 },
             qualRank: e.qualRank ?? null,
             qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
             qualified: e.qualified ?? null,
@@ -69,8 +124,8 @@ export async function POST(req: NextRequest) {
             set: {
               shooter1Name: `${e.m_lastName} ${e.m_firstName}`.trim() || null,
               shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
-              shooter1Detail: { series: e.m_series, total: e.mTotal },
-              shooter2Detail: { series: e.f_series, total: e.fTotal },
+              shooter1Detail: { series: e.m_series ?? [], total: e.mTotal ?? 0 },
+              shooter2Detail: { series: e.f_series ?? [], total: e.fTotal ?? 0 },
               qualRank: e.qualRank ?? null,
               qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
               qualified: e.qualified ?? null,

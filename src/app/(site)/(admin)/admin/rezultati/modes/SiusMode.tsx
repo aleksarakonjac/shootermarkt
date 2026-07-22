@@ -1,104 +1,203 @@
 "use client";
 
-import { useState } from "react";
-import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
+import { useState, useEffect, useRef } from "react";
+import type { ReviewRow, CommitPayload } from "@/lib/pdf-import/types";
+import type { SiusFinalEntry } from "@/app/api/admin/sius/public-import/route";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
-import { DatePicker } from "@/components/ui/DatePicker";
 
-type Step = "select" | "review" | "done";
+type Step = "pick" | "disciplines" | "review" | "done";
 
-interface SiusChamp { guid: string; name: string; events: string[] }
+interface DbComp { id: number; name: string; date: string; location: string | null; siusId?: string | null }
+interface SiusEvent { runningId: string; eventCode: string; name: string; state: string }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
 
-const DISC_LABELS: Record<string, string> = {
-  ARM: "10m VP Muškarci", ARW: "10m VP Žene",
-  APM: "10m AP Muškarci", APW: "10m AP Žene",
-};
+const SUPPORTED_CODES = new Set(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW", "RFPM"]);
 
-const LEVELS: { value: CompetitionLevel; label: string }[] = [
-  { value: "world",       label: "Svetsko (ISSF)"    },
-  { value: "continental", label: "Kontinentalno"     },
-  { value: "national",    label: "Državno"           },
-  { value: "regional",    label: "Regionalno"        },
-  { value: "club",        label: "Klubsko"           },
-  { value: "olympic",     label: "Olimpijsko"        },
-];
+const fmtVal = (v: number, code: string) =>
+  (code.startsWith("AR") || code.startsWith("R3P")) ? v.toFixed(1) : String(Math.round(v));
+
+// ── CompSearch ────────────────────────────────────────────────────────────────
+
+function CompSearch({ comps, value, onChange }: {
+  comps: DbComp[];
+  value: number | null;
+  onChange: (comp: DbComp | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = comps.find((c) => c.id === value) ?? null;
+
+  useEffect(() => {
+    function onOut(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onOut);
+    return () => document.removeEventListener("mousedown", onOut);
+  }, []);
+
+  const filtered = query.trim()
+    ? comps.filter((c) =>
+        c.name.toLowerCase().includes(query.toLowerCase()) ||
+        c.date.includes(query) ||
+        c.location?.toLowerCase().includes(query.toLowerCase())
+      )
+    : comps;
+
+  function pick(c: DbComp) {
+    onChange(c);
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--bg)] text-sm text-left focus:outline-none focus:border-[var(--brand-primary)] hover:border-[var(--border-strong)] transition-colors"
+      >
+        {selected ? (
+          <>
+            <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] shrink-0">{selected.date.slice(0, 10)}</span>
+            <span className="font-semibold text-[var(--ink)] truncate">{selected.name}</span>
+            {selected.location && <span className="text-xs text-[var(--subtle)] shrink-0 hidden sm:block">· {selected.location}</span>}
+          </>
+        ) : (
+          <span className="text-[var(--subtle)]">Izaberi takmičenje iz baze…</span>
+        )}
+        <span className="ml-auto text-[var(--subtle)] text-xs shrink-0">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="absolute z-30 top-full mt-1 left-0 right-0 rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-[var(--border)]">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Pretraži po nazivu, datumu, mestu…"
+              className="w-full text-sm px-2 py-1.5 rounded border border-[var(--border)] bg-[var(--surface)] text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)]"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {filtered.length === 0 && (
+              <div className="px-3 py-2 text-xs text-[var(--subtle)]">Nema rezultata.</div>
+            )}
+            {filtered.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => pick(c)}
+                className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-[var(--surface)] transition-colors"
+                style={value === c.id ? { background: "var(--brand-primary-light)" } : undefined}
+              >
+                <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] shrink-0 w-24">{c.date.slice(0, 10)}</span>
+                <span className="text-sm font-medium text-[var(--ink)] truncate">{c.name}</span>
+                {c.siusId && <span className="text-xs shrink-0 font-[family-name:var(--font-jetbrains-mono)]" style={{ color: "var(--success)" }}>SIUS ✓</span>}
+                {c.location && <span className="text-xs text-[var(--subtle)] shrink-0 ml-auto hidden sm:block">{c.location}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export function SiusMode() {
-  const [step, setStep] = useState<Step>("select");
+  const [step, setStep] = useState<Step>("pick");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [champs, setChamps] = useState<SiusChamp[]>([]);
-  const [champsLoaded, setChampsLoaded] = useState(false);
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<SiusChamp | null>(null);
-  const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
-  const [compLevel, setCompLevel] = useState<CompetitionLevel>("world");
-  const [compDate, setCompDate] = useState("");
-  const [compLocation, setCompLocation] = useState("");
+  const [dbComps, setDbComps] = useState<DbComp[]>([]);
+  const [selectedComp, setSelectedComp] = useState<DbComp | null>(null);
+  const [siusId, setSiusId] = useState("");
+
+  const [events, setEvents] = useState<SiusEvent[]>([]);
+  const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set());
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
+  const [finalEntries, setFinalEntries] = useState<SiusFinalEntry[]>([]);
   const [eventCount, setEventCount] = useState(0);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [nocFilter, setNocFilter] = useState("");
   const [result, setResult] = useState<CommitResult | null>(null);
 
-  async function loadChamps() {
-    setLoading(true); setError(null); setChampsLoaded(false);
+  useEffect(() => {
+    fetch("/api/admin/competitions")
+      .then((r) => r.json())
+      .then((data: DbComp[]) => setDbComps(data))
+      .catch(() => {});
+  }, []);
+
+  function handleCompPick(comp: DbComp | null) {
+    setSelectedComp(comp);
+    if (comp?.siusId) setSiusId(comp.siusId);
+  }
+
+  async function handleLoadEvents() {
+    if (!siusId.trim()) return;
+    setLoading(true); setError(null);
     try {
-      const res = await fetch("/api/admin/sius/championships");
+      const res = await fetch(`/api/admin/sius/events?siusId=${encodeURIComponent(siusId.trim())}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Greška");
-      setChamps(data); setChampsLoaded(true);
+      if (!res.ok) throw new Error(data.error ?? "Failed");
+      const supported = (data.events as SiusEvent[]).filter((e) => SUPPORTED_CODES.has(e.eventCode));
+      setEvents(supported);
+      setSelectedCodes(new Set(supported.map((e) => e.eventCode)));
+      setStep("disciplines");
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }
 
-  function selectChamp(c: SiusChamp) {
-    setSelected(c);
-    setSelectedEvents(new Set(c.events));
-    setCompDate(""); setCompLocation("");
-  }
-
-  function toggleEvent(ev: string) {
-    setSelectedEvents((prev) => {
-      const next = new Set(prev);
-      if (next.has(ev)) { next.delete(ev); } else { next.add(ev); }
-      return next;
-    });
-  }
-
   async function handleImport() {
-    if (!selected || selectedEvents.size === 0) return;
+    if (selectedCodes.size === 0) return;
     setLoading(true); setError(null);
     try {
-      const res = await fetch("/api/admin/sius/import", {
+      const res = await fetch("/api/admin/sius/public-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guid: selected.guid, events: Array.from(selectedEvents), name: selected.name }),
+        body: JSON.stringify({ siusId: siusId.trim(), disciplineCodes: Array.from(selectedCodes) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Import failed");
-      setRows(data.rows); setEventCount(data.eventCount);
-      setImportErrors(data.errors ?? []); setStep("review");
+      setRows(data.rows);
+      setFinalEntries(data.finalEntries ?? []);
+      setEventCount(data.eventCount);
+      setImportErrors(data.errors ?? []);
+      setStep("review");
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }
 
   async function handleCommit() {
-    if (!selected) return;
+    if (!selectedComp) return;
     setLoading(true); setError(null);
-    const payload: CommitPayload = {
-      competition: {
-        name: selected.name,
-        date: compDate || new Date().toISOString().split("T")[0],
-        location: compLocation || "",
-        level: compLevel,
-      },
-      rows,
-    };
+
+    // Merge active final entries into qual rows before committing
+    const activeFinals = finalEntries.filter((f) => !f.skip);
+    const mergedRows = rows.map((r) => {
+      const f = activeFinals.find(
+        (fe) => fe.disciplineCode === r.disciplineCode && (
+          (fe.siusAthleteId && fe.siusAthleteId === r.issfId) ||
+          (fe.lastName.toLowerCase() === r.lastName.toLowerCase() &&
+           fe.firstName.toLowerCase() === r.firstName.toLowerCase())
+        )
+      );
+      if (!f) return r;
+      return {
+        ...r,
+        qualified: true,
+        finalTotal: f.total,
+        finalRank: f.rank,
+        finalSeries: f.series.length > 0 ? f.series : null,
+      };
+    });
+
+    const payload: CommitPayload = { competitionId: selectedComp.id, rows: mergedRows };
     try {
       const res = await fetch("/api/admin/import/commit", {
         method: "POST",
@@ -117,13 +216,14 @@ export function SiusMode() {
   }
 
   function reset() {
-    setStep("select"); setSelected(null); setSelectedEvents(new Set());
-    setRows([]); setResult(null); setError(null); setNocFilter(""); setImportErrors([]);
+    setStep("pick"); setRows([]); setFinalEntries([]); setResult(null); setError(null);
+    setNocFilter(""); setImportErrors([]); setEvents([]);
+    setSelectedCodes(new Set()); setSelectedComp(null); setSiusId("");
   }
 
-  const filtered = search
-    ? champs.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
-    : champs;
+  function backToPick() {
+    setStep("pick"); setEvents([]); setSelectedCodes(new Set()); setError(null);
+  }
 
   const activeCount = rows.filter((r) => !r.skip).length;
 
@@ -137,153 +237,163 @@ export function SiusMode() {
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
-      {step === "select" && (
-        <>
-          {!champsLoaded ? (
-            <div className="rounded-xl border border-[var(--border)] p-8 text-center space-y-3">
-              <p className="text-sm text-[var(--muted)]">Učitaj listu takmičenja sa results.sius.com (~200 takmičenja)</p>
-              <button
-                onClick={loadChamps}
-                disabled={loading}
-                className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
-              >
-                {loading ? "Učitavam…" : "Učitaj SIUS takmičenja"}
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="flex gap-3 items-center">
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Pretraži (ISSF, European, Grand Prix…)"
-                  className="flex-1 rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-                />
-                <span className="text-xs text-[var(--subtle)] shrink-0">{filtered.length}/{champs.length}</span>
-              </div>
+      {/* ── Step 1: pick competition + SIUS UUID ── */}
+      {step === "pick" && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--muted)] mb-1.5">Takmičenje iz baze *</label>
+            <CompSearch comps={dbComps} value={selectedComp?.id ?? null} onChange={handleCompPick} />
+          </div>
 
-              <div className="rounded-xl border border-[var(--border)] overflow-hidden max-h-[380px] overflow-y-auto">
-                {filtered.length === 0 ? (
-                  <div className="py-10 text-center text-sm text-[var(--muted)]">Nema rezultata za &ldquo;{search}&rdquo;</div>
-                ) : (
-                  <div className="divide-y divide-[var(--border)]">
-                    {filtered.map((c) => (
-                      <button
-                        key={c.guid}
-                        onClick={() => selectChamp(c)}
-                        className="w-full text-left px-4 py-3 flex items-center justify-between gap-4 transition-colors hover:bg-[var(--surface)]"
-                        style={{ background: selected?.guid === c.guid ? "var(--brand-primary-light)" : undefined }}
-                      >
-                        <span className="font-semibold text-sm text-[var(--ink)] truncate">{c.name}</span>
-                        <div className="flex gap-1 shrink-0">
-                          {c.events.map((ev) => (
-                            <span key={ev} className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] px-1.5 py-0.5 rounded font-semibold border border-[var(--border)]" style={{ color: "var(--brand-primary)" }}>
-                              {ev}
-                            </span>
-                          ))}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-[var(--muted)] mb-1">SIUS UUID</label>
+            <input
+              value={siusId}
+              onChange={(e) => setSiusId(e.target.value)}
+              placeholder="npr. f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm font-[family-name:var(--font-jetbrains-mono)] text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
+            />
+            <p className="mt-1 text-xs text-[var(--subtle)]">Polje <code>siusId</code> na stranici takmičenja ili sa shootingsportscloud.com · automatski popunjeno ako takmičenje ima upisano</p>
+          </div>
 
-              {selected && (
-                <div className="rounded-xl border border-[var(--brand-primary)] p-5 space-y-4">
-                  <p className="font-semibold text-[var(--ink)]">{selected.name}</p>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-[var(--muted)] mb-2">Discipline za uvoz</label>
-                    <div className="flex flex-wrap gap-2">
-                      {selected.events.map((ev) => (
-                        <button
-                          key={ev}
-                          onClick={() => toggleEvent(ev)}
-                          className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors border border-[var(--border)]"
-                          style={{
-                            background: selectedEvents.has(ev) ? "var(--brand-primary)" : "var(--surface)",
-                            color: selectedEvents.has(ev) ? "white" : "var(--ink)",
-                          }}
-                        >
-                          {ev}{DISC_LABELS[ev] ? ` — ${DISC_LABELS[ev]}` : ""}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Datum</label>
-                      <DatePicker value={compDate} onChange={setCompDate} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Lokacija</label>
-                      <input value={compLocation} onChange={(e) => setCompLocation(e.target.value)} placeholder="npr. Ruse, Bugarska" className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Nivo</label>
-                      <select value={compLevel} onChange={(e) => setCompLevel(e.target.value as CompetitionLevel)} className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]">
-                        {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleImport}
-                    disabled={loading || selectedEvents.size === 0}
-                    className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
-                  >
-                    {loading
-                      ? `Preuzimam PDF-ove… (${selectedEvents.size})`
-                      : `Uvezi ${selectedEvents.size} disciplin${selectedEvents.size === 1 ? "u" : "e"} →`}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </>
+          <button
+            onClick={handleLoadEvents}
+            disabled={loading || !selectedComp || !siusId.trim()}
+            className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
+          >
+            {loading ? "Učitavam discipline…" : "Učitaj discipline →"}
+          </button>
+        </div>
       )}
 
+      {/* ── Step 2: pick disciplines ── */}
+      {step === "disciplines" && (
+        <div className="space-y-5">
+          {/* Selected comp info */}
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-[var(--muted)] mb-0.5">Takmičenje</p>
+              <p className="font-semibold text-sm text-[var(--ink)] truncate">{selectedComp?.name}</p>
+            </div>
+            <button onClick={backToPick} className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors shrink-0">← Promeni</button>
+          </div>
+
+          {events.length === 0 ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Nisu pronađene podržane discipline na ovom SIUS takmičenju.
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-[var(--muted)] mb-2">Discipline ({events.length} dostupno)</label>
+              <div className="flex flex-wrap gap-2">
+                {events.map((e) => {
+                  const on = selectedCodes.has(e.eventCode);
+                  return (
+                    <button
+                      key={e.eventCode}
+                      type="button"
+                      onClick={() => setSelectedCodes((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(e.eventCode)) next.delete(e.eventCode); else next.add(e.eventCode);
+                        return next;
+                      })}
+                      className="rounded-md px-3 py-1.5 text-xs font-semibold transition-colors border"
+                      style={{
+                        background: on ? "var(--brand-primary)" : "var(--surface)",
+                        color: on ? "white" : "var(--ink)",
+                        borderColor: on ? "var(--brand-primary)" : "var(--border)",
+                      }}
+                    >
+                      <span className="font-[family-name:var(--font-jetbrains-mono)]">{e.eventCode}</span>
+                      {e.name && <span className="ml-1.5 font-normal opacity-80">— {e.name}</span>}
+                      {e.state && e.state !== "Finished" && (
+                        <span className="ml-1.5 opacity-60 text-[0.65rem]">({e.state})</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleImport}
+              disabled={loading || selectedCodes.size === 0}
+              className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
+            >
+              {loading ? "Preuzimam rezultate…" : `Uvezi ${selectedCodes.size} disciplin${selectedCodes.size === 1 ? "u" : "e"} →`}
+            </button>
+            <button onClick={backToPick} className="rounded-md border border-[var(--border-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors">← Nazad</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 3: review ── */}
       {step === "review" && (
         <>
+          {/* Comp + stats header */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-4 text-sm text-[var(--muted)]">
-              <span><span className="font-semibold text-[var(--ink)]">{eventCount}</span> discipline</span>
-              <span><span className="font-semibold text-[var(--ink)]">{activeCount}</span> za unos</span>
-              <span><span className="font-semibold text-[var(--ink)]">{rows.filter(r => r.skip).length}</span> preskočeno</span>
-              {rows.filter(r => r.warning).length > 0 && (
-                <span style={{ color: "var(--warning)" }}>⚠ {rows.filter(r => r.warning).length} novih strelaca</span>
-              )}
+            <div>
+              <p className="text-xs text-[var(--muted)]">{selectedComp?.name}</p>
+              <div className="flex flex-wrap gap-4 text-sm text-[var(--muted)] mt-1">
+                <span><span className="font-semibold text-[var(--ink)]">{eventCount}</span> disciplin{eventCount === 1 ? "a" : "e"}</span>
+                <span><span className="font-semibold text-[var(--ink)]">{activeCount}</span> za unos</span>
+                <span><span className="font-semibold text-[var(--ink)]">{rows.filter(r => r.skip).length}</span> preskočeno</span>
+                {rows.filter(r => r.warning).length > 0 && (
+                  <span style={{ color: "var(--warning)" }}>⚠ {rows.filter(r => r.warning).length} novih strelaca</span>
+                )}
+              </div>
             </div>
-            <button onClick={reset} className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">← Nazad</button>
+            <button onClick={() => setStep("disciplines")} className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">← Nazad</button>
           </div>
 
           {importErrors.length > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 space-y-1">
-              <p className="font-semibold">Upozorenja tokom parsiranja:</p>
+              <p className="font-semibold">Upozorenja:</p>
               {importErrors.map((e, i) => <div key={i}>{e}</div>)}
             </div>
           )}
 
-          {/* Metadata editable in review */}
-          <div className="rounded-xl border border-[var(--border)] p-4 grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Datum takmičenja</label>
-              <DatePicker value={compDate} onChange={setCompDate} />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Lokacija</label>
-              <input value={compLocation} onChange={(e) => setCompLocation(e.target.value)} className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Nivo</label>
-              <select value={compLevel} onChange={(e) => setCompLevel(e.target.value as CompetitionLevel)} className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]">
-                {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-              </select>
-            </div>
-          </div>
-
           <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))} />
+
+          {/* Finals section */}
+          {finalEntries.length > 0 && (
+            <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+              <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between">
+                <span className="text-xs font-semibold text-[var(--muted)]">
+                  Finale · {finalEntries.filter(f => !f.skip).length} za unos
+                </span>
+                <span className="text-xs text-[var(--subtle)]">{finalEntries.filter(f => f.skip).length} preskočeno</span>
+              </div>
+              <div className="divide-y divide-[var(--border)]">
+                {finalEntries.map((f, idx) => (
+                  <div key={idx} className={`px-4 py-2.5 flex items-center gap-3 ${f.skip ? "opacity-40" : ""}`}>
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--muted)] w-6 text-right shrink-0">{f.rank}</span>
+                    <span className="text-[0.7rem] font-semibold text-[var(--subtle)] w-14 shrink-0">{f.disciplineCode}</span>
+                    <span className="flex-1 min-w-0 text-sm text-[var(--ink)] truncate">{f.lastName} {f.firstName}</span>
+                    <span className="text-xs text-[var(--subtle)] shrink-0">{f.nation}</span>
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)] shrink-0">{fmtVal(f.total, f.disciplineCode)}</span>
+                    {f.series.length > 0 && (
+                      <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)] shrink-0 hidden sm:block">
+                        [{f.series.map((v) => fmtVal(v, f.disciplineCode)).join(" · ")}]
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setFinalEntries(prev => prev.map((e, i) => i === idx ? { ...e, skip: !e.skip } : e))}
+                      className="shrink-0 text-xs px-2 py-0.5 rounded border transition-colors"
+                      style={f.skip
+                        ? { borderColor: "var(--border)", color: "var(--subtle)" }
+                        : { borderColor: "var(--border-strong)", color: "var(--ink)" }
+                      }
+                    >
+                      {f.skip ? "uključi" : "preskoči"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3">
             <button onClick={handleCommit} disabled={loading || activeCount === 0} className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50">

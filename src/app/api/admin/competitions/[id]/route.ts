@@ -22,7 +22,7 @@ export async function PATCH(
   if (isNaN(compId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const body = await req.json();
-  const { name, nameSr, nameEn, date, dateEnd, location, level, tags, issfId, siusId } = body;
+  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, level, tags, issfId, siusId } = body;
 
   if (!name?.trim() || !date || !level) {
     return NextResponse.json({ error: "Naziv, datum i nivo su obavezni" }, { status: 400 });
@@ -37,6 +37,8 @@ export async function PATCH(
       date,
       dateEnd: dateEnd?.trim() && dateEnd.trim() !== date ? dateEnd.trim() : null,
       location: location?.trim() || null,
+      locationSr: locationSr?.trim() || null,
+      locationEn: locationEn?.trim() || null,
       level: level as CompetitionLevel,
       issfId: issfId?.trim() || null,
       siusId: siusId?.trim() || null,

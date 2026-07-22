@@ -23,6 +23,8 @@ export function CompetitionFormClient() {
     date: "",
     dateEnd: "",
     location: "",
+    locationSr: "",
+    locationEn: "",
     level: "national" as CompetitionLevel,
     issfId: "",
   });
@@ -128,6 +130,27 @@ export function CompetitionFormClient() {
               placeholder="npr. Beograd, SC Crvena zvezda"
               className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija (SR)</label>
+              <input
+                value={form.locationSr}
+                onChange={(e) => set("locationSr", e.target.value)}
+                placeholder="Srpski naziv"
+                className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija (EN)</label>
+              <input
+                value={form.locationEn}
+                onChange={(e) => set("locationEn", e.target.value)}
+                placeholder="English name"
+                className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
+              />
+            </div>
           </div>
         </div>
 

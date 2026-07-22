@@ -128,6 +128,7 @@ export interface SiusElimRound {
 export interface SiusLiveData {
   qual: SiusLiveResult[];
   elim: SiusElimRound[];
+  final: SiusLiveResult[];
 }
 
 function isElimSubEvent(name: string): boolean {
@@ -168,17 +169,21 @@ export async function fetchLiveSiusResults(
       const done = subEvents.filter((s) => s.state !== "Planned");
       const qualSubs = done.filter((s) => !isElimSubEvent(s.name) && !isFinalSubEvent(s.name));
       const elimSubs = done.filter((s) => isElimSubEvent(s.name));
+      const finalSub = done.find((s) => isFinalSubEvent(s.name));
 
-      // Qual: prefer InCompetition, fall back to first finished
-      const activeQual =
-        qualSubs.find((s) => s.state === "InCompetition") ?? qualSubs.at(0);
+      const data: SiusLiveData = { qual: [], elim: [], final: [] };
 
-      const data: SiusLiveData = { qual: [], elim: [] };
-
-      if (activeQual) {
+      // Fetch ALL qual sub-events and merge (R3P has multiple relays)
+      for (const sub of qualSubs) {
         try {
-          data.qual = await fetchSiusSeries(compUuid, event.runningId, activeQual.runningId);
+          const r = await fetchSiusSeries(compUuid, event.runningId, sub.runningId);
+          data.qual.push(...r);
         } catch { /* ignore */ }
+      }
+      // Re-rank merged qual by total desc
+      if (qualSubs.length > 1 && data.qual.length > 0) {
+        data.qual.sort((a, b) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0));
+        data.qual.forEach((r, i) => { r.rank = i + 1; });
       }
 
       // Elimination rounds (one per sub-event, ordered by round number)
@@ -191,8 +196,21 @@ export async function fetchLiveSiusResults(
         } catch { /* ignore */ }
       }
 
+      // Final sub-event
+      if (finalSub) {
+        try {
+          data.final = await fetchSiusSeries(compUuid, event.runningId, finalSub.runningId);
+        } catch { /* ignore */ }
+      }
+
       if (data.qual.length > 0 || data.elim.length > 0) {
-        out.set(event.eventCode, data);
+        const existing = out.get(event.eventCode);
+        if (existing) {
+          if (data.qual.length > 0) existing.qual = data.qual;
+          existing.elim.push(...data.elim);
+        } else {
+          out.set(event.eventCode, data);
+        }
       }
     })
   );
