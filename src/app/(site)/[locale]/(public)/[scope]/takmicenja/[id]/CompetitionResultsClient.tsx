@@ -113,8 +113,8 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId }:
           <CompetitionOverview
             groups={groups}
             mixedGroups={mixedGroups}
-            onSelectIndividual={(code, category) =>
-              setSelection({ kind: "individual", disciplineCode: code, category, stage: "qual" })
+            onSelectIndividual={(code, category, stage) =>
+              setSelection({ kind: "individual", disciplineCode: code, category, stage })
             }
             onSelectMixed={(code) =>
               setSelection({ kind: "mixed", disciplineCode: code, stage: "qual" })
@@ -138,6 +138,11 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId }:
 
 // ── Overview ──────────────────────────────────────────────────────────────────
 
+const PHASE_LABEL: Record<string, string> = {
+  qual: "Kvalifikacije",
+  final: "Finale",
+};
+
 function CompetitionOverview({
   groups,
   mixedGroups,
@@ -146,7 +151,7 @@ function CompetitionOverview({
 }: {
   groups: DisciplineGroup[];
   mixedGroups: MixedTeamGroup[];
-  onSelectIndividual: (code: string, category: AgeCategory) => void;
+  onSelectIndividual: (code: string, category: AgeCategory, stage: "qual" | "final") => void;
   onSelectMixed: (code: string) => void;
 }) {
   return (
@@ -154,6 +159,12 @@ function CompetitionOverview({
       {/* Individual disciplines */}
       {groups.map((g) => {
         const totalShooters = g.categories.reduce((s, c) => s + c.results.length, 0);
+        const singleCat = g.categories.length === 1;
+        const singleCatData = singleCat ? g.categories[0] : null;
+        const singleHasFinal = singleCatData?.results.some(
+          (r) => r.finalRank != null || r.finalTotal != null
+        ) ?? false;
+
         return (
           <div key={g.code}>
             <div className="flex items-center gap-2.5 mb-2">
@@ -170,32 +181,68 @@ function CompetitionOverview({
             </div>
 
             <div className="rounded-xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
-              {g.categories.map((cat) => {
-                const hasFinal = cat.results.some(
-                  (r) => r.finalRank != null || r.finalTotal != null
-                );
-                return (
+              {singleCat && singleCatData ? (
+                /* Single category: show phase rows directly */
+                <>
                   <button
-                    key={cat.category}
-                    onClick={() => onSelectIndividual(g.code, cat.category)}
+                    onClick={() => onSelectIndividual(g.code, singleCatData.category, "qual")}
                     className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
+                      <PhaseBadge label="KV" active />
                       <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                        {CATEGORY_LABEL[cat.category]}
+                        {PHASE_LABEL.qual}
                       </span>
                       <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">
-                        {cat.results.length}
+                        {singleCatData.results.length}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <PhaseBadge label="KV" active />
-                      {hasFinal && <PhaseBadge label="F" accent />}
-                      <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150 ml-0.5" aria-hidden="true" />
-                    </div>
+                    <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
                   </button>
-                );
-              })}
+                  {singleHasFinal && (
+                    <button
+                      onClick={() => onSelectIndividual(g.code, singleCatData.category, "final")}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <PhaseBadge label="F" accent />
+                        <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                          {PHASE_LABEL.final}
+                        </span>
+                      </div>
+                      <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
+                    </button>
+                  )}
+                </>
+              ) : (
+                /* Multiple categories: show category rows */
+                g.categories.map((cat) => {
+                  const hasFinal = cat.results.some(
+                    (r) => r.finalRank != null || r.finalTotal != null
+                  );
+                  return (
+                    <button
+                      key={cat.category}
+                      onClick={() => onSelectIndividual(g.code, cat.category, "qual")}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                          {CATEGORY_LABEL[cat.category]}
+                        </span>
+                        <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">
+                          {cat.results.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <PhaseBadge label="KV" active />
+                        {hasFinal && <PhaseBadge label="F" accent />}
+                        <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150 ml-0.5" aria-hidden="true" />
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
         );
@@ -368,6 +415,7 @@ function CompetitionDetail({
   // Individual discipline
   const group = groups.find((g) => g.code === selection.disciplineCode);
   const catGroup = group?.categories.find((c) => c.category === selection.category);
+  const showCategory = (group?.categories.length ?? 0) > 1;
 
   const hasFinal =
     catGroup?.results.some((r) => r.finalRank != null || r.finalTotal != null) ?? false;
@@ -422,9 +470,11 @@ function CompetitionDetail({
             >
               {selection.disciplineCode}
             </span>
-            <span className="text-[0.72rem] font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
-              {CATEGORY_LABEL[selection.category]}
-            </span>
+            {showCategory && (
+              <span className="text-[0.72rem] font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                {CATEGORY_LABEL[selection.category]}
+              </span>
+            )}
           </div>
           <h3
             className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase truncate"
