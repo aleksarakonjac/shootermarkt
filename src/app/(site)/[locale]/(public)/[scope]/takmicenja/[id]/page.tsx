@@ -8,6 +8,7 @@ import {
   clubs,
   disciplines,
   mixedTeamResults,
+  competitionSchedule,
 } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -24,6 +25,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
 import { RelatedNewsSection } from "@/components/RelatedNewsSection";
+import { ScheduleSection, type ScheduleSlot } from "./ScheduleSection";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
 
@@ -117,6 +119,30 @@ export default async function CompetitionPage({ params }: Props) {
     .innerJoin(disciplines, eq(mixedTeamResults.disciplineId, disciplines.id))
     .where(eq(mixedTeamResults.competitionId, compId))
     .orderBy(asc(mixedTeamResults.qualRank));
+
+  // Fetch schedule slots
+  const scheduleRows = await db
+    .select({
+      id: competitionSchedule.id,
+      disciplineCode: disciplines.code,
+      stage: competitionSchedule.stage,
+      category: competitionSchedule.category,
+      startTime: competitionSchedule.startTime,
+      endTime: competitionSchedule.endTime,
+    })
+    .from(competitionSchedule)
+    .innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id))
+    .where(eq(competitionSchedule.competitionId, compId))
+    .orderBy(asc(competitionSchedule.startTime));
+
+  const scheduleSlots: ScheduleSlot[] = scheduleRows.map((r) => ({
+    id: r.id,
+    disciplineCode: r.disciplineCode,
+    stage: r.stage,
+    category: r.category,
+    startTime: r.startTime.toISOString(),
+    endTime: r.endTime?.toISOString() ?? null,
+  }));
 
   // Group mixed team results by discipline code
   const mixedGroupOrder: string[] = [];
@@ -316,6 +342,9 @@ export default async function CompetitionPage({ params }: Props) {
           )}
         </div>
       </div>
+
+      {/* ── Schedule ─────────────────────────────────────────────── */}
+      <ScheduleSection slots={scheduleSlots} locale={locale} />
 
       {/* ── Results ───────────────────────────────────────────────── */}
       <div>
