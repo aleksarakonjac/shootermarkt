@@ -326,22 +326,16 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
                           </td>
                           <td className="py-1 pr-4 align-top whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">
                             <div className="flex items-baseline gap-1 text-[var(--ink)]">
-                              {fmtTime(slot.startTime, timezone)}
+                              {fmtTime(slot.startTime)}
                               {slot.endTime && (
-                                <span className="text-[var(--subtle)]">– {fmtTime(slot.endTime, timezone)}</span>
+                                <span className="text-[var(--subtle)]">– {fmtTime(slot.endTime)}</span>
                               )}
-                              <span className="text-[0.65rem] text-[var(--subtle)] font-normal tracking-tight">
-                                {tzAbbr(slot.startTime, timezone)}
-                              </span>
                             </div>
                             {showDualTime && (
-                              <div className="text-[0.68rem] text-[var(--subtle)] leading-tight mt-0.5">
-                                {fmtTime(slot.startTime)}
-                                {slot.endTime && <span> – {fmtTime(slot.endTime)}</span>}
-                                {" "}
-                                <span className="opacity-70">
-                                  {locale === "sr" ? "vaše vr." : "your time"}
-                                </span>
+                              <div className="flex items-baseline gap-1 text-[0.68rem] text-[var(--subtle)] leading-tight mt-0.5">
+                                {fmtTime(slot.startTime, timezone)}
+                                {slot.endTime && <span>– {fmtTime(slot.endTime, timezone)}</span>}
+                                <span className="opacity-70">{tzAbbr(slot.startTime, timezone)}</span>
                               </div>
                             )}
                           </td>
