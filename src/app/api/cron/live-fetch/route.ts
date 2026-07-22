@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { competitions, competitionSchedule, disciplines, results, shooters } from "@/lib/db/schema";
 import type { AgeCategory } from "@/lib/db/schema";
-import { and, eq, isNotNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml } from "@/lib/issf/adapter";
 import { fetchLiveSiusResults, type SiusLiveResult } from "@/lib/sius/public-adapter";
 import { matchShooter } from "@/lib/name-match";
@@ -36,8 +36,11 @@ export async function GET(req: NextRequest) {
         or(isNotNull(competitions.issfId), isNotNull(competitions.siusId)),
         lte(competitionSchedule.startTime, now),
         or(
-          sql`${competitionSchedule.endTime} >= ${now}`,
-          sql`${competitionSchedule.endTime} IS NULL AND ${competitionSchedule.startTime} >= ${windowStart}`
+          gte(competitionSchedule.endTime, now),
+          and(
+            isNull(competitionSchedule.endTime),
+            gte(competitionSchedule.startTime, windowStart)
+          )
         )
       )
     );
