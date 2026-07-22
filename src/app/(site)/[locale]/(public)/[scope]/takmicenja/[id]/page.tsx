@@ -79,6 +79,9 @@ export default async function CompetitionPage({ params }: Props) {
       disciplineName: disciplines.name,
       apparatus: disciplines.apparatus,
       category: results.category,
+      elimRound: results.elimRound,
+      elimTotal: results.elimTotal,
+      elimRank: results.elimRank,
       qualTotal: results.qualTotal,
       qualRank: results.qualRank,
       qualInners: results.qualInners,
@@ -190,6 +193,9 @@ export default async function CompetitionPage({ params }: Props) {
       nationality: r.nationality,
       clubName: r.clubName ?? null,
       clubNocCode: r.clubNocCode ?? null,
+      elimRound: r.elimRound,
+      elimTotal: r.elimTotal,
+      elimRank: r.elimRank,
       qualTotal: r.qualTotal,
       qualRank: r.qualRank,
       qualInners: r.qualInners,
@@ -344,7 +350,7 @@ export default async function CompetitionPage({ params }: Props) {
       </div>
 
       {/* ── Schedule ─────────────────────────────────────────────── */}
-      <ScheduleSection slots={scheduleSlots} locale={locale} />
+      <ScheduleSection slots={scheduleSlots} locale={locale} timezone={comp.timezone ?? "UTC"} />
 
       {/* ── Results ───────────────────────────────────────────────── */}
       <div>

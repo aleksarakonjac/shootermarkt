@@ -429,6 +429,7 @@ export const competitions = pgTable(
     siusId: varchar("scius_id", { length: 50 }).unique(),
     externalId: varchar("external_id", { length: 300 }),
     tags: varchar("tags", { length: 20 }).array().notNull().default([]),
+    timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -480,6 +481,12 @@ export const results = pgTable(
 
     // Uzrasna kategorija pod kojom je rezultat postignut (iz biltena)
     category: ageCategoryEnum("category").notNull().default("senior"),
+
+    // Elimination (R3P-style: runs before qual to reduce field; integer scores)
+    // elim_round = which heat/group (1, 2, …); null = no elimination for this result
+    elimRound: integer("elim_round"),
+    elimTotal: integer("elim_total"),
+    elimRank: integer("elim_rank"),
 
     // Qualification
     qualTotal: decimal("qual_total", { precision: 6, scale: 1 }),

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
-import { competitionSchedule, disciplines, disciplineCodeEnum } from "@/lib/db/schema";
+import { competitions, competitionSchedule, disciplines, disciplineCodeEnum } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
 type DisciplineCode = typeof disciplineCodeEnum.enumValues[number];
 import { fetchScheduleFromHtml, type ISSFScheduleEntry } from "@/lib/issf/adapter";
+import { venueLocalToUtc } from "@/lib/timezone";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -40,6 +41,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "dbCompetitionId and entries required" }, { status: 400 });
   }
 
+  // Get competition timezone for correct UTC conversion
+  const comp = await db.select({ timezone: competitions.timezone })
+    .from(competitions)
+    .where(eq(competitions.id, dbCompetitionId))
+    .then((r) => r[0]);
+  const timezone = comp?.timezone ?? "UTC";
+
   // Resolve discipline codes to IDs
   const codes = [...new Set(entries.map((e) => e.disciplineCode).filter(Boolean))] as DisciplineCode[];
   const discRows = await db.select({ id: disciplines.id, code: disciplines.code })
@@ -54,8 +62,8 @@ export async function POST(req: NextRequest) {
       disciplineId: codeToId[e.disciplineCode!],
       stage: e.stage === "training" || e.stage === "ceremony" || e.stage === "other" ? "qual" : e.stage,
       category: "senior" as const,
-      startTime: new Date(`${e.date}T${e.startTime}:00`),
-      endTime: e.endTime ? new Date(`${e.date}T${e.endTime}:00`) : null,
+      startTime: venueLocalToUtc(e.date, e.startTime, timezone),
+      endTime: e.endTime ? venueLocalToUtc(e.date, e.endTime, timezone) : null,
     }));
 
   if (!toInsert.length) {

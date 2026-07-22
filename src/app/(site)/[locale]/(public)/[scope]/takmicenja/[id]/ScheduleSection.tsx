@@ -15,6 +15,7 @@ export type ScheduleSlot = {
 type Props = {
   slots: ScheduleSlot[];
   locale: string;
+  timezone: string; // IANA timezone of the venue, e.g. "Asia/Shanghai"
 };
 
 const STAGE_LABELS: Record<string, Record<string, string>> = {
@@ -54,11 +55,48 @@ function slotStatus(slot: ScheduleSlot, now: Date): "active" | "upcoming" | "pas
   return end >= now ? "active" : "past";
 }
 
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function fmtTime(iso: string, timezone?: string): string {
+  return new Date(iso).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(timezone ? { timeZone: timezone } : {}),
+  });
 }
 
-function localDateKey(iso: string): string {
+function tzAbbr(iso: string, timezone: string): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: timezone,
+    timeZoneName: "short",
+  }).formatToParts(new Date(iso));
+  return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+}
+
+/** Returns true when venue timezone differs from browser timezone at the given moment. */
+function venueDiffersFromBrowser(iso: string, venueTimezone: string): boolean {
+  const d = new Date(iso);
+  const browserOffset = -d.getTimezoneOffset(); // minutes east of UTC
+  const venueFmt = new Intl.DateTimeFormat("en", {
+    timeZone: venueTimezone,
+    timeZoneName: "shortOffset",
+  }).formatToParts(d);
+  const offsetStr = venueFmt.find((p) => p.type === "timeZoneName")?.value ?? ""; // "GMT+8"
+  const m = offsetStr.match(/GMT([+-])(\d+)(?::(\d+))?/);
+  if (!m) return false;
+  const sign = m[1] === "+" ? 1 : -1;
+  const venueOffset = sign * (parseInt(m[2]) * 60 + parseInt(m[3] ?? "0"));
+  return browserOffset !== venueOffset;
+}
+
+function localDateKey(iso: string, timezone?: string): string {
+  if (timezone) {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    return fmt.format(new Date(iso)); // "YYYY-MM-DD"
+  }
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -94,7 +132,7 @@ function pickDefaultDay(dateKeys: string[], byDate: Map<string, ScheduleSlot[]>,
   return dateKeys[dateKeys.length - 1];
 }
 
-export function ScheduleSection({ slots, locale }: Props) {
+export function ScheduleSection({ slots, locale, timezone }: Props) {
   const [now, setNow] = useState<Date>(() => new Date());
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -105,17 +143,20 @@ export function ScheduleSection({ slots, locale }: Props) {
 
   if (slots.length === 0) return null;
 
-  // Group by local date
+  // Group by venue date
   const dateKeys: string[] = [];
   const byDate = new Map<string, ScheduleSlot[]>();
   for (const slot of slots) {
-    const key = localDateKey(slot.startTime);
+    const key = localDateKey(slot.startTime, timezone);
     if (!byDate.has(key)) {
       dateKeys.push(key);
       byDate.set(key, []);
     }
     byDate.get(key)!.push(slot);
   }
+
+  // Detect if venue TZ differs from browser (computed once per first slot)
+  const showDualTime = slots.length > 0 && venueDiffersFromBrowser(slots[0].startTime, timezone);
 
   const usePills = dateKeys.length >= 3;
 
@@ -283,10 +324,25 @@ export function ScheduleSection({ slots, locale }: Props) {
                               )}
                             </span>
                           </td>
-                          <td className="py-1 pr-4 align-middle whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--ink)]">
-                            {fmtTime(slot.startTime)}
-                            {slot.endTime && (
-                              <span className="text-[var(--subtle)]"> – {fmtTime(slot.endTime)}</span>
+                          <td className="py-1 pr-4 align-top whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">
+                            <div className="flex items-baseline gap-1 text-[var(--ink)]">
+                              {fmtTime(slot.startTime, timezone)}
+                              {slot.endTime && (
+                                <span className="text-[var(--subtle)]">– {fmtTime(slot.endTime, timezone)}</span>
+                              )}
+                              <span className="text-[0.65rem] text-[var(--subtle)] font-normal tracking-tight">
+                                {tzAbbr(slot.startTime, timezone)}
+                              </span>
+                            </div>
+                            {showDualTime && (
+                              <div className="text-[0.68rem] text-[var(--subtle)] leading-tight mt-0.5">
+                                {fmtTime(slot.startTime)}
+                                {slot.endTime && <span> – {fmtTime(slot.endTime)}</span>}
+                                {" "}
+                                <span className="opacity-70">
+                                  {locale === "sr" ? "vaše vr." : "your time"}
+                                </span>
+                              </div>
                             )}
                           </td>
                           <td className="py-1 pr-4 align-middle whitespace-nowrap font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[var(--ink)] tracking-wide">

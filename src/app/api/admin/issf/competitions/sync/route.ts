@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { competitions } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
+import { guessTimezone } from "@/lib/timezone";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
     name: string;
     dateFrom: string;
     city: string;
+    nationCode?: string;
     level?: CompetitionLevel;
   }> = body.competitions;
 
@@ -66,6 +68,7 @@ export async function POST(req: NextRequest) {
     location: c.city,
     level: (c.level ?? "medjunarodno") as CompetitionLevel,
     issfId: String(c.id),
+    timezone: guessTimezone(c.city, c.nationCode ?? null),
   }));
 
   const inserted = await db

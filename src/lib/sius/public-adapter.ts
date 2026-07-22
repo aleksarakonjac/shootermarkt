@@ -120,26 +120,44 @@ export async function fetchSiusSeries(
   });
 }
 
+export interface SiusElimRound {
+  round: number;
+  results: SiusLiveResult[];
+}
+
+export interface SiusLiveData {
+  qual: SiusLiveResult[];
+  elim: SiusElimRound[];
+}
+
+function isElimSubEvent(name: string): boolean {
+  return /elim/i.test(name);
+}
+
+function isFinalSubEvent(name: string): boolean {
+  return /final/i.test(name);
+}
+
+function elimRoundNumber(name: string, fallback: number): number {
+  const m = name.match(/(\d+)\s*$/);
+  return m ? parseInt(m[1]) : fallback;
+}
+
 /**
- * Convenience: for a given SIUS competition UUID + discipline codes, fetches
- * the currently active (InCompetition) qualification results for each discipline.
- * Returns a map of eventCode → results.
+ * Fetch all live/finished qual and elimination results for the given discipline codes.
+ * Returns a map of eventCode → { qual, elim[] }.
  */
 export async function fetchLiveSiusResults(
   compUuid: string,
   disciplineCodes: string[]
-): Promise<Map<string, SiusLiveResult[]>> {
-  const out = new Map<string, SiusLiveResult[]>();
+): Promise<Map<string, SiusLiveData>> {
+  const out = new Map<string, SiusLiveData>();
 
   const allEvents = await fetchSiusEvents(compUuid);
-  const relevantEvents = allEvents.filter(
-    (e) => disciplineCodes.includes(e.eventCode) || MVP_CODES.has(e.eventCode)
-  );
+  const relevantEvents = allEvents.filter((e) => disciplineCodes.includes(e.eventCode));
 
   await Promise.all(
     relevantEvents.map(async (event) => {
-      if (!disciplineCodes.includes(event.eventCode)) return;
-
       let subEvents: SiusSubEvent[];
       try {
         subEvents = await fetchSiusSubEvents(compUuid, event.runningId);
@@ -147,27 +165,34 @@ export async function fetchLiveSiusResults(
         return;
       }
 
-      // prefer InCompetition qual round; fall back to first non-Planned (Order 1 = Qualification)
-      const activeSubEvent =
-        subEvents.find((s) => s.state === "InCompetition" && !s.name.toLowerCase().includes("final")) ??
-        subEvents.find((s) => s.state === "InCompetition") ??
-        subEvents.filter((s) => s.state !== "Planned").at(0);
+      const done = subEvents.filter((s) => s.state !== "Planned");
+      const qualSubs = done.filter((s) => !isElimSubEvent(s.name) && !isFinalSubEvent(s.name));
+      const elimSubs = done.filter((s) => isElimSubEvent(s.name));
 
-      if (!activeSubEvent) return;
+      // Qual: prefer InCompetition, fall back to first finished
+      const activeQual =
+        qualSubs.find((s) => s.state === "InCompetition") ?? qualSubs.at(0);
 
-      let results: SiusLiveResult[];
-      try {
-        results = await fetchSiusSeries(
-          compUuid,
-          event.runningId,
-          activeSubEvent.runningId
-        );
-      } catch {
-        return;
+      const data: SiusLiveData = { qual: [], elim: [] };
+
+      if (activeQual) {
+        try {
+          data.qual = await fetchSiusSeries(compUuid, event.runningId, activeQual.runningId);
+        } catch { /* ignore */ }
       }
 
-      if (results.length > 0) {
-        out.set(event.eventCode, results);
+      // Elimination rounds (one per sub-event, ordered by round number)
+      let elimFallbackIdx = 1;
+      for (const sub of elimSubs) {
+        const rnd = elimRoundNumber(sub.name, elimFallbackIdx++);
+        try {
+          const r = await fetchSiusSeries(compUuid, event.runningId, sub.runningId);
+          if (r.length > 0) data.elim.push({ round: rnd, results: r });
+        } catch { /* ignore */ }
+      }
+
+      if (data.qual.length > 0 || data.elim.length > 0) {
+        out.set(event.eventCode, data);
       }
     })
   );

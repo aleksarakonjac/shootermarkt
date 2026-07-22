@@ -125,6 +125,7 @@ export function extractMvpEvents(
   category: "senior" | "junior";
   qualPhase: ISSFResultPhase | null;
   finalPhase: ISSFResultPhase | null;
+  elimPhases: Array<{ round: number; phase: ISSFResultPhase }>;
 }> {
   const out = [];
   for (const group of groups) {
@@ -136,10 +137,29 @@ export function extractMvpEvents(
       const qualPhase = phases.find((p) => p.title === "Qualification") ?? null;
       const finalPhase = phases.find((p) => p.title === "Final") ?? null;
 
-      out.push({ disciplineCode: dc, category: event.isJunior ? "junior" as const : "senior" as const, qualPhase, finalPhase });
+      // Elimination phases: "Elimination Relay 1", "Elimination Relay 2", etc.
+      const rawElim = phases.filter((p) => /elimination/i.test(p.title));
+      const elimPhases = rawElim.map((p, i) => {
+        const m = p.title.match(/(\d+)\s*$/);
+        return { round: m ? parseInt(m[1]) : i + 1, phase: p };
+      });
+
+      out.push({ disciplineCode: dc, category: event.isJunior ? "junior" as const : "senior" as const, qualPhase, finalPhase, elimPhases });
     }
   }
   return out;
+}
+
+/**
+ * Fetch R3P elimination round results — same HTML format as qualification.
+ * Integer totals (no decimals for 50m 3P elimination), with Q marker for advancers.
+ */
+export async function fetchElimResultsFromHtml(
+  competitionId: number,
+  resultKey: string,
+  noCache = false
+): Promise<ISSFQualResult[]> {
+  return fetchQualResultsFromHtml(competitionId, resultKey, noCache);
 }
 
 const API_LIMIT = 300;

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { competitions } from "@/lib/db/schema";
-import { desc, asc, ilike, and, sql, eq, gte, lt } from "drizzle-orm";
+import { desc, asc, ilike, and, sql, eq, gt } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Pagination } from "../components/Pagination";
@@ -37,13 +37,18 @@ export default async function AdminTakmicenjaPage({
 
   const baseWhere = conditions.length ? and(...conditions) : undefined;
 
+  const currentCondition = and(
+    sql`${competitions.date} <= ${today}`,
+    sql`coalesce(${competitions.dateEnd}, ${competitions.date}) >= ${today}`,
+  );
+
   const upcomingCondition = baseWhere
-    ? and(baseWhere, gte(competitions.date, today))
-    : gte(competitions.date, today);
+    ? and(baseWhere, gt(competitions.date, today))
+    : gt(competitions.date, today);
 
   const pastCondition = baseWhere
-    ? and(baseWhere, lt(competitions.date, today))
-    : lt(competitions.date, today);
+    ? and(baseWhere, sql`coalesce(${competitions.dateEnd}, ${competitions.date}) < ${today}`)
+    : sql`coalesce(${competitions.dateEnd}, ${competitions.date}) < ${today}`;
 
   const [upcomingCountRes, pastCountRes] = await Promise.all([
     db.select({ total: sql<number>`count(*)::int` }).from(competitions).where(upcomingCondition),
@@ -127,7 +132,7 @@ export default async function AdminTakmicenjaPage({
     );
   };
 
-  const [data, yearRows] = await Promise.all([
+  const [data, yearRows, currentCompetitions] = await Promise.all([
     db
       .select({
         id: competitions.id,
@@ -149,6 +154,18 @@ export default async function AdminTakmicenjaPage({
       .from(competitions)
       .groupBy(sql`date_part('year', ${competitions.date}::date)`)
       .orderBy(desc(sql`date_part('year', ${competitions.date}::date)`)),
+    db
+      .select({
+        id: competitions.id,
+        name: competitions.name,
+        date: competitions.date,
+        dateEnd: competitions.dateEnd,
+        location: competitions.location,
+        level: competitions.level,
+      })
+      .from(competitions)
+      .where(currentCondition)
+      .orderBy(asc(competitions.date), asc(competitions.dateEnd), desc(competitions.id)),
   ]);
 
   const years = yearRows.map((r) => r.year).filter(Boolean);
@@ -181,6 +198,50 @@ export default async function AdminTakmicenjaPage({
           </Link>
         </div>
       </div>
+
+      {currentCompetitions.length > 0 && (
+        <section aria-labelledby="current-competitions-heading" className="mb-8">
+          <div className="flex items-baseline justify-between gap-4 mb-3">
+            <h2
+              id="current-competitions-heading"
+              className="font-[family-name:var(--font-barlow-condensed)] text-lg font-extrabold uppercase tracking-tight text-[var(--ink)]"
+            >
+              U toku
+            </h2>
+            <span className="text-xs text-[var(--muted)]">
+              {currentCompetitions.length} {currentCompetitions.length === 1 ? "takmičenje" : "takmičenja"}
+            </span>
+          </div>
+          <div className="overflow-hidden rounded-lg border border-[var(--live-border)] bg-[var(--live-bg)] divide-y divide-[var(--live-border)]">
+            {currentCompetitions.map((competition) => (
+              <div
+                key={competition.id}
+                className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3.5"
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--live-dot)]" aria-hidden="true" />
+                  <span className="truncate font-semibold text-[var(--ink)]">{competition.name}</span>
+                </div>
+                <span className="whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
+                  {formatDateRangeSr(competition.date, competition.dateEnd)}
+                </span>
+                <span className="min-w-28 text-sm text-[var(--muted)]">
+                  {competition.location ?? "—"}
+                </span>
+                <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded" style={LEVEL_STYLE[competition.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
+                  {LEVEL_LABEL[competition.level] ?? competition.level}
+                </span>
+                <Link
+                  href={`/admin/takmicenja/${competition.id}/edit`}
+                  className="ml-auto text-xs font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
+                >
+                  Uredi →
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="flex border-b border-[var(--border)] mb-6">
         <Link

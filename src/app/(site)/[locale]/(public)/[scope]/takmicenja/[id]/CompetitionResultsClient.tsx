@@ -34,6 +34,9 @@ export type DisciplineGroup = {
       nationality: string | null;
       clubName: string | null;
       clubNocCode: string | null;
+      elimRound: number | null;
+      elimTotal: number | null;
+      elimRank: number | null;
       qualTotal: string | null;
       qualRank: number | null;
       qualInners: number | null;
@@ -53,9 +56,11 @@ export type MixedTeamGroup = {
   teams: MixedTeamRow[];
 };
 
+type Stage = "elim" | "qual" | "final";
+
 type Selection =
-  | { kind: "individual"; disciplineCode: string; category: AgeCategory; stage: "qual" | "final" }
-  | { kind: "mixed"; disciplineCode: string; stage: "qual" | "final" };
+  | { kind: "individual"; disciplineCode: string; category: AgeCategory; stage: Stage; elimRound?: number }
+  | { kind: "mixed"; disciplineCode: string; stage: Stage; elimRound?: number };
 
 interface Props {
   groups: DisciplineGroup[];
@@ -69,6 +74,14 @@ const fadeVariants = {
   hidden: { opacity: 0, y: 6 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.18, ease: "easeOut" as const } },
   exit:   { opacity: 0, y: -4, transition: { duration: 0.12, ease: "easeIn" as const } },
+};
+
+// ── Phase labels ──────────────────────────────────────────────────────────────
+
+const PHASE_LABEL: Record<string, string> = {
+  elim: "Eliminacije",
+  qual: "Kvalifikacije",
+  final: "Finale",
 };
 
 // ── Root ──────────────────────────────────────────────────────────────────────
@@ -113,8 +126,8 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId }:
           <CompetitionOverview
             groups={groups}
             mixedGroups={mixedGroups}
-            onSelectIndividual={(code, category, stage) =>
-              setSelection({ kind: "individual", disciplineCode: code, category, stage })
+            onSelectIndividual={(code, category, stage, elimRound) =>
+              setSelection({ kind: "individual", disciplineCode: code, category, stage, elimRound })
             }
             onSelectMixed={(code) =>
               setSelection({ kind: "mixed", disciplineCode: code, stage: "qual" })
@@ -128,7 +141,9 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId }:
             mixedGroups={mixedGroups}
             selection={selection}
             onBack={() => setSelection(null)}
-            onStageChange={(stage) => setSelection((s) => (s ? { ...s, stage } : s))}
+            onStageChange={(stage, elimRound) =>
+              setSelection((s) => s ? { ...s, stage: stage as Stage, elimRound } : s)
+            }
           />
         </motion.div>
       )}
@@ -138,11 +153,6 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId }:
 
 // ── Overview ──────────────────────────────────────────────────────────────────
 
-const PHASE_LABEL: Record<string, string> = {
-  qual: "Kvalifikacije",
-  final: "Finale",
-};
-
 function CompetitionOverview({
   groups,
   mixedGroups,
@@ -151,7 +161,7 @@ function CompetitionOverview({
 }: {
   groups: DisciplineGroup[];
   mixedGroups: MixedTeamGroup[];
-  onSelectIndividual: (code: string, category: AgeCategory, stage: "qual" | "final") => void;
+  onSelectIndividual: (code: string, category: AgeCategory, stage: Stage, elimRound?: number) => void;
   onSelectMixed: (code: string) => void;
 }) {
   return (
@@ -161,9 +171,6 @@ function CompetitionOverview({
         const totalShooters = g.categories.reduce((s, c) => s + c.results.length, 0);
         const singleCat = g.categories.length === 1;
         const singleCatData = singleCat ? g.categories[0] : null;
-        const singleHasFinal = singleCatData?.results.some(
-          (r) => r.finalRank != null || r.finalTotal != null
-        ) ?? false;
 
         return (
           <div key={g.code}>
@@ -183,47 +190,19 @@ function CompetitionOverview({
             <div className="rounded-xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
               {singleCat && singleCatData ? (
                 /* Single category: show phase rows directly */
-                <>
-                  <button
-                    onClick={() => onSelectIndividual(g.code, singleCatData.category, "qual")}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <PhaseBadge label="KV" active />
-                      <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                        {PHASE_LABEL.qual}
-                      </span>
-                      <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">
-                        {singleCatData.results.length}
-                      </span>
-                    </div>
-                    <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
-                  </button>
-                  {singleHasFinal && (
-                    <button
-                      onClick={() => onSelectIndividual(g.code, singleCatData.category, "final")}
-                      className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <PhaseBadge label="F" accent />
-                        <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                          {PHASE_LABEL.final}
-                        </span>
-                      </div>
-                      <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
-                    </button>
-                  )}
-                </>
+                <SingleCatRows
+                  catData={singleCatData}
+                  onSelect={(stage, elimRound) => onSelectIndividual(g.code, singleCatData.category, stage, elimRound)}
+                />
               ) : (
-                /* Multiple categories: show category rows */
+                /* Multiple categories: category rows */
                 g.categories.map((cat) => {
-                  const hasFinal = cat.results.some(
-                    (r) => r.finalRank != null || r.finalTotal != null
-                  );
+                  const hasFinal = cat.results.some((r) => r.finalRank != null || r.finalTotal != null);
+                  const hasElim = cat.results.some((r) => r.elimRound != null);
                   return (
                     <button
                       key={cat.category}
-                      onClick={() => onSelectIndividual(g.code, cat.category, "qual")}
+                      onClick={() => onSelectIndividual(g.code, cat.category, hasElim ? "elim" : "qual")}
                       className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -235,6 +214,7 @@ function CompetitionOverview({
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {hasElim && <PhaseBadge label="E" elim />}
                         <PhaseBadge label="KV" active />
                         {hasFinal && <PhaseBadge label="F" accent />}
                         <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150 ml-0.5" aria-hidden="true" />
@@ -290,17 +270,111 @@ function CompetitionOverview({
   );
 }
 
+// ── Single-category phase rows ────────────────────────────────────────────────
+
+function SingleCatRows({
+  catData,
+  onSelect,
+}: {
+  catData: DisciplineGroup["categories"][number];
+  onSelect: (stage: Stage, elimRound?: number) => void;
+}) {
+  const hasElim = catData.results.some((r) => r.elimRound != null);
+  const hasFinal = catData.results.some((r) => r.finalRank != null || r.finalTotal != null);
+
+  // Collect distinct elim rounds sorted
+  const elimRounds = hasElim
+    ? [...new Set(catData.results.map((r) => r.elimRound).filter((r): r is number => r != null))].sort((a, b) => a - b)
+    : [];
+
+  return (
+    <>
+      {/* Elimination: one row per round */}
+      {elimRounds.map((rnd) => {
+        const count = catData.results.filter((r) => r.elimRound === rnd).length;
+        return (
+          <button
+            key={`e${rnd}`}
+            onClick={() => onSelect("elim", rnd)}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <PhaseBadge label="E" elim />
+              <span className="text-sm font-semibold text-[var(--ink)] truncate">
+                {PHASE_LABEL.elim} R{rnd}
+              </span>
+              <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">
+                {count}
+              </span>
+            </div>
+            <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
+          </button>
+        );
+      })}
+
+      {/* Qualification */}
+      <button
+        onClick={() => onSelect("qual")}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <PhaseBadge label="KV" active />
+          <span className="text-sm font-semibold text-[var(--ink)] truncate">
+            {PHASE_LABEL.qual}
+          </span>
+          <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">
+            {catData.results.length}
+          </span>
+        </div>
+        <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
+      </button>
+
+      {/* Final */}
+      {hasFinal && (
+        <button
+          onClick={() => onSelect("final")}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <PhaseBadge label="F" accent />
+            <span className="text-sm font-semibold text-[var(--ink)] truncate">
+              {PHASE_LABEL.final}
+            </span>
+          </div>
+          <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
+        </button>
+      )}
+    </>
+  );
+}
+
 // ── Phase badge ───────────────────────────────────────────────────────────────
 
 function PhaseBadge({
   label,
   active = false,
   accent = false,
+  elim = false,
 }: {
   label: string;
   active?: boolean;
   accent?: boolean;
+  elim?: boolean;
 }) {
+  if (elim) {
+    return (
+      <span
+        className="inline-flex items-center px-1.5 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
+        style={{
+          background: "color-mix(in oklch, oklch(0.65 0.15 30) 12%, transparent)",
+          color: "oklch(0.55 0.15 30)",
+          border: "1px solid color-mix(in oklch, oklch(0.65 0.15 30) 25%, transparent)",
+        }}
+      >
+        {label}
+      </span>
+    );
+  }
   if (accent) {
     return (
       <span
@@ -349,7 +423,7 @@ function CompetitionDetail({
   mixedGroups: MixedTeamGroup[];
   selection: Selection;
   onBack: () => void;
-  onStageChange: (stage: "qual" | "final") => void;
+  onStageChange: (stage: string, elimRound?: number) => void;
 }) {
   if (selection.kind === "mixed") {
     const mixedGroup = mixedGroups.find((g) => g.code === selection.disciplineCode);
@@ -417,8 +491,18 @@ function CompetitionDetail({
   const catGroup = group?.categories.find((c) => c.category === selection.category);
   const showCategory = (group?.categories.length ?? 0) > 1;
 
-  const hasFinal =
-    catGroup?.results.some((r) => r.finalRank != null || r.finalTotal != null) ?? false;
+  const hasFinal = catGroup?.results.some((r) => r.finalRank != null || r.finalTotal != null) ?? false;
+  const hasElim = catGroup?.results.some((r) => r.elimRound != null) ?? false;
+
+  // Distinct elimination rounds sorted
+  const elimRounds = hasElim
+    ? [...new Set(catGroup!.results.map((r) => r.elimRound).filter((r): r is number => r != null))].sort((a, b) => a - b)
+    : [];
+
+  // Current elim round shown in detail (default to first)
+  const currentElimRound = selection.stage === "elim"
+    ? (selection.elimRound ?? elimRounds[0])
+    : elimRounds[0];
 
   const qualRows: CompResultRow[] =
     catGroup?.results.map((r) => ({
@@ -435,6 +519,20 @@ function CompetitionDetail({
       apparatus: group?.apparatus ?? null,
     })) ?? [];
 
+  const elimRows = catGroup?.results
+    .filter((r) => r.elimRound === currentElimRound)
+    .sort((a, b) => (a.elimRank ?? 999) - (b.elimRank ?? 999))
+    .map((r) => ({
+      id: r.id,
+      shooterId: r.shooterId,
+      name: `${r.lastName} ${r.firstName}`,
+      clubDisplay: r.clubName ?? r.clubNocCode ?? "",
+      nationality: r.nationality,
+      elimTotal: r.elimTotal,
+      elimRank: r.elimRank,
+      qualified: r.qualified,
+    })) ?? [];
+
   const finalRows: FinalResultRow[] =
     catGroup?.results
       .filter((r) => r.finalRank != null || r.finalTotal != null)
@@ -448,6 +546,14 @@ function CompetitionDetail({
         finalRank: r.finalRank,
         finalDetail: r.finalDetail,
       })) ?? [];
+
+  // Build stage toggle options in correct order: Elim → Qual → Final
+  type StageOption = { key: Stage; label: string; badge: React.ReactNode };
+  const stageOptions: StageOption[] = [
+    ...(hasElim ? [{ key: "elim" as Stage, label: "Eliminacije", badge: <PhaseBadge label="E" elim={selection.stage === "elim"} /> }] : []),
+    { key: "qual" as Stage, label: "Kvalifikacije", badge: <PhaseBadge label="KV" active={selection.stage === "qual"} /> },
+    ...(hasFinal ? [{ key: "final" as Stage, label: "Finale", badge: <PhaseBadge label="F" accent={selection.stage === "final"} /> }] : []),
+  ];
 
   return (
     <div>
@@ -486,29 +592,39 @@ function CompetitionDetail({
       </div>
 
       {/* ── Stage toggle ─────────────────────────────────────────── */}
-      {hasFinal && (
-        <div className="flex items-center gap-0.5 mb-5 p-1 bg-[var(--surface)] rounded-lg w-fit border border-[var(--border)]">
-          {(["qual", "final"] as const).map((s) => (
+      {stageOptions.length > 1 && (
+        <div className="flex items-center gap-0.5 mb-4 p-1 bg-[var(--surface)] rounded-lg w-fit border border-[var(--border)]">
+          {stageOptions.map((opt) => (
             <button
-              key={s}
-              onClick={() => onStageChange(s)}
+              key={opt.key}
+              onClick={() => onStageChange(opt.key, opt.key === "elim" ? currentElimRound : undefined)}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors duration-150 ${
-                selection.stage === s
+                selection.stage === opt.key
                   ? "bg-[var(--bg)] text-[var(--ink)] shadow-sm"
                   : "text-[var(--muted)] hover:text-[var(--ink)]"
               }`}
             >
-              {s === "qual" ? (
-                <>
-                  <PhaseBadge label="KV" active={selection.stage === "qual"} />
-                  Kvalifikacija
-                </>
-              ) : (
-                <>
-                  <PhaseBadge label="F" accent={selection.stage === "final"} />
-                  Finale
-                </>
-              )}
+              {opt.badge}
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Elim round selector ──────────────────────────────────── */}
+      {selection.stage === "elim" && elimRounds.length > 1 && (
+        <div className="flex items-center gap-1.5 mb-4">
+          {elimRounds.map((rnd) => (
+            <button
+              key={rnd}
+              onClick={() => onStageChange("elim", rnd)}
+              className="px-2.5 py-1 rounded-sm text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide transition-colors"
+              style={{
+                background: currentElimRound === rnd ? "var(--ink)" : "var(--surface-2)",
+                color: currentElimRound === rnd ? "var(--surface)" : "var(--muted)",
+              }}
+            >
+              R{rnd}
             </button>
           ))}
         </div>
@@ -516,7 +632,16 @@ function CompetitionDetail({
 
       {/* ── Table ────────────────────────────────────────────────── */}
       <AnimatePresence mode="wait" initial={false}>
-        {selection.stage === "qual" ? (
+        {selection.stage === "elim" ? (
+          <motion.div
+            key={`elim-${currentElimRound}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: 0.15 } }}
+            exit={{ opacity: 0, transition: { duration: 0.1 } }}
+          >
+            <ElimTable rows={elimRows} />
+          </motion.div>
+        ) : selection.stage === "qual" ? (
           <motion.div
             key="qual"
             initial={{ opacity: 0 }}
@@ -536,6 +661,83 @@ function CompetitionDetail({
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Elimination table ─────────────────────────────────────────────────────────
+
+type ElimRow = {
+  id: number;
+  shooterId: number;
+  name: string;
+  clubDisplay: string;
+  nationality: string | null;
+  elimTotal: number | null;
+  elimRank: number | null;
+  qualified: boolean | null;
+};
+
+function ElimTable({ rows }: { rows: ElimRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-10 text-center">
+        <p className="text-sm text-[var(--muted)]">Nema podataka za ovu rundu.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+            <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] w-8">#</th>
+            <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">Strelac</th>
+            <th className="py-2 px-3 text-right text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">Σ</th>
+            <th className="py-2 px-3 text-center text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] w-8">→</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--border)]">
+          {rows.map((r, i) => (
+            <tr
+              key={r.id}
+              className="bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-75"
+            >
+              <td className="py-2.5 px-3 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">
+                {r.elimRank ?? i + 1}
+              </td>
+              <td className="py-2.5 px-3">
+                <span className="font-semibold text-[var(--ink)]">{r.name}</span>
+                {r.nationality && (
+                  <span className="ml-1.5 text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)]">
+                    {r.nationality}
+                  </span>
+                )}
+                {r.clubDisplay && (
+                  <span className="ml-2 text-xs text-[var(--muted)] hidden sm:inline">{r.clubDisplay}</span>
+                )}
+              </td>
+              <td className="py-2.5 px-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]">
+                {r.elimTotal ?? "—"}
+              </td>
+              <td className="py-2.5 px-3 text-center">
+                {r.qualified === true && (
+                  <span className="text-[0.6rem] font-bold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide px-1.5 py-0.5 rounded"
+                    style={{
+                      background: "color-mix(in oklch, var(--success) 12%, transparent)",
+                      color: "var(--success)",
+                      border: "1px solid color-mix(in oklch, var(--success) 22%, transparent)",
+                    }}
+                  >
+                    KV
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
