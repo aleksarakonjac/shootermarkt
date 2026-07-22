@@ -198,7 +198,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
         aria-expanded={open}
       >
         <h2
-          className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase tracking-tight text-[var(--ink)]"
+          className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase tracking-tight text-[var(--ink)] m-0 leading-none"
           style={{ fontSize: "1.25rem", letterSpacing: "-0.02em" }}
         >
           {title}
