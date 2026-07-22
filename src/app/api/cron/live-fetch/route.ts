@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         or(isNotNull(competitions.issfId), isNotNull(competitions.siusId)),
         lte(competitionSchedule.startTime, now),
         or(
-          gte(competitionSchedule.endTime, now),
+          gte(competitionSchedule.endTime, windowStart),
           and(
             isNull(competitionSchedule.endTime),
             gte(competitionSchedule.startTime, windowStart)
