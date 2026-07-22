@@ -74,115 +74,104 @@ export async function GET(req: NextRequest) {
     byComp.set(slot.competitionId, list);
   }
 
-  for (const [competitionId, slots] of byComp) {
-    const { siusId, issfId } = slots[0];
-    const rows: Array<typeof results.$inferInsert> = [];
+  const counts = await Promise.all(
+    [...byComp.entries()].map(async ([competitionId, slots]) => {
+      const { siusId, issfId } = slots[0];
+      const rows: Array<typeof results.$inferInsert> = [];
 
-    if (siusId) {
-      // ── SIUS primary source ───────────────────────────────────────────────
-      const disciplineCodes = slots
-        .filter((s) => s.stage.startsWith("qual"))
-        .map((s) => s.disciplineCode);
+      if (siusId) {
+        // ── SIUS primary source ─────────────────────────────────────────────
+        const disciplineCodes = slots
+          .filter((s) => s.stage.startsWith("qual"))
+          .map((s) => s.disciplineCode);
 
-      console.log("[cron] SIUS disciplineCodes:", disciplineCodes);
-      let siusResults: Map<string, SiusLiveResult[]> = new Map();
-      try {
-        siusResults = await fetchLiveSiusResults(siusId, disciplineCodes);
-        console.log("[cron] SIUS results keys:", [...siusResults.keys()], "sizes:", [...siusResults.values()].map((v) => v.length));
-      } catch (e) {
-        console.error("[cron] SIUS fetch failed:", e);
-        // fall through to ISSF below
-      }
-
-      for (const slot of slots) {
-        if (!slot.stage.startsWith("qual")) continue;
-        const eventResults = siusResults.get(slot.disciplineCode);
-        if (!eventResults?.length) continue;
-
-        for (const r of eventResults) {
-          const match = matchShooter(r.firstName, r.lastName, r.nation, allShooters);
-          let shooterId: number;
-          if (match.kind === "exact") {
-            shooterId = match.id;
-          } else if (r.siusAthleteId) {
-            const [created] = await db
-              .insert(shooters)
-              .values({
-                firstName: r.firstName,
-                lastName: r.lastName,
-                nationality: r.nation || null,
-                verified: false,
-                createdBySelf: false,
-                siusAthleteId: r.siusAthleteId,
-              })
-              .onConflictDoUpdate({
-                target: [shooters.siusAthleteId],
-                set: { firstName: r.firstName, lastName: r.lastName, nationality: r.nation || null },
-              })
-              .returning({ id: shooters.id });
-            shooterId = created.id;
-            allShooters.push({ id: created.id, firstName: r.firstName, lastName: r.lastName, nationality: r.nation, issfId: null });
-          } else {
-            continue;
-          }
-
-          rows.push({
-            shooterId,
-            competitionId,
-            disciplineId: slot.disciplineId,
-            category: slot.category,
-            qualTotal: r.total.toFixed(1),
-            qualInners: r.inners ?? null,
-            qualRank: r.rank,
-            qualified: null,
-            ...(r.series.length > 0 ? { qualDetail: { series: r.series } } : {}),
-            source: "issf_import",
-          });
+        console.log("[cron] SIUS disciplineCodes:", disciplineCodes);
+        let siusResults: Map<string, SiusLiveResult[]> = new Map();
+        try {
+          siusResults = await fetchLiveSiusResults(siusId, disciplineCodes);
+          console.log("[cron] SIUS results keys:", [...siusResults.keys()], "sizes:", [...siusResults.values()].map((v) => v.length));
+        } catch (e) {
+          console.error("[cron] SIUS fetch failed:", e);
         }
+
+        for (const slot of slots) {
+          if (!slot.stage.startsWith("qual")) continue;
+          const eventResults = siusResults.get(slot.disciplineCode);
+          if (!eventResults?.length) continue;
+
+          for (const r of eventResults) {
+            const match = matchShooter(r.firstName, r.lastName, r.nation, allShooters);
+            let shooterId: number;
+            if (match.kind === "exact") {
+              shooterId = match.id;
+            } else if (r.siusAthleteId) {
+              const [created] = await db
+                .insert(shooters)
+                .values({
+                  firstName: r.firstName,
+                  lastName: r.lastName,
+                  nationality: r.nation || null,
+                  verified: false,
+                  createdBySelf: false,
+                  siusAthleteId: r.siusAthleteId,
+                })
+                .onConflictDoUpdate({
+                  target: [shooters.siusAthleteId],
+                  set: { firstName: r.firstName, lastName: r.lastName, nationality: r.nation || null },
+                })
+                .returning({ id: shooters.id });
+              shooterId = created.id;
+              allShooters.push({ id: created.id, firstName: r.firstName, lastName: r.lastName, nationality: r.nation, issfId: null });
+            } else {
+              continue;
+            }
+
+            rows.push({
+              shooterId,
+              competitionId,
+              disciplineId: slot.disciplineId,
+              category: slot.category,
+              qualTotal: r.total.toFixed(1),
+              qualInners: r.inners ?? null,
+              qualRank: r.rank,
+              qualified: null,
+              ...(r.series.length > 0 ? { qualDetail: { series: r.series } } : {}),
+              source: "issf_import",
+            });
+          }
+        }
+
+        // if SIUS returned nothing, fall back to ISSF
+        if (rows.length === 0 && issfId) {
+          await fetchFromIssf(parseInt(issfId), slots, competitionId, allShooters, shooterByIssfId, rows);
+        }
+      } else if (issfId) {
+        // ── ISSF only ───────────────────────────────────────────────────────
+        await fetchFromIssf(parseInt(issfId), slots, competitionId, allShooters, shooterByIssfId, rows);
       }
 
-      // if SIUS returned nothing (e.g. event not yet public), fall back to ISSF
-      if (rows.length === 0 && issfId) {
-        await fetchFromIssf(
-          parseInt(issfId),
-          slots,
-          competitionId,
-          allShooters,
-          shooterByIssfId,
-          rows
-        );
-      }
-    } else if (issfId) {
-      // ── ISSF fallback ─────────────────────────────────────────────────────
-      await fetchFromIssf(
-        parseInt(issfId),
-        slots,
-        competitionId,
-        allShooters,
-        shooterByIssfId,
-        rows
-      );
-    }
+      console.log(`[cron] comp ${competitionId}: ${rows.length} rows to upsert`);
+      if (rows.length === 0) return 0;
 
-    console.log(`[cron] comp ${competitionId}: ${rows.length} rows to upsert`);
-    if (rows.length === 0) continue;
+      await db
+        .insert(results)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
+          set: {
+            qualTotal: sql`excluded.qual_total`,
+            qualInners: sql`excluded.qual_inners`,
+            qualRank: sql`excluded.qual_rank`,
+            qualified: sql`excluded.qualified`,
+            qualDetail: sql`excluded.qual_detail`,
+          },
+        });
 
-    await db
-      .insert(results)
-      .values(rows)
-      .onConflictDoUpdate({
-        target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
-        set: {
-          qualTotal: sql`excluded.qual_total`,
-          qualInners: sql`excluded.qual_inners`,
-          qualRank: sql`excluded.qual_rank`,
-          qualified: sql`excluded.qualified`,
-          qualDetail: sql`excluded.qual_detail`,
-        },
-      });
+      return rows.length;
+    })
+  );
 
-    totalUpserted += rows.length;
-  }
+  totalUpserted = counts.reduce((a, b) => a + b, 0);
 
   return NextResponse.json({ ok: true, active: activeSlots.length, upserted: totalUpserted });
 }
