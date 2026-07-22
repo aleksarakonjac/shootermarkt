@@ -63,12 +63,24 @@ function fmtTime(iso: string, timezone?: string): string {
   });
 }
 
-function tzAbbr(iso: string, timezone: string): string {
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: timezone,
-    timeZoneName: "short",
-  }).formatToParts(new Date(iso));
-  return parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+function tzDiff(iso: string, venueTimezone: string): string {
+  const d = new Date(iso);
+  const browserOffset = -d.getTimezoneOffset(); // minutes east of UTC
+  const venueFmt = new Intl.DateTimeFormat("en", {
+    timeZone: venueTimezone,
+    timeZoneName: "shortOffset",
+  }).formatToParts(d);
+  const offsetStr = venueFmt.find((p) => p.type === "timeZoneName")?.value ?? "";
+  const m = offsetStr.match(/GMT([+-])(\d+)(?::(\d+))?/);
+  if (!m) return "";
+  const sign = m[1] === "+" ? 1 : -1;
+  const venueOffset = sign * (parseInt(m[2]) * 60 + parseInt(m[3] ?? "0"));
+  const diffMin = venueOffset - browserOffset;
+  if (diffMin === 0) return "";
+  const h = Math.floor(Math.abs(diffMin) / 60);
+  const min = Math.abs(diffMin) % 60;
+  const prefix = diffMin > 0 ? "+" : "−";
+  return min === 0 ? `${prefix}${h}h` : `${prefix}${h}h${min}m`;
 }
 
 /** Returns true when venue timezone differs from browser timezone at the given moment. */
@@ -335,7 +347,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
                               <div className="flex items-baseline gap-1 text-[0.68rem] text-[var(--subtle)] leading-tight mt-0.5">
                                 {fmtTime(slot.startTime, timezone)}
                                 {slot.endTime && <span>– {fmtTime(slot.endTime, timezone)}</span>}
-                                <span className="opacity-70">{tzAbbr(slot.startTime, timezone)}</span>
+                                <span className="opacity-70">{tzDiff(slot.startTime, timezone)}</span>
                               </div>
                             )}
                           </td>
