@@ -104,7 +104,7 @@ export default async function AdminTickerPage() {
     getPublishedArticles({ limit: 200 }).catch(() => []),
 
     // Reuse the public assembly so admin sees the exact automatic upper-ticker rotation.
-    getHomepageTicker("all", "sr").catch(() => ({ live: [], upcoming: [], today })),
+    getHomepageTicker("srb", "sr").catch(() => ({ live: [], upcoming: [], today })),
   ]);
 
   const now = new Date();
