@@ -172,7 +172,7 @@ export default async function AdminTakmicenjaPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1
             className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase tracking-tight text-[var(--ink)]"
@@ -182,7 +182,7 @@ export default async function AdminTakmicenjaPage({
           </h1>
           <p className="text-sm text-[var(--muted)] mt-0.5">prikazano {data.length} od {total}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <BatchTranslateButton />
           <Link
             href="/admin/takmicenja/sync"
@@ -216,27 +216,29 @@ export default async function AdminTakmicenjaPage({
             {currentCompetitions.map((competition) => (
               <div
                 key={competition.id}
-                className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3.5"
+                className="flex flex-wrap items-start gap-x-5 gap-y-1.5 px-4 py-3.5"
               >
                 <div className="flex min-w-0 flex-1 items-center gap-2.5">
                   <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--live-dot)]" aria-hidden="true" />
-                  <span className="truncate font-semibold text-[var(--ink)]">{competition.name}</span>
+                  <span className="font-semibold text-[var(--ink)] leading-snug">{competition.name}</span>
                 </div>
-                <span className="whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
-                  {formatDateRangeSr(competition.date, competition.dateEnd)}
-                </span>
-                <span className="min-w-28 text-sm text-[var(--muted)]">
-                  {competition.location ?? "—"}
-                </span>
-                <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded" style={LEVEL_STYLE[competition.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
-                  {LEVEL_LABEL[competition.level] ?? competition.level}
-                </span>
-                <Link
-                  href={`/admin/takmicenja/${competition.id}/edit`}
-                  className="ml-auto text-xs font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
-                >
-                  Uredi →
-                </Link>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 w-full sm:w-auto sm:ml-auto">
+                  <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
+                    {formatDateRangeSr(competition.date, competition.dateEnd)}
+                  </span>
+                  {competition.location && (
+                    <span className="text-sm text-[var(--muted)]">{competition.location}</span>
+                  )}
+                  <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded" style={LEVEL_STYLE[competition.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
+                    {LEVEL_LABEL[competition.level] ?? competition.level}
+                  </span>
+                  <Link
+                    href={`/admin/takmicenja/${competition.id}/edit`}
+                    className="text-xs font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
+                  >
+                    Uredi →
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
@@ -280,7 +282,43 @@ export default async function AdminTakmicenjaPage({
           </div>
         ) : (
           <>
-            <table className="w-full text-sm">
+            {/* ── Mobile card list (< md) ─────────────────────────────── */}
+            <ul className="md:hidden divide-y divide-[var(--border)]">
+              {data.map((c) => (
+                <li key={c.id} className="px-4 py-3 hover:bg-[var(--surface)] transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-[var(--ink)] leading-snug line-clamp-2">{c.name}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--muted)]">
+                        <span className="font-[family-name:var(--font-jetbrains-mono)]">
+                          {formatDateRangeSr(c.date, c.dateEnd)}
+                        </span>
+                        {c.location && <span>{c.location}</span>}
+                        {(c.organizer ?? c.issfId) && (
+                          <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)]">
+                            {c.organizer ?? c.issfId}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded" style={LEVEL_STYLE[c.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
+                        {LEVEL_LABEL[c.level] ?? c.level}
+                      </span>
+                      <Link
+                        href={`/admin/takmicenja/${c.id}/edit`}
+                        className="text-xs font-medium text-[var(--muted)] hover:text-[var(--brand-primary)] transition-colors"
+                      >
+                        Uredi →
+                      </Link>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* ── Desktop table (≥ md) ────────────────────────────────── */}
+            <table className="hidden md:table w-full text-sm">
               <thead>
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                   {renderSortableHeader("name", "Naziv")}

@@ -212,7 +212,7 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
 
       {/* Bulk action bar */}
       {selectedUnverified.length > 0 && (
-        <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3">
+        <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 flex flex-wrap items-center gap-3">
           <span className="text-sm text-[var(--muted)]">
             <span className="font-semibold text-[var(--ink)]">{selectedUnverified.length}</span> selektovano
           </span>
@@ -238,141 +238,217 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
             Nema strelaca. <Link href="/admin/strelci/novi" className="text-[var(--brand-primary)] hover:underline">Dodaj prvog →</Link>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                <th className="px-4 py-3 w-8">
-                  {unverified.length > 0 && (
-                    <input
-                      type="checkbox"
-                      checked={allUnverifiedSelected}
-                      onChange={toggleAllUnverified}
-                      className="accent-[var(--brand-primary)] cursor-pointer"
-                      title="Selektuj sve neverifikovane"
-                    />
-                  )}
-                </th>
-                <th className="w-14 px-2 py-3" scope="col" aria-label="Profilna slika" />
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("name")}>
-                  Strelac<SortIcon col="name" sortCol={sortCol} sortDir={sortDir} />
-                </th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("country")}>
-                  Zemlja<SortIcon col="country" sortCol={sortCol} sortDir={sortDir} />
-                </th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("gender")}>
-                  Pol<SortIcon col="gender" sortCol={sortCol} sortDir={sortDir} />
-                </th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("birthDate")}>
-                  Datum rođ.<SortIcon col="birthDate" sortCol={sortCol} sortDir={sortDir} />
-                </th>
-                <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("apparatus")}>
-                  Disciplina<SortIcon col="apparatus" sortCol={sortCol} sortDir={sortDir} />
-                </th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
+          <>
+            {/* ── Mobile card list (< md) ─────────────────────────────── */}
+            <ul className="md:hidden divide-y divide-[var(--border)]">
               {data.map((s) => (
-                <tr
-                  key={s.id}
-                  className="hover:bg-[var(--surface)] transition-colors"
-                  style={selected.has(s.id) ? { background: "var(--surface)" } : undefined}
-                >
-                  <td className="px-4 py-3">
+                <li key={s.id} className="px-4 py-3" style={selected.has(s.id) ? { background: "var(--surface)" } : undefined}>
+                  <div className="flex items-start gap-3">
                     {!s.verified && (
                       <input
                         type="checkbox"
                         checked={selected.has(s.id)}
                         onChange={() => toggle(s.id)}
-                        className="accent-[var(--brand-primary)] cursor-pointer"
+                        className="mt-1 accent-[var(--brand-primary)] cursor-pointer shrink-0"
                       />
                     )}
-                  </td>
-                  <td className="px-2 py-2">
                     <ShooterThumbnail shooter={s} />
-                  </td>
-                  <td className="px-4 py-3 font-medium text-[var(--ink)]">
-                    <a href={`/admin/strelci/${s.id}`} className="hover:text-[var(--brand-primary)] transition-colors">
-                      {s.lastName} {s.firstName}
-                    </a>
-                    {s.createdBySelf && (
-                      <span className="ml-2 text-[0.65rem] font-semibold px-1.5 py-0.5 rounded" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}>
-                        self
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {s.nationality ? (
-                      <span className="flex items-center gap-1.5">
-                        {(() => {
-                          const alpha2 = NOC_LIST.find((n) => n.noc === s.nationality)?.alpha2;
-                          return alpha2 ? (
-                            <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ fontSize: "1em", borderRadius: "2px", flexShrink: 0 }} />
-                          ) : null;
-                        })()}
-                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">{s.nationality}</span>
-                        {s.countryName && s.countryName !== s.nationality && (
-                          <span className="text-[0.65rem] text-[var(--muted)] truncate max-w-[100px]">{s.countryName}</span>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="text-[var(--subtle)] text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--muted)]">{s.clubName ?? <span className="text-[var(--subtle)]">—</span>}</td>
-                  <td className="px-4 py-3 text-xs font-bold">
-                    {s.gender === "M" ? (
-                      <span style={{ color: "oklch(0.52 0.18 250)" }}>M</span>
-                    ) : s.gender === "F" ? (
-                      <span style={{ color: "oklch(0.55 0.18 350)" }}>Ž</span>
-                    ) : (
-                      <span className="text-[var(--subtle)] font-normal">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-[var(--ink)] whitespace-nowrap">
-                    {s.birthDate ? (
-                      <>
-                        <span className="font-[family-name:var(--font-jetbrains-mono)]">{fmtDate(s.birthDate)}</span>
-                        <span className="text-[var(--muted)] ml-1">({calcAge(s.birthDate)} g.)</span>
-                      </>
-                    ) : s.birthYear ? (
-                      <span className="text-[var(--muted)]">{s.birthYear}</span>
-                    ) : (
-                      <span className="text-[var(--subtle)]">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-[var(--ink)]">
-                    {s.apparatus ? (
-                      <span className="text-[var(--muted)]">{APPARATUS_LABELS[s.apparatus] ?? s.apparatus}</span>
-                    ) : (
-                      <span className="text-[var(--subtle)]">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      {!s.verified && (
-                        <button
-                          onClick={() => verifySingle(s.id)}
-                          disabled={verifying}
-                          className="text-xs font-semibold text-[var(--brand-primary)] hover:underline disabled:opacity-50"
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <a
+                          href={`/admin/strelci/${s.id}`}
+                          className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors leading-snug"
                         >
-                          Verifikuj
-                        </button>
-                      )}
-                      <button
-                        onClick={() => deleteSingle(s.id, `${s.lastName} ${s.firstName}`)}
-                        disabled={verifying}
-                        className="text-xs font-semibold text-red-500 hover:underline disabled:opacity-50"
-                      >
-                        Obriši
-                      </button>
+                          {s.lastName} {s.firstName}
+                        </a>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {!s.verified && (
+                            <button
+                              onClick={() => verifySingle(s.id)}
+                              disabled={verifying}
+                              className="text-xs font-semibold text-[var(--brand-primary)] hover:underline disabled:opacity-50"
+                            >
+                              Verifikuj
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteSingle(s.id, `${s.lastName} ${s.firstName}`)}
+                            disabled={verifying}
+                            className="text-xs font-semibold text-red-500 hover:underline disabled:opacity-50"
+                          >
+                            Obriši
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--muted)]">
+                        {s.nationality && (
+                          <span className="flex items-center gap-1">
+                            {(() => {
+                              const alpha2 = NOC_LIST.find((n) => n.noc === s.nationality)?.alpha2;
+                              return alpha2 ? <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ fontSize: "0.9em", borderRadius: "2px" }} /> : null;
+                            })()}
+                            <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">{s.nationality}</span>
+                          </span>
+                        )}
+                        {s.clubName && <span className="truncate max-w-[120px]">{s.clubName}</span>}
+                        {s.gender && (
+                          <span className="font-bold" style={{ color: s.gender === "M" ? "oklch(0.52 0.18 250)" : "oklch(0.55 0.18 350)" }}>
+                            {s.gender === "M" ? "M" : "Ž"}
+                          </span>
+                        )}
+                        {s.apparatus && <span>{APPARATUS_LABELS[s.apparatus] ?? s.apparatus}</span>}
+                        {s.birthDate && (
+                          <span className="font-[family-name:var(--font-jetbrains-mono)]">{fmtDate(s.birthDate)}</span>
+                        )}
+                        {s.createdBySelf && (
+                          <span className="text-[0.65rem] font-semibold px-1.5 py-0.5 rounded" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}>
+                            self
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+
+            {/* ── Desktop table (≥ md) ────────────────────────────────── */}
+            <table className="hidden md:table w-full text-sm">
+              <thead>
+                <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
+                  <th className="px-4 py-3 w-8">
+                    {unverified.length > 0 && (
+                      <input
+                        type="checkbox"
+                        checked={allUnverifiedSelected}
+                        onChange={toggleAllUnverified}
+                        className="accent-[var(--brand-primary)] cursor-pointer"
+                        title="Selektuj sve neverifikovane"
+                      />
+                    )}
+                  </th>
+                  <th className="w-14 px-2 py-3" scope="col" aria-label="Profilna slika" />
+                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("name")}>
+                    Strelac<SortIcon col="name" sortCol={sortCol} sortDir={sortDir} />
+                  </th>
+                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("country")}>
+                    Zemlja<SortIcon col="country" sortCol={sortCol} sortDir={sortDir} />
+                  </th>
+                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
+                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("gender")}>
+                    Pol<SortIcon col="gender" sortCol={sortCol} sortDir={sortDir} />
+                  </th>
+                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("birthDate")}>
+                    Datum rođ.<SortIcon col="birthDate" sortCol={sortCol} sortDir={sortDir} />
+                  </th>
+                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] cursor-pointer select-none hover:text-[var(--ink)] transition-colors" onClick={() => setSort("apparatus")}>
+                    Disciplina<SortIcon col="apparatus" sortCol={sortCol} sortDir={sortDir} />
+                  </th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {data.map((s) => (
+                  <tr
+                    key={s.id}
+                    className="hover:bg-[var(--surface)] transition-colors"
+                    style={selected.has(s.id) ? { background: "var(--surface)" } : undefined}
+                  >
+                    <td className="px-4 py-3">
+                      {!s.verified && (
+                        <input
+                          type="checkbox"
+                          checked={selected.has(s.id)}
+                          onChange={() => toggle(s.id)}
+                          className="accent-[var(--brand-primary)] cursor-pointer"
+                        />
+                      )}
+                    </td>
+                    <td className="px-2 py-2">
+                      <ShooterThumbnail shooter={s} />
+                    </td>
+                    <td className="px-4 py-3 font-medium text-[var(--ink)]">
+                      <a href={`/admin/strelci/${s.id}`} className="hover:text-[var(--brand-primary)] transition-colors">
+                        {s.lastName} {s.firstName}
+                      </a>
+                      {s.createdBySelf && (
+                        <span className="ml-2 text-[0.65rem] font-semibold px-1.5 py-0.5 rounded" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}>
+                          self
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {s.nationality ? (
+                        <span className="flex items-center gap-1.5">
+                          {(() => {
+                            const alpha2 = NOC_LIST.find((n) => n.noc === s.nationality)?.alpha2;
+                            return alpha2 ? (
+                              <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ fontSize: "1em", borderRadius: "2px", flexShrink: 0 }} />
+                            ) : null;
+                          })()}
+                          <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">{s.nationality}</span>
+                          {s.countryName && s.countryName !== s.nationality && (
+                            <span className="text-[0.65rem] text-[var(--muted)] truncate max-w-[100px]">{s.countryName}</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-[var(--subtle)] text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--muted)]">{s.clubName ?? <span className="text-[var(--subtle)]">—</span>}</td>
+                    <td className="px-4 py-3 text-xs font-bold">
+                      {s.gender === "M" ? (
+                        <span style={{ color: "oklch(0.52 0.18 250)" }}>M</span>
+                      ) : s.gender === "F" ? (
+                        <span style={{ color: "oklch(0.55 0.18 350)" }}>Ž</span>
+                      ) : (
+                        <span className="text-[var(--subtle)] font-normal">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-[var(--ink)] whitespace-nowrap">
+                      {s.birthDate ? (
+                        <>
+                          <span className="font-[family-name:var(--font-jetbrains-mono)]">{fmtDate(s.birthDate)}</span>
+                          <span className="text-[var(--muted)] ml-1">({calcAge(s.birthDate)} g.)</span>
+                        </>
+                      ) : s.birthYear ? (
+                        <span className="text-[var(--muted)]">{s.birthYear}</span>
+                      ) : (
+                        <span className="text-[var(--subtle)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-[var(--ink)]">
+                      {s.apparatus ? (
+                        <span className="text-[var(--muted)]">{APPARATUS_LABELS[s.apparatus] ?? s.apparatus}</span>
+                      ) : (
+                        <span className="text-[var(--subtle)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {!s.verified && (
+                          <button
+                            onClick={() => verifySingle(s.id)}
+                            disabled={verifying}
+                            className="text-xs font-semibold text-[var(--brand-primary)] hover:underline disabled:opacity-50"
+                          >
+                            Verifikuj
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteSingle(s.id, `${s.lastName} ${s.firstName}`)}
+                          disabled={verifying}
+                          className="text-xs font-semibold text-red-500 hover:underline disabled:opacity-50"
+                        >
+                          Obriši
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
         <Pagination page={page} total={total} pageSize={pageSize} />
       </div>

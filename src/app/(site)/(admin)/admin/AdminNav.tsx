@@ -45,7 +45,7 @@ const GROUPS: NavGroup[] = [
   },
 ];
 
-export function AdminNav() {
+export function AdminNav({ onNavClick }: { onNavClick?: () => void }) {
   const pathname = usePathname();
 
   function isActive(href: string): boolean {
@@ -58,6 +58,7 @@ export function AdminNav() {
       {/* Dashboard link */}
       <Link
         href="/admin"
+        onClick={onNavClick}
         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium mb-1 transition-colors duration-100 ${
           isActive("/admin") && pathname === "/admin"
             ? "bg-[var(--surface-2)] text-[var(--brand-primary)]"
@@ -86,6 +87,7 @@ export function AdminNav() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onNavClick}
                   className={`relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors duration-100 ${
                     active
                       ? "bg-[var(--surface-2)] text-[var(--brand-primary)] font-medium"

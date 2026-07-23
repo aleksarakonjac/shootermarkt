@@ -64,7 +64,7 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
         defaultValue={params.get("q") ?? ""}
         onChange={(e) => onSearch(e.target.value)}
         placeholder="Pretraži ime..."
-        className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] w-48"
+        className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] w-full sm:w-48"
       />
 
       <SearchDropdown
@@ -74,7 +74,7 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
         placeholder="Sve nacije"
         emptyLabel="Sve nacije"
         searchPlaceholder="Pretraži naciju..."
-        className="w-52"
+        className="w-full sm:w-52"
       />
 
       <SearchDropdown
@@ -85,7 +85,7 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
           { value: "F", label: "Ženski" },
         ]}
         placeholder="Pol"
-        className="w-40"
+        className="w-[calc(50%-4px)] sm:w-40"
       />
 
       <SearchDropdown
@@ -97,28 +97,29 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
           { value: "both", label: "Puška + Pištolj" },
         ]}
         placeholder="Disciplina"
-        className="w-48"
+        className="w-[calc(50%-4px)] sm:w-48"
       />
 
-      {hasActiveFilters && (
-        <button
-          onClick={() => {
-            update("nat", "");
-            update("gender", "");
-            update("apparatus", "");
-          }}
-          className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors px-1"
-        >
-          × Ukloni filtere
-        </button>
-      )}
-
-      <CustomCheckbox
+      <div className="flex items-center gap-3 w-full sm:w-auto">
+        <CustomCheckbox
           checked={onlyUnverified}
           onChange={(checked) => update("verified", checked ? "0" : "")}
           label="Samo neverifikovani"
           className=""
         />
+        {hasActiveFilters && (
+          <button
+            onClick={() => {
+              update("nat", "");
+              update("gender", "");
+              update("apparatus", "");
+            }}
+            className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors px-1"
+          >
+            × Ukloni filtere
+          </button>
+        )}
+      </div>
     </div>
   );
 }

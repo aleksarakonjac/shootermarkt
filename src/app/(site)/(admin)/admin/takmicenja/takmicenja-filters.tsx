@@ -79,7 +79,7 @@ export function TakmicenjaFilters({ years, currentLevel, currentTag }: Props) {
         defaultValue={params.get("q") ?? ""}
         onChange={(e) => onSearch(e.target.value)}
         placeholder="Pretraži naziv..."
-        className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] w-52"
+        className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] w-full sm:w-52"
       />
       <SearchDropdown
         value={params.get("year") ?? currentYear}
@@ -87,7 +87,7 @@ export function TakmicenjaFilters({ years, currentLevel, currentTag }: Props) {
         options={yearOptions}
         placeholder={currentYear}
         searchable={false}
-        className="w-32"
+        className="w-[calc(33%-6px)] sm:w-32"
       />
       <SearchDropdown
         value={currentLevel ?? params.get("level") ?? ""}
@@ -96,7 +96,7 @@ export function TakmicenjaFilters({ years, currentLevel, currentTag }: Props) {
         placeholder="Svi nivoi"
         emptyLabel="Svi nivoi"
         searchable={false}
-        className="w-44"
+        className="w-[calc(34%-6px)] sm:w-44"
       />
       <SearchDropdown
         value={currentTag ?? params.get("tag") ?? ""}
@@ -106,7 +106,7 @@ export function TakmicenjaFilters({ years, currentLevel, currentTag }: Props) {
         emptyLabel="Svi tagovi"
         searchable={false}
         labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
-        className="w-36"
+        className="w-[calc(33%-6px)] sm:w-36"
       />
     </div>
   );

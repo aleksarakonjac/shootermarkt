@@ -99,7 +99,7 @@ export default async function AdminStrelciPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1
             className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase tracking-tight text-[var(--ink)]"
@@ -109,7 +109,7 @@ export default async function AdminStrelciPage({
           </h1>
           <p className="text-sm text-[var(--muted)] mt-0.5">prikazano {data.length} od {total}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Link
             href="/admin/strelci/issf"
             className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
