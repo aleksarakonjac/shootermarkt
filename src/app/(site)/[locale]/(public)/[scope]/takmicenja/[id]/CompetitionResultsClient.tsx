@@ -675,7 +675,7 @@ function CompetitionDetail({
             animate={{ opacity: 1, transition: { duration: 0.15 } }}
             exit={{ opacity: 0, transition: { duration: 0.1 } }}
           >
-            <ElimTable rows={elimRows} locale={locale} />
+            <ElimTable rows={elimRows} locale={locale} disciplineCode={selection.disciplineCode} />
           </motion.div>
         ) : selection.stage === "qual" ? (
           <motion.div
@@ -714,7 +714,8 @@ type ElimRow = {
   qualified: boolean | null;
 };
 
-function ElimTable({ rows, locale }: { rows: ElimRow[]; locale: string }) {
+function ElimTable({ rows, locale, disciplineCode }: { rows: ElimRow[]; locale: string; disciplineCode: string }) {
+  const fmtElim = (v: number) => disciplineCode.startsWith("AR") ? v.toFixed(1) : String(Math.round(v));
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-10 text-center">
@@ -755,7 +756,7 @@ function ElimTable({ rows, locale }: { rows: ElimRow[]; locale: string }) {
                 )}
               </td>
               <td className="py-2.5 px-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]">
-                {r.elimTotal ?? "—"}
+                {r.elimTotal != null ? fmtElim(r.elimTotal) : "—"}
               </td>
               <td className="py-2.5 px-3 text-center">
                 {r.qualified === true && (
