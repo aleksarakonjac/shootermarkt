@@ -373,19 +373,19 @@ export function SiusMode() {
                     <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--muted)] w-6 text-right shrink-0">{f.rank}</span>
                     {/* Discipline */}
                     <span className="text-[0.7rem] font-semibold text-[var(--subtle)] w-14 shrink-0">{f.disciplineCode}</span>
-                    {/* Name + series stepped below */}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-[var(--ink)] truncate">{f.lastName} {f.firstName}</div>
+                    {/* Name + series inline */}
+                    <div className="flex-1 min-w-0 flex items-baseline gap-2 overflow-hidden">
+                      <span className="text-sm text-[var(--ink)] shrink-0">{f.lastName} {f.firstName}</span>
                       {f.series.length > 0 && (
-                        <div className="mt-0.5 pl-3 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)] leading-relaxed">
-                          {f.series.map((v, i) => (
-                            <span key={i} className="inline-block mr-2">{fmtVal(v, f.disciplineCode)}</span>
-                          ))}
-                        </div>
+                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)] truncate">
+                          {f.series.map((v) => fmtVal(v, f.disciplineCode)).join(" · ")}
+                        </span>
                       )}
                     </div>
+                    {/* Total — left of NOC */}
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)] shrink-0">{fmtVal(f.total, f.disciplineCode)}</span>
                     {/* Nation */}
-                    <span className="text-xs text-[var(--subtle)] shrink-0">{f.nation}</span>
+                    <span className="text-xs text-[var(--subtle)] shrink-0 w-8">{f.nation}</span>
                     {/* Skip button */}
                     <button
                       onClick={() => setFinalEntries(prev => prev.map((e, i) => i === idx ? { ...e, skip: !e.skip } : e))}
@@ -397,8 +397,6 @@ export function SiusMode() {
                     >
                       {f.skip ? "uključi" : "preskoči"}
                     </button>
-                    {/* Total — far right */}
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)] shrink-0 w-16 text-right">{fmtVal(f.total, f.disciplineCode)}</span>
                   </div>
                 ))}
               </div>
