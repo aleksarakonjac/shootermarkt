@@ -69,7 +69,7 @@ export function matchShooter(
   const fLast = foldName(last);
   const fFirst = foldName(first);
   const nocOk = (c: MatchCandidate) =>
-    !c.nationality || !noc || c.nationality === noc || noc === "SRB";
+    !c.nationality || !noc || c.nationality === noc || noc === "SRB" || noc === "AIN";
 
   // 1. Exact fold-ključ
   const exact = existing.find(

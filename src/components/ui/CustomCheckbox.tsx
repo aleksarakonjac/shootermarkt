@@ -19,7 +19,7 @@ export const CustomCheckbox = forwardRef<HTMLInputElement, Props>(function Custo
       <input
         type="checkbox"
         ref={ref}
-        checked={checked}
+        checked={checked ?? false}
         onChange={(e) => onChange(e.target.checked)}
         disabled={disabled}
         className="appearance-none w-4 h-4 rounded border border-[var(--border)] bg-[var(--bg)] checked:bg-[var(--brand-primary)] checked:border-[var(--brand-primary)] focus:outline-none transition-colors relative"

@@ -23,11 +23,12 @@ export default async function AdminStrelciPage({
   const gender = sp.gender?.trim() ?? "";
   const apparatus = sp.apparatus?.trim() ?? "";
   const onlyUnverified = sp.verified === "0";
+  const includeNoApparatus = sp.no_apparatus === "1";
   const sortCol = sp.sort ?? "name";
   const sortDir = sp.dir === "desc" ? "desc" : "asc";
 
   const conditions = [
-    inArray(shooters.apparatus, [...MVP_APPARATUS]),
+    includeNoApparatus ? undefined : inArray(shooters.apparatus, [...MVP_APPARATUS]),
     q
       ? and(
           ...q
@@ -131,6 +132,7 @@ export default async function AdminStrelciPage({
           onlyUnverified={onlyUnverified}
           gender={gender}
           apparatus={apparatus}
+          includeNoApparatus={includeNoApparatus}
         />
       </div>
 

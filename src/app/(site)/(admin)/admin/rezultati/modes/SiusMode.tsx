@@ -37,18 +37,54 @@ function CompSearch({ comps, value, onChange }: {
     return () => document.removeEventListener("mousedown", onOut);
   }, []);
 
+  const today = new Date().toISOString().split("T")[0];
+
+  const sorted = [...comps].sort((a, b) => b.date.localeCompare(a.date));
+
   const filtered = query.trim()
-    ? comps.filter((c) =>
+    ? sorted.filter((c) =>
         c.name.toLowerCase().includes(query.toLowerCase()) ||
         c.date.includes(query) ||
         c.location?.toLowerCase().includes(query.toLowerCase())
       )
-    : comps;
+    : sorted;
+
+  // pinned: ongoing first, then most recent — max 3
+  const pinned = query.trim() ? [] : (() => {
+    const ongoing = sorted.filter((c) => c.date <= today);
+    return ongoing.slice(0, 3);
+  })();
+  const pinnedIds = new Set(pinned.map((c) => c.id));
+  const listItems = query.trim() ? filtered : filtered.filter((c) => !pinnedIds.has(c.id));
 
   function pick(c: DbComp) {
     onChange(c);
     setQuery("");
     setOpen(false);
+  }
+
+  function renderRow(c: DbComp, label?: string) {
+    return (
+      <button
+        key={c.id}
+        onClick={() => pick(c)}
+        className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-[var(--surface)] transition-colors"
+        style={value === c.id ? { background: "var(--brand-primary-light)" } : undefined}
+      >
+        {label && (
+          <span
+            className="shrink-0 text-[0.6rem] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
+            style={{ color: "var(--brand-primary)", border: "1px solid var(--brand-primary)", opacity: 0.85 }}
+          >
+            {label}
+          </span>
+        )}
+        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] shrink-0 w-24">{c.date.slice(0, 10)}</span>
+        <span className="text-sm font-medium text-[var(--ink)] truncate">{c.name}</span>
+        {c.siusId && <span className="text-xs shrink-0 font-[family-name:var(--font-jetbrains-mono)]" style={{ color: "var(--success)" }}>SIUS ✓</span>}
+        {c.location && <span className="text-xs text-[var(--subtle)] shrink-0 ml-auto hidden sm:block">{c.location}</span>}
+      </button>
+    );
   }
 
   return (
@@ -81,23 +117,23 @@ function CompSearch({ comps, value, onChange }: {
               className="w-full text-sm px-2 py-1.5 rounded border border-[var(--border)] bg-[var(--surface)] text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)]"
             />
           </div>
-          <div className="max-h-64 overflow-y-auto">
+          <div className="max-h-72 overflow-y-auto">
             {filtered.length === 0 && (
               <div className="px-3 py-2 text-xs text-[var(--subtle)]">Nema rezultata.</div>
             )}
-            {filtered.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => pick(c)}
-                className="w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-[var(--surface)] transition-colors"
-                style={value === c.id ? { background: "var(--brand-primary-light)" } : undefined}
-              >
-                <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] shrink-0 w-24">{c.date.slice(0, 10)}</span>
-                <span className="text-sm font-medium text-[var(--ink)] truncate">{c.name}</span>
-                {c.siusId && <span className="text-xs shrink-0 font-[family-name:var(--font-jetbrains-mono)]" style={{ color: "var(--success)" }}>SIUS ✓</span>}
-                {c.location && <span className="text-xs text-[var(--subtle)] shrink-0 ml-auto hidden sm:block">{c.location}</span>}
-              </button>
-            ))}
+            {pinned.length > 0 && (
+              <>
+                {pinned.map((c, i) => renderRow(c, i === 0 ? "Tekuće" : "Nedavno"))}
+                {listItems.length > 0 && (
+                  <div className="flex items-center gap-3 px-3 py-1.5">
+                    <div className="flex-1 border-t border-[var(--border)]" />
+                    <span className="text-[0.6rem] font-semibold uppercase tracking-widest text-[var(--subtle)]">Sva takmičenja</span>
+                    <div className="flex-1 border-t border-[var(--border)]" />
+                  </div>
+                )}
+              </>
+            )}
+            {listItems.map((c) => renderRow(c))}
           </div>
         </div>
       )}

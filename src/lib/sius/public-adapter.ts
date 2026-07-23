@@ -249,14 +249,21 @@ function parseSeriesTotals(
     .filter((v) => !isNaN(v));
 }
 
-/** SIUS: "HRBEKOVA Danka" → { lastName: "HRBEKOVA", firstName: "Danka" } */
+/** SIUS: "HRBEKOVA Danka" → { lastName: "HRBEKOVA", firstName: "Danka" }
+ *  Handles compound last names: "KOCHALUMKAL VINOD Vidarsa" → { lastName: "KOCHALUMKAL VINOD", firstName: "Vidarsa" }
+ *  Rule: leading consecutive ALL-CAPS words = last name, rest = first name. */
 function splitDisplayName(displayName: string): {
   firstName: string;
   lastName: string;
 } {
   const parts = displayName.trim().split(/\s+/);
   if (parts.length === 1) return { firstName: "", lastName: parts[0] };
-  return { firstName: parts.slice(1).join(" "), lastName: parts[0] };
+  let split = 1;
+  for (let i = 1; i < parts.length; i++) {
+    if (/^[A-Z\-']+$/.test(parts[i])) split = i + 1;
+    else break;
+  }
+  return { lastName: parts.slice(0, split).join(" "), firstName: parts.slice(split).join(" ") };
 }
 
 // ── Raw response types ────────────────────────────────────────────────────────

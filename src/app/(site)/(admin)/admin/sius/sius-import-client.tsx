@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { DatePicker } from "@/components/ui/DatePicker";
+import { CompetitionPinnedSelect } from "@/components/ui/CompetitionPinnedSelect";
+import type { CompetitionOption } from "@/components/ui/CompetitionPinnedSelect";
 import type { ReviewRow, CommitPayload, CompetitionLevel } from "@/lib/pdf-import/types";
 
 type Step = "select" | "review" | "done";
@@ -52,6 +54,9 @@ export function SiusImportClient() {
   const [compLevel, setCompLevel] = useState<CompetitionLevel>("world");
   const [compDate, setCompDate] = useState("");
   const [compLocation, setCompLocation] = useState("");
+
+  const [competitionMode, setCompetitionMode] = useState<"new" | "existing">("existing");
+  const [selectedDbComp, setSelectedDbComp] = useState<CompetitionOption | null>(null);
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [eventCount, setEventCount] = useState(0);
@@ -122,15 +127,18 @@ export function SiusImportClient() {
     if (!selectedComp) return;
     setLoading(true);
     setError(null);
-    const payload: CommitPayload = {
-      competition: {
-        name: selectedComp.name,
-        date: compDate || new Date().toISOString().split("T")[0],
-        location: compLocation || "",
-        level: compLevel,
-      },
-      rows,
-    };
+    const useExisting = competitionMode === "existing" && selectedDbComp;
+    const payload: CommitPayload = useExisting
+      ? { competitionId: selectedDbComp.id, rows }
+      : {
+          competition: {
+            name: selectedComp.name,
+            date: compDate || new Date().toISOString().split("T")[0],
+            location: compLocation || "",
+            level: compLevel,
+          },
+          rows,
+        };
     try {
       const res = await fetch("/api/admin/import/commit", {
         method: "POST",
@@ -160,6 +168,7 @@ export function SiusImportClient() {
     setStep("select");
     setSelectedComp(null);
     setSelectedEvents(new Set());
+    setSelectedDbComp(null);
     setRows([]);
     setResult(null);
     setError(null);
@@ -167,9 +176,11 @@ export function SiusImportClient() {
     setImportErrors([]);
   }
 
-  const filtered = search
-    ? championships.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
-    : championships;
+  const filtered = championships.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase())
+  );
+  const pinned = !search ? championships.slice(0, 3) : [];
+  const listItems = !search ? championships.slice(3) : filtered;
 
   const allNocs = Array.from(new Set(rows.map((r) => r.teamNoc))).sort();
   const filteredRows = nocFilter ? rows.filter((r) => r.teamNoc === nocFilter) : rows;
@@ -236,15 +247,63 @@ export function SiusImportClient() {
                 </span>
               </div>
 
+              {/* Pinned: current + 2 recent (hidden during search) */}
+              {pinned.length > 0 && (
+                <div className="space-y-1.5">
+                  {pinned.map((c, i) => {
+                    const isSelected = selectedComp?.guid === c.guid;
+                    const label = i === 0 ? "Tekuće" : "Nedavno";
+                    const labelColor = i === 0 ? "var(--brand-primary)" : "var(--muted)";
+                    return (
+                      <button
+                        key={c.guid}
+                        onClick={() => selectComp(c)}
+                        className="w-full text-left px-4 py-3 rounded-xl border flex items-center justify-between gap-4 transition-colors hover:bg-[var(--surface)]"
+                        style={{
+                          borderColor: isSelected ? "var(--brand-primary)" : "var(--border)",
+                          background: isSelected ? "var(--brand-primary-light)" : "var(--bg)",
+                        }}
+                      >
+                        <div className="min-w-0 flex items-center gap-2.5">
+                          <span
+                            className="shrink-0 text-[0.6rem] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
+                            style={{ color: labelColor, border: `1px solid ${labelColor}`, opacity: 0.8 }}
+                          >
+                            {label}
+                          </span>
+                          <p className="font-semibold text-sm text-[var(--ink)] truncate">{c.name}</p>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          {c.events.map((ev) => (
+                            <span
+                              key={ev}
+                              className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] px-1.5 py-0.5 rounded font-semibold"
+                              style={{ background: "var(--surface)", color: "var(--brand-primary)", border: "1px solid var(--border)" }}
+                            >
+                              {ev}
+                            </span>
+                          ))}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  <div className="flex items-center gap-3 pt-1 pb-0.5">
+                    <div className="flex-1 border-t border-[var(--border)]" />
+                    <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--subtle)]">Sva takmičenja</span>
+                    <div className="flex-1 border-t border-[var(--border)]" />
+                  </div>
+                </div>
+              )}
+
               {/* Championship list */}
-              <div className="rounded-xl border border-[var(--border)] overflow-hidden max-h-[420px] overflow-y-auto">
-                {filtered.length === 0 ? (
+              <div className="rounded-xl border border-[var(--border)] overflow-hidden max-h-[360px] overflow-y-auto">
+                {listItems.length === 0 && search ? (
                   <div className="py-10 text-center text-sm text-[var(--muted)]">
                     Nema rezultata za &ldquo;{search}&rdquo;
                   </div>
                 ) : (
                   <div className="divide-y divide-[var(--border)]">
-                    {filtered.map((c) => {
+                    {listItems.map((c) => {
                       const isSelected = selectedComp?.guid === c.guid;
                       return (
                         <button
@@ -279,6 +338,59 @@ export function SiusImportClient() {
                 <div className="rounded-xl border border-[var(--brand-primary)] p-5 space-y-4">
                   <p className="font-semibold text-[var(--ink)]">{selectedComp.name}</p>
 
+                  {/* Competition link */}
+                  <div>
+                    <div className="flex gap-1 mb-2 p-0.5 rounded-md bg-[var(--surface)] w-fit">
+                      {(["existing", "new"] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setCompetitionMode(mode)}
+                          className="rounded px-3 py-1 text-xs font-semibold transition-colors"
+                          style={{
+                            background: competitionMode === mode ? "var(--bg)" : "transparent",
+                            color: competitionMode === mode ? "var(--ink)" : "var(--muted)",
+                            boxShadow: competitionMode === mode ? "0 1px 3px oklch(0 0 0/0.08)" : "none",
+                          }}
+                        >
+                          {mode === "existing" ? "Poveži sa postojećim" : "Novo takmičenje"}
+                        </button>
+                      ))}
+                    </div>
+                    {competitionMode === "existing" ? (
+                      <CompetitionPinnedSelect
+                        value={selectedDbComp?.id ?? null}
+                        onChange={setSelectedDbComp}
+                      />
+                    ) : (
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum</label>
+                          <DatePicker value={compDate} onChange={setCompDate} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija</label>
+                          <input
+                            value={compLocation}
+                            onChange={(e) => setCompLocation(e.target.value)}
+                            placeholder="npr. Ruse, Bugarska"
+                            className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo</label>
+                          <select
+                            value={compLevel}
+                            onChange={(e) => setCompLevel(e.target.value as CompetitionLevel)}
+                            className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
+                          >
+                            {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Discipline selection */}
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-2">
@@ -299,41 +411,6 @@ export function SiusImportClient() {
                           {ev} — {DISC_LABELS[ev]}
                         </button>
                       ))}
-                    </div>
-                  </div>
-
-                  {/* Metadata */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
-                        Datum
-                      </label>
-                      <DatePicker value={compDate} onChange={setCompDate} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
-                        Lokacija
-                      </label>
-                      <input
-                        value={compLocation}
-                        onChange={(e) => setCompLocation(e.target.value)}
-                        placeholder="npr. Ruse, Bugarska"
-                        className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
-                        Nivo
-                      </label>
-                      <select
-                        value={compLevel}
-                        onChange={(e) => setCompLevel(e.target.value as CompetitionLevel)}
-                        className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
-                      >
-                        {LEVELS.map((l) => (
-                          <option key={l.value} value={l.value}>{l.label}</option>
-                        ))}
-                      </select>
                     </div>
                   </div>
 

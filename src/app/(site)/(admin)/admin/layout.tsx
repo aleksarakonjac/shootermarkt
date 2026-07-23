@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AdminNav } from "./AdminNav";
+import { AdminMobileHeader } from "./AdminMobileHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,8 @@ export default async function AdminLayout({
   return (
     <div className="flex min-h-screen bg-[var(--bg)]">
 
-      {/* ── Sidebar ─────────────────────────────────────────────────── */}
-      <aside className="w-56 shrink-0 flex flex-col border-r border-[var(--border)] bg-[var(--surface)] sticky top-0 h-screen">
-
-        {/* Logo / identity */}
+      {/* ── Sidebar — desktop only ───────────────────────────────────── */}
+      <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] sticky top-0 h-screen">
         <div className="flex items-center gap-2 px-4 h-14 border-b border-[var(--border)] shrink-0">
           <Link href="/" className="flex items-baseline gap-0 no-underline" title="Nazad na sajt">
             <span className="font-[family-name:var(--font-barlow-condensed)] font-extrabold text-[1.1rem] uppercase tracking-tight text-[var(--brand-primary)] leading-none">
@@ -39,26 +38,14 @@ export default async function AdminLayout({
             Admin
           </span>
         </div>
-
-        {/* Nav */}
         <AdminNav />
-
-        {/* Footer */}
         <div className="shrink-0 border-t border-[var(--border)] px-4 py-3">
           <p className="text-[0.65rem] text-[var(--subtle)] truncate mb-1">{user.email}</p>
           <div className="flex items-center gap-2">
-            <Link
-              href="/"
-              className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
-            >
-              ← Nazad na sajt
-            </Link>
+            <Link href="/" className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">← Nazad na sajt</Link>
             <span className="text-[var(--border-strong)]">·</span>
             <form action="/logout" method="post">
-              <button
-                type="submit"
-                className="text-xs font-medium text-[var(--brand-primary)] hover:text-[var(--brand-primary-hover)] transition-colors"
-              >
+              <button type="submit" className="text-xs font-medium text-[var(--brand-primary)] hover:text-[var(--brand-primary-hover)] transition-colors">
                 Odjavi se
               </button>
             </form>
@@ -69,15 +56,18 @@ export default async function AdminLayout({
       {/* ── Main ────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        {/* Top bar */}
-        <header className="sticky top-0 z-[var(--z-sticky)] h-14 border-b border-[var(--border)] bg-[var(--bg)] flex items-center px-8 shrink-0">
-  <Link href="/admin" className="text-sm font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors mr-4">
-    Home
-  </Link>
-  <div className="flex-1" id="admin-breadcrumb" />
-</header>
+        {/* Mobile top bar + drawer */}
+        <AdminMobileHeader email={user.email ?? ""} />
 
-        <main className="flex-1 px-8 py-8">
+        {/* Desktop top bar */}
+        <header className="hidden md:flex sticky top-0 z-[var(--z-sticky)] h-14 border-b border-[var(--border)] bg-[var(--bg)] items-center px-8 shrink-0">
+          <Link href="/admin" className="text-sm font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors mr-4">
+            Home
+          </Link>
+          <div className="flex-1" id="admin-breadcrumb" />
+        </header>
+
+        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
           {children}
         </main>
       </div>
