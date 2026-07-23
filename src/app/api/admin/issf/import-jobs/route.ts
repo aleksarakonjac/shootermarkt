@@ -9,7 +9,9 @@ export async function POST() {
 
   try {
     return NextResponse.json(await queueIssfImportJob(), { status: 202 });
-  } catch {
-    return NextResponse.json({ error: "Pokretanje ISSF importa nije uspelo" }, { status: 500 });
+  } catch (e) {
+    console.error("[issf/import-jobs] queueIssfImportJob failed:", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: `Pokretanje ISSF importa nije uspelo: ${msg}` }, { status: 500 });
   }
 }
