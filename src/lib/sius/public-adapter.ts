@@ -75,6 +75,22 @@ export async function fetchSiusSubEvents(
     }));
 }
 
+/** Same as fetchSiusSubEvents but includes hidden sub-events (needed for debug). */
+export async function fetchSiusSubEventsAll(
+  compUuid: string,
+  eventUuid: string
+): Promise<SiusSubEvent[]> {
+  const data = await pub<RawSubEvent[]>(
+    `/competitions/${compUuid}/events/${eventUuid}/subevents`
+  );
+  return data.map((s) => ({
+    runningId: s.RunningId,
+    name: s.Name,
+    state: s.State,
+    hidden: s.Hidden,
+  }));
+}
+
 export async function fetchSiusSeries(
   compUuid: string,
   eventUuid: string,
@@ -161,13 +177,15 @@ export async function fetchLiveSiusResults(
     relevantEvents.map(async (event) => {
       let subEvents: SiusSubEvent[];
       try {
-        subEvents = await fetchSiusSubEvents(compUuid, event.runningId);
+        subEvents = await fetchSiusSubEventsAll(compUuid, event.runningId);
       } catch {
         return;
       }
 
       const done = subEvents.filter((s) => s.state !== "Planned");
-      const qualSubs = done.filter((s) => !isElimSubEvent(s.name) && !isFinalSubEvent(s.name));
+      // Qual: visible only (avoid hidden aggregated/combined sub-events)
+      const qualSubs = done.filter((s) => !s.hidden && !isElimSubEvent(s.name) && !isFinalSubEvent(s.name));
+      // Elim/final: include hidden (SIUS sometimes marks these as hidden)
       const elimSubs = done.filter((s) => isElimSubEvent(s.name));
       const finalSub = done.find((s) => isFinalSubEvent(s.name));
 

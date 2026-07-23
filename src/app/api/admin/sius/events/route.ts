@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { fetchSiusEvents } from "@/lib/sius/public-adapter";
+import { fetchSiusEvents, fetchSiusSubEventsAll } from "@/lib/sius/public-adapter";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -16,7 +16,17 @@ export async function GET(req: NextRequest) {
 
   try {
     const events = await fetchSiusEvents(siusId);
-    return NextResponse.json({ events });
+    const withSubs = await Promise.all(
+      events.map(async (e) => {
+        try {
+          const subEvents = await fetchSiusSubEventsAll(siusId, e.runningId);
+          return { ...e, subEvents };
+        } catch {
+          return { ...e, subEvents: [] };
+        }
+      })
+    );
+    return NextResponse.json({ events: withSubs });
   } catch (e) {
     return NextResponse.json({ error: `SIUS fetch failed: ${e}` }, { status: 502 });
   }
