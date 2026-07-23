@@ -307,7 +307,7 @@ export function CompetitionsSyncClient() {
       )}
 
       {/* Controls */}
-      <div className="rounded-xl border border-[var(--border)] p-5 mb-5 flex flex-wrap gap-6 items-end">
+      <div className="rounded-xl border border-[var(--border)] p-5 mb-5 flex flex-wrap gap-4 items-end">
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">Godina</label>
           <SearchDropdown
@@ -400,7 +400,8 @@ export function CompetitionsSyncClient() {
             {events.length === 0 ? (
               <div className="py-12 text-center text-sm text-[var(--muted)]">Nema takmičenja za {year}.</div>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm" style={{ minWidth: "860px" }}>
                 <thead>
                   <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                     <th className="w-10 px-3 py-2.5">
@@ -512,6 +513,7 @@ export function CompetitionsSyncClient() {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </>

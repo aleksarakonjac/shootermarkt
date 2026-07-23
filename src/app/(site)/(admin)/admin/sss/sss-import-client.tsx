@@ -275,7 +275,7 @@ export function SssImportClient() {
                   <p className="font-semibold text-sm text-[var(--ink)]">{selectedBilten.filename}</p>
                   <p className="text-xs font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] break-all">{selectedBilten.url}</p>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Naziv takmičenja</label>
                       <input

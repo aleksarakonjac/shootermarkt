@@ -85,7 +85,7 @@ export function CompetitionFormClient() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <TranslatedNameInput
               sourceName={form.name}
               from={detectedLang}
@@ -106,7 +106,7 @@ export function CompetitionFormClient() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum od *</label>
               <DatePicker value={form.date} onChange={(v) => set("date", v)} required />
@@ -132,7 +132,7 @@ export function CompetitionFormClient() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija (SR)</label>
               <input

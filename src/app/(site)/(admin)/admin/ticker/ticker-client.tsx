@@ -855,7 +855,9 @@ function CompetitionScheduleRow({
           className={activeUskoroOverride?.isActive ? `${btnGhost} text-amber-600` : btnGhost}
           title="Forsirati USKORO prikaz"
         >
-          {activeUskoroOverride?.isActive ? "▲ Uskoro" : "Forsirati uskoro"}
+          {activeUskoroOverride?.isActive
+            ? <><span className="hidden sm:inline">▲ </span>Uskoro</>
+            : <><span className="hidden sm:inline">Forsirati </span>uskoro</>}
         </button>
 
         {/* Force live */}
@@ -865,15 +867,15 @@ function CompetitionScheduleRow({
           className={activeLiveOverride?.isActive ? btnDanger : btnGhost}
         >
           {activeLiveOverride?.isActive ? (
-            <><span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-primary)] inline-block" /> Forsirano live</>
-          ) : "Forsirati live"}
+            <><span className="w-1.5 h-1.5 rounded-full bg-[var(--brand-primary)] inline-block" />{" "}<span className="hidden sm:inline">Forsirano </span>live</>
+          ) : <><span className="hidden sm:inline">Forsirati </span>live</>}
         </button>
       </div>
 
       {expanded && (
         <div className="border-t border-[var(--border)] bg-[var(--bg)]">
           {slots.length > 0 && (
-            <div className="divide-y divide-[var(--border)]">
+            <div className="divide-y divide-[var(--border)] overflow-x-auto">
               {slots
                 .slice()
                 .sort((a, b) => a.startTime.localeCompare(b.startTime))

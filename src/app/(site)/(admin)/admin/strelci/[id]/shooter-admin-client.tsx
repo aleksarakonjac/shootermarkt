@@ -170,7 +170,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
   return (
     <div className="max-w-4xl">
       {/* Breadcrumb + actions */}
-      <div className="flex items-center justify-between mb-6 gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <nav className="flex items-center gap-2 text-xs text-[var(--muted)]">
           <Link href="/admin/strelci" className="hover:text-[var(--ink)] transition-colors">
             ← Strelci
@@ -417,7 +417,44 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
           </div>
         ) : (
           <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-            <table className="w-full text-sm">
+            {/* Mobile card list */}
+            <ul className="md:hidden divide-y divide-[var(--border)]">
+              {results.map((r) => (
+                <li key={r.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium text-xs text-[var(--ink)] leading-snug line-clamp-2 flex-1">{r.competitionName}</p>
+                    <span
+                      className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded font-[family-name:var(--font-jetbrains-mono)] shrink-0"
+                      style={{
+                        background: (DISCIPLINE_COLORS[r.disciplineCode] ?? DEFAULT_DISCIPLINE).bg,
+                        color: (DISCIPLINE_COLORS[r.disciplineCode] ?? DEFAULT_DISCIPLINE).fg,
+                      }}
+                    >
+                      {r.disciplineCode}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[0.7rem] text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)]">
+                    <span>{fmtDate(r.competitionDate)}</span>
+                    {r.qualTotal != null && (
+                      <span className="font-semibold text-[var(--ink)]">{r.qualTotal.toFixed(1)}</span>
+                    )}
+                    {r.qualRank && <span>#{r.qualRank}</span>}
+                    {r.finalRank && (
+                      <span style={{ color: r.finalRank <= 3 ? "var(--brand-primary)" : "var(--muted)" }}>
+                        finale #{r.finalRank}
+                      </span>
+                    )}
+                    {r.category && r.category !== "senior" && (
+                      <span className="font-semibold px-1.5 py-0.5 rounded bg-[var(--brand-primary-light)] text-[var(--brand-primary)]">
+                        {CATEGORY_SHORT[r.category] ?? r.category}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {/* Desktop table */}
+            <table className="hidden md:table w-full text-sm">
               <thead>
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                   <th className="px-4 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Takmičenje</th>

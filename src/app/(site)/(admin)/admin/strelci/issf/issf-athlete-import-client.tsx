@@ -403,7 +403,8 @@ export function ISSFAthleteImportClient() {
             {athletes.length === 0 ? (
               <div className="py-12 text-center text-sm text-[var(--muted)]">Nema rezultata.</div>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm" style={{ minWidth: "560px" }}>
                 <thead>
                   <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                     <th className="w-10 px-3 py-2.5">
@@ -469,6 +470,7 @@ export function ISSFAthleteImportClient() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 

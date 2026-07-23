@@ -90,7 +90,7 @@ export function ShooterFormClient({ clubs: initialClubs }: { clubs: Club[] }) {
         <div className="rounded-xl border border-[var(--border)] p-5 space-y-4">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Osnovni podaci</h2>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Prezime *</label>
               <input value={form.lastName} onChange={(e) => set("lastName", e.target.value)} required placeholder="Petrović" className={inputCls} />
@@ -101,7 +101,7 @@ export function ShooterFormClient({ clubs: initialClubs }: { clubs: Club[] }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Zemlja</label>
               <NocDropdown value={form.nationality} onChange={(v) => set("nationality", v)} />

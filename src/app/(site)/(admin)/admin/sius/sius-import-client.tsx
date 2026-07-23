@@ -303,7 +303,7 @@ export function SiusImportClient() {
                   </div>
 
                   {/* Metadata */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">
                         Datum
@@ -386,7 +386,7 @@ export function SiusImportClient() {
           )}
 
           {/* Metadata for commit */}
-          <div className="rounded-xl border border-[var(--border)] p-4 grid grid-cols-3 gap-4">
+          <div className="rounded-xl border border-[var(--border)] p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Datum takmičenja</label>
               <input
