@@ -592,7 +592,7 @@ export function SiusImportClient() {
                       <td className="px-3 py-2 text-right">
                         <input
                           type="number"
-                          value={row.qualTotal}
+                          value={row.qualTotal ?? ""}
                           onChange={(e) => updateRow(trueIdx, { qualTotal: parseFloat(e.target.value) })}
                           step="0.1"
                           className="w-16 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] text-sm py-0.5"

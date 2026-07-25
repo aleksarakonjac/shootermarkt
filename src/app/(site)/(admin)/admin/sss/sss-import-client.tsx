@@ -420,7 +420,7 @@ export function SssImportClient() {
                         </td>
                       ))}
                       <td className={`sticky right-[176px] ${stickyBg} px-3 py-2 text-right border-l border-[var(--border)]`}>
-                        <input type="number" value={row.qualTotal} onChange={(e) => updateRow(trueIdx, { qualTotal: parseFloat(e.target.value) })} step="0.1" className="w-16 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] text-sm py-0.5" />
+                        <input type="number" value={row.qualTotal ?? ""} onChange={(e) => updateRow(trueIdx, { qualTotal: parseFloat(e.target.value) })} step="0.1" className="w-16 text-right bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] text-sm py-0.5" />
                       </td>
                       <td className={`sticky right-[80px] ${stickyBg} px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-xs`}>{row.qualInners != null ? `${row.qualInners}x` : "—"}</td>
                       <td className={`sticky right-0 ${stickyBg} px-3 py-2`}>

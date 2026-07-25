@@ -393,51 +393,80 @@ export function SiusMode() {
 
           <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))} />
 
-          {/* Finals section */}
-          {finalEntries.length > 0 && (
-            <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-              <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between">
-                <span className="text-xs font-semibold text-[var(--muted)]">
-                  Finale · {finalEntries.filter(f => !f.skip).length} za unos
-                </span>
-                <span className="text-xs text-[var(--subtle)]">{finalEntries.filter(f => f.skip).length} preskočeno</span>
-              </div>
-              <div className="divide-y divide-[var(--border)]">
-                {finalEntries.map((f, idx) => (
-                  <div key={idx} className={`px-4 py-2.5 flex items-center gap-3 ${f.skip ? "opacity-40" : ""}`}>
-                    {/* Rank */}
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--muted)] w-6 text-right shrink-0">{f.rank}</span>
-                    {/* Discipline */}
-                    <span className="text-[0.7rem] font-semibold text-[var(--subtle)] w-14 shrink-0">{f.disciplineCode}</span>
-                    {/* Name + series inline */}
-                    <div className="flex-1 min-w-0 flex items-baseline gap-2 overflow-hidden">
-                      <span className="text-sm text-[var(--ink)] shrink-0">{f.lastName} {f.firstName}</span>
-                      {f.series.length > 0 && (
-                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)] truncate">
-                          {f.series.map((v) => fmtVal(v, f.disciplineCode)).join(" · ")}
+          {/* Finals section — per discipline */}
+          {finalEntries.length > 0 && (() => {
+            const byDisc = Array.from(
+              finalEntries.reduce((map, f, idx) => {
+                const key = f.disciplineCode;
+                if (!map.has(key)) map.set(key, []);
+                map.get(key)!.push({ f, idx });
+                return map;
+              }, new Map<string, { f: SiusFinalEntry; idx: number }[]>())
+            );
+            return (
+              <div className="space-y-4">
+                {byDisc.map(([disc, entries]) => {
+                  const maxSeries = Math.max(...entries.map(({ f }) => f.series.length));
+                  const activeCount = entries.filter(({ f }) => !f.skip).length;
+                  return (
+                    <div key={disc} className="rounded-xl border border-[var(--border)] overflow-hidden">
+                      <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-[var(--ink)]">
+                          Finale · <span className="font-[family-name:var(--font-jetbrains-mono)]">{disc}</span>
                         </span>
-                      )}
+                        <span className="text-xs text-[var(--subtle)]">{activeCount} za unos</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
+                              <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">#</th>
+                              <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Prezime</th>
+                              <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ime</th>
+                              <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
+                              {maxSeries > 0 && Array.from({ length: maxSeries }, (_, i) => (
+                                <th key={i} className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">F{i + 1}</th>
+                              ))}
+                              <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Final ukupno</th>
+                              <th className="px-3 py-2.5" />
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--border)]">
+                            {[...entries].sort((a, b) => (a.f.rank ?? 99) - (b.f.rank ?? 99)).map(({ f, idx }) => (
+                              <tr key={idx} className={f.skip ? "opacity-40" : "hover:bg-[var(--surface)]"}>
+                                <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--muted)]">{f.rank}</td>
+                                <td className="px-3 py-2 font-medium text-[var(--ink)]">{f.lastName}</td>
+                                <td className="px-3 py-2 text-[var(--ink)]">{f.firstName}</td>
+                                <td className="px-3 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{f.nation}</td>
+                                {maxSeries > 0 && Array.from({ length: maxSeries }, (_, i) => (
+                                  <td key={i} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">
+                                    {f.series[i] != null ? fmtVal(f.series[i], disc) : "—"}
+                                  </td>
+                                ))}
+                                <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]">{fmtVal(f.total, disc)}</td>
+                                <td className="px-3 py-2 text-right">
+                                  <button
+                                    onClick={() => setFinalEntries(prev => prev.map((e, i) => i === idx ? { ...e, skip: !e.skip } : e))}
+                                    className="text-xs px-2 py-0.5 rounded border transition-colors"
+                                    style={f.skip
+                                      ? { borderColor: "var(--border)", color: "var(--subtle)" }
+                                      : { borderColor: "var(--border-strong)", color: "var(--ink)" }
+                                    }
+                                  >
+                                    {f.skip ? "uključi" : "preskoči"}
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                    {/* Total — left of NOC */}
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)] shrink-0">{fmtVal(f.total, f.disciplineCode)}</span>
-                    {/* Nation */}
-                    <span className="text-xs text-[var(--subtle)] shrink-0 w-8">{f.nation}</span>
-                    {/* Skip button */}
-                    <button
-                      onClick={() => setFinalEntries(prev => prev.map((e, i) => i === idx ? { ...e, skip: !e.skip } : e))}
-                      className="shrink-0 text-xs px-2 py-0.5 rounded border transition-colors"
-                      style={f.skip
-                        ? { borderColor: "var(--border)", color: "var(--subtle)" }
-                        : { borderColor: "var(--border-strong)", color: "var(--ink)" }
-                      }
-                    >
-                      {f.skip ? "uključi" : "preskoči"}
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div className="flex gap-3">
             <button onClick={handleCommit} disabled={loading || activeCount === 0} className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50">

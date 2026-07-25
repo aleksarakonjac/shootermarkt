@@ -167,7 +167,7 @@ export interface ReviewRow {
   disciplineCode: DisciplineCode;
   /** Uzrasna kategorija pod kojom rezultat važi (najmlađa u kojoj strelac nastupa). */
   category: AgeCategory;
-  qualTotal: number;
+  qualTotal: number | null;
   qualInners?: number | null;
   qualRank?: number;
   qualSeries?: number[];

@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
             category: "senior",
             qualTotal: null,
             qualInners: null,
-            qualRank: null,
+            qualRank: undefined,
             qualified: null,
             finalTotal: null,
             finalRank: null,
