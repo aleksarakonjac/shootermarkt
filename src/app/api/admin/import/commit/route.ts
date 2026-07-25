@@ -194,8 +194,9 @@ export async function POST(req: NextRequest) {
           : null,
         qualified: row.qualified ?? null,
         elimRound: row.elimRound ?? null,
-        elimTotal: row.elimTotal ?? null,
+        elimTotal: row.elimTotal != null ? Math.round(row.elimTotal) : null,
         elimRank: row.elimRank ?? null,
+        elimDetail: row.elimSeries ? { series: row.elimSeries.map(Math.round) } : null,
         finalTotal: row.finalTotal?.toString() ?? null,
         finalRank: row.finalRank ?? null,
         finalDetail: row.finalSeries || row.finalShots || row.finalCumulative || row.finalShotsByStage
@@ -226,6 +227,7 @@ export async function POST(req: NextRequest) {
               elimRound: sql`excluded.elim_round`,
               elimTotal: sql`excluded.elim_total`,
               elimRank: sql`excluded.elim_rank`,
+              elimDetail: sql`excluded.elim_detail`,
             },
           });
       } else {

@@ -132,8 +132,9 @@ export async function POST(req: NextRequest) {
         }
         if (row.elimRound == null || round > row.elimRound) {
           row.elimRound = round;
-          row.elimTotal = e.total;
+          row.elimTotal = Math.round(e.total);
           row.elimRank = e.rank;
+          row.elimSeries = e.series.length > 0 ? e.series.map(Math.round) : null;
         }
       }
     }

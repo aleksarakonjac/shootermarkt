@@ -201,6 +201,11 @@ export type BulletinFinalDetail = {
 
 export type FinalDetail = ArApFinalDetail | PositionsFinalDetail | BulletinFinalDetail;
 
+// Elimination detail stored per result (R3P-style heats — always integer scores)
+export type ElimDetail = {
+  series: number[];
+};
+
 // ── Countries ─────────────────────────────────────────────────────────────────
 
 export const countries = pgTable(
@@ -489,6 +494,7 @@ export const results = pgTable(
     elimRound: integer("elim_round"),
     elimTotal: integer("elim_total"),
     elimRank: integer("elim_rank"),
+    elimDetail: jsonb("elim_detail").$type<ElimDetail>(),
 
     // Qualification
     qualTotal: decimal("qual_total", { precision: 6, scale: 1 }),

@@ -180,6 +180,7 @@ export interface ReviewRow {
   elimRound?: number | null;
   elimTotal?: number | null;
   elimRank?: number | null;
+  elimSeries?: number[] | null;
   finalTotal?: number | null;
   finalRank?: number | null;
   finalSeries?: number[] | null;
