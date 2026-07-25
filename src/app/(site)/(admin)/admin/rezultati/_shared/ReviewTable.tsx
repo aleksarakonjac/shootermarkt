@@ -107,6 +107,8 @@ function QualificationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowCh
   );
 }
 
+const R3P_POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"];
+
 function EliminationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: Props["onRowChange"] }) {
   if (rows.length === 0) return null;
   const rounds = Array.from(new Set(rows.map(({ row }) => row.elimRound!))).sort((a, b) => a - b);
@@ -119,21 +121,33 @@ function EliminationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChan
           .filter(({ row }) => row.elimRound === round)
           .sort((a, b) => (a.row.elimRank ?? 99) - (b.row.elimRank ?? 99));
         const seriesCount = Math.max(0, ...roundRows.map(({ row }) => row.elimSeries?.length ?? 0));
+        const isR3PPositions = seriesCount === 6;
         return (
           <div key={round} className="border-t border-[var(--border)]">
             <div className="px-4 py-1.5 text-[0.7rem] font-semibold text-[var(--subtle)]">Runda {round} · {roundRows.length}</div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-sm">
-                <thead><tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-                  <th className="px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">#</th>
-                  <th className="px-3 py-2 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
-                  <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Prezime</th>
-                  <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ime</th>
-                  <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
-                  {Array.from({ length: seriesCount }, (_, i) => <th key={i} className="px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">S{i + 1}</th>)}
-                  <th className="px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ukupno</th>
-                  <th className="px-3 py-2 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">St.</th>
-                </tr></thead>
+                <thead>
+                  {isR3PPositions && (
+                    <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                      <th colSpan={5} />
+                      {R3P_POSITION_LABELS.map((label) => (
+                        <th key={label} colSpan={2} className="px-3 py-1 text-center text-[0.6rem] font-semibold uppercase tracking-wider text-[var(--subtle)] border-l border-[var(--border)]">{label}</th>
+                      ))}
+                      <th colSpan={2} />
+                    </tr>
+                  )}
+                  <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                    <th className="px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">#</th>
+                    <th className="px-3 py-2 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
+                    <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Prezime</th>
+                    <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ime</th>
+                    <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
+                    {Array.from({ length: seriesCount }, (_, i) => <th key={i} className={`px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${isR3PPositions && i % 2 === 0 ? "border-l border-[var(--border)]" : ""}`}>S{i + 1}</th>)}
+                    <th className="px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ukupno</th>
+                    <th className="px-3 py-2 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">St.</th>
+                  </tr>
+                </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {roundRows.map(({ row, index }) => (
                     <tr key={index} className={row.skip ? "opacity-40" : "hover:bg-[var(--bg)]"}>
