@@ -64,10 +64,20 @@ function ShotBreakdown({ groups, prefix = "S" }: { groups?: number[][] | null; p
 }
 
 function QualificationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: Props["onRowChange"] }) {
+  const isR3P = rows[0]?.row.disciplineCode.startsWith("R3P") ?? false;
   return (
     <div className="overflow-x-auto border-t border-[var(--border)]">
       <table className="w-full min-w-[1260px] text-sm">
         <thead>
+          {isR3P && (
+            <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
+              <th colSpan={7} />
+              {R3P_POSITION_LABELS.map((label) => (
+                <th key={label} colSpan={2} className="px-3 py-1 text-center text-[0.6rem] font-semibold uppercase tracking-wider text-[var(--subtle)] border-l border-[var(--border)]">{label}</th>
+              ))}
+              <th colSpan={3} />
+            </tr>
+          )}
           <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
             <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">#</th>
             <th className="px-3 py-2.5 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
@@ -76,7 +86,7 @@ function QualificationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowCh
             <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
             <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Klub</th>
             <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Kat.</th>
-            {[1, 2, 3, 4, 5, 6].map((series) => <th key={series} className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">S{series}</th>)}
+            {[1, 2, 3, 4, 5, 6].map((series) => <th key={series} className={`px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${isR3P && series % 2 === 1 ? "border-l border-[var(--border)]" : ""}`}>S{series}</th>)}
             <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inner tens</th>
             <th className={`${stickyHeader} ${stickyDivider} right-16 w-24 px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]`}>Ukupno</th>
             <th className={`${stickyHeader} right-0 w-16 px-3 py-2.5 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]`}>St.</th>
