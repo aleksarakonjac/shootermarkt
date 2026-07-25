@@ -200,8 +200,8 @@ export async function POST(req: NextRequest) {
         finalRank: row.finalRank ?? null,
         finalDetail: row.finalSeries || row.finalShots || row.finalCumulative || row.finalShotsByStage
           ? {
-              format: "bulletin",
-              scoring: row.finalScoring ?? "decimal",
+              format: "bulletin" as const,
+              scoring: (row.finalScoring ?? "decimal") as "decimal" | "hit_count",
               ...(row.finalSeries ? { series: row.finalSeries } : {}),
               ...(row.finalSeriesLabels ? { seriesLabels: row.finalSeriesLabels } : {}),
               ...(row.finalShots ? { shots: row.finalShots } : {}),
