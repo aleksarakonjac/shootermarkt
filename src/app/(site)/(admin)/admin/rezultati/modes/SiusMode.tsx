@@ -15,7 +15,7 @@ interface CommitResult { inserted: number; skipped: number; errors: string[]; co
 const SUPPORTED_CODES = new Set(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW", "RFPM"]);
 
 const fmtVal = (v: number, code: string) =>
-  (code.startsWith("AR") || code.startsWith("R3P")) ? v.toFixed(1) : String(Math.round(v));
+  (code.startsWith("AR") || code.startsWith("R3P") || code.startsWith("AP")) ? v.toFixed(1) : String(Math.round(v));
 
 // ── CompSearch ────────────────────────────────────────────────────────────────
 
