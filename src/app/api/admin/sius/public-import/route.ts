@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
   for (const [disciplineCode, data] of siusData) {
     const code = disciplineCode as ReviewRow["disciplineCode"];
 
-    if (data.qual.length === 0) {
-      errors.push(`${disciplineCode}: no qual results`);
+    if (data.qual.length === 0 && data.elim.length === 0) {
+      errors.push(`${disciplineCode}: no results`);
       continue;
     }
 
@@ -98,16 +98,38 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Merge elimination rounds — track last (highest) round each athlete reached
+    // Merge elimination rounds — track last (highest) round each athlete reached.
+    // If no qual data yet, seed discRows from elim participants first.
     for (const { round, results: elimResults } of data.elim) {
       for (const e of elimResults) {
-        const row = discRows.find(
+        let row = discRows.find(
           (r) =>
             (e.siusAthleteId && r.issfId === e.siusAthleteId) ||
             (r.lastName.toLowerCase() === e.lastName.toLowerCase() &&
               r.firstName.toLowerCase() === e.firstName.toLowerCase())
         );
-        if (!row) continue;
+        if (!row) {
+          if (data.qual.length > 0) continue; // qual exists but shooter not found — skip
+          const match = matchShooter(e.firstName, e.lastName, e.nation, allShooters);
+          const shooterId = match.kind === "exact" ? match.id : undefined;
+          row = {
+            shooterId,
+            issfId: e.siusAthleteId ?? undefined,
+            firstName: e.firstName,
+            lastName: e.lastName,
+            teamNoc: e.nation,
+            disciplineCode: code,
+            category: "senior",
+            qualTotal: null,
+            qualInners: null,
+            qualRank: null,
+            qualified: null,
+            finalTotal: null,
+            finalRank: null,
+            warning: shooterId ? undefined : "Novi strelac — biće kreiran",
+          };
+          discRows.push(row);
+        }
         if (row.elimRound == null || round > row.elimRound) {
           row.elimRound = round;
           row.elimTotal = e.total;
