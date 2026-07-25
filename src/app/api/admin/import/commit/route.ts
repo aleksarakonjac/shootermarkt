@@ -178,44 +178,59 @@ export async function POST(req: NextRequest) {
       }
 
       // 5. Insert result
-      await db
-        .insert(results)
-        .values({
-          shooterId,
-          competitionId,
-          disciplineId,
-          category: (row.category ?? "senior") as typeof results.$inferInsert.category,
-          clubId: clubId ?? null,
-          qualTotal: row.qualTotal.toString(),
-          qualInners: row.qualInners ?? null,
-          qualRank: row.qualRank ?? null,
-          qualDetail: row.qualPositions
-            ? { kneeling: row.qualPositions.kneeling, prone: row.qualPositions.prone, standing: row.qualPositions.standing }
-            : row.qualSeries ? { series: row.qualSeries }
-            : null,
-          qualified: row.qualified ?? null,
-          elimRound: row.elimRound ?? null,
-          elimTotal: row.elimTotal ?? null,
-          elimRank: row.elimRank ?? null,
-          finalTotal: row.finalTotal?.toString() ?? null,
-          finalRank: row.finalRank ?? null,
-          finalDetail: row.finalSeries || row.finalShots || row.finalCumulative || row.finalShotsByStage
-            ? {
-                format: "bulletin",
-                scoring: row.finalScoring ?? "decimal",
-                ...(row.finalSeries ? { series: row.finalSeries } : {}),
-                ...(row.finalSeriesLabels ? { seriesLabels: row.finalSeriesLabels } : {}),
-                ...(row.finalShots ? { shots: row.finalShots } : {}),
-                ...(row.finalShotsByStage ? { shotsByStage: row.finalShotsByStage } : {}),
-                ...(row.finalCumulative ? { cumulative: row.finalCumulative } : {}),
-                ...(row.finalRanks ? { ranks: row.finalRanks } : {}),
-                ...(row.finalShootOff ? { shootOff: true } : {}),
-              }
-            : null,
-          remark: row.remark ?? null,
-          source: payload.source ?? "pdf_import",
-        })
-        .onConflictDoNothing();
+      const isElimOnly = row.elimRound != null && row.qualTotal == null;
+      const values = {
+        shooterId,
+        competitionId,
+        disciplineId,
+        category: (row.category ?? "senior") as typeof results.$inferInsert.category,
+        clubId: clubId ?? null,
+        qualTotal: row.qualTotal != null ? row.qualTotal.toString() : null,
+        qualInners: row.qualInners ?? null,
+        qualRank: row.qualRank ?? null,
+        qualDetail: row.qualPositions
+          ? { kneeling: row.qualPositions.kneeling, prone: row.qualPositions.prone, standing: row.qualPositions.standing }
+          : row.qualSeries ? { series: row.qualSeries }
+          : null,
+        qualified: row.qualified ?? null,
+        elimRound: row.elimRound ?? null,
+        elimTotal: row.elimTotal ?? null,
+        elimRank: row.elimRank ?? null,
+        finalTotal: row.finalTotal?.toString() ?? null,
+        finalRank: row.finalRank ?? null,
+        finalDetail: row.finalSeries || row.finalShots || row.finalCumulative || row.finalShotsByStage
+          ? {
+              format: "bulletin",
+              scoring: row.finalScoring ?? "decimal",
+              ...(row.finalSeries ? { series: row.finalSeries } : {}),
+              ...(row.finalSeriesLabels ? { seriesLabels: row.finalSeriesLabels } : {}),
+              ...(row.finalShots ? { shots: row.finalShots } : {}),
+              ...(row.finalShotsByStage ? { shotsByStage: row.finalShotsByStage } : {}),
+              ...(row.finalCumulative ? { cumulative: row.finalCumulative } : {}),
+              ...(row.finalRanks ? { ranks: row.finalRanks } : {}),
+              ...(row.finalShootOff ? { shootOff: true } : {}),
+            }
+          : null,
+        remark: row.remark ?? null,
+        source: payload.source ?? "pdf_import",
+      };
+
+      if (isElimOnly) {
+        // Elim-only row: upsert so that if a qual row already exists we patch the elim fields
+        await db
+          .insert(results)
+          .values(values)
+          .onConflictDoUpdate({
+            target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
+            set: {
+              elimRound: sql`excluded.elim_round`,
+              elimTotal: sql`excluded.elim_total`,
+              elimRank: sql`excluded.elim_rank`,
+            },
+          });
+      } else {
+        await db.insert(results).values(values).onConflictDoNothing();
+      }
 
       inserted++;
     } catch (err) {
