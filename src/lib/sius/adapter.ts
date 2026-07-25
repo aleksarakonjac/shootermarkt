@@ -3,6 +3,9 @@ const MVP_EVENTS = new Set(["ARM", "ARW", "APM", "APW"]);
 const CALLBACK_ID =
   "ctl00%24ctl00%24ContentPlaceHolder%24PageContentPlaceHolder%24ASPxGridViewShootEventFiles";
 
+/** R3P disciplines have an elimination phase PDF in addition to qual. */
+const R3P_EVENTS = new Set(["R3PM", "R3PW"]);
+
 export interface SiusChampionship {
   guid: string;
   name: string;
@@ -50,26 +53,24 @@ function parseChampionshipsHtml(html: string): SiusChampionship[] {
   }));
 }
 
-/** Get qual individual file path for a championship + event via DevExpress AJAX callback. */
-export async function fetchQualFile(guid: string, event: string): Promise<string | null> {
+/** Fetch all PDF file paths for a championship + event via DevExpress AJAX callback. */
+async function fetchSiusFiles(guid: string, event: string): Promise<string[]> {
   const pageUrl = `${SIUS_BASE}/ShootEvent.aspx?Championship=${guid}&ShootEvent=${event}`;
 
-  // GET the page first to extract ViewState
   const pageRes = await fetch(pageUrl, {
     headers: { "User-Agent": "Mozilla/5.0" },
     cache: "no-store",
   });
-  if (!pageRes.ok) return null;
+  if (!pageRes.ok) return [];
   const html = await pageRes.text();
 
   const vsMatch = html.match(/name="__VIEWSTATE"[^>]*value="([^"]+)"/);
   const vsgMatch = html.match(/name="__VIEWSTATEGENERATOR"[^>]*value="([^"]+)"/);
-  if (!vsMatch) return null;
+  if (!vsMatch) return [];
 
   const viewState = vsMatch[1];
   const viewStateGen = vsgMatch?.[1] ?? "";
 
-  // Build form body
   const params = new URLSearchParams();
   params.set("__VIEWSTATE", viewState);
   params.set("__VIEWSTATEGENERATOR", viewStateGen);
@@ -85,12 +86,12 @@ export async function fetchQualFile(guid: string, event: string): Promise<string
     body: params.toString(),
     cache: "no-store",
   });
-  if (!callbackRes.ok) return null;
+  if (!callbackRes.ok) return [];
   const body = await callbackRes.text();
 
   // Response: DX({'result':{'stateObject':{'keys':['path/to/file.pdf', ...], ...}}})
   const keysMatch = body.match(/"keys":\[([^\]]*)\]/);
-  if (!keysMatch) return null;
+  if (!keysMatch) return [];
 
   const keysRaw = keysMatch[1];
   const files: string[] = [];
@@ -99,14 +100,25 @@ export async function fetchQualFile(guid: string, event: string): Promise<string
   while ((fm = filePattern.exec(keysRaw)) !== null) {
     files.push(fm[1]);
   }
+  return files;
+}
 
+/** Get qual individual file path for a championship + event. */
+export async function fetchQualFile(guid: string, event: string): Promise<string | null> {
+  const files = await fetchSiusFiles(guid, event);
   // Q100000IA = Qualification Individual RankList (not team, not final)
-  const qualFile = files.find((f) => {
-    const base = f.split(/[\\/]/).pop() ?? "";
-    return base.startsWith("Q100000IA");
-  });
+  return files.find((f) => (f.split(/[\\/]/).pop() ?? "").startsWith("Q100000IA")) ?? null;
+}
 
-  return qualFile ?? null;
+/**
+ * Get elimination individual file path for a championship + R3P event.
+ * E100000IA = Elimination Individual RankList (R3PM/R3PW only).
+ * Returns null for non-R3P events or when the file is not present.
+ */
+export async function fetchElimFile(guid: string, event: string): Promise<string | null> {
+  if (!R3P_EVENTS.has(event)) return null;
+  const files = await fetchSiusFiles(guid, event);
+  return files.find((f) => (f.split(/[\\/]/).pop() ?? "").startsWith("E100000IA")) ?? null;
 }
 
 /** Download a PDF from results.sius.com. */

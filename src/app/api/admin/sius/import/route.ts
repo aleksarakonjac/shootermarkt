@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { fetchQualFile, downloadSiusPdf } from "@/lib/sius/adapter";
+import { fetchQualFile, fetchElimFile, downloadSiusPdf } from "@/lib/sius/adapter";
 import { parsePdfWithGemini } from "@/lib/pdf-import/gemini-adapter";
 import { db } from "@/lib/db";
 import { shooters, clubs } from "@/lib/db/schema";
-import type { ReviewRow } from "@/lib/pdf-import/types";
+import { mergeFinalsIntoRows, type ReviewRow } from "@/lib/pdf-import/types";
+import { foldName } from "@/lib/name-match";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -140,6 +141,40 @@ export async function POST(req: NextRequest) {
       { error: "No events parsed successfully", errors },
       { status: 422 }
     );
+  }
+
+  // For R3P disciplines, fetch elimination PDF and merge final results into rows.
+  const r3pEvents = events.filter((e) => e === "R3PM" || e === "R3PW");
+  for (const event of r3pEvents) {
+    let elimFile: string | null;
+    try {
+      elimFile = await fetchElimFile(guid, event);
+    } catch {
+      errors.push(`${event} elim: file list error`);
+      continue;
+    }
+    if (!elimFile) continue;
+
+    let elimBuf: Buffer;
+    try {
+      elimBuf = await downloadSiusPdf(guid, elimFile);
+    } catch (e) {
+      errors.push(`${event} elim: PDF download failed — ${e}`);
+      continue;
+    }
+
+    let elimBilten;
+    try {
+      elimBilten = await parsePdfWithGemini(elimBuf);
+    } catch (e) {
+      errors.push(`${event} elim: Gemini parse failed — ${e}`);
+      continue;
+    }
+
+    const { matchedFinals, unmatchedFinals } = mergeFinalsIntoRows(rows, elimBilten.events, foldName);
+    if (matchedFinals === 0 && unmatchedFinals > 0) {
+      errors.push(`${event} elim: parsed ${unmatchedFinals} final results but none matched qual rows`);
+    }
   }
 
   return NextResponse.json({ rows, eventCount, errors, name });

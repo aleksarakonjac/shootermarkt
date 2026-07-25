@@ -98,7 +98,7 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
     const isFinal = slot.stage === "final" || slot.stage === "elimination";
     const ranked = resultRows.filter((row) => row.competitionId === slot.competitionId && row.disciplineId === slot.disciplineId && row.category === slot.category && (isFinal ? row.finalRank != null && row.finalTotal != null : row.qualRank != null && row.qualTotal != null)).sort((a, b) => Number(isFinal ? a.finalRank : a.qualRank) - Number(isFinal ? b.finalRank : b.qualRank)).slice(0, 3);
     if (!ranked.length) return null;
-    return ranked.map((row, index) => `${index + 1}. ${row.lastName} ${Number(isFinal ? row.finalTotal : row.qualTotal).toFixed(slot.discCode.startsWith("AP") ? 0 : 1)}`).join(" · ");
+    return ranked.map((row, index) => `${index + 1}. ${row.lastName} ${Number(isFinal ? row.finalTotal : row.qualTotal).toFixed(!isFinal && slot.discCode.startsWith("AP") ? 0 : 1)}`).join(" · ");
   };
   const live = liveRows.map((competition) => {
     const state = getTickerScheduleState(slots.filter((slot) => slot.competitionId === competition.id), now);

@@ -10,7 +10,7 @@ const COLLAPSE_AT = 10;
 const ALL_DISCIPLINES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW"] as const;
 
 const isQualDecimal = (code: string) => code.startsWith("AR");
-const isFinalDecimal = (code: string) => code.startsWith("AR") || code.startsWith("R3P");
+const isFinalDecimal = (code: string) => code.startsWith("AR") || code.startsWith("R3P") || code.startsWith("AP");
 const fmtScore = (v: number, code: string) =>
   isQualDecimal(code) ? v.toFixed(1) : String(Math.round(v));
 const fmtFinal = (v: number, code: string) =>

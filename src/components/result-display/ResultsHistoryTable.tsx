@@ -104,7 +104,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
               const isExpanded = expanded.has(r.id);
               const canExpand = r.qualDetail != null || r.finalDetail != null;
               const qualDecimals = r.disciplineCode.startsWith("AR");
-              const finalDecimals = r.disciplineCode.startsWith("AR") || r.disciplineCode.startsWith("R3P");
+              const finalDecimals = r.disciplineCode.startsWith("AR") || r.disciplineCode.startsWith("R3P") || r.disciplineCode.startsWith("AP");
               const hasDecimals = qualDecimals; // kept for series/detail downstream
               const fmtQual = (v: string) => qualDecimals ? parseFloat(v).toFixed(1) : Math.round(parseFloat(v)).toString();
               const fmtFinal = (v: string) => finalDecimals ? parseFloat(v).toFixed(1) : Math.round(parseFloat(v)).toString();
