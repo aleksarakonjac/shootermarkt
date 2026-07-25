@@ -47,15 +47,31 @@ const REMARK_STYLE: Record<string, { bg: string; color: string; border: string }
   },
 };
 
-function RemarkBadge({ remark }: { remark: string }) {
+function RemarkBadge({ remark, className = "ml-1.5" }: { remark: string; className?: string }) {
   const style = REMARK_STYLE[remark] ?? REMARK_STYLE.DNS;
   return (
     <span
-      className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[0.58rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)] shrink-0 leading-none"
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[0.58rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)] shrink-0 leading-none ${className}`}
       style={{ background: style.bg, color: style.color, border: `1px solid ${style.border}` }}
       title={remark}
     >
       {remark}
+    </span>
+  );
+}
+
+function QualifiedBadge() {
+  return (
+    <span
+      className="inline-flex items-center px-1.5 py-0.5 rounded text-[0.58rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)] shrink-0 leading-none"
+      style={{
+        background: "color-mix(in oklch, var(--brand-primary) 12%, transparent)",
+        color: "var(--brand-primary)",
+        border: "1px solid color-mix(in oklch, var(--brand-primary) 25%, transparent)",
+      }}
+      title="Kvalifikovan za finale"
+    >
+      Q
     </span>
   );
 }
@@ -154,9 +170,9 @@ export function CompetitionQualTable({ results }: Props) {
                 </th>
               )}
 
-              {/* Qualified */}
-              <th className="px-3 py-3 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] w-10">
-                F
+              {/* Remarks */}
+              <th className="px-3 py-3 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] w-16">
+                Nap.
               </th>
             </tr>
           </thead>
@@ -215,7 +231,6 @@ export function CompetitionQualTable({ results }: Props) {
                           {r.birthYear}
                         </span>
                       )}
-                      {r.remark && <RemarkBadge remark={r.remark} />}
                     </span>
                   </td>
 
@@ -297,20 +312,15 @@ export function CompetitionQualTable({ results }: Props) {
                   )}
 
 
-                  {/* Qualified mark */}
+                  {/* Remarks: DSQ/DNS/DNF/SO/RPO from result, or Q for top-8 finalists */}
                   <td className="px-3 py-2.5 text-center">
-                    {isTopQual ? (
-                      <span
-                        className="inline-block w-4 h-4 rounded-full text-[0.6rem] font-bold text-white flex items-center justify-center"
-                        style={{ background: "var(--brand-primary)" }}
-                        title="Finalista"
-                        aria-label="Ušao u finale"
-                      >
-                        ✓
-                      </span>
-                    ) : r.qualified === false ? (
+                    {r.remark ? (
+                      <RemarkBadge remark={r.remark} className="" />
+                    ) : isTopQual ? (
+                      <QualifiedBadge />
+                    ) : (
                       <span className="text-[var(--subtle)] text-xs">—</span>
-                    ) : null}
+                    )}
                   </td>
                 </tr>
               );

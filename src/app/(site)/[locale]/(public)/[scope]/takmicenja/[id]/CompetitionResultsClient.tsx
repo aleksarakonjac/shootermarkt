@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { ChevronRight, ChevronLeft } from "lucide-react";
-import type { QualDetail, FinalDetail, AgeCategory } from "@/lib/db/schema";
+import type { QualDetail, FinalDetail, ElimDetail, AgeCategory } from "@/lib/db/schema";
 import { CATEGORY_LABEL } from "@/lib/pdf-import/types";
 import {
   CompetitionQualTable,
@@ -38,6 +38,7 @@ export type DisciplineGroup = {
       elimRound: number | null;
       elimTotal: number | null;
       elimRank: number | null;
+      elimDetail: ElimDetail | null;
       qualTotal: string | null;
       qualRank: number | null;
       qualInners: number | null;
@@ -229,10 +230,11 @@ function CompetitionOverview({
                 g.categories.map((cat) => {
                   const hasFinal = cat.results.some((r) => r.finalRank != null || r.finalTotal != null);
                   const hasElim = cat.results.some((r) => r.elimRound != null);
+                  const hasQual = cat.results.some((r) => r.qualTotal != null);
                   return (
                     <button
                       key={cat.category}
-                      onClick={() => onSelectIndividual(g.code, cat.category, hasElim ? "elim" : "qual")}
+                      onClick={() => onSelectIndividual(g.code, cat.category, hasQual ? "qual" : "elim")}
                       className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -245,7 +247,7 @@ function CompetitionOverview({
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {hasElim && <PhaseBadge label="E" elim />}
-                        <PhaseBadge label="Q" active />
+                        {hasQual && <PhaseBadge label="Q" active />}
                         {hasFinal && <PhaseBadge label="F" accent />}
                         <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150 ml-0.5" aria-hidden="true" />
                       </div>
@@ -312,6 +314,7 @@ function SingleCatRows({
   onSelect: (stage: Stage, elimRound?: number) => void;
 }) {
   const hasElim = catData.results.some((r) => r.elimRound != null);
+  const hasQual = catData.results.some((r) => r.qualTotal != null);
   const hasFinal = catData.results.some((r) => r.finalRank != null || r.finalTotal != null);
 
   // Collect distinct elim rounds sorted
@@ -345,21 +348,23 @@ function SingleCatRows({
       })}
 
       {/* Qualification */}
-      <button
-        onClick={() => onSelect("qual")}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
-      >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <PhaseBadge label="Q" active />
-          <span className="text-sm font-semibold text-[var(--ink)] truncate">
-            {(PHASE_LABELS[locale] ?? PHASE_LABELS.en).qual}
-          </span>
-          <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">
-            {catData.results.length}
-          </span>
-        </div>
-        <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
-      </button>
+      {hasQual && (
+        <button
+          onClick={() => onSelect("qual")}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <PhaseBadge label="Q" active />
+            <span className="text-sm font-semibold text-[var(--ink)] truncate">
+              {(PHASE_LABELS[locale] ?? PHASE_LABELS.en).qual}
+            </span>
+            <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">
+              {catData.results.filter((r) => r.qualTotal != null).length}
+            </span>
+          </div>
+          <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
+        </button>
+      )}
 
       {/* Final */}
       {hasFinal && (
@@ -527,6 +532,7 @@ function CompetitionDetail({
 
   const hasFinal = catGroup?.results.some((r) => r.finalRank != null || r.finalTotal != null) ?? false;
   const hasElim = catGroup?.results.some((r) => r.elimRound != null) ?? false;
+  const hasQual = catGroup?.results.some((r) => r.qualTotal != null) ?? false;
 
   // Distinct elimination rounds sorted
   const elimRounds = hasElim
@@ -567,6 +573,7 @@ function CompetitionDetail({
       nationality: r.nationality,
       elimTotal: r.elimTotal,
       elimRank: r.elimRank,
+      elimDetail: r.elimDetail,
       qualified: r.qualified,
     })) ?? [];
 
@@ -589,9 +596,14 @@ function CompetitionDetail({
   const phaseL = PHASE_LABELS[locale] ?? PHASE_LABELS.en;
   const stageOptions: StageOption[] = [
     ...(hasElim ? [{ key: "elim" as Stage, label: phaseL.elim, badge: <PhaseBadge label="E" elim={selection.stage === "elim"} /> }] : []),
-    { key: "qual" as Stage, label: phaseL.qual, badge: <PhaseBadge label="Q" active={selection.stage === "qual"} /> },
+    ...(hasQual ? [{ key: "qual" as Stage, label: phaseL.qual, badge: <PhaseBadge label="Q" active={selection.stage === "qual"} /> }] : []),
     ...(hasFinal ? [{ key: "final" as Stage, label: phaseL.final, badge: <PhaseBadge label="F" accent={selection.stage === "final"} /> }] : []),
   ];
+
+  // If the selected stage no longer applies (e.g. qual hasn't started yet), fall back to a valid one
+  const effectiveStage: Stage = stageOptions.some((o) => o.key === selection.stage)
+    ? selection.stage
+    : (stageOptions[0]?.key ?? "qual");
 
   return (
     <div>
@@ -635,7 +647,7 @@ function CompetitionDetail({
               key={opt.key}
               onClick={() => onStageChange(opt.key, opt.key === "elim" ? currentElimRound : undefined)}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors duration-150 ${
-                selection.stage === opt.key
+                effectiveStage === opt.key
                   ? "bg-[var(--bg)] text-[var(--ink)] shadow-sm"
                   : "text-[var(--muted)] hover:text-[var(--ink)]"
               }`}
@@ -648,7 +660,7 @@ function CompetitionDetail({
       )}
 
       {/* ── Elim round selector ──────────────────────────────────── */}
-      {selection.stage === "elim" && elimRounds.length > 1 && (
+      {effectiveStage === "elim" && elimRounds.length > 1 && (
         <div className="flex items-center gap-1.5 mb-4">
           {elimRounds.map((rnd) => (
             <button
@@ -668,7 +680,7 @@ function CompetitionDetail({
 
       {/* ── Table ────────────────────────────────────────────────── */}
       <AnimatePresence mode="wait" initial={false}>
-        {selection.stage === "elim" ? (
+        {effectiveStage === "elim" ? (
           <motion.div
             key={`elim-${currentElimRound}`}
             initial={{ opacity: 0 }}
@@ -677,7 +689,7 @@ function CompetitionDetail({
           >
             <ElimTable rows={elimRows} locale={locale} disciplineCode={selection.disciplineCode} />
           </motion.div>
-        ) : selection.stage === "qual" ? (
+        ) : effectiveStage === "qual" ? (
           <motion.div
             key="qual"
             initial={{ opacity: 0 }}
@@ -711,7 +723,13 @@ type ElimRow = {
   nationality: string | null;
   elimTotal: number | null;
   elimRank: number | null;
+  elimDetail: ElimDetail | null;
   qualified: boolean | null;
+};
+
+const R3P_POSITION_LABELS: Record<string, string[]> = {
+  sr: ["Klečeći", "Ležeći", "Stojeći"],
+  en: ["Kneeling", "Prone", "Standing"],
 };
 
 function ElimTable({ rows, locale, disciplineCode }: { rows: ElimRow[]; locale: string; disciplineCode: string }) {
@@ -724,57 +742,95 @@ function ElimTable({ rows, locale, disciplineCode }: { rows: ElimRow[]; locale: 
     );
   }
 
+  const seriesCount = Math.max(0, ...rows.map((r) => r.elimDetail?.series.length ?? 0));
+  const isPositions = seriesCount === 6; // R3P: 2 series per stance (kneeling/prone/standing)
+  const posLabels = R3P_POSITION_LABELS[locale] ?? R3P_POSITION_LABELS.en;
+
   return (
     <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-            <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] w-8">#</th>
-            <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">{locale === "en" ? "Athlete" : "Strelac"}</th>
-            <th className="py-2 px-3 text-right text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">Σ</th>
-            <th className="py-2 px-3 text-center text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] w-8">→</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[var(--border)]">
-          {rows.map((r, i) => (
-            <tr
-              key={r.id}
-              className="bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-75"
-            >
-              <td className="py-2.5 px-3 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">
-                {r.elimRank ?? i + 1}
-              </td>
-              <td className="py-2.5 px-3">
-                <span className="font-semibold text-[var(--ink)]">{r.name}</span>
-                {r.nationality && (
-                  <span className="ml-1.5 text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)]">
-                    {r.nationality}
-                  </span>
-                )}
-                {r.clubDisplay && (
-                  <span className="ml-2 text-xs text-[var(--muted)] hidden sm:inline">{r.clubDisplay}</span>
-                )}
-              </td>
-              <td className="py-2.5 px-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]">
-                {r.elimTotal != null ? fmtElim(r.elimTotal) : "—"}
-              </td>
-              <td className="py-2.5 px-3 text-center">
-                {r.qualified === true && (
-                  <span className="text-[0.6rem] font-bold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide px-1.5 py-0.5 rounded"
-                    style={{
-                      background: "color-mix(in oklch, var(--success) 12%, transparent)",
-                      color: "var(--success)",
-                      border: "1px solid color-mix(in oklch, var(--success) 22%, transparent)",
-                    }}
-                  >
-                    KV
-                  </span>
-                )}
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse" style={{ minWidth: seriesCount > 0 ? `${420 + seriesCount * 56}px` : undefined }}>
+          <thead>
+            {isPositions && (
+              <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                <th colSpan={3} />
+                {posLabels.map((label) => (
+                  <th key={label} colSpan={2} className="py-1 px-3 text-center text-[0.6rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] border-l border-[var(--border)]">
+                    {label}
+                  </th>
+                ))}
+                <th colSpan={2} />
+              </tr>
+            )}
+            <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+              <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] w-8">#</th>
+              <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">{locale === "en" ? "Athlete" : "Strelac"}</th>
+              <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">{locale === "en" ? "Club" : "Klub"}</th>
+              {Array.from({ length: seriesCount }).map((_, i) => (
+                <th
+                  key={i}
+                  className={`py-2 px-3 text-right text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] ${isPositions && i % 2 === 0 ? "border-l border-[var(--border)]" : ""}`}
+                  style={{ minWidth: "48px" }}
+                >
+                  S{i + 1}
+                </th>
+              ))}
+              <th className="py-2 px-3 text-right text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">Σ</th>
+              <th className="py-2 px-3 text-center text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] w-8">→</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-[var(--border)]">
+            {rows.map((r, i) => {
+              const series = r.elimDetail?.series ?? null;
+              return (
+                <tr
+                  key={r.id}
+                  className="bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-75"
+                >
+                  <td className="py-2.5 px-3 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">
+                    {r.elimRank ?? i + 1}
+                  </td>
+                  <td className="py-2.5 px-3">
+                    <span className="font-semibold text-[var(--ink)]">{r.name}</span>
+                    {r.nationality && (
+                      <span className="ml-1.5 text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)]">
+                        {r.nationality}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 text-xs text-[var(--muted)]">
+                    {r.clubDisplay}
+                  </td>
+                  {Array.from({ length: seriesCount }).map((_, si) => (
+                    <td
+                      key={si}
+                      className={`py-2.5 px-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)] ${isPositions && si % 2 === 0 ? "border-l border-[var(--border)]" : ""}`}
+                    >
+                      {series?.[si] != null ? fmtElim(series[si]) : "—"}
+                    </td>
+                  ))}
+                  <td className="py-2.5 px-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]">
+                    {r.elimTotal != null ? fmtElim(r.elimTotal) : "—"}
+                  </td>
+                  <td className="py-2.5 px-3 text-center">
+                    {r.qualified === true && (
+                      <span className="text-[0.6rem] font-bold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide px-1.5 py-0.5 rounded"
+                        style={{
+                          background: "color-mix(in oklch, var(--success) 12%, transparent)",
+                          color: "var(--success)",
+                          border: "1px solid color-mix(in oklch, var(--success) 22%, transparent)",
+                        }}
+                      >
+                        KV
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

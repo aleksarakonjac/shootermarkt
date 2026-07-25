@@ -1,8 +1,7 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { Link } from "@/i18n/navigation";
-import { ChevronDown } from "lucide-react";
 import type { FinalDetail } from "@/lib/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { ArApFinalDisplay } from "./ArApFinalDisplay";
@@ -24,19 +23,27 @@ interface Props {
   results: FinalResultRow[];
 }
 
-const MEDAL: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
+const MEDAL_COLOR: Record<number, string> = {
+  1: "oklch(0.75 0.14 85)",
+  2: "oklch(0.75 0.01 85)",
+  3: "oklch(0.60 0.10 55)",
+};
+
+function MedalIcon({ rank }: { rank: number }) {
+  const color = MEDAL_COLOR[rank];
+  if (!color) return null;
+  return (
+    <span
+      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[0.65rem] font-bold text-white shrink-0"
+      style={{ background: color }}
+      aria-label={`Mesto ${rank}`}
+    >
+      {rank}
+    </span>
+  );
+}
 
 export function CompetitionFinalTable({ results }: Props) {
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
-
-  function toggle(id: number) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); } else { next.add(id); }
-      return next;
-    });
-  }
-
   const sorted = [...results]
     .filter((r) => r.finalRank != null || r.finalTotal != null)
     .sort((a, b) => {
@@ -72,34 +79,23 @@ export function CompetitionFinalTable({ results }: Props) {
             <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--ink)] w-24">
               {isHitCountFinal ? "Pogoci" : "Final Σ"}
             </th>
-            <th className="w-9" />
           </tr>
         </thead>
         <tbody>
           {sorted.map((r) => {
-            const isExpanded = expanded.has(r.id);
-            const canExpand = r.finalDetail != null;
-            const medal = r.finalRank != null ? MEDAL[r.finalRank] : null;
-
             return (
               <Fragment key={r.id}>
-                <tr
-                  onClick={canExpand ? () => toggle(r.id) : undefined}
-                  className={`border-b border-[var(--border)] transition-colors ${
-                    canExpand ? "cursor-pointer" : ""
-                  } ${
-                    isExpanded
-                      ? "bg-[var(--surface)]"
-                      : "hover:bg-[var(--surface)]"
-                  }`}
-                  aria-expanded={canExpand ? isExpanded : undefined}
-                >
+                <tr className="border-b border-[var(--border)] transition-colors">
                   {/* Rank */}
                   <td className="px-3 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums">
-                    {medal ? (
-                      <span className="text-base leading-none">{medal}</span>
-                    ) : r.finalRank != null ? (
-                      <span className="text-[var(--muted)]">{r.finalRank}</span>
+                    {r.finalRank != null ? (
+                      MEDAL_COLOR[r.finalRank] ? (
+                        <span className="inline-flex justify-end">
+                          <MedalIcon rank={r.finalRank} />
+                        </span>
+                      ) : (
+                        <span className="text-[var(--muted)]">{r.finalRank}</span>
+                      )
                     ) : (
                       <span className="text-[var(--subtle)]">—</span>
                     )}
@@ -109,7 +105,6 @@ export function CompetitionFinalTable({ results }: Props) {
                   <td className="px-4 py-3">
                     <Link
                       href={`/strelci/${r.shooterId}`}
-                      onClick={(e) => e.stopPropagation()}
                       className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
                     >
                       {r.name}
@@ -147,45 +142,24 @@ export function CompetitionFinalTable({ results }: Props) {
                       <span className="font-normal text-[var(--subtle)]">—</span>
                     )}
                   </td>
-
-                  {/* Expand chevron */}
-                  <td className="px-2 py-3 text-center">
-                    {canExpand && (
-                      <ChevronDown
-                        size={14}
-                        className={`text-[var(--muted)] transition-transform duration-200 mx-auto ${
-                          isExpanded ? "rotate-180" : ""
-                        }`}
-                        aria-hidden="true"
-                      />
-                    )}
-                  </td>
                 </tr>
 
-                {/* Expand row */}
-                <tr aria-hidden={!isExpanded}>
-                  <td colSpan={5} className="p-0">
-                    <div
-                      className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-                        isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                      }`}
-                    >
-                      <div className="overflow-hidden">
-                        {r.finalDetail && (
-                          <div className="bg-[var(--surface)] border-t border-[var(--border)] px-4 py-4">
-                            {r.finalDetail.format === "ar_ap_10m" ? (
-                              <ArApFinalDisplay detail={r.finalDetail} />
-                            ) : r.finalDetail.format === "bulletin" ? (
-                              <BulletinFinalDisplay detail={r.finalDetail} />
-                            ) : (
-                              <PositionsFinalDisplay detail={r.finalDetail} />
-                            )}
-                          </div>
+                {/* Series detail — always shown, not collapsed */}
+                {r.finalDetail && (
+                  <tr>
+                    <td colSpan={4} className="p-0">
+                      <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-4">
+                        {r.finalDetail.format === "ar_ap_10m" ? (
+                          <ArApFinalDisplay detail={r.finalDetail} />
+                        ) : r.finalDetail.format === "bulletin" ? (
+                          <BulletinFinalDisplay detail={r.finalDetail} />
+                        ) : (
+                          <PositionsFinalDisplay detail={r.finalDetail} />
                         )}
                       </div>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                )}
               </Fragment>
             );
           })}
