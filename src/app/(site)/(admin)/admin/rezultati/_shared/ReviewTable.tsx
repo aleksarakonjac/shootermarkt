@@ -107,6 +107,53 @@ function QualificationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowCh
   );
 }
 
+function EliminationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: Props["onRowChange"] }) {
+  if (rows.length === 0) return null;
+  const rounds = Array.from(new Set(rows.map(({ row }) => row.elimRound!))).sort((a, b) => a - b);
+
+  return (
+    <div className="border-t border-[var(--border)] bg-[var(--surface)]">
+      <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Eliminacije</div>
+      {rounds.map((round) => {
+        const roundRows = rows
+          .filter(({ row }) => row.elimRound === round)
+          .sort((a, b) => (a.row.elimRank ?? 99) - (b.row.elimRank ?? 99));
+        return (
+          <div key={round} className="border-t border-[var(--border)]">
+            <div className="px-4 py-1.5 text-[0.7rem] font-semibold text-[var(--subtle)]">Runda {round} · {roundRows.length}</div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead><tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                  <th className="px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">#</th>
+                  <th className="px-3 py-2 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
+                  <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Prezime</th>
+                  <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ime</th>
+                  <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
+                  <th className="px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ukupno</th>
+                  <th className="px-3 py-2 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">St.</th>
+                </tr></thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {roundRows.map(({ row, index }) => (
+                    <tr key={index} className={row.skip ? "opacity-40" : "hover:bg-[var(--bg)]"}>
+                      <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">{row.elimRank ?? "—"}</td>
+                      <td className="px-3 py-2 text-center"><input type="checkbox" checked={!!row.skip} onChange={(event) => onRowChange(index, { skip: event.target.checked })} className="accent-[var(--brand-primary)]" /></td>
+                      <td className="px-3 py-2 font-medium text-[var(--ink)]">{row.lastName}</td>
+                      <td className="px-3 py-2 text-[var(--ink)]">{row.firstName}</td>
+                      <td className="px-3 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.teamNoc}</td>
+                      <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]">{row.elimTotal != null ? fmtFinal(row.elimTotal, row.disciplineCode) : "—"}</td>
+                      <td className="px-2 py-2 text-center"><ShooterMatchCell row={row} onChange={(patch) => onRowChange(index, patch)} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function FinalsTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: Props["onRowChange"] }) {
   if (rows.length === 0) return null;
   const isHitCountFinal = rows[0]?.row.disciplineCode === "SPW";
@@ -178,26 +225,31 @@ export function ReviewTable({ rows, nocFilter, onRowChange, onNocFilterChange, o
       </div> : null}
 
       {byDiscipline.map(({ discipline, rows: disciplineRows }) => {
+        const qualRows = disciplineRows.filter(({ row }) => row.qualTotal != null);
+        const elimRows = disciplineRows.filter(({ row }) => row.elimRound != null);
         const finalRows = disciplineRows.filter(({ row }) => row.finalRank != null || row.finalTotal != null);
         const isExpanded = expanded.has(discipline);
-        const visibleRows = isExpanded ? disciplineRows : disciplineRows.slice(0, COLLAPSE_AT);
-        const hiddenCount = disciplineRows.length - COLLAPSE_AT;
+        const visibleRows = isExpanded ? qualRows : qualRows.slice(0, COLLAPSE_AT);
+        const hiddenCount = qualRows.length - COLLAPSE_AT;
         return <section key={discipline} className="overflow-hidden rounded-lg border border-[var(--border)]">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <h3 className="text-sm font-semibold text-[var(--ink)]">{DISCIPLINE_META[discipline].label}</h3>
             <div className="flex items-center gap-3">
-              <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{disciplineRows.length} kvalifikacija</span>
-              {hiddenCount > 0 && (
+              <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
+                {qualRows.length > 0 ? `${qualRows.length} kvalifikacija` : `${disciplineRows.length} za unos`}
+              </span>
+              {qualRows.length > 0 && hiddenCount > 0 && (
                 <button
                   onClick={() => setExpanded((prev) => { const next = new Set(prev); isExpanded ? next.delete(discipline) : next.add(discipline); return next; })}
                   className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"
                 >
-                  {isExpanded ? "Skupi ↑" : `Prikaži sve ${disciplineRows.length} ↓`}
+                  {isExpanded ? "Skupi ↑" : `Prikaži sve ${qualRows.length} ↓`}
                 </button>
               )}
             </div>
           </div>
-          <QualificationTable rows={visibleRows} onRowChange={onRowChange} />
+          {qualRows.length > 0 && <QualificationTable rows={visibleRows} onRowChange={onRowChange} />}
+          <EliminationTable rows={elimRows} onRowChange={onRowChange} />
           <FinalsTable rows={finalRows} onRowChange={onRowChange} />
         </section>;
       })}
