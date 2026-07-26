@@ -100,8 +100,8 @@ function LiveDetail({ item }: { item: TickerItem }) {
 
   const detail = (
     <span
-      className="shrink-0 flex items-center gap-1.5"
-      style={{ opacity: visible ? 1 : 0, transition: "opacity 0.3s ease", minWidth: 80 }}
+      className="shrink-0 flex items-center gap-1.5 max-sm:w-full max-sm:min-w-0"
+      style={{ opacity: visible ? 1 : 0, transition: "opacity 0.3s ease", minWidth: 0 }}
     >
       {current.label && (
         <span className="font-extrabold uppercase" style={{ fontSize: 9, letterSpacing: "0.08em", color: "rgba(255,255,255,0.5)" }}>
@@ -113,7 +113,7 @@ function LiveDetail({ item }: { item: TickerItem }) {
       </span>
     </span>
   );
-  return current.href ? <Link href={scopedHref(current.href)} className="hover:opacity-75 transition-opacity">{detail}</Link> : detail;
+  return current.href ? <Link href={scopedHref(current.href)} className="hover:opacity-75 transition-opacity max-sm:w-full">{detail}</Link> : detail;
 }
 
 // ── Upper bar (cycles through live + uskoro + custom) ────────────────────────
@@ -137,12 +137,12 @@ function UpperBar({ items, live, upcoming, locale }: { items: TickerItem[]; live
 
   const item = items[Math.min(idx, items.length - 1)];
 
-  const transform = slide === "out" ? "translateY(-32px)" : slide === "enter" ? "translateY(32px)" : "translateY(0)";
-  const transition = slide === "enter" ? "none" : "transform 0.32s ease";
+  const opacity = slide === "in" ? 1 : 0;
+  const transition = slide === "enter" ? "none" : "opacity 0.2s ease";
 
   return (
-    <div style={{ height: 32, background: "var(--brand-primary)", overflow: "hidden" }} role="status" aria-label={`Ticker: ${item.name}`}>
-      <div style={{ transform, transition, height: 32 }}>
+    <div className="min-h-12 sm:h-8" style={{ background: "var(--brand-primary)", overflow: "hidden" }} role="status" aria-label={`Ticker: ${item.name}`}>
+      <div className="min-h-12 sm:h-8" style={{ opacity, transition }}>
         <LiveBarInner item={item} live={live} upcoming={upcoming} locale={locale} />
       </div>
     </div>
@@ -155,7 +155,7 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
   const isUskoro = item.status === "USKORO";
 
   const inner = (
-    <div className="mx-auto max-w-7xl px-4 h-full flex items-center gap-3 min-w-0">
+    <div className="mx-auto max-w-7xl px-4 py-1 sm:py-0 h-full flex items-center gap-3 min-w-0">
 
       {/* Status badge */}
       {isLive && (
@@ -194,7 +194,7 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
       )}
 
       {/* Divider */}
-      <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
+      <span className="hidden sm:inline-block shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
 
       {/* Level + country */}
       {(() => {
@@ -220,15 +220,15 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
       })()}
 
       {/* Name + detail */}
-      <span className="flex items-center gap-2 flex-1 min-w-0">
-        <span className="font-semibold text-xs truncate min-w-0" style={{ color: "white" }}>
+      <span className="flex items-center gap-2 flex-1 min-w-0 max-sm:flex-col max-sm:items-start max-sm:gap-0">
+        <span className="font-semibold text-xs min-w-0 max-sm:leading-tight sm:truncate" style={{ color: "white" }}>
           {item.name}
         </span>
 
         {/* Show rotating detail only for LIVE */}
         {isLive && (item.detailItems?.length || item.detailText) && (
           <>
-            <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
+            <span className="hidden sm:inline-block shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
             <LiveDetail item={item} />
           </>
         )}
