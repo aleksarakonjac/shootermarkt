@@ -562,20 +562,26 @@ function CompetitionDetail({
       apparatus: group?.apparatus ?? null,
     })) ?? [];
 
-  const elimRows = catGroup?.results
-    .filter((r) => r.elimRound === currentElimRound)
-    .sort((a, b) => (a.elimRank ?? 999) - (b.elimRank ?? 999))
-    .map((r) => ({
-      id: r.id,
-      shooterId: r.shooterId,
-      name: `${r.lastName} ${r.firstName}`,
-      clubDisplay: r.clubName ?? r.clubNocCode ?? "",
-      nationality: r.nationality,
-      elimTotal: r.elimTotal,
-      elimRank: r.elimRank,
-      elimDetail: r.elimDetail,
-      qualified: r.qualified,
-    })) ?? [];
+  // Elim rows reuse CompetitionQualTable's row shape so both tables render identically
+  const elimRows: CompResultRow[] =
+    catGroup?.results
+      .filter((r) => r.elimRound === currentElimRound)
+      .map((r) => ({
+        id: r.id,
+        shooterId: r.shooterId,
+        name: `${r.lastName} ${r.firstName}`,
+        birthYear: null,
+        clubDisplay: r.clubName ?? r.clubNocCode ?? "",
+        nationality: r.nationality,
+        qualTotal: r.elimTotal != null ? String(r.elimTotal) : null,
+        qualRank: r.elimRank,
+        qualInners: null,
+        qualified: r.qualified,
+        qualDetail: r.elimDetail,
+        remark: null,
+        disciplineCode: group?.code ?? "",
+        apparatus: group?.apparatus ?? null,
+      })) ?? [];
 
   const finalRows: FinalResultRow[] =
     catGroup?.results
@@ -687,7 +693,7 @@ function CompetitionDetail({
             animate={{ opacity: 1, transition: { duration: 0.15 } }}
             exit={{ opacity: 0, transition: { duration: 0.1 } }}
           >
-            <ElimTable rows={elimRows} locale={locale} disciplineCode={selection.disciplineCode} />
+            <CompetitionQualTable results={elimRows} />
           </motion.div>
         ) : effectiveStage === "qual" ? (
           <motion.div
@@ -709,128 +715,6 @@ function CompetitionDetail({
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-// ── Elimination table ─────────────────────────────────────────────────────────
-
-type ElimRow = {
-  id: number;
-  shooterId: number;
-  name: string;
-  clubDisplay: string;
-  nationality: string | null;
-  elimTotal: number | null;
-  elimRank: number | null;
-  elimDetail: ElimDetail | null;
-  qualified: boolean | null;
-};
-
-const R3P_POSITION_LABELS: Record<string, string[]> = {
-  sr: ["Klečeći", "Ležeći", "Stojeći"],
-  en: ["Kneeling", "Prone", "Standing"],
-};
-
-function ElimTable({ rows, locale, disciplineCode }: { rows: ElimRow[]; locale: string; disciplineCode: string }) {
-  const fmtElim = (v: number) => disciplineCode.startsWith("AR") ? v.toFixed(1) : String(Math.round(v));
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-10 text-center">
-        <p className="text-sm text-[var(--muted)]">{locale === "en" ? "No data for this round." : "Nema podataka za ovu rundu."}</p>
-      </div>
-    );
-  }
-
-  const seriesCount = Math.max(0, ...rows.map((r) => r.elimDetail?.series.length ?? 0));
-  const isPositions = seriesCount === 6; // R3P: 2 series per stance (kneeling/prone/standing)
-  const posLabels = R3P_POSITION_LABELS[locale] ?? R3P_POSITION_LABELS.en;
-
-  return (
-    <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse" style={{ minWidth: seriesCount > 0 ? `${420 + seriesCount * 56}px` : undefined }}>
-          <thead>
-            {isPositions && (
-              <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-                <th colSpan={3} />
-                {posLabels.map((label) => (
-                  <th key={label} colSpan={2} className="py-1 px-3 text-center text-[0.6rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] border-l border-[var(--border)]">
-                    {label}
-                  </th>
-                ))}
-                <th colSpan={2} />
-              </tr>
-            )}
-            <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-              <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] w-8">#</th>
-              <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">{locale === "en" ? "Athlete" : "Strelac"}</th>
-              <th className="py-2 px-3 text-left text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">{locale === "en" ? "Club" : "Klub"}</th>
-              {Array.from({ length: seriesCount }).map((_, i) => (
-                <th
-                  key={i}
-                  className={`py-2 px-3 text-right text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] ${isPositions && i % 2 === 0 ? "border-l border-[var(--border)]" : ""}`}
-                  style={{ minWidth: "48px" }}
-                >
-                  S{i + 1}
-                </th>
-              ))}
-              <th className="py-2 px-3 text-right text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)]">Σ</th>
-              <th className="py-2 px-3 text-center text-[0.65rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] w-8">→</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--border)]">
-            {rows.map((r, i) => {
-              const series = r.elimDetail?.series ?? null;
-              return (
-                <tr
-                  key={r.id}
-                  className="bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-75"
-                >
-                  <td className="py-2.5 px-3 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">
-                    {r.elimRank ?? i + 1}
-                  </td>
-                  <td className="py-2.5 px-3">
-                    <span className="font-semibold text-[var(--ink)]">{r.name}</span>
-                    {r.nationality && (
-                      <span className="ml-1.5 text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)]">
-                        {r.nationality}
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3 text-xs text-[var(--muted)]">
-                    {r.clubDisplay}
-                  </td>
-                  {Array.from({ length: seriesCount }).map((_, si) => (
-                    <td
-                      key={si}
-                      className={`py-2.5 px-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)] ${isPositions && si % 2 === 0 ? "border-l border-[var(--border)]" : ""}`}
-                    >
-                      {series?.[si] != null ? fmtElim(series[si]) : "—"}
-                    </td>
-                  ))}
-                  <td className="py-2.5 px-3 text-right font-[family-name:var(--font-jetbrains-mono)] font-bold tabular-nums text-[var(--ink)]">
-                    {r.elimTotal != null ? fmtElim(r.elimTotal) : "—"}
-                  </td>
-                  <td className="py-2.5 px-3 text-center">
-                    {r.qualified === true && (
-                      <span className="text-[0.6rem] font-bold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide px-1.5 py-0.5 rounded"
-                        style={{
-                          background: "color-mix(in oklch, var(--success) 12%, transparent)",
-                          color: "var(--success)",
-                          border: "1px solid color-mix(in oklch, var(--success) 22%, transparent)",
-                        }}
-                      >
-                        KV
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import { Link } from "@/i18n/navigation";
-import type { QualDetail } from "@/lib/db/schema";
+import type { QualDetail, PositionsQualDetail } from "@/lib/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
+
+const POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"] as const;
+const POSITION_KEYS = ["kneeling", "prone", "standing"] as const;
 
 export type CompResultRow = {
   id: number;
@@ -102,6 +105,19 @@ export function CompetitionQualTable({ results }: Props) {
   const seriesCount = isSeriesType
     ? (firstWithDetail!.qualDetail as { series: number[] }).series.length
     : 0;
+  // R3P-style disciplines sometimes store per-position series flat (2 series per stance = 6)
+  const isR3PFlatPositions = isSeriesType && seriesCount === 6 && (results[0]?.disciplineCode?.startsWith("R3P") ?? false);
+
+  // Per-position sub-series column counts (may differ, e.g. standing split into 2 series)
+  const posSeriesCounts = isPositionsType
+    ? POSITION_KEYS.reduce((acc, pos) => {
+        acc[pos] = Math.max(0, ...results.map((r) => (r.qualDetail as PositionsQualDetail | null)?.[pos]?.series.length ?? 0));
+        return acc;
+      }, {} as Record<(typeof POSITION_KEYS)[number], number>)
+    : null;
+
+  const showGroupHeader = isPositionsType || isR3PFlatPositions;
+
   // Show inners column if any row has inners data
   const showInners = results.some((r) => r.qualInners != null);
 
@@ -118,8 +134,33 @@ export function CompetitionQualTable({ results }: Props) {
   return (
     <div className="rounded-xl border border-[var(--border)] overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse" style={{ minWidth: isSeriesType ? `${360 + seriesCount * 68}px` : "480px" }}>
+        <table
+          className="w-full text-sm border-collapse"
+          style={{
+            minWidth: isSeriesType
+              ? `${360 + seriesCount * 68}px`
+              : isPositionsType && posSeriesCounts
+                ? `${420 + (posSeriesCounts.kneeling + posSeriesCounts.prone + posSeriesCounts.standing) * 60}px`
+                : "480px",
+          }}
+        >
           <thead>
+            {/* Stance group header (R3P-style disciplines) */}
+            {showGroupHeader && (
+              <tr className="bg-[var(--surface-2)] border-b border-[var(--border)]">
+                <th colSpan={3} />
+                {POSITION_KEYS.map((pos, pi) => (
+                  <th
+                    key={pos}
+                    colSpan={isPositionsType ? posSeriesCounts![pos] : 2}
+                    className={`px-3 py-1 text-center text-[0.6rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--subtle)] ${pi > 0 ? "border-l border-[var(--border)]" : ""}`}
+                  >
+                    {POSITION_LABELS[pi]}
+                  </th>
+                ))}
+                <th colSpan={1 + (showInners ? 1 : 0) + 1} />
+              </tr>
+            )}
             <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
               <th className="px-3 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] w-12">
                 #
@@ -136,27 +177,27 @@ export function CompetitionQualTable({ results }: Props) {
                 Array.from({ length: seriesCount }).map((_, i) => (
                   <th
                     key={i}
-                    className="px-3 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]"
+                    className={`px-3 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${isR3PFlatPositions && i % 2 === 0 && i > 0 ? "border-l border-[var(--border)]" : ""}`}
                     style={{ minWidth: "64px" }}
                   >
                     S{i + 1}
                   </th>
                 ))}
 
-              {/* Position columns */}
-              {isPositionsType && (
-                <>
-                  <th className="px-3 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]" style={{ minWidth: "72px" }}>
-                    Klec
-                  </th>
-                  <th className="px-3 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]" style={{ minWidth: "72px" }}>
-                    Lez
-                  </th>
-                  <th className="px-3 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]" style={{ minWidth: "72px" }}>
-                    Stoj
-                  </th>
-                </>
-              )}
+              {/* Position sub-series columns */}
+              {isPositionsType &&
+                posSeriesCounts &&
+                POSITION_KEYS.flatMap((pos, pi) =>
+                  Array.from({ length: posSeriesCounts[pos] }).map((_, si) => (
+                    <th
+                      key={`${pos}-${si}`}
+                      className={`px-3 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${si === 0 && pi > 0 ? "border-l border-[var(--border)]" : ""}`}
+                      style={{ minWidth: "56px" }}
+                    >
+                      S{si + 1}
+                    </th>
+                  ))
+                )}
 
               {/* Total */}
               <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--ink)] w-20">
@@ -184,11 +225,7 @@ export function CompetitionQualTable({ results }: Props) {
                   : null;
               const posDetail =
                 isPositionsType && r.qualDetail
-                  ? (r.qualDetail as {
-                      kneeling: { series: number[][]; total: number };
-                      prone:    { series: number[][]; total: number };
-                      standing: { series: number[][]; total: number };
-                    })
+                  ? (r.qualDetail as PositionsQualDetail)
                   : null;
 
               const bestSeriesIdx =
@@ -271,27 +308,31 @@ export function CompetitionQualTable({ results }: Props) {
                             isBest
                               ? "text-[var(--ink)] font-semibold"
                               : "text-[var(--muted)]"
-                          }`}
+                          } ${isR3PFlatPositions && i % 2 === 0 && i > 0 ? "border-l border-[var(--border)]" : ""}`}
                         >
                           {val != null ? fmt(val) : <span className="text-[var(--subtle)]">—</span>}
                         </td>
                       );
                     })}
 
-                  {/* Position subtotals */}
-                  {isPositionsType && (
-                    <>
-                      <td className="px-3 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]">
-                        {posDetail ? fmt(posDetail.kneeling.total) : <span className="text-[var(--subtle)]">—</span>}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]">
-                        {posDetail ? fmt(posDetail.prone.total) : <span className="text-[var(--subtle)]">—</span>}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]">
-                        {posDetail ? fmt(posDetail.standing.total) : <span className="text-[var(--subtle)]">—</span>}
-                      </td>
-                    </>
-                  )}
+                  {/* Position sub-series values */}
+                  {isPositionsType &&
+                    posSeriesCounts &&
+                    POSITION_KEYS.flatMap((pos, pi) => {
+                      const posData = posDetail?.[pos];
+                      return Array.from({ length: posSeriesCounts[pos] }).map((_, si) => {
+                        const shots = posData?.series[si];
+                        const val = shots ? shots.reduce((a, b) => a + b, 0) : null;
+                        return (
+                          <td
+                            key={`${pos}-${si}`}
+                            className={`px-3 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)] ${si === 0 && pi > 0 ? "border-l border-[var(--border)]" : ""}`}
+                          >
+                            {val != null ? fmt(val) : <span className="text-[var(--subtle)]">—</span>}
+                          </td>
+                        );
+                      });
+                    })}
 
                   {/* Total */}
                   <td className="px-4 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)]">
