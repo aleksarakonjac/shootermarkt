@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { Link } from "@/i18n/navigation";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { useTranslations, useLocale } from "next-intl";
@@ -100,8 +100,8 @@ function LiveDetail({ item }: { item: TickerItem }) {
 
   const detail = (
     <span
-      className="shrink-0 flex items-center gap-1.5 max-sm:w-full max-sm:min-w-0"
-      style={{ opacity: visible ? 1 : 0, transition: "opacity 0.3s ease", minWidth: 0 }}
+      className="shrink-0 flex items-center gap-1.5"
+      style={{ opacity: visible ? 1 : 0, transition: "opacity 0.3s ease", minWidth: 80 }}
     >
       {current.label && (
         <span className="font-extrabold uppercase" style={{ fontSize: 9, letterSpacing: "0.08em", color: "rgba(255,255,255,0.5)" }}>
@@ -113,12 +113,115 @@ function LiveDetail({ item }: { item: TickerItem }) {
       </span>
     </span>
   );
-  return current.href ? <Link href={scopedHref(current.href)} className="hover:opacity-75 transition-opacity max-sm:w-full">{detail}</Link> : detail;
+  return current.href ? <Link href={scopedHref(current.href)} className="hover:opacity-75 transition-opacity">{detail}</Link> : detail;
 }
 
 // ── Upper bar (cycles through live + uskoro + custom) ────────────────────────
 
 function UpperBar({ items, live, upcoming, locale }: { items: TickerItem[]; live: string; upcoming: string; locale: string }) {
+  return (
+    <>
+      <div className="sm:hidden"><MobileUpperBar items={items} live={live} upcoming={upcoming} /></div>
+      <div className="hidden sm:block"><DesktopUpperBar items={items} live={live} upcoming={upcoming} locale={locale} /></div>
+    </>
+  );
+}
+
+type MobileTickerSegment = {
+  item: TickerItem;
+  text: string;
+  href?: string;
+};
+
+function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: string; upcoming: string }) {
+  const scopedHref = useScopedHref();
+  const segments = useMemo<MobileTickerSegment[]>(() => items.flatMap((item) => {
+    const details = item.status === "LIVE"
+      ? item.detailItems?.length ? item.detailItems : item.detailText ? [{ text: item.detailText }] : []
+      : [];
+
+    return [
+      { item, text: item.name, href: item.href },
+      ...details.map((detail) => ({
+        item,
+        text: detail.label ? `${detail.label} · ${detail.text}` : detail.text,
+        href: detail.href,
+      })),
+    ];
+  }), [items]);
+  const [idx, setIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+  const [travelPx, setTravelPx] = useState(0);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const segment = segments[Math.min(idx, segments.length - 1)];
+  const travelDuration = Math.max(2200, Math.ceil(travelPx / 0.05));
+  const segmentDuration = travelPx > 0 ? travelDuration * 2 + 1200 : 4000;
+
+  useEffect(() => {
+    const measure = () => setTravelPx(Math.max(0, (textRef.current?.scrollWidth ?? 0) - (viewportRef.current?.clientWidth ?? 0)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (viewportRef.current) observer.observe(viewportRef.current);
+    return () => observer.disconnect();
+  }, [idx]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setIdx((current) => (current + 1) % segments.length);
+        requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
+      }, 220);
+    }, segmentDuration);
+    return () => clearTimeout(timer);
+  }, [segmentDuration, segments.length]);
+
+  const isLive = segment.item.status === "LIVE";
+  const isUpcoming = segment.item.status === "USKORO";
+  const scrollStyle = travelPx > 0
+    ? {
+        "--ticker-mobile-distance": `-${travelPx}px`,
+        animation: `ticker-mobile-scroll ${segmentDuration}ms ease-in-out both`,
+      } as CSSProperties
+    : undefined;
+  const text = (
+    <span
+      ref={textRef}
+      key={`${segment.item.id}-${idx}`}
+      className="inline-block whitespace-nowrap font-semibold text-xs"
+      style={{ color: "white", ...scrollStyle }}
+    >
+      {segment.text}
+    </span>
+  );
+
+  return (
+    <div className="h-8 overflow-hidden" style={{ background: "var(--brand-primary)" }} role="status" aria-label={`Ticker: ${segment.text}`}>
+      <div className="mx-auto flex h-full max-w-7xl items-center gap-2 px-4" style={{ opacity: visible ? 1 : 0, transition: "opacity 0.22s ease" }}>
+        {isLive && <MobileStatusBadge label={live} live />}
+        {isUpcoming && <MobileStatusBadge label={upcoming.toUpperCase()} />}
+        {segment.item.status === "CUSTOM" && segment.item.label && <MobileStatusBadge label={segment.item.label} />}
+        <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
+        <div ref={viewportRef} className="min-w-0 flex-1 overflow-hidden">
+          {segment.href ? <Link href={scopedHref(segment.href)} className="block hover:opacity-80">{text}</Link> : text}
+        </div>
+        {segment.href && <span className="shrink-0" style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }} aria-hidden="true">→</span>}
+      </div>
+    </div>
+  );
+}
+
+function MobileStatusBadge({ label, live = false }: { label: string; live?: boolean }) {
+  return (
+    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded px-1.5 font-extrabold select-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: live ? "var(--brand-primary)" : "#92400e", background: live ? "white" : "#fefce8" }}>
+      {live && <span className="shrink-0 rounded-full" style={{ width: 5, height: 5, background: "var(--brand-primary)", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />}
+      {label}
+    </span>
+  );
+}
+
+function DesktopUpperBar({ items, live, upcoming, locale }: { items: TickerItem[]; live: string; upcoming: string; locale: string }) {
   const [idx, setIdx]     = useState(0);
   const [slide, setSlide] = useState<"in" | "out" | "enter">("in");
 
@@ -137,12 +240,12 @@ function UpperBar({ items, live, upcoming, locale }: { items: TickerItem[]; live
 
   const item = items[Math.min(idx, items.length - 1)];
 
-  const opacity = slide === "in" ? 1 : 0;
-  const transition = slide === "enter" ? "none" : "opacity 0.2s ease";
+  const transform = slide === "out" ? "translateY(-32px)" : slide === "enter" ? "translateY(32px)" : "translateY(0)";
+  const transition = slide === "enter" ? "none" : "transform 0.32s ease";
 
   return (
-    <div className="min-h-12 sm:h-8" style={{ background: "var(--brand-primary)", overflow: "hidden" }} role="status" aria-label={`Ticker: ${item.name}`}>
-      <div className="min-h-12 sm:h-8" style={{ opacity, transition }}>
+    <div style={{ height: 32, background: "var(--brand-primary)", overflow: "hidden" }} role="status" aria-label={`Ticker: ${item.name}`}>
+      <div style={{ transform, transition, height: 32 }}>
         <LiveBarInner item={item} live={live} upcoming={upcoming} locale={locale} />
       </div>
     </div>
@@ -155,7 +258,7 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
   const isUskoro = item.status === "USKORO";
 
   const inner = (
-    <div className="mx-auto max-w-7xl px-4 py-1 sm:py-0 h-full flex items-center gap-3 min-w-0">
+    <div className="mx-auto max-w-7xl px-4 h-full flex items-center gap-3 min-w-0">
 
       {/* Status badge */}
       {isLive && (
@@ -194,7 +297,7 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
       )}
 
       {/* Divider */}
-      <span className="hidden sm:inline-block shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
+      <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
 
       {/* Level + country */}
       {(() => {
@@ -220,15 +323,15 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
       })()}
 
       {/* Name + detail */}
-      <span className="flex items-center gap-2 flex-1 min-w-0 max-sm:flex-col max-sm:items-start max-sm:gap-0">
-        <span className="font-semibold text-xs min-w-0 max-sm:leading-tight sm:truncate" style={{ color: "white" }}>
+      <span className="flex items-center gap-2 flex-1 min-w-0">
+        <span className="font-semibold text-xs truncate min-w-0" style={{ color: "white" }}>
           {item.name}
         </span>
 
         {/* Show rotating detail only for LIVE */}
         {isLive && (item.detailItems?.length || item.detailText) && (
           <>
-            <span className="hidden sm:inline-block shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
+            <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
             <LiveDetail item={item} />
           </>
         )}

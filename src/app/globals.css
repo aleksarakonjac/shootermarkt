@@ -402,7 +402,13 @@ p {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
 }
+@keyframes ticker-mobile-scroll {
+  0%, 10%   { transform: translateX(0); }
+  45%, 55%  { transform: translateX(var(--ticker-mobile-distance)); }
+  90%, 100% { transform: translateX(0); }
+}
 @media (prefers-reduced-motion: reduce) {
   @keyframes ticker-pulse  { 0%, 100% { opacity: 1; } }
   @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(0); } }
+  @keyframes ticker-mobile-scroll { from { transform: translateX(0); } to { transform: translateX(0); } }
 }
