@@ -8,6 +8,7 @@ import { DateTimePicker } from "@/components/ui/DateTimePicker";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { formatDateSr } from "@/lib/date-utils";
 import { CATEGORY_LABEL, type AgeCategory } from "@/lib/pdf-import/types";
+import { venueLocalToUtc } from "@/lib/timezone";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ interface CompetitionRow {
   level: string;
   countryCode2: string | null;
   nocCode: string | null;
+  timezone: string;
 }
 
 interface SlotRow {
@@ -227,11 +229,14 @@ function CustomSelect({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtDatetime(iso: string): string {
-  const d            = iso.slice(0, 16);
-  const [date, time] = d.split("T");
-  const [y, m, day]  = date.split("-");
-  return `${day}.${m}.${y} ${time}`;
+function fmtDatetime(iso: string, timezone?: string): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone, // undefined = browser's own timezone
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  const p = Object.fromEntries(fmt.formatToParts(new Date(iso)).map(({ type, value }) => [type, value]));
+  return `${p.day}.${p.month}.${p.year} ${p.hour}:${p.minute}`;
 }
 
 function formatDateRange(start: string, end: string | null): string {
@@ -881,6 +886,7 @@ function CompetitionScheduleRow({
                   <SlotRow
                     key={slot.id}
                     slot={slot}
+                    timezone={comp.timezone}
                     live={liveSlotIds.includes(slot.id)}
                     onDelete={() => onSlotDelete(slot.id)}
                   />
@@ -891,6 +897,7 @@ function CompetitionScheduleRow({
             disciplines={disciplines}
             compDateStart={comp.date}
             compDateEnd={comp.dateEnd ?? comp.date}
+            timezone={comp.timezone}
             onAdd={onSlotAdd}
           />
         </div>
@@ -901,7 +908,7 @@ function CompetitionScheduleRow({
 
 // ── SlotRow ───────────────────────────────────────────────────────────────────
 
-function SlotRow({ slot, live, onDelete }: { slot: SlotRow; live: boolean; onDelete: () => Promise<void> }) {
+function SlotRow({ slot, timezone, live, onDelete }: { slot: SlotRow; timezone: string; live: boolean; onDelete: () => Promise<void> }) {
   const [loading, setLoading] = useState(false);
   return (
     <div className={`px-6 py-2.5 flex items-center gap-4 text-xs ${live ? "bg-red-50/50 dark:bg-red-950/10" : ""}`}>
@@ -911,8 +918,19 @@ function SlotRow({ slot, live, onDelete }: { slot: SlotRow; live: boolean; onDel
       <span className="px-2 py-0.5 rounded text-[0.65rem] font-medium bg-[var(--surface-2)] text-[var(--muted)] border border-[var(--border)] uppercase shrink-0">
         {CATEGORY_LABEL[slot.category as AgeCategory] ?? slot.category}
       </span>
-      <span className="text-[var(--muted)] shrink-0">{fmtDatetime(slot.startTime)}</span>
-      {slot.endTime && (<><span className="text-[var(--border-strong)]">→</span><span className="text-[var(--muted)] shrink-0">{fmtDatetime(slot.endTime)}</span></>)}
+      <span className="text-[var(--muted)] shrink-0 flex flex-col leading-tight">
+        <span>{fmtDatetime(slot.startTime, timezone)}</span>
+        <span className="text-[0.65rem] text-[var(--subtle)]">({fmtDatetime(slot.startTime)} tvoje vreme)</span>
+      </span>
+      {slot.endTime && (
+        <>
+          <span className="text-[var(--border-strong)]">→</span>
+          <span className="text-[var(--muted)] shrink-0 flex flex-col leading-tight">
+            <span>{fmtDatetime(slot.endTime, timezone)}</span>
+            <span className="text-[0.65rem] text-[var(--subtle)]">({fmtDatetime(slot.endTime)} tvoje vreme)</span>
+          </span>
+        </>
+      )}
       <span className="flex-1" />
       <button
         onClick={async () => { setLoading(true); await onDelete(); setLoading(false); }}
@@ -930,10 +948,11 @@ function SlotRow({ slot, live, onDelete }: { slot: SlotRow; live: boolean; onDel
 
 const TICKER_DISCIPLINE_CODES = new Set(["ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "SPW"]);
 
-function AddSlotForm({ disciplines, compDateStart, compDateEnd, onAdd }: {
+function AddSlotForm({ disciplines, compDateStart, compDateEnd, timezone, onAdd }: {
   disciplines: DisciplineOption[];
   compDateStart: string;
   compDateEnd: string;
+  timezone: string;
   onAdd: (p: { disciplineId: number; stage: string; category: string; startTime: string; endTime: string | null }) => Promise<string | null>;
 }) {
   const [disciplineId, setDisciplineId] = useState("");
@@ -946,11 +965,22 @@ function AddSlotForm({ disciplines, compDateStart, compDateEnd, onAdd }: {
 
   const valid = disciplineId && stage && category && startTime;
 
+  function toUtcIso(localValue: string): string {
+    const [datePart, timePart] = localValue.split("T");
+    return venueLocalToUtc(datePart, timePart, timezone).toISOString();
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!valid) return;
     setLoading(true); setError(null);
-    const err = await onAdd({ disciplineId: parseInt(disciplineId), stage, category, startTime, endTime: endTime || null });
+    const err = await onAdd({
+      disciplineId: parseInt(disciplineId),
+      stage,
+      category,
+      startTime: toUtcIso(startTime),
+      endTime: endTime ? toUtcIso(endTime) : null,
+    });
     setLoading(false);
     if (err) { setError(err); return; }
     setDisciplineId(""); setStage(""); setCategory("senior"); setStartTime(""); setEndTime("");
@@ -983,7 +1013,7 @@ function AddSlotForm({ disciplines, compDateStart, compDateEnd, onAdd }: {
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Početak</label>
+        <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Početak (vreme na lokaciji, {timezone})</label>
         <DateTimePicker
           value={startTime}
           onChange={setStartTime}
@@ -993,7 +1023,7 @@ function AddSlotForm({ disciplines, compDateStart, compDateEnd, onAdd }: {
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Kraj (opciono)</label>
+        <label className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">Kraj (opciono, vreme na lokaciji)</label>
         <DateTimePicker
           value={endTime}
           onChange={setEndTime}

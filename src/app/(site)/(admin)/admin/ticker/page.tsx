@@ -34,6 +34,7 @@ export default async function AdminTickerPage() {
       level: competitions.level,
       countryCode2: countries.code2,
       nocCode: countries.nocCode,
+      timezone: competitions.timezone,
     })
       .from(competitions)
       .leftJoin(countries, eq(competitions.countryId, countries.id))

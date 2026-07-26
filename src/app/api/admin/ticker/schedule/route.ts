@@ -22,13 +22,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Validate stage start_time is within competition date range
-  const [comp] = await db.select({ date: competitions.date, dateEnd: competitions.dateEnd })
+  const [comp] = await db.select({ date: competitions.date, dateEnd: competitions.dateEnd, timezone: competitions.timezone })
     .from(competitions)
     .where(eq(competitions.id, competitionId));
 
   if (!comp) return NextResponse.json({ error: "Competition not found" }, { status: 404 });
 
-  const slotDate = startTime.slice(0, 10); // YYYY-MM-DD
+  // startTime is a UTC instant; derive the venue-local calendar date for range validation.
+  const slotDate = new Intl.DateTimeFormat("en-CA", { timeZone: comp.timezone, year: "numeric", month: "2-digit", day: "2-digit" })
+    .format(new Date(startTime)); // YYYY-MM-DD
   const compStart = comp.date;
   const compEnd = comp.dateEnd ?? comp.date;
 
