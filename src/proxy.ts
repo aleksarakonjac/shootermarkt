@@ -22,6 +22,10 @@ function scopeRedirect(request: NextRequest): NextResponse | null {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  if (/^\/(?:sr|en)\/(?:srb|issf)\/admin\/?$/.test(pathname)) {
+    return NextResponse.redirect(new URL("/admin", request.url), 308);
+  }
+
   // Public site: scope redirect then locale routing, no auth gate.
   if (!pathname.startsWith("/admin") && !pathname.startsWith("/portal")) {
     return scopeRedirect(request) ?? intlMiddleware(request);

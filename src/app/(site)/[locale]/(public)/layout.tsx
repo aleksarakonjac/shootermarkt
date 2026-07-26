@@ -5,6 +5,7 @@ import ThemeToggle from "./components/ThemeToggle";
 import { RegionSelector } from "./components/RegionSelector";
 import { LocaleSwitcher } from "./components/LocaleSwitcher";
 import { ScopedLink } from "./components/ScopedLink";
+import Link from "next/link";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 export const revalidate = 300;
@@ -165,7 +166,7 @@ export default async function PublicLayout({ children, params }: Props) {
           {/* Bottom bar */}
           <div className="border-t border-[var(--border)] py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
             <p className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
-              © {new Date().getFullYear()} Shootermarkt
+              © {new Date().getFullYear()} <Link href="/admin" className="hover:text-[var(--ink)] transition-colors">Shootermarkt</Link>
             </p>
           </div>
 
