@@ -1,6 +1,13 @@
 @import "tailwindcss";
 @import "flag-icons/css/flag-icons.min.css";
 
+/* AIN — ISSF neutral-athlete status, not a real country, so flag-icons has no
+   sprite for it. Custom asset, wired into the same .fi-{code} class the rest
+   of the flag rendering already relies on. */
+.fi-ain {
+  background-image: url("/flags/ain.svg");
+}
+
 /* ── Brand tokens ──────────────────────────────────────────────────────────── */
 :root {
   /* Primary — red accent */

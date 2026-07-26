@@ -266,7 +266,7 @@ export interface ISSFScheduleEntry {
   endTime: string | null;
   eventTitle: string;
   disciplineCode: string | null; // null = not a shooting event we track
-  stage: "qual" | "elimination" | "final" | "training" | "ceremony" | "other";
+  stage: "qual" | "qual_precision" | "qual_rapid" | "elimination" | "final" | "training" | "ceremony" | "other";
   isTraining: boolean;
   isFinal: boolean;
   isMedal: boolean;
@@ -307,11 +307,20 @@ function mapTitleToDisciplineCode(title: string): string | null {
   return null;
 }
 
-function detectStage(title: string): ISSFScheduleEntry["stage"] {
+// SPW splits qualification into two stages — precision and rapid fire — each
+// scheduled as its own slot (and each may span multiple relays/rounds), but
+// both feed one combined qual ranking (see live-fetch cron dedup). Only SPW
+// carries this split — "rapid" also appears in RFPM's own discipline name,
+// so the sub-stage check only applies once we know the row is SPW.
+function detectStage(title: string, disciplineCode: string | null): ISSFScheduleEntry["stage"] {
   if (/^pre-event training/i.test(title)) return "training";
   if (/^medal ceremony/i.test(title))     return "ceremony";
   if (/^final\s/i.test(title))            return "final";
   if (/elimination/i.test(title))         return "elimination";
+  if (disciplineCode === "SPW") {
+    if (/precision/i.test(title)) return "qual_precision";
+    if (/rapid/i.test(title))     return "qual_rapid";
+  }
   if (/qual/i.test(title))                return "qual";
   return "qual"; // default for competition entries with a time
 }
@@ -364,14 +373,15 @@ function parseScheduleHtml(html: string, year: number): ISSFScheduleEntry[] {
       const isFinal   = /^final\s/i.test(eventTitle);
       const isMedal   = /^medal ceremony/i.test(eventTitle);
 
+      const disciplineCode = mapTitleToDisciplineCode(eventTitle);
       entries.push({
         date: dateStr,
         dayLabel: header.label,
         startTime,
         endTime,
         eventTitle,
-        disciplineCode: mapTitleToDisciplineCode(eventTitle),
-        stage: detectStage(eventTitle),
+        disciplineCode,
+        stage: detectStage(eventTitle, disciplineCode),
         isTraining,
         isFinal,
         isMedal,

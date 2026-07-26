@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useRouter } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
@@ -416,6 +417,7 @@ export function GlobalSearch() {
   const [searchError, setSearchError] = useState(false);
   const [retry, setRetry] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
+  const reducedMotion = useReducedMotion();
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -560,18 +562,36 @@ export function GlobalSearch() {
   // ── Modal JSX ─────────────────────────────────────────────────────────────
 
   const modal = (
-    <div
+    <motion.div
+      key="global-search-modal"
       className="fixed inset-0 z-[var(--z-modal)] flex items-start justify-center px-4"
       style={{ paddingTop: "12vh", background: "oklch(0 0 0 / 0.45)", backdropFilter: "blur(3px)" }}
+      initial={reducedMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={reducedMotion ? { opacity: 1 } : { opacity: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
+      transition={{ duration: reducedMotion ? 0 : 0.3, ease: [0.22, 1, 0.36, 1] }}
       onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
       role="dialog"
       aria-modal="true"
       aria-label={t("ariaLabel")}
     >
-      <div
+      <motion.div
         ref={dialogRef}
         className="w-full max-w-xl rounded-xl border border-[var(--border)] overflow-hidden"
         style={{ background: "var(--bg)" }}
+        initial={reducedMotion ? false : { opacity: 0, y: -28, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={reducedMotion ? { opacity: 1 } : {
+          opacity: [1, 1, 0],
+          y: -28,
+          scale: 0.98,
+          transition: {
+            duration: 0.36,
+            ease: [0.22, 1, 0.36, 1],
+            opacity: { times: [0, 0.55, 1] },
+          },
+        }}
+        transition={{ duration: reducedMotion ? 0 : 0.36, ease: [0.22, 1, 0.36, 1] }}
       >
         {/* Input row */}
         <div className="flex items-center gap-3 px-4 border-b border-[var(--border)]">
@@ -824,8 +844,8 @@ export function GlobalSearch() {
             </span>
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 
   return (
@@ -854,7 +874,10 @@ export function GlobalSearch() {
       </button>
 
       {/* Portal modal — renders in body, outside header stacking context */}
-      {mounted && isOpen && createPortal(modal, document.body)}
+      {mounted && createPortal(
+        <AnimatePresence>{isOpen && modal}</AnimatePresence>,
+        document.body,
+      )}
     </>
   );
 }

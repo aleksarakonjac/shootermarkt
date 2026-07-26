@@ -1,13 +1,18 @@
+"use client";
+
+import { useState, type CSSProperties } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import type { QualDetail, PositionsQualDetail } from "@/lib/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
+import { displayNoc } from "@/lib/noc-list";
 
 const POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"] as const;
 const POSITION_KEYS = ["kneeling", "prone", "standing"] as const;
 
 // Disciplines whose flat `series` array is really several fixed-size phases
-// shot back to back. Group header + column count are always shown for these,
-// even before any series data has arrived (live results fill columns in as
+// shot back to back. Shown as labeled groups in the expanded series detail,
+// even before any series data has arrived (live results fill values in as
 // the match progresses).
 type FlatGroup = { label: string; count: number };
 const FLAT_GROUPS_BY_DISCIPLINE: Array<{ match: (code: string) => boolean; groups: FlatGroup[] }> = [
@@ -30,7 +35,8 @@ function getFlatGroups(code: string | undefined): FlatGroup[] | null {
 export type CompResultRow = {
   id: number;
   shooterId: number;
-  name: string;
+  firstName: string;
+  lastName: string;
   birthYear: number | null | undefined;
   clubDisplay: string;
   nationality: string | null;
@@ -83,27 +89,85 @@ function QualifiedBadge() {
   );
 }
 
-interface Props {
-  results: CompResultRow[];
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 14 14"
+      fill="none"
+      aria-hidden="true"
+      className="shrink-0 text-[var(--subtle)]"
+      style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 180ms ease" }}
+    >
+      <path d="M2.5 5l4.5 4 4.5-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
-// Fixed pixel widths for every non-flexible column. Sticky offsets are plain
-// constants against these — no DOM measuring needed, because (unlike a real
-// <table>, where table-layout:auto can silently override a column's width
-// and where position:sticky on a table-cell is unreliable in Chromium) a
-// CSS Grid track's size is authoritative and its items support sticky cleanly.
-const RANK_W = "44px";
-const NAME_W = "minmax(150px, 1fr)";
-const CLUB_W = "minmax(90px, 150px)";
-const SERIES_W = "56px";
-const INNERS_W = "44px";
-const TOTAL_W = "76px";
-const REMARK_W = "60px";
+interface Props {
+  results: CompResultRow[];
+  /** world/olympic/continental (ISSF-level) fields — no clubs, only national teams. */
+  competitionLevel?: string;
+}
 
-const headerCellCls = "px-3 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center bg-[var(--surface-2)]";
-const groupHeaderCellCls = "px-3 py-2 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--subtle)] flex items-center justify-center bg-[var(--surface-2)]";
+const NOC_ONLY_LEVELS = new Set(["world", "olympic", "continental"]);
 
-export function CompetitionQualTable({ results }: Props) {
+// Fixed pixel widths for the (now few) non-flexible columns — a CSS Grid
+// track's size is authoritative, unlike a real <table> under table-layout:auto.
+const RANK_W = "32px";
+const NAME_W = "minmax(96px, 1fr)";
+const CLUB_W = "minmax(52px, 120px)";
+const TOTAL_W = "92px";
+const REMARK_W = "28px";
+const CHEVRON_W = "24px";
+
+const headerCellCls = "px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-3 flex items-center bg-[var(--surface-2)] border-b border-[var(--border)]";
+
+// One labeled block of series values inside the expanded detail row, e.g.
+// "S1  105 106" or (grouped disciplines) "Klečeći  105 106".
+type DetailGroup = { label: string; values: Array<number | null>; bestIdx: number };
+
+function buildDetailGroups(
+  r: CompResultRow,
+  isPositionsType: boolean,
+  flatGroups: FlatGroup[] | null,
+  posSeriesCounts: Record<(typeof POSITION_KEYS)[number], number> | null
+): DetailGroup[] {
+  if (isPositionsType && posSeriesCounts) {
+    const posDetail = r.qualDetail as PositionsQualDetail | null;
+    return POSITION_KEYS.filter((pos) => posSeriesCounts[pos] > 0).map((pos, pi) => {
+      const series = posDetail?.[pos]?.series ?? [];
+      const values = Array.from({ length: posSeriesCounts[pos] }).map((_, si) => {
+        const shots = series[si];
+        return shots ? shots.reduce((a, b) => a + b, 0) : null;
+      });
+      return { label: POSITION_LABELS[pi], values, bestIdx: -1 };
+    });
+  }
+
+  const seriesArr = r.qualDetail && "series" in r.qualDetail ? (r.qualDetail as { series: number[] }).series : [];
+  const bestIdx = seriesArr.length > 0 ? seriesArr.indexOf(Math.max(...seriesArr)) : -1;
+
+  if (flatGroups) {
+    let offset = 0;
+    return flatGroups.map((g) => {
+      const values = seriesArr.slice(offset, offset + g.count);
+      const localBest = bestIdx >= offset && bestIdx < offset + g.count ? bestIdx - offset : -1;
+      offset += g.count;
+      return { label: g.label, values: values.length > 0 ? values : Array(g.count).fill(null), bestIdx: localBest };
+    });
+  }
+
+  // Ungrouped flat series — one mini-group per series so the visual language
+  // (label above values) stays consistent whether or not the discipline groups.
+  return seriesArr.map((v, i) => ({ label: `S${i + 1}`, values: [v], bestIdx: v != null && i === bestIdx ? 0 : -1 }));
+}
+
+export function CompetitionQualTable({ results, competitionLevel }: Props) {
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const reducedMotion = useReducedMotion();
+
   if (results.length === 0) {
     return (
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center">
@@ -112,52 +176,31 @@ export function CompetitionQualTable({ results }: Props) {
     );
   }
 
-  const hasDecimals =
+  const isAirRifle =
     results[0]?.apparatus === "air_rifle" ||
     (results[0]?.disciplineCode?.startsWith("AR") ?? false);
+  const hasDecimals = isAirRifle;
 
   // Detect display type from first result with qualDetail
   const firstWithDetail = results.find((r) => r.qualDetail != null);
   const isPositionsType =
     firstWithDetail?.qualDetail != null && "kneeling" in firstWithDetail.qualDetail;
-  // R3P/SPW-style disciplines are always fixed groups of series (3×2 or 2×3),
-  // shown from the start regardless of how many series have actually come in
-  // yet — live results fill columns in as the match progresses, so the full
-  // grid (with empty cells) must render up front.
   const flatGroups = isPositionsType ? null : getFlatGroups(results[0]?.disciplineCode);
-  const isFlatGrouped = flatGroups != null;
   const isSeriesType =
-    isFlatGrouped || (firstWithDetail?.qualDetail != null && "series" in firstWithDetail.qualDetail);
-  const seriesCount = isFlatGrouped
-    ? flatGroups.reduce((sum, g) => sum + g.count, 0)
-    : isSeriesType
-      ? (firstWithDetail!.qualDetail as { series: number[] }).series.length
-      : 0;
-  // Column indices (0-based) where a new group starts, for the border-left divider
-  const groupBoundaries = new Set<number>();
-  if (flatGroups) {
-    let acc = 0;
-    for (const g of flatGroups.slice(0, -1)) {
-      acc += g.count;
-      groupBoundaries.add(acc);
-    }
-  }
+    flatGroups != null || (firstWithDetail?.qualDetail != null && "series" in firstWithDetail.qualDetail);
+  const hasSeriesDetail = isPositionsType || isSeriesType;
 
-  // Per-position sub-series column counts (may differ, e.g. standing split into 2 series)
   const posSeriesCounts = isPositionsType
     ? POSITION_KEYS.reduce((acc, pos) => {
         acc[pos] = Math.max(0, ...results.map((r) => (r.qualDetail as PositionsQualDetail | null)?.[pos]?.series.length ?? 0));
         return acc;
       }, {} as Record<(typeof POSITION_KEYS)[number], number>)
     : null;
-  const posSeriesTotal = posSeriesCounts
-    ? posSeriesCounts.kneeling + posSeriesCounts.prone + posSeriesCounts.standing
-    : 0;
 
-  const showGroupHeader = isPositionsType || isFlatGrouped;
-
-  // Show inners column if any row has inners data
-  const showInners = results.some((r) => r.qualInners != null);
+  // Inner tens don't apply to air rifle; for other disciplines the column
+  // sits to the right of the total, not the left.
+  const showInners = !isAirRifle && results.some((r) => r.qualInners != null);
+  const clubHeaderLabel = NOC_ONLY_LEVELS.has(competitionLevel ?? "") ? "NOC" : "Klub / NOC";
 
   const fmt = (v: number) =>
     hasDecimals ? v.toFixed(1) : Math.round(v).toString();
@@ -169,250 +212,205 @@ export function CompetitionQualTable({ results }: Props) {
     return a.qualRank - b.qualRank;
   });
 
-  const seriesTracks = isPositionsType
-    ? `repeat(${posSeriesTotal}, ${SERIES_W})`
-    : isSeriesType
-      ? `repeat(${seriesCount}, ${SERIES_W})`
-      : "";
-  const gridTemplateColumns = [RANK_W, NAME_W, CLUB_W, seriesTracks, showInners ? INNERS_W : "", TOTAL_W, REMARK_W]
+  const gridTemplateColumns = [RANK_W, NAME_W, CLUB_W, TOTAL_W, REMARK_W, hasSeriesDetail ? CHEVRON_W : ""]
     .filter(Boolean)
     .join(" ");
-  const totalCols = 3 + (isPositionsType ? posSeriesTotal : seriesCount) + (showInners ? 1 : 0) + 2;
+  const mobileGridTemplateColumns = hasSeriesDetail
+    ? "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 24px 18px"
+    : "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 24px";
+
+  const allExpanded = hasSeriesDetail && sorted.every((r) => expanded.has(r.id));
+  const toggleAll = () => {
+    setExpanded(allExpanded ? new Set() : new Set(sorted.map((r) => r.id)));
+  };
+  const toggleRow = (id: number) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+      {hasSeriesDetail && (
+        <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border)] bg-[var(--surface)]">
+          <button
+            type="button"
+            onClick={toggleAll}
+            className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
+          >
+            {allExpanded ? "Sakrij serije" : "Prikaži sve serije"}
+            <ChevronIcon open={allExpanded} />
+          </button>
+        </div>
+      )}
       <div className="overflow-x-auto">
-        <div role="table" className="text-sm grid" style={{ gridTemplateColumns, minWidth: `${totalCols * 56 + 90}px` }}>
-          {/* Stance/phase group header (R3P, SPW precizno+brzo) */}
-          {showGroupHeader && (
-            <div role="row" style={{ display: "contents" }}>
-              <div style={{ gridColumn: "span 3" }} className="bg-[var(--surface-2)]" aria-hidden="true" />
-              {isPositionsType &&
-                POSITION_KEYS.map((pos, pi) => (
-                  <div
-                    key={pos}
-                    role="columnheader"
-                    style={{ gridColumn: `span ${posSeriesCounts![pos]}` }}
-                    className={`${groupHeaderCellCls} ${pi > 0 ? "border-l border-[var(--border)]" : ""}`}
-                  >
-                    {POSITION_LABELS[pi]}
-                  </div>
-                ))}
-              {isFlatGrouped &&
-                flatGroups!.map((g, gi) => (
-                  <div
-                    key={gi}
-                    role="columnheader"
-                    style={{ gridColumn: `span ${g.count}` }}
-                    className={`${groupHeaderCellCls} ${gi > 0 ? "border-l border-[var(--border)]" : ""}`}
-                  >
-                    {g.label}
-                  </div>
-                ))}
-              <div style={{ gridColumn: `span ${showInners ? 3 : 2}` }} className="bg-[var(--surface-2)]" aria-hidden="true" />
-            </div>
-          )}
-
+        <div
+          role="table"
+          className="text-sm grid [grid-template-columns:var(--mobile-grid)] sm:[grid-template-columns:var(--desktop-grid)]"
+          style={{ "--mobile-grid": mobileGridTemplateColumns, "--desktop-grid": gridTemplateColumns } as CSSProperties}
+        >
           {/* Column header row */}
           <div role="row" style={{ display: "contents" }}>
-            <div role="columnheader" className={`${headerCellCls} justify-end border-b border-[var(--border)]`}>#</div>
-            <div role="columnheader" className={`${headerCellCls} border-b border-[var(--border)]`}>Strelac</div>
-            <div role="columnheader" className={`${headerCellCls} border-b border-[var(--border)]`}>Klub / NOC</div>
-
-            {isSeriesType &&
-              Array.from({ length: seriesCount }).map((_, i) => (
-                <div
-                  key={i}
-                  role="columnheader"
-                  className={`${headerCellCls} justify-end border-b border-[var(--border)] ${groupBoundaries.has(i) ? "border-l" : ""}`}
-                >
-                  S{i + 1}
-                </div>
-              ))}
-
-            {isPositionsType &&
-              posSeriesCounts &&
-              POSITION_KEYS.flatMap((pos, pi) =>
-                Array.from({ length: posSeriesCounts[pos] }).map((_, si) => (
-                  <div
-                    key={`${pos}-${si}`}
-                    role="columnheader"
-                    className={`${headerCellCls} justify-end border-b border-[var(--border)] ${si === 0 && pi > 0 ? "border-l" : ""}`}
-                  >
-                    S{si + 1}
-                  </div>
-                ))
-              )}
-
-            {showInners && (
-              <div role="columnheader" className={`${headerCellCls} justify-end border-b border-[var(--border)]`}>×</div>
-            )}
-
-            <div
-              role="columnheader"
-              className="sticky flex items-center justify-end px-4 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--ink)] border-b border-[var(--border)]"
-              style={{ right: REMARK_W, background: "var(--surface-2)", zIndex: 1 }}
-            >
-              Σ
-            </div>
-            <div
-              role="columnheader"
-              className="sticky flex items-center justify-center px-3 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] border-b border-[var(--border)]"
-              style={{ right: 0, background: "var(--surface-2)", zIndex: 1 }}
-            >
-              Nap.
-            </div>
+            <div role="columnheader" className={`${headerCellCls} justify-end`}>#</div>
+            <div role="columnheader" className={headerCellCls}>Strelac</div>
+            <div role="columnheader" className={headerCellCls}>{clubHeaderLabel}</div>
+            <div role="columnheader" className={`${headerCellCls} justify-end`}>Σ</div>
+            <div role="columnheader" className={headerCellCls} aria-hidden="true" />
+            {hasSeriesDetail && <div role="columnheader" className={headerCellCls} aria-hidden="true" />}
           </div>
 
           {/* Body rows */}
           {sorted.map((r, idx) => {
-            const seriesArr =
-              isSeriesType && r.qualDetail
-                ? (r.qualDetail as { series: number[] }).series
-                : null;
-            const posDetail =
-              isPositionsType && r.qualDetail
-                ? (r.qualDetail as PositionsQualDetail)
-                : null;
-
-            const bestSeriesIdx =
-              seriesArr != null
-                ? seriesArr.indexOf(Math.max(...seriesArr))
-                : -1;
-
             const isTopQual = r.qualified === true;
             const isOddRow = idx % 2 === 1;
-            const isLast = idx === sorted.length - 1;
+            const isExpanded = expanded.has(r.id);
+            const isLastRow = idx === sorted.length - 1;
             const rowBg = isOddRow ? "var(--surface)" : "var(--bg)";
-            const cellCls = `px-3 py-2.5 text-sm flex items-center group-hover:bg-[var(--surface-2)] transition-colors ${isLast ? "" : "border-b border-[var(--border)]"}`;
+            const showBottomBorder = !isLastRow || isExpanded;
+            const cellCls = `px-2 py-2.5 text-sm sm:px-3 flex items-center transition-colors ${showBottomBorder ? "border-b border-[var(--border)]" : ""}`;
 
             return (
-              <div key={r.id} role="row" className="group" style={{ display: "contents" }}>
-                {/* Rank */}
-                <div className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums`} style={{ background: rowBg }}>
-                  {r.qualRank != null ? (
-                    <span className={r.qualRank <= 3 ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>
-                      {r.qualRank}
-                    </span>
-                  ) : (
-                    <span className="text-[var(--subtle)]">—</span>
-                  )}
-                </div>
-
-                {/* Name */}
-                <div className={cellCls} style={{ background: rowBg }}>
-                  <span className="inline-flex items-center gap-1.5 flex-wrap">
-                    <Link
-                      href={`/strelci/${r.shooterId}`}
-                      className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
-                    >
-                      {r.name}
-                    </Link>
-                    {r.birthYear != null && (
-                      <span className="text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] tabular-nums translate-y-px">
-                        {r.birthYear}
+              <div key={r.id} role="rowgroup" style={{ display: "contents" }}>
+                <div
+                  role="row"
+                  className="group"
+                  style={{ display: "contents", cursor: hasSeriesDetail ? "pointer" : undefined }}
+                  onClick={hasSeriesDetail ? () => toggleRow(r.id) : undefined}
+                >
+                  {/* Rank */}
+                  <div
+                    className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`}
+                    style={{ background: rowBg }}
+                  >
+                    {r.qualRank != null ? (
+                      <span className={r.qualRank <= 3 ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>
+                        {r.qualRank}
                       </span>
-                    )}
-                  </span>
-                </div>
-
-                {/* Club / NOC */}
-                <div className={cellCls} style={{ background: rowBg }}>
-                  <div className="flex items-center gap-2 min-w-0">
-                    {r.nationality && (() => {
-                      const alpha2 = NOC_LIST.find((n) => n.noc === r.nationality)?.alpha2;
-                      return (
-                        <span className="shrink-0 flex items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">
-                          {alpha2 && (
-                            <span
-                              className={`fi fi-${alpha2.toLowerCase()}`}
-                              style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block", flexShrink: 0 }}
-                            />
-                          )}
-                          {r.nationality}
-                        </span>
-                      );
-                    })()}
-                    {r.clubDisplay && (
-                      <span className="text-[var(--muted)] text-xs truncate">
-                        {r.clubDisplay}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Series values */}
-                {isSeriesType &&
-                  Array.from({ length: seriesCount }).map((_, i) => {
-                    const val = seriesArr?.[i];
-                    const isBest = i === bestSeriesIdx && val != null;
-                    return (
-                      <div
-                        key={i}
-                        className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums ${
-                          isBest ? "text-[var(--ink)] font-semibold" : "text-[var(--muted)]"
-                        } ${groupBoundaries.has(i) ? "border-l" : ""}`}
-                        style={{ background: rowBg }}
-                      >
-                        {val != null ? fmt(val) : <span className="text-[var(--subtle)]">—</span>}
-                      </div>
-                    );
-                  })}
-
-                {/* Position sub-series values */}
-                {isPositionsType &&
-                  posSeriesCounts &&
-                  POSITION_KEYS.flatMap((pos, pi) => {
-                    const posData = posDetail?.[pos];
-                    return Array.from({ length: posSeriesCounts[pos] }).map((_, si) => {
-                      const shots = posData?.series[si];
-                      const val = shots ? shots.reduce((a, b) => a + b, 0) : null;
-                      return (
-                        <div
-                          key={`${pos}-${si}`}
-                          className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums text-[var(--muted)] ${si === 0 && pi > 0 ? "border-l" : ""}`}
-                          style={{ background: rowBg }}
-                        >
-                          {val != null ? fmt(val) : <span className="text-[var(--subtle)]">—</span>}
-                        </div>
-                      );
-                    });
-                  })}
-
-                {/* Inners */}
-                {showInners && (
-                  <div className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]`} style={{ background: rowBg }}>
-                    {r.qualInners != null ? (
-                      <>{r.qualInners}<span className="text-[0.6rem]">×</span></>
                     ) : (
                       <span className="text-[var(--subtle)]">—</span>
                     )}
                   </div>
-                )}
 
-                {/* Total — pinned right on mobile so it stays visible while scrolling series columns */}
-                <div
-                  className={`sticky flex items-center justify-end px-4 py-2.5 font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] ${isLast ? "" : "border-b border-[var(--border)]"}`}
-                  style={{ right: REMARK_W, background: rowBg, zIndex: 1 }}
-                >
-                  {r.qualTotal != null
-                    ? fmt(parseFloat(r.qualTotal))
-                    : <span className="font-normal text-[var(--subtle)]">—</span>}
-                </div>
+                  {/* Name — mobile: last name and first name each fixed to their own
+                      line, so every row is exactly 2 lines regardless of name length
+                      (never lets natural text-wrap decide, which produced 2 or 3
+                      lines inconsistently). Desktop has room to run it all inline. */}
+                  <div className={`${cellCls} min-w-0 group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
+                    <Link
+                      href={`/strelci/${r.shooterId}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex min-w-0 flex-col leading-tight py-0.5 group/name sm:flex-row sm:items-baseline sm:gap-1.5"
+                    >
+                      <span className="min-w-0 truncate font-medium text-[var(--ink)] transition-colors group-hover/name:text-[var(--brand-primary)]">
+                        {r.lastName}
+                      </span>
+                      <span className="flex min-w-0 items-center gap-1.5 truncate text-sm text-[var(--muted)]">
+                        <span className="truncate">{r.firstName}</span>
+                        {r.birthYear != null && (
+                          <span className="shrink-0 text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] tabular-nums">
+                            {r.birthYear}
+                          </span>
+                        )}
+                      </span>
+                    </Link>
+                  </div>
 
-                {/* Remarks: DSQ/DNS/DNF/SO/RPO from result, or Q for top-8 finalists — pinned right */}
-                <div
-                  className={`sticky flex items-center justify-center px-3 py-2.5 ${isLast ? "" : "border-b border-[var(--border)]"}`}
-                  style={{ right: 0, background: rowBg, zIndex: 1 }}
-                >
-                  {r.remark ? (
-                    <RemarkBadge remark={r.remark} className="" />
-                  ) : isTopQual ? (
-                    <QualifiedBadge />
-                  ) : (
-                    <span className="text-[var(--subtle)] text-xs">—</span>
+                  {/* Club / NOC */}
+                  <div className={`${cellCls} group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {r.nationality && (() => {
+                        const noc = displayNoc(r.nationality);
+                        const alpha2 = NOC_LIST.find((n) => n.noc === noc)?.alpha2;
+                        return (
+                          <span className="shrink-0 flex items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">
+                            {alpha2 && (
+                              <span
+                                className={`fi fi-${alpha2.toLowerCase()}`}
+                                style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block", flexShrink: 0 }}
+                              />
+                            )}
+                            {noc}
+                          </span>
+                        );
+                      })()}
+                      {r.clubDisplay && (
+                        <span className="text-[var(--muted)] text-xs truncate">
+                          {r.clubDisplay}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Total — inner tens shown inline, right after the number */}
+                  <div
+                    className={`${cellCls} justify-end gap-1.5 font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`}
+                    style={{ background: rowBg }}
+                  >
+                    {r.qualTotal != null
+                      ? fmt(parseFloat(r.qualTotal))
+                      : <span className="font-normal text-[var(--subtle)]">—</span>}
+                    {showInners && r.qualInners != null && (
+                      <span className="text-xs font-normal text-[var(--muted)]">
+                        {r.qualInners}<span className="text-[0.6rem]">×</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Remark / Q badge — own narrow column, not inline with the total */}
+                  <div className={`${cellCls} justify-center group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
+                    {r.remark ? (
+                      <RemarkBadge remark={r.remark} className="" />
+                    ) : isTopQual ? (
+                      <QualifiedBadge />
+                    ) : null}
+                  </div>
+
+                  {/* Expand chevron — rightmost, not next to rank (reads as a trend arrow there) */}
+                  {hasSeriesDetail && (
+                    <div className={`${cellCls} justify-center group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
+                      <ChevronIcon open={isExpanded} />
+                    </div>
                   )}
                 </div>
+
+                {/* Expanded series detail — compact, labeled groups, spans full width */}
+                <AnimatePresence initial={false}>
+                  {hasSeriesDetail && isExpanded && (
+                    <motion.div
+                      key={`series-${r.id}`}
+                      role="row"
+                      initial={reducedMotion ? false : { height: 0, opacity: 0, y: -4 }}
+                      animate={{ height: "auto", opacity: 1, y: 0 }}
+                      exit={reducedMotion ? undefined : { height: 0, opacity: 0, transition: { duration: 0.18 } }}
+                      transition={{ duration: reducedMotion ? 0 : 0.26, ease: [0.22, 1, 0.36, 1] }}
+                      style={{ gridColumn: "1 / -1", background: rowBg }}
+                      className={`min-h-0 px-3 overflow-hidden ${isLastRow ? "" : "border-b border-[var(--border)]"}`}
+                    >
+                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 py-2">
+                        {buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts).map((g, gi) => (
+                          <div key={gi} className="flex flex-col gap-0.5">
+                            <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
+                              {g.label}
+                            </span>
+                            <div className="flex gap-2 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">
+                              {g.values.map((v, vi) => (
+                                <span
+                                  key={vi}
+                                  className={vi === g.bestIdx ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}
+                                >
+                                  {v != null ? fmt(v) : "—"}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             );
           })}

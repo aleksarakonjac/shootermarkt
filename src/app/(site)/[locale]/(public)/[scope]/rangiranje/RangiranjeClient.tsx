@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { ScopedLink } from "../../components/ScopedLink";
-import { NOC_LIST } from "@/lib/noc-list";
+import { NOC_LIST, displayNoc } from "@/lib/noc-list";
 import {
   trendLabel,
   trendColor,
@@ -118,8 +118,9 @@ function nocAlpha2(noc: string | null): string | null {
   return NOC_LIST.find((n) => n.noc === noc)?.alpha2 ?? null;
 }
 
-function FlagChip({ noc, inline = false }: { noc: string | null; inline?: boolean }) {
-  if (!noc) return <span className="text-[var(--subtle)]">—</span>;
+function FlagChip({ noc: rawNoc, inline = false }: { noc: string | null; inline?: boolean }) {
+  if (!rawNoc) return <span className="text-[var(--subtle)]">—</span>;
+  const noc = displayNoc(rawNoc);
   const a2 = nocAlpha2(noc);
   return (
     <span

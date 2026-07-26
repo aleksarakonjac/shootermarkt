@@ -3,14 +3,14 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
-import { NOC_LIST } from "@/lib/noc-list";
+import { NOC_LIST, displayNoc } from "@/lib/noc-list";
 import { trendLabel, type Trend } from "@/lib/forma";
 import { type ShooterOption } from "@/components/ui/ShooterSearchSelect";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
 function nocAlpha2(noc: string | null | undefined): string | null {
   if (!noc) return null;
-  return NOC_LIST.find((n) => n.noc === noc)?.alpha2 ?? null;
+  return NOC_LIST.find((n) => n.noc === displayNoc(noc))?.alpha2 ?? null;
 }
 
 // ── Inline search input ──────────────────────────────────────────────────────

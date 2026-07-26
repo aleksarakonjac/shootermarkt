@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { NOC_LIST } from "@/lib/noc-list";
+import { NOC_LIST, displayNoc } from "@/lib/noc-list";
 
 export interface ShooterOption {
   id: number;
@@ -30,7 +30,7 @@ interface Props {
 
 function nocAlpha2(noc: string | null | undefined): string | null {
   if (!noc) return null;
-  return NOC_LIST.find((n) => n.noc === noc)?.alpha2 ?? null;
+  return NOC_LIST.find((n) => n.noc === displayNoc(noc))?.alpha2 ?? null;
 }
 
 function FlagChip({ noc }: { noc: string | null | undefined }) {

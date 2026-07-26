@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { ChevronRight, ChevronLeft } from "lucide-react";
@@ -72,6 +72,7 @@ interface Props {
   mixedGroups: MixedTeamGroup[];
   competitionId: number;
   locale: string;
+  competitionLevel?: string;
 }
 
 // ── Fade variants ─────────────────────────────────────────────────────────────
@@ -118,9 +119,57 @@ function eliminationRoundLabel(round: number, locale: string): string {
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
-export function CompetitionResultsClient({ groups, mixedGroups, competitionId, locale }: Props) {
+export function CompetitionResultsClient({ groups, mixedGroups, competitionId, locale, competitionLevel }: Props) {
   const router = useRouter();
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
+  const detailRef = useRef<HTMLDivElement>(null);
+
+  const urlSelection = useMemo<Selection | null>(() => {
+    const params = new URLSearchParams(search);
+    const disciplineCode = params.get("disc");
+    const stage = params.get("stage");
+    if (!disciplineCode || (stage !== "elim" && stage !== "qual" && stage !== "final")) return null;
+
+    const round = Number(params.get("round"));
+    const elimRound = stage === "elim" && Number.isInteger(round) && round > 0 ? round : undefined;
+
+    if (params.get("result") === "mixed") {
+      return mixedGroups.some((group) => group.code === disciplineCode)
+        ? { kind: "mixed", disciplineCode, stage, elimRound }
+        : null;
+    }
+
+    const category = params.get("category") as AgeCategory | null;
+    return category && groups.some((group) => group.code === disciplineCode && group.categories.some((item) => item.category === category))
+      ? { kind: "individual", disciplineCode, category, stage, elimRound }
+      : null;
+  }, [groups, mixedGroups, search]);
+  const [selection, setSelection] = useState<Selection | null>(() => urlSelection);
+
+  useEffect(() => {
+    // Browser Back/Forward changes the URL outside of this component's click handlers.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelection(urlSelection);
+  }, [urlSelection]);
+
+  const setSelectionUrl = useCallback((next: Selection | null, replace = false) => {
+    const params = new URLSearchParams(search);
+    ["result", "disc", "category", "stage", "round"].forEach((key) => params.delete(key));
+
+    if (next) {
+      params.set("result", next.kind);
+      params.set("disc", next.disciplineCode);
+      params.set("stage", next.stage);
+      if (next.kind === "individual") params.set("category", next.category);
+      if (next.stage === "elim" && next.elimRound != null) params.set("round", String(next.elimRound));
+    }
+
+    const href = params.size > 0 ? `${pathname}?${params}` : pathname;
+    if (replace) router.replace(href, { scroll: false });
+    else router.push(href, { scroll: false });
+  }, [pathname, router, search]);
 
   const retry = useCallback(() => router.refresh(), [router]);
 
@@ -137,6 +186,10 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId, l
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [competitionId, retry]);
+
+  useEffect(() => {
+    if (selection) detailRef.current?.scrollIntoView({ block: "start" });
+  }, [selection]);
 
   if (groups.length === 0 && mixedGroups.length === 0) {
     return (
@@ -159,25 +212,35 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId, l
             groups={groups}
             mixedGroups={mixedGroups}
             locale={locale}
-            onSelectIndividual={(code, category, stage, elimRound) =>
-              setSelection({ kind: "individual", disciplineCode: code, category, stage, elimRound })
-            }
-            onSelectMixed={(code) =>
-              setSelection({ kind: "mixed", disciplineCode: code, stage: "qual" })
-            }
+            onSelectIndividual={(code, category, stage, elimRound) => {
+              const next = { kind: "individual" as const, disciplineCode: code, category, stage, elimRound };
+              setSelection(next);
+              setSelectionUrl(next);
+            }}
+            onSelectMixed={(code) => {
+              const next = { kind: "mixed" as const, disciplineCode: code, stage: "qual" as const };
+              setSelection(next);
+              setSelectionUrl(next);
+            }}
           />
         </motion.div>
       ) : (
-        <motion.div key="detail" variants={fadeVariants} initial="hidden" animate="visible" exit="exit">
+        <motion.div ref={detailRef} key="detail" variants={fadeVariants} initial="hidden" animate="visible" exit="exit" className="scroll-mt-24">
           <CompetitionDetail
             groups={groups}
             mixedGroups={mixedGroups}
             selection={selection}
             locale={locale}
-            onBack={() => setSelection(null)}
-            onStageChange={(stage, elimRound) =>
-              setSelection((s) => s ? { ...s, stage: stage as Stage, elimRound } : s)
-            }
+            competitionLevel={competitionLevel}
+            onBack={() => {
+              setSelection(null);
+              setSelectionUrl(null, true);
+            }}
+            onStageChange={(stage, elimRound) => {
+              const next = { ...selection, stage: stage as Stage, elimRound };
+              setSelection(next);
+              setSelectionUrl(next, true);
+            }}
           />
         </motion.div>
       )}
@@ -460,6 +523,7 @@ function CompetitionDetail({
   mixedGroups,
   selection,
   locale,
+  competitionLevel,
   onBack,
   onStageChange,
 }: {
@@ -467,6 +531,7 @@ function CompetitionDetail({
   mixedGroups: MixedTeamGroup[];
   selection: Selection;
   locale: string;
+  competitionLevel?: string;
   onBack: () => void;
   onStageChange: (stage: string, elimRound?: number) => void;
 }) {
@@ -559,7 +624,8 @@ function CompetitionDetail({
     catGroup?.results.map((r) => ({
       id: r.id,
       shooterId: r.shooterId,
-      name: `${r.lastName} ${r.firstName}`,
+      firstName: r.firstName,
+      lastName: r.lastName,
       birthYear: r.birthYear,
       clubDisplay: r.clubName ?? r.clubNocCode ?? "",
       nationality: r.nationality,
@@ -580,7 +646,8 @@ function CompetitionDetail({
       .map((r) => ({
         id: r.id,
         shooterId: r.shooterId,
-        name: `${r.lastName} ${r.firstName}`,
+        firstName: r.firstName,
+        lastName: r.lastName,
         birthYear: r.birthYear,
         clubDisplay: r.clubName ?? r.clubNocCode ?? "",
         nationality: r.nationality,
@@ -603,22 +670,24 @@ function CompetitionDetail({
       .map((r) => ({
         id: r.id,
         shooterId: r.shooterId,
-        name: `${r.lastName} ${r.firstName}`,
+        firstName: r.firstName,
+        lastName: r.lastName,
         birthYear: r.birthYear,
         clubDisplay: r.clubName ?? r.clubNocCode ?? "",
         nationality: r.nationality,
         finalTotal: r.finalTotal,
         finalRank: r.finalRank,
         finalDetail: r.finalDetail,
+        remark: r.finalRemark,
       })) ?? [];
 
   // Build stage toggle options in correct order: Elim → Qual → Final
-  type StageOption = { key: Stage; label: string; badge: React.ReactNode };
+  type StageOption = { key: Stage; label: string; shortLabel: string; badge: React.ReactNode };
   const phaseL = PHASE_LABELS[locale] ?? PHASE_LABELS.en;
   const stageOptions: StageOption[] = [
-    ...(hasElim ? [{ key: "elim" as Stage, label: phaseL.elim, badge: <PhaseBadge label="E" elim={selection.stage === "elim"} /> }] : []),
-    ...(hasQual ? [{ key: "qual" as Stage, label: phaseL.qual, badge: <PhaseBadge label="Q" active={selection.stage === "qual"} /> }] : []),
-    ...(hasFinal ? [{ key: "final" as Stage, label: phaseL.final, badge: <PhaseBadge label="F" accent={selection.stage === "final"} /> }] : []),
+    ...(hasElim ? [{ key: "elim" as Stage, label: phaseL.elim, shortLabel: "Elim.", badge: <PhaseBadge label="E" elim={selection.stage === "elim"} /> }] : []),
+    ...(hasQual ? [{ key: "qual" as Stage, label: phaseL.qual, shortLabel: locale === "en" ? "Qual." : "Kval.", badge: <PhaseBadge label="Q" active={selection.stage === "qual"} /> }] : []),
+    ...(hasFinal ? [{ key: "final" as Stage, label: phaseL.final, shortLabel: phaseL.final, badge: <PhaseBadge label="F" accent={selection.stage === "final"} /> }] : []),
   ];
 
   // If the selected stage no longer applies (e.g. qual hasn't started yet), fall back to a valid one
@@ -662,14 +731,15 @@ function CompetitionDetail({
 
       {/* ── Stage toggle ─────────────────────────────────────────── */}
       {(stageOptions.length > 1 || (effectiveStage === "elim" && elimRounds.length > 1)) && (
-        <div className={`mb-4 inline-flex flex-col items-start ${elimRounds.length > 1 ? "min-h-[5rem]" : ""}`}>
+        <div className={`mb-4 flex w-full flex-col items-start sm:inline-flex sm:w-auto ${elimRounds.length > 1 ? "min-h-[5rem]" : ""}`}>
           {stageOptions.length > 1 && (
-            <div className={`flex items-center gap-0.5 border border-[var(--border)] bg-[var(--surface)] p-1 ${effectiveStage === "elim" && elimRounds.length > 1 ? "rounded-t-lg rounded-br-lg rounded-bl-none" : "rounded-lg"}`}>
+            <div className={`${stageOptions.length === 3 ? "grid-cols-3" : "grid-cols-2"} grid w-full items-center gap-0.5 border border-[var(--border)] bg-[var(--surface)] p-1 sm:flex sm:w-auto ${effectiveStage === "elim" && elimRounds.length > 1 ? "rounded-t-lg rounded-br-lg rounded-bl-none" : "rounded-lg"}`}>
               {stageOptions.map((opt) => (
                 <button
                   key={opt.key}
                   onClick={() => onStageChange(opt.key, opt.key === "elim" ? currentElimRound : undefined)}
-                  className={`relative flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors duration-150 ${
+                  aria-label={opt.label}
+                  className={`relative flex min-w-0 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors duration-150 sm:px-4 ${
                     effectiveStage === opt.key
                       ? "text-[var(--ink)]"
                       : "text-[var(--muted)] hover:text-[var(--ink)]"
@@ -685,7 +755,8 @@ function CompetitionDetail({
                   )}
                   <span className="relative z-10 flex items-center gap-1.5">
                     {opt.badge}
-                    {opt.label}
+                    <span className="sm:hidden">{opt.shortLabel}</span>
+                    <span className="hidden sm:inline">{opt.label}</span>
                   </span>
                 </button>
               ))}
@@ -697,7 +768,11 @@ function CompetitionDetail({
               <motion.div
                 initial={reducedMotion ? false : { opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+                exit={reducedMotion ? undefined : {
+                  opacity: 0,
+                  y: -8,
+                  transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] },
+                }}
                 transition={selectorTransition}
                 className={`${stageOptions.length > 1 ? "-mt-px rounded-br-lg rounded-bl-lg border-t-0" : "rounded-lg"} flex w-fit items-center gap-0.5 border border-[var(--border)] bg-[var(--surface)] p-1`}
               >
@@ -737,7 +812,7 @@ function CompetitionDetail({
             animate={{ opacity: 1, transition: { duration: 0.22 } }}
             exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
-            <CompetitionQualTable results={elimRows} />
+            <CompetitionQualTable results={elimRows} competitionLevel={competitionLevel} />
           </motion.div>
         ) : effectiveStage === "qual" ? (
           <motion.div
@@ -746,7 +821,7 @@ function CompetitionDetail({
             animate={{ opacity: 1, transition: { duration: 0.22 } }}
             exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
-            <CompetitionQualTable results={qualRows} />
+            <CompetitionQualTable results={qualRows} competitionLevel={competitionLevel} />
           </motion.div>
         ) : (
           <motion.div
@@ -755,7 +830,7 @@ function CompetitionDetail({
             animate={{ opacity: 1, transition: { duration: 0.22 } }}
             exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
-            <CompetitionFinalTable results={finalRows} />
+            <CompetitionFinalTable results={finalRows} competitionLevel={competitionLevel} />
           </motion.div>
         )}
       </AnimatePresence>

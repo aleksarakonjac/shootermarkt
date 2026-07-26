@@ -13,7 +13,7 @@ import type { ChartPoint, FormaScore } from "@/components/shooter/FormaChart";
 import { FormaScoreHeading } from "@/components/shooter/FormaScoreHeading";
 import { CareerStats, type CareerStat } from "@/components/shooter/CareerStats";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@/lib/pdf-import/types";
-import { NOC_LIST } from "@/lib/noc-list";
+import { NOC_LIST, displayNoc } from "@/lib/noc-list";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
@@ -204,8 +204,9 @@ export default async function ShooterPage({ params }: Props) {
   });
 
   // ── Country info ─────────────────────────────────────────────────────────────
-  const nocEntry = shooter.nationality
-    ? NOC_LIST.find((n) => n.noc === shooter.nationality)
+  const displayedNoc = displayNoc(shooter.nationality);
+  const nocEntry = displayedNoc
+    ? NOC_LIST.find((n) => n.noc === displayedNoc)
     : null;
 
   return (
@@ -267,7 +268,7 @@ export default async function ShooterPage({ params }: Props) {
                     {nocEntry.alpha2 && (
                       <span className={`fi fi-${nocEntry.alpha2.toLowerCase()} shrink-0`} style={{ fontSize: "0.9em", borderRadius: 2 }} aria-hidden="true" />
                     )}
-                    {shooter.nationality}
+                    {displayedNoc}
                   </dd>
                 </div>
               )}

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Link } from "@/i18n/navigation";
-import { NOC_LIST } from "@/lib/noc-list";
+import { NOC_LIST, displayNoc } from "@/lib/noc-list";
 import { trendLabel, type Trend } from "@/lib/forma";
 import { CATEGORY_LABEL, type AgeCategory } from "@/lib/pdf-import/types";
 import { ShooterSearchSelect, type ShooterOption } from "@/components/ui/ShooterSearchSelect";
@@ -123,7 +123,7 @@ function ShooterHeader({ c, scopedHref }: { c: H2HCandidate | undefined; scopedH
       </div>
     );
   }
-  const a2 = nocAlpha2(c.nationality);
+  const a2 = nocAlpha2(displayNoc(c.nationality));
   return (
     <Link
       href={scopedHref(`/strelci/${c.shooterId}`)}

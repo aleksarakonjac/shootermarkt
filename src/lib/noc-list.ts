@@ -204,10 +204,21 @@ export const NOC_LIST = [
   { noc: "TUV", name: "Tuvalu",              alpha2: "TV" },
   { noc: "VAN", name: "Vanuatu",             alpha2: "VU" },
   // Neutral / historical
-  { noc: "AIN", name: "Neutralni sportisti", alpha2: "" },
+  { noc: "AIN", name: "Neutralni sportisti", alpha2: "AIN" },
   { noc: "SCG", name: "Srbija i Crna Gora",  alpha2: "CS" },
   { noc: "YUG", name: "Jugoslavija",         alpha2: "YU" },
   { noc: "URS", name: "SSSR",                alpha2: "SU" },
 ] as const;
 
 export type NocEntry = (typeof NOC_LIST)[number];
+
+// ISSF neutral-status codes — RUS/BLR athletes compete as AIN (URS is the
+// pre-1992 Soviet code, folded in for old imported results). Display-only:
+// underlying nationality stays RUS/BLR/URS in the DB so admin can still tell
+// Russian and Belarusian shooters apart.
+const NEUTRAL_STATUS_NOCS = new Set(["RUS", "BLR", "URS"]);
+
+export function displayNoc(noc: string | null | undefined): string | null {
+  if (!noc) return noc ?? null;
+  return NEUTRAL_STATUS_NOCS.has(noc) ? "AIN" : noc;
+}

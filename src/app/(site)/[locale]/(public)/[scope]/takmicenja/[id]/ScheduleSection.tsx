@@ -426,7 +426,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
                       key={dk}
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setSelectedDay(dk); }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-sm font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide transition-colors"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-sm text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide transition-colors"
                       style={{
                         background: isSelected ? "var(--ink)" : "var(--surface-2)",
                         color: isSelected ? "var(--surface)" : allPast ? "var(--subtle)" : "var(--muted)",

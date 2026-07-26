@@ -374,7 +374,7 @@ export default async function CompetitionPage({ params }: Props) {
         >
           {t("detail.results")}
         </h2>
-        <CompetitionResultsClient groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} />
+        <CompetitionResultsClient groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} />
       </div>
 
       <RelatedNewsSection type="competition" refId={compId} locale={locale} />

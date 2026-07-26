@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { shooters, clubs, results, competitions, shooterFormaCache } from "@/lib/db/schema";
 import { eq, asc, ilike, or, and, isNotNull, inArray, sql, desc, gte } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { NOC_LIST } from "@/lib/noc-list";
+import { NOC_LIST, displayNoc } from "@/lib/noc-list";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { RANKING_MIN_SAMPLE } from "@/lib/forma";
 import { StrelciFilterBar } from "./StrelciFilterBar";
@@ -545,8 +545,9 @@ export default async function StrelciPage({ params, searchParams }: Props) {
               </thead>
               <tbody>
                 {enrichedData.map((s, index) => {
-                  const alpha2  = s.nationality
-                    ? NOC_LIST.find((n) => n.noc === s.nationality)?.alpha2
+                  const noc = displayNoc(s.nationality);
+                  const alpha2  = noc
+                    ? NOC_LIST.find((n) => n.noc === noc)?.alpha2
                     : undefined;
                   const disc    = getDiscCode(s.apparatus, s.gender);
                   const discSty = disc ? DISC_STYLE[disc] : null;
@@ -590,7 +591,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                               {s.nationality && (
                                 <span className="flex shrink-0 items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-semibold text-[var(--muted)]">
                                   {alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "2px", display: "inline-block" }} />}
-                                  {s.nationality}
+                                  {noc}
                                 </span>
                               )}
                             </span>
@@ -605,7 +606,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                                 />
                               )}
                               <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--muted)]">
-                                {s.nationality}
+                                {noc}
                               </span>
                             </span>
                           )}
