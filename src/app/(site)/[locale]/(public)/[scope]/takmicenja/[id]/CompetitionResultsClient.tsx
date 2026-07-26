@@ -586,7 +586,7 @@ function CompetitionDetail({
         nationality: r.nationality,
         qualTotal: r.elimTotal != null ? String(r.elimTotal) : null,
         qualRank: r.elimRank,
-        qualInners: null,
+        qualInners: r.elimDetail?.inners ?? null,
         // Elimination is a separate performance from qualification — no "Q"
         // (qualified-for-final) badge here, but its own remark now flows
         // through independently instead of being copied from qual.

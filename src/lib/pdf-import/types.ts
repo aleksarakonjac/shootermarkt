@@ -179,6 +179,7 @@ export interface ReviewRow {
   qualified?: boolean | null;
   elimRound?: number | null;
   elimTotal?: number | null;
+  elimInners?: number | null;
   elimRank?: number | null;
   elimSeries?: number[] | null;
   finalTotal?: number | null;

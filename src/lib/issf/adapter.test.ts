@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { searchAthletes } from "./adapter";
+import { fetchElimResultsFromHtml, searchAthletes } from "./adapter";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -19,5 +19,17 @@ describe("searchAthletes", () => {
     await searchAthletes("SRB");
 
     expect(peak).toBe(8);
+  });
+});
+
+describe("fetchElimResultsFromHtml", () => {
+  it("keeps inner tens from an elimination total", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(`
+      <tr><td>1</td><td>12</td><td><a href="/athletes/athlete-1">DOE Jane</a></td><td>SRB</td><td>98</td><td>97</td><td>96</td><td>95</td><td>94</td><td>93</td><td>573-21x</td><td>Q</td></tr>
+    `)));
+
+    await expect(fetchElimResultsFromHtml(1, "R3PW")).resolves.toMatchObject([
+      { total: 573, inners: 21 },
+    ]);
   });
 });

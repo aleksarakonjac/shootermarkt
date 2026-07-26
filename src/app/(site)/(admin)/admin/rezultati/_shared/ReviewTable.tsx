@@ -154,6 +154,7 @@ function EliminationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChan
                     <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ime</th>
                     <th className="px-3 py-2 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
                     {Array.from({ length: seriesCount }, (_, i) => <th key={i} className={`px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] ${isR3PPositions && i % 2 === 0 ? "border-l border-[var(--border)]" : ""}`}>S{i + 1}</th>)}
+                    <th className="px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inner tens</th>
                     <th className="px-3 py-2 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ukupno</th>
                     <th className="px-3 py-2 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">St.</th>
                   </tr>
@@ -167,6 +168,7 @@ function EliminationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChan
                       <td className="px-3 py-2 text-[var(--ink)]">{row.firstName}</td>
                       <td className="px-3 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.teamNoc}</td>
                       {Array.from({ length: seriesCount }, (_, i) => <td key={i} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{row.elimSeries?.[i] != null ? Math.round(row.elimSeries[i]) : "—"}</td>)}
+                      <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{row.elimInners != null ? `${row.elimInners}×` : "—"}</td>
                       <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]">{row.elimTotal != null ? Math.round(row.elimTotal) : "—"}</td>
                       <td className="px-2 py-2 text-center"><ShooterMatchCell row={row} onChange={(patch) => onRowChange(index, patch)} /></td>
                     </tr>

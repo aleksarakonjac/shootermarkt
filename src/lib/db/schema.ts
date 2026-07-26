@@ -204,6 +204,7 @@ export type FinalDetail = ArApFinalDetail | PositionsFinalDetail | BulletinFinal
 // Elimination detail stored per result (R3P-style heats — always integer scores)
 export type ElimDetail = {
   series: number[];
+  inners?: number | null;
 };
 
 // ── Countries ─────────────────────────────────────────────────────────────────

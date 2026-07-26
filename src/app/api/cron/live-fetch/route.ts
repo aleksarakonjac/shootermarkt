@@ -159,6 +159,7 @@ async function processCompetition(
               elimRound: round,
               elimTotal: Math.round(r.total),
               elimRank: r.rank,
+              elimDetail: { series: r.series.map(Math.round), inners: r.inners },
               qualified: r.qualified || null,
               elimRemark: r.remark,
               source: "issf_import",
@@ -225,6 +226,7 @@ async function processCompetition(
           elimRound: sql`excluded.elim_round`,
           elimTotal: sql`excluded.elim_total`,
           elimRank: sql`excluded.elim_rank`,
+          elimDetail: sql`excluded.elim_detail`,
           qualified: sql`coalesce(excluded.qualified, ${results.qualified})`,
           elimRemark: sql`coalesce(excluded.elim_remark, ${results.elimRemark})`,
         },
@@ -342,6 +344,7 @@ async function fetchFromIssf(
             elimRound: round,
             elimTotal: Math.round(r.total),
             elimRank: r.rank,
+            elimDetail: { series: r.series.map(Math.round), inners: r.inners },
             qualified: r.qualified,
             source: "issf_import",
           });

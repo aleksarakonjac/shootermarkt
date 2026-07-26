@@ -196,7 +196,9 @@ export async function POST(req: NextRequest) {
         elimRound: row.elimRound ?? null,
         elimTotal: row.elimTotal != null ? Math.round(row.elimTotal) : null,
         elimRank: row.elimRank ?? null,
-        elimDetail: row.elimSeries ? { series: row.elimSeries.map(Math.round) } : null,
+        elimDetail: row.elimSeries || row.elimInners != null
+          ? { ...(row.elimSeries ? { series: row.elimSeries.map(Math.round) } : { series: [] }), inners: row.elimInners ?? null }
+          : null,
         finalTotal: row.finalTotal?.toString() ?? null,
         finalRank: row.finalRank ?? null,
         finalDetail: row.finalSeries || row.finalShots || row.finalCumulative || row.finalShotsByStage
