@@ -76,121 +76,153 @@ export async function GET(req: NextRequest) {
 
   const counts = await Promise.all(
     [...byComp.entries()].map(async ([competitionId, slots]) => {
-      const { siusId, issfId } = slots[0];
-      const rows: Array<typeof results.$inferInsert> = [];
-
-      if (siusId) {
-        // ── SIUS primary source ─────────────────────────────────────────────
-        const disciplineCodes = [...new Set(slots.map((s) => s.disciplineCode))];
-
-        console.log("[cron] SIUS disciplineCodes:", disciplineCodes);
-        let siusData: Map<string, SiusLiveData> = new Map();
-        try {
-          siusData = await fetchLiveSiusResults(siusId, disciplineCodes);
-          console.log("[cron] SIUS data:", [...siusData.entries()].map(([k, v]) => `${k}: qual=${v.qual.length} elim=${v.elim.length}`));
-        } catch (e) {
-          console.error("[cron] SIUS fetch failed:", e);
-        }
-
-        for (const slot of slots) {
-          const eventData = siusData.get(slot.disciplineCode);
-          if (!eventData) continue;
-
-          if (slot.stage.startsWith("qual") && eventData.qual.length > 0) {
-            for (const r of eventData.qual) {
-              const shooterId = await resolveOrCreateShooter(r, allShooters);
-              if (!shooterId) continue;
-              rows.push({
-                shooterId,
-                competitionId,
-                disciplineId: slot.disciplineId,
-                category: slot.category,
-                qualTotal: r.total.toFixed(1),
-                qualInners: r.inners ?? null,
-                qualRank: r.rank,
-                qualified: null,
-                ...(r.series.length > 0 ? { qualDetail: { series: r.series } } : {}),
-                source: "issf_import",
-              });
-            }
-          }
-
-          if (slot.stage === "elimination") {
-            for (const { round, results: elimResults } of eventData.elim) {
-              for (const r of elimResults) {
-                const shooterId = await resolveOrCreateShooter(r, allShooters);
-                if (!shooterId) continue;
-                rows.push({
-                  shooterId,
-                  competitionId,
-                  disciplineId: slot.disciplineId,
-                  category: slot.category,
-                  elimRound: round,
-                  elimTotal: Math.round(r.total),
-                  elimRank: r.rank,
-                  qualified: null,
-                  source: "issf_import",
-                });
-              }
-            }
-          }
-        }
-
-        // if SIUS returned nothing, fall back to ISSF
-        if (rows.length === 0 && issfId) {
-          await fetchFromIssf(parseInt(issfId), slots, competitionId, allShooters, shooterByIssfId, rows);
-        }
-      } else if (issfId) {
-        // ── ISSF only ───────────────────────────────────────────────────────
-        await fetchFromIssf(parseInt(issfId), slots, competitionId, allShooters, shooterByIssfId, rows);
+      try {
+        return await processCompetition(competitionId, slots, allShooters, shooterByIssfId);
+      } catch (e) {
+        console.error(`[cron] comp ${competitionId} failed:`, e);
+        return 0;
       }
-
-      console.log(`[cron] comp ${competitionId}: ${rows.length} rows to upsert`);
-      if (rows.length === 0) return 0;
-
-      // Qual rows: upsert by (shooter, comp, disc, cat)
-      const qualRows = rows.filter((r) => r.elimRound == null);
-      const elimRowsToInsert = rows.filter((r) => r.elimRound != null);
-
-      if (qualRows.length > 0) {
-        await db
-          .insert(results)
-          .values(qualRows)
-          .onConflictDoUpdate({
-            target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
-            set: {
-              qualTotal: sql`excluded.qual_total`,
-              qualInners: sql`excluded.qual_inners`,
-              qualRank: sql`excluded.qual_rank`,
-              qualified: sql`excluded.qualified`,
-              qualDetail: sql`excluded.qual_detail`,
-            },
-          });
-      }
-
-      // Elim rows: upsert by (shooter, comp, disc, cat) — elim_round stored on the existing row
-      // Each shooter appears in exactly one elim round so this updates the single row.
-      for (const row of elimRowsToInsert) {
-        await db
-          .insert(results)
-          .values(row)
-          .onConflictDoUpdate({
-            target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
-            set: {
-              elimRound: sql`excluded.elim_round`,
-              elimTotal: sql`excluded.elim_total`,
-              elimRank: sql`excluded.elim_rank`,
-            },
-          });
-      }
-
-      return rows.length;
     })
   );
 
   totalUpserted = counts.reduce((a, b) => a + b, 0);
 
   return NextResponse.json({ ok: true, active: activeSlots.length, upserted: totalUpserted });
+}
+
+async function processCompetition(
+  competitionId: number,
+  slots: Array<{ competitionId: number; disciplineId: number; stage: string; category: AgeCategory; issfId: string | null; siusId: string | null; disciplineCode: string }>,
+  allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>,
+  shooterByIssfId: Map<string, number>
+): Promise<number> {
+  const { siusId, issfId } = slots[0];
+  const rows: Array<typeof results.$inferInsert> = [];
+
+  // A discipline/category can have multiple "qual" schedule rows at different
+  // times (e.g. SPW: precizna + brza paljba are separate time slots but share
+  // one combined qual ranking). SIUS already returns that merged qual result
+  // under a single discipline code, so collapse the schedule rows down to one
+  // slot per (discipline, category, stage-kind) before processing — otherwise
+  // we'd push the same merged result twice into one insert batch.
+  const dedupedSlots = [...new Map(
+    slots.map((s) => [`${s.disciplineId}|${s.category}|${s.stage.startsWith("qual") ? "qual" : s.stage}`, s])
+  ).values()];
+
+  if (siusId) {
+    // ── SIUS primary source ─────────────────────────────────────────────
+    const disciplineCodes = [...new Set(dedupedSlots.map((s) => s.disciplineCode))];
+
+    console.log("[cron] SIUS disciplineCodes:", disciplineCodes);
+    let siusData: Map<string, SiusLiveData> = new Map();
+    try {
+      siusData = await fetchLiveSiusResults(siusId, disciplineCodes);
+      console.log("[cron] SIUS data:", [...siusData.entries()].map(([k, v]) => `${k}: qual=${v.qual.length} elim=${v.elim.length}`));
+    } catch (e) {
+      console.error("[cron] SIUS fetch failed:", e);
+    }
+
+    for (const slot of dedupedSlots) {
+      const eventData = siusData.get(slot.disciplineCode);
+      if (!eventData) continue;
+
+      if (slot.stage.startsWith("qual") && eventData.qual.length > 0) {
+        for (const r of eventData.qual) {
+          const shooterId = await resolveOrCreateShooter(r, allShooters);
+          if (!shooterId) continue;
+          rows.push({
+            shooterId,
+            competitionId,
+            disciplineId: slot.disciplineId,
+            category: slot.category,
+            qualTotal: r.total.toFixed(1),
+            qualInners: r.inners ?? null,
+            qualRank: r.rank,
+            qualified: null,
+            ...(r.series.length > 0 ? { qualDetail: { series: r.series } } : {}),
+            source: "issf_import",
+          });
+        }
+      }
+
+      if (slot.stage === "elimination") {
+        for (const { round, results: elimResults } of eventData.elim) {
+          for (const r of elimResults) {
+            const shooterId = await resolveOrCreateShooter(r, allShooters);
+            if (!shooterId) continue;
+            rows.push({
+              shooterId,
+              competitionId,
+              disciplineId: slot.disciplineId,
+              category: slot.category,
+              elimRound: round,
+              elimTotal: Math.round(r.total),
+              elimRank: r.rank,
+              qualified: null,
+              source: "issf_import",
+            });
+          }
+        }
+      }
+    }
+
+    // if SIUS returned nothing, fall back to ISSF
+    if (rows.length === 0 && issfId) {
+      await fetchFromIssf(parseInt(issfId), dedupedSlots, competitionId, allShooters, shooterByIssfId, rows);
+    }
+  } else if (issfId) {
+    // ── ISSF only ───────────────────────────────────────────────────────
+    await fetchFromIssf(parseInt(issfId), dedupedSlots, competitionId, allShooters, shooterByIssfId, rows);
+  }
+
+  // Defensive dedup: a single insert batch can't touch the same
+  // (shooter, comp, disc, cat) conflict target twice — Postgres throws
+  // "ON CONFLICT DO UPDATE command cannot affect row a second time" and
+  // fails the whole batch. Keep the last occurrence per key.
+  const dedupedRows = [...new Map(
+    rows.map((r) => [`${r.shooterId}|${r.competitionId}|${r.disciplineId}|${r.category}`, r])
+  ).values()];
+
+  console.log(`[cron] comp ${competitionId}: ${rows.length} rows fetched, ${dedupedRows.length} after dedup`);
+  if (dedupedRows.length === 0) return 0;
+
+  // Qual rows: upsert by (shooter, comp, disc, cat)
+  const qualRows = dedupedRows.filter((r) => r.elimRound == null);
+  const elimRowsToInsert = dedupedRows.filter((r) => r.elimRound != null);
+
+  if (qualRows.length > 0) {
+    await db
+      .insert(results)
+      .values(qualRows)
+      .onConflictDoUpdate({
+        target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
+        set: {
+          qualTotal: sql`excluded.qual_total`,
+          qualInners: sql`excluded.qual_inners`,
+          qualRank: sql`excluded.qual_rank`,
+          qualified: sql`excluded.qualified`,
+          qualDetail: sql`excluded.qual_detail`,
+        },
+      });
+  }
+
+  // Elim rows: upsert by (shooter, comp, disc, cat) — elim_round stored on the existing row
+  // Each shooter appears in exactly one elim round so this updates the single row.
+  for (const row of elimRowsToInsert) {
+    await db
+      .insert(results)
+      .values(row)
+      .onConflictDoUpdate({
+        target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
+        set: {
+          elimRound: sql`excluded.elim_round`,
+          elimTotal: sql`excluded.elim_total`,
+          elimRank: sql`excluded.elim_rank`,
+        },
+      });
+  }
+
+  return dedupedRows.length;
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
