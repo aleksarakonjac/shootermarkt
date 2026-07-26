@@ -34,10 +34,16 @@ export async function POST(req: NextRequest) {
   if (isNaN(competitionId)) {
     return NextResponse.json({ error: "competitionId required" }, { status: 400 });
   }
+  const disciplineCodes: string[] | undefined = body.disciplineCodes;
+  const codeFilter = disciplineCodes?.length ? new Set(disciplineCodes) : null;
 
   const groups = await fetchCompetitionResults(competitionId);
-  const mvpEvents = extractMvpEvents(groups);
-  const mixedEvents = extractMixedTeamEvents(groups);
+  let mvpEvents = extractMvpEvents(groups);
+  let mixedEvents = extractMixedTeamEvents(groups);
+  if (codeFilter) {
+    mvpEvents = mvpEvents.filter((e) => codeFilter.has(e.disciplineCode));
+    mixedEvents = mixedEvents.filter((e) => codeFilter.has(e.disciplineCode));
+  }
 
   if (mvpEvents.length === 0 && mixedEvents.length === 0) {
     return NextResponse.json(

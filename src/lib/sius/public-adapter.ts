@@ -196,27 +196,29 @@ export async function fetchLiveSiusResults(
 
       const data: SiusLiveData = { qual: [], elim: [], final: [] };
 
-      // Fetch ALL qual sub-events and merge (R3P has multiple relays)
-      for (const sub of qualSubs) {
-        try {
-          const r = await fetchSiusSeries(compUuid, event.runningId, sub.runningId);
-          data.qual.push(...r);
-        } catch { /* ignore */ }
-      }
+      // Fetch ALL qual sub-events in parallel and merge (R3P has multiple relays)
+      const qualResults = await Promise.all(
+        qualSubs.map((sub) =>
+          fetchSiusSeries(compUuid, event.runningId, sub.runningId).catch(() => [])
+        )
+      );
+      data.qual.push(...qualResults.flat());
       // Re-rank merged qual by total desc
       if (qualSubs.length > 1 && data.qual.length > 0) {
         data.qual.sort((a, b) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0));
         data.qual.forEach((r, i) => { r.rank = i + 1; });
       }
 
-      // Elimination rounds (one per sub-event, ordered by round number)
-      let elimFallbackIdx = 1;
-      for (const sub of elimSubs) {
-        const rnd = elimRoundNumber(sub.name, elimFallbackIdx++);
-        try {
-          const r = await fetchSiusSeries(compUuid, event.runningId, sub.runningId);
-          if (r.length > 0) data.elim.push({ round: rnd, results: r });
-        } catch { /* ignore */ }
+      // Elimination rounds (one per sub-event, ordered by round number), fetched in parallel
+      const elimResults = await Promise.all(
+        elimSubs.map((sub, i) =>
+          fetchSiusSeries(compUuid, event.runningId, sub.runningId)
+            .then((r) => ({ round: elimRoundNumber(sub.name, i + 1), results: r }))
+            .catch(() => ({ round: elimRoundNumber(sub.name, i + 1), results: [] as SiusLiveResult[] }))
+        )
+      );
+      for (const er of elimResults) {
+        if (er.results.length > 0) data.elim.push(er);
       }
 
       // Final sub-event

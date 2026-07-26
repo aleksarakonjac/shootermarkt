@@ -1,10 +1,12 @@
 import { db } from "@/lib/db";
 import { competitions, disciplines, countries } from "@/lib/db/schema";
-import { gte, asc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import type { Metadata } from "next";
 import { ISSFScheduleImportClient } from "./schedule-client";
 
 export const metadata: Metadata = { title: "Admin · ISSF Satnica" };
+
+const ISSF_LEVELS = ["world", "olympic", "continental"] as const;
 
 export default async function ISSFScheduleImportPage() {
   const today = new Date().toISOString().split("T")[0];
@@ -15,17 +17,28 @@ export default async function ISSFScheduleImportPage() {
       name: competitions.name,
       date: competitions.date,
       dateEnd: competitions.dateEnd,
+      location: competitions.location,
       nocCode: countries.nocCode,
     })
       .from(competitions)
       .leftJoin(countries, eq(competitions.countryId, countries.id))
-      .where(gte(competitions.date, today))
-      .orderBy(asc(competitions.date)),
+      .where(inArray(competitions.level, ISSF_LEVELS))
+      .orderBy(desc(competitions.date)),
 
     db.select({ id: disciplines.id, code: disciplines.code, name: disciplines.name })
       .from(disciplines)
       .orderBy(disciplines.code),
   ]);
+
+  // Featured = current (spans today) + next 3 upcoming + last 3 finished, closest first.
+  const current = comps.filter((c) => c.date <= today && (c.dateEnd ?? c.date) >= today);
+  const upcoming = comps.filter((c) => c.date > today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
+  const past = comps.filter((c) => (c.dateEnd ?? c.date) < today).slice(0, 3); // already date-desc from query
+  const featured = [
+    ...current.map((c) => ({ ...c, status: "current" as const })),
+    ...upcoming.map((c) => ({ ...c, status: "upcoming" as const })),
+    ...past.map((c) => ({ ...c, status: "past" as const })),
+  ];
 
   return (
     <div className="max-w-5xl">
@@ -35,7 +48,7 @@ export default async function ISSFScheduleImportPage() {
           Preuzmi satnicu sa ISSF sajta i importuj u bazu radi popunjavanja tickera
         </p>
       </div>
-      <ISSFScheduleImportClient competitions={comps} disciplines={discs} />
+      <ISSFScheduleImportClient competitions={comps} featured={featured} disciplines={discs} />
     </div>
   );
 }

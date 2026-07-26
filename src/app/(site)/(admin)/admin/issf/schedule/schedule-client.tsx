@@ -4,13 +4,21 @@ import { useState, useTransition, useId } from "react";
 import type { ISSFScheduleEntry } from "@/lib/issf/adapter";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 
-interface CompOption { id: number; name: string; date: string; dateEnd: string | null; nocCode: string | null; }
+interface CompOption { id: number; name: string; date: string; dateEnd: string | null; location: string | null; nocCode: string | null; }
+interface FeaturedComp extends CompOption { status: "current" | "upcoming" | "past"; }
 interface DiscOption  { id: number; code: string; name: string; }
 
 interface Props {
   competitions: CompOption[];
+  featured: FeaturedComp[];
   disciplines:  DiscOption[];
 }
+
+const FEATURED_LABEL: Record<FeaturedComp["status"], string> = {
+  current:  "🔴 Tekuće",
+  upcoming: "🔜 Uskoro",
+  past:     "✅ Skoro završeno",
+};
 
 const STAGE_LABEL: Record<string, string> = {
   qual:        "Kval",
@@ -36,7 +44,7 @@ function extractIssfId(input: string): number | null {
   return numMatch ? parseInt(numMatch[0]) : null;
 }
 
-export function ISSFScheduleImportClient({ competitions, disciplines }: Props) {
+export function ISSFScheduleImportClient({ competitions, featured, disciplines }: Props) {
   const uid = useId();
   const [issfInput,  setIssfInput]  = useState("");
   const [year,       setYear]       = useState(new Date().getFullYear());
@@ -149,6 +157,33 @@ export function ISSFScheduleImportClient({ competitions, disciplines }: Props) {
         </div>
 
         <div>
+          <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">
+            Izdvojena takmičenja
+          </label>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {featured.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setDbCompId(c.id)}
+                className={`text-left px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
+                  dbCompId === c.id
+                    ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/10"
+                    : "border-[var(--border)] bg-[var(--surface-2)] hover:bg-[var(--surface-2)]/70"
+                }`}
+              >
+                <span className="text-[var(--muted)] mr-1.5">{FEATURED_LABEL[c.status]}</span>
+                <span className="text-[var(--ink)] font-medium">{c.name}</span>
+                <span className="text-[var(--subtle)] ml-1.5">
+                  {c.date}{c.location ? ` · ${c.location}` : ""}
+                </span>
+              </button>
+            ))}
+            {featured.length === 0 && (
+              <p className="text-xs text-[var(--subtle)]">Nema tekućih, uskoro ili nedavno završenih takmičenja.</p>
+            )}
+          </div>
+
           <label htmlFor={`${uid}-comp`} className="block text-xs font-medium text-[var(--muted)] mb-1">
             Takmičenje u bazi (za koje se importuje satnica)
           </label>
@@ -159,9 +194,10 @@ export function ISSFScheduleImportClient({ competitions, disciplines }: Props) {
             options={competitions.map((competition) => ({
               value: String(competition.id),
               label: competition.name,
-              sublabel: competition.dateEnd
-                ? `${competition.date} – ${competition.dateEnd}`
-                : competition.date,
+              sublabel: [
+                competition.dateEnd ? `${competition.date} – ${competition.dateEnd}` : competition.date,
+                competition.location,
+              ].filter(Boolean).join(" · "),
             }))}
             placeholder="— Izaberi takmičenje —"
             emptyLabel="— Izaberi takmičenje —"
