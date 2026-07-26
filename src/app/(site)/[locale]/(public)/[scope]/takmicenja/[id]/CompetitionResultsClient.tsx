@@ -470,7 +470,7 @@ function PhaseBadge({
   if (elim) {
     return (
       <span
-        className="inline-flex items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)]"
+        className="inline-flex w-6 justify-center items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)]"
         style={{
           background: "color-mix(in oklch, oklch(0.65 0.15 30) 12%, transparent)",
           color: "oklch(0.55 0.15 30)",
@@ -484,7 +484,7 @@ function PhaseBadge({
   if (accent) {
     return (
       <span
-        className="inline-flex items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)]"
+        className="inline-flex w-6 justify-center items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)]"
         style={{
           background: "color-mix(in oklch, var(--brand-accent) 12%, transparent)",
           color: "var(--brand-accent)",
@@ -498,7 +498,7 @@ function PhaseBadge({
   if (active) {
     return (
       <span
-        className="inline-flex items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)]"
+        className="inline-flex w-6 justify-center items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)]"
         style={{
           background: "color-mix(in oklch, var(--success) 12%, transparent)",
           color: "var(--success)",
@@ -510,7 +510,7 @@ function PhaseBadge({
     );
   }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] bg-[var(--surface-2)] text-[var(--subtle)] border border-[var(--border)]">
+    <span className="inline-flex w-6 justify-center items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] bg-[var(--surface-2)] text-[var(--subtle)] border border-[var(--border)]">
       {label}
     </span>
   );
