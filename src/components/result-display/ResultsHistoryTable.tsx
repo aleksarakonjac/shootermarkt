@@ -20,6 +20,9 @@ export type ResultRowData = {
   finalRank: number | null;
   competitionName: string;
   competitionDate: string;
+  competitionLocation: string | null;
+  competitionCountry: string | null;
+  competitionCountryCode2: string | null;
   disciplineCode: string;
   category?: string | null;
   qualDetail: QualDetail | null;
@@ -79,20 +82,14 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
         <table className="w-full table-fixed text-xs sm:text-sm">
           <thead>
             <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-              <th className="w-[42%] px-2 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
+              <th className="w-[40%] px-2 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Competition" : "Takmičenje"}
-              </th>
-              <th className="hidden px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:table-cell">
-                {locale === "en" ? "Date" : "Datum"}
               </th>
               <th className="w-[15%] px-1 py-2.5 text-left text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Disc." : "Disc."}
               </th>
-              <th className="w-[22%] px-1 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
+              <th className="w-[24%] px-1 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Qual." : "Kval."}
-              </th>
-              <th className="hidden px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:table-cell">
-                {locale === "en" ? "Rank" : "Rang"}
               </th>
               <th className="w-[21%] px-1 py-2.5 text-right text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-4 sm:py-3 sm:text-[0.7rem]">
                 {locale === "en" ? "Final" : "Finale"}
@@ -123,9 +120,13 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                   >
                     <td className="px-2 py-2.5 font-medium text-[var(--ink)] sm:px-4 sm:py-3">
                       <span className="block break-words leading-snug">{r.competitionName}</span>
-                    </td>
-                    <td className="hidden px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] sm:table-cell">
-                      {r.competitionDate.split("-").reverse().join(".")}
+                      <span className="block font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-normal text-[var(--subtle)] mt-0.5 sm:text-xs">
+                        {r.competitionDate.split("-").reverse().join(".")}
+                        {r.competitionLocation && ` · ${r.competitionLocation}`}
+                        {r.competitionCountry && " · "}
+                        {r.competitionCountryCode2 && <span className={`fi fi-${r.competitionCountryCode2.toLowerCase()} inline-block mx-1`} style={{ width: "14px", height: "10px", borderRadius: "1px" }} />}
+                        {r.competitionCountry}
+                      </span>
                     </td>
                     <td className="px-1 py-2.5 sm:px-4 sm:py-3">
                       <span className="inline-flex items-center gap-1.5">
@@ -139,24 +140,17 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                         )}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-1 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] sm:px-4 sm:py-3">
+                    <td className="whitespace-nowrap px-1 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] sm:px-4 sm:py-3">
                       {r.qualTotal != null ? (
                         <>
-                          {fmt(r.qualTotal)}
+                          <span className="font-semibold text-[var(--ink)]">{fmt(r.qualTotal)}</span>
                           {r.qualInners != null && (
                             <span className="ml-0.5 text-[0.65rem] text-[var(--muted)] sm:ml-1 sm:text-xs">{r.qualInners}×</span>
                           )}
+                          {r.qualRank != null && (
+                            <span className="block text-[0.65rem] text-[var(--subtle)] sm:text-xs">#{r.qualRank}</span>
+                          )}
                         </>
-                      ) : (
-                        <span className="text-[var(--subtle)]">—</span>
-                      )}
-                    </td>
-                    <td className="hidden px-4 py-3 text-right text-[var(--muted)] sm:table-cell">
-                      {r.qualRank != null ? (
-                        <span>
-                          <span className="text-[var(--subtle)] text-xs">#</span>
-                          {r.qualRank}
-                        </span>
                       ) : (
                         <span className="text-[var(--subtle)]">—</span>
                       )}
@@ -178,7 +172,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                   </tr>
 
                   <tr aria-hidden={!isExpanded}>
-                    <td colSpan={6} className="p-0">
+                    <td colSpan={4} className="p-0">
                       <div
                         className={`grid transition-[grid-template-rows] duration-200 ease-out ${
                           isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"

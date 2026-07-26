@@ -1,5 +1,3 @@
-"use client";
-
 import { Link } from "@/i18n/navigation";
 import type { FinalDetail } from "@/lib/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
@@ -8,6 +6,7 @@ export type FinalResultRow = {
   id: number;
   shooterId: number;
   name: string;
+  birthYear: number | null;
   clubDisplay: string;
   nationality: string | null;
   finalTotal: string | null;
@@ -108,6 +107,16 @@ function buildColumns(rows: FinalResultRow[]): Column[] {
   return cols;
 }
 
+// Fixed pixel widths — see CompetitionQualTable for why CSS Grid (not a real
+// <table>) is required for sticky columns to actually stick.
+const RANK_W = "48px";
+const NAME_W = "minmax(150px, 1fr)";
+const CLUB_W = "minmax(90px, 150px)";
+const SERIES_W = "60px";
+const TOTAL_W = "96px";
+
+const headerCellCls = "px-3 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center bg-[var(--surface)] border-b border-[var(--border)]";
+
 export function CompetitionFinalTable({ results }: Props) {
   const sorted = [...results]
     .filter((r) => r.finalRank != null || r.finalTotal != null)
@@ -129,65 +138,68 @@ export function CompetitionFinalTable({ results }: Props) {
   const isHitCountFinal = sorted.some((result) => result.finalDetail?.format === "bulletin" && result.finalDetail.scoring === "hit_count");
   const columns = buildColumns(sorted);
 
+  const gridTemplateColumns = [RANK_W, NAME_W, CLUB_W, `repeat(${columns.length}, ${SERIES_W})`, TOTAL_W].join(" ");
+  const totalCols = 3 + columns.length + 1;
+
   return (
     <div className="rounded-xl border border-[var(--border)] overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse" style={{ minWidth: `${360 + columns.length * 60}px` }}>
-          <thead>
-            <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-              <th className="px-3 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] w-12">
-                #
-              </th>
-              <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Strelac
-              </th>
-              <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                Klub / NOC
-              </th>
-              {columns.map((col, i) => (
-                <th
-                  key={i}
-                  className="px-3 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]"
-                  style={{ minWidth: "56px" }}
-                >
-                  {col.header}
-                </th>
-              ))}
-              <th className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--ink)] w-24">
-                {isHitCountFinal ? "Pogoci" : "Final Σ"}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((r) => (
-              <tr key={r.id} className="border-b border-[var(--border)] last:border-b-0 transition-colors hover:bg-[var(--surface-2)]">
+        <div role="table" className="text-sm grid" style={{ gridTemplateColumns, minWidth: `${totalCols * 56 + 60}px` }}>
+          <div role="row" style={{ display: "contents" }}>
+            <div role="columnheader" className={`${headerCellCls} justify-center`}>#</div>
+            <div role="columnheader" className={headerCellCls}>Strelac</div>
+            <div role="columnheader" className={headerCellCls}>Klub / NOC</div>
+            {columns.map((col, i) => (
+              <div key={i} role="columnheader" className={`${headerCellCls} justify-end`}>
+                {col.header}
+              </div>
+            ))}
+            <div
+              role="columnheader"
+              className="sticky flex items-center justify-end px-4 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--ink)] border-b border-[var(--border)]"
+              style={{ right: 0, background: "var(--surface)", zIndex: 1 }}
+            >
+              {isHitCountFinal ? "Pogoci" : "Final Σ"}
+            </div>
+          </div>
+
+          {sorted.map((r, idx) => {
+            const isLast = idx === sorted.length - 1;
+            const cellCls = `px-3 py-2.5 text-sm flex items-center hover:bg-[var(--surface-2)] transition-colors ${isLast ? "" : "border-b border-[var(--border)]"}`;
+            return (
+              <div key={r.id} role="row" style={{ display: "contents" }}>
                 {/* Rank */}
-                <td className="px-3 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums">
+                <div className={`${cellCls} justify-center font-[family-name:var(--font-jetbrains-mono)] tabular-nums`}>
                   {r.finalRank != null ? (
                     MEDAL_COLOR[r.finalRank] ? (
-                      <span className="inline-flex justify-end">
-                        <MedalIcon rank={r.finalRank} />
-                      </span>
+                      <MedalIcon rank={r.finalRank} />
                     ) : (
                       <span className="text-[var(--muted)]">{r.finalRank}</span>
                     )
                   ) : (
                     <span className="text-[var(--subtle)]">—</span>
                   )}
-                </td>
+                </div>
 
                 {/* Name */}
-                <td className="px-4 py-2.5">
-                  <Link
-                    href={`/strelci/${r.shooterId}`}
-                    className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
-                  >
-                    {r.name}
-                  </Link>
-                </td>
+                <div className={cellCls}>
+                  <span className="inline-flex items-center gap-1.5 flex-wrap">
+                    <Link
+                      href={`/strelci/${r.shooterId}`}
+                      className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
+                    >
+                      {r.name}
+                    </Link>
+                    {r.birthYear != null && (
+                      <span className="text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] tabular-nums translate-y-px">
+                        {r.birthYear}
+                      </span>
+                    )}
+                  </span>
+                </div>
 
                 {/* Club / NOC */}
-                <td className="px-4 py-2.5">
+                <div className={cellCls}>
                   <div className="flex items-center gap-2 min-w-0">
                     {r.nationality && (() => {
                       const alpha2 = NOC_LIST.find((n) => n.noc === r.nationality)?.alpha2;
@@ -209,28 +221,31 @@ export function CompetitionFinalTable({ results }: Props) {
                       </span>
                     )}
                   </div>
-                </td>
+                </div>
 
                 {/* Series columns */}
                 {columns.map((col, i) => {
                   const val = col.getValue(r);
                   return (
-                    <td key={i} className="px-3 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]">
+                    <div key={i} className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums text-[var(--muted)]`}>
                       {val != null ? col.fmt(val) : <span className="text-[var(--subtle)]">—</span>}
-                    </td>
+                    </div>
                   );
                 })}
 
-                {/* Final total */}
-                <td className="px-4 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)]">
+                {/* Final total — pinned right on mobile so it stays visible while scrolling series columns */}
+                <div
+                  className={`sticky flex items-center justify-end px-4 py-2.5 font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] ${isLast ? "" : "border-b border-[var(--border)]"}`}
+                  style={{ right: 0, background: "var(--bg)", zIndex: 1 }}
+                >
                   {r.finalTotal ?? (
                     <span className="font-normal text-[var(--subtle)]">—</span>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

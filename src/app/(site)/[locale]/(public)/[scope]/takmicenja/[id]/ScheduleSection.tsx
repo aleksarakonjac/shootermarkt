@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, Fragment } from "react";
 import { getTickerSlotEnd } from "@/lib/ticker-schedule";
 
 export type ScheduleSlot = {
@@ -38,18 +38,6 @@ const STAGE_LABELS: Record<string, Record<string, string>> = {
 const CATEGORY_SHORT: Record<string, Record<string, string>> = {
   sr: { junior: "Jun.", youth: "Om.", cadet: "Kad." },
   en: { junior: "Jun.", youth: "Yth.", cadet: "Cad." },
-};
-
-const DISCIPLINE_NAMES: Record<string, { sr: string; en: string }> = {
-  ARM:  { sr: "Vazdušna puška M",  en: "Air rifle M" },
-  ARW:  { sr: "Vazdušna puška Ž",  en: "Air rifle W" },
-  APM:  { sr: "Vazdušni pištolj M", en: "Air pistol M" },
-  APW:  { sr: "Vazdušni pištolj Ž", en: "Air pistol W" },
-  R3PM: { sr: "3×20 puška M",       en: "3×20 rifle M" },
-  R3PW: { sr: "3×20 puška Ž",       en: "3×20 rifle W" },
-  APMT: { sr: "10m pištolj miks",   en: "10m pistol mixed" },
-  ARMT: { sr: "10m puška miks",     en: "10m rifle mixed" },
-  SPW:  { sr: "Sport pištolj Ž",    en: "Sport pistol W" },
 };
 
 function fmtCountdown(ms: number, locale: string): string {
@@ -175,6 +163,8 @@ function pickDefaultDay(dateKeys: string[], byDate: Map<string, ScheduleSlot[]>,
 export function ScheduleSection({ slots, locale, timezone }: Props) {
   const [now, setNow] = useState<Date>(() => new Date());
   const contentRef = useRef<HTMLDivElement>(null);
+  const previewInnerRef = useRef<HTMLDivElement>(null);
+  const [wrapHeight, setWrapHeight] = useState<number | "auto">("auto");
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
@@ -212,6 +202,22 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
     if (hasLive) setOpen(true);
   }, [hasLive]);
 
+  // Measure whichever panel (preview or full schedule) is currently visible
+  // so the wrapper animates height to it directly, instead of two competing
+  // grid-row transitions fighting over layout.
+  useLayoutEffect(() => {
+    const el = open ? contentRef.current : previewInnerRef.current;
+    if (!el) return;
+    // offsetTop + offsetHeight (not scrollHeight) so the element's own
+    // margin-top (e.g. contentRef's mt-3) is counted — otherwise the wrap
+    // is measured a few px short and clips the last row's bottom line.
+    const update = () => setWrapHeight(el.offsetTop + el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open]);
+
   const lang = STAGE_LABELS[locale] ?? STAGE_LABELS.en;
   const catShort = CATEGORY_SHORT[locale] ?? CATEGORY_SHORT.en;
   const liveCount = slots.filter((s) => slotStatus(s, now) === "active").length;
@@ -226,11 +232,70 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
           return st === "imminent" || st === "upcoming" || st === "future";
         })
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0] ?? null;
-  const liveHint = activeSlot ?? nextSlot;
-  const liveHintIsNext = !activeSlot && !!nextSlot;
   const isImminent = !activeSlot && !!nextSlot && slotStatus(nextSlot, now) === "imminent";
 
   const visibleDays = usePills ? [selectedDay] : dateKeys;
+
+  // Collapsed preview: next 2-3 upcoming slots across all days (spills into the
+  // next day once today runs out); only falls back to past slots when the
+  // whole competition is over and there's nothing upcoming left at all.
+  const allByTime = slots.slice().sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  const upcoming = allByTime.filter((s) => slotStatus(s, now) !== "past");
+  const previewSlots = upcoming.length > 0 ? upcoming.slice(0, 3) : allByTime.slice(-3);
+  const previewDayKey = previewSlots.length > 0 ? localDateKey(previewSlots[0].startTime, timezone) : null;
+
+  const renderSlotRow = (slot: ScheduleSlot) => {
+    const st = slotStatus(slot, now);
+    const stageLabel = lang[slot.stage] ?? slot.stage;
+    const catLabel = slot.category !== "senior" ? catShort[slot.category] ?? slot.category : null;
+
+    return (
+      <tr key={slot.id} style={{ opacity: st === "past" ? 0.45 : 1 }}>
+        <td className="w-5 py-1 pr-2 align-middle">
+          <span className="flex items-center justify-center w-4">
+            {st === "active" ? (
+              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }} />
+            ) : st === "imminent" ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }} />
+            ) : st === "upcoming" ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--ink)] shrink-0" />
+            ) : st === "past" ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--subtle)] shrink-0" />
+            ) : (
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--border-strong)] shrink-0" />
+            )}
+          </span>
+        </td>
+        <td className="py-1 pr-4 align-top whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">
+          <div className="flex items-baseline gap-1 text-[var(--ink)]">
+            {fmtTime(slot.startTime)}
+            {slot.endTime && (
+              <span className="text-[var(--subtle)]">– {fmtTime(slot.endTime)}</span>
+            )}
+          </div>
+          {showDualTime && (
+            <div className="flex items-baseline gap-1 text-[0.68rem] text-[var(--subtle)] leading-tight mt-0.5">
+              {fmtTime(slot.startTime, timezone)}
+              {slot.endTime && <span>– {fmtTime(slot.endTime, timezone)}</span>}
+              <span className="opacity-70">{tzDiff(slot.startTime, timezone)}</span>
+            </div>
+          )}
+        </td>
+        <td className="py-1 pr-4 align-middle whitespace-nowrap font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[var(--ink)] tracking-wide">
+          {slot.disciplineCode}
+        </td>
+        <td className="py-1 align-middle text-[var(--muted)] text-xs">
+          {stageLabel}
+          {catLabel && <span className="ml-1.5 text-[var(--subtle)]">{catLabel}</span>}
+          {st === "imminent" && (() => {
+            const ms = new Date(slot.startTime).getTime() - now.getTime();
+            const cd = fmtCountdown(ms, locale);
+            return cd ? <span className="text-[var(--subtle)] ml-1.5">· {cd}</span> : null;
+          })()}
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <section className="mb-8">
@@ -285,46 +350,67 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
             </span>
           )}
         </div>
-
-        {liveHint && (
-          <span className="text-xs font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] translate-y-px">
-            {liveHintIsNext && !isImminent && (
-              <span className="text-[var(--subtle)] mr-1">
-                {locale === "sr" ? "Sledeće:" : "Next:"}
-              </span>
-            )}
-            {liveHintIsNext && isImminent && (
-              <span className="text-[var(--subtle)] mr-1">
-                {locale === "sr" ? "Uskoro:" : "Soon:"}
-              </span>
-            )}
-            <span className="font-bold text-[var(--ink)]">{liveHint.disciplineCode}</span>
-            {" "}
-            <span className="text-[var(--muted)]">
-              {(DISCIPLINE_NAMES[liveHint.disciplineCode]?.[locale as "sr" | "en"] ?? DISCIPLINE_NAMES[liveHint.disciplineCode]?.en)}
-            </span>
-            {" · "}
-            {lang[liveHint.stage] ?? liveHint.stage}
-            {liveHintIsNext && (() => {
-              const ms = new Date(liveHint.startTime).getTime() - now.getTime();
-              const cd = fmtCountdown(ms, locale);
-              return cd ? <span className="text-[var(--subtle)] ml-1">· {cd}</span> : null;
-            })()}
-          </span>
-        )}
-
       </button>
 
-      {/* Collapsible body */}
+      {/* Preview and full schedule occupy the same box and cross-fade;
+          the wrapper's measured height is the only thing that animates,
+          so the two states can't fight each other into a lopsided grow. */}
       <div
+        className="schedule-anim-wrap"
         style={{
-          display: "grid",
-          gridTemplateRows: open ? "1fr" : "0fr",
-          transition: "grid-template-rows 220ms ease",
+          position: "relative",
+          overflow: "hidden",
+          height: wrapHeight,
+          transition: "height 240ms cubic-bezier(0.33, 1, 0.68, 1)",
         }}
       >
-        <div ref={contentRef} style={{ overflow: "hidden", minHeight: 0 }}>
-          <div className="pt-4 border-t border-[var(--border)] mt-3">
+        {previewSlots.length > 0 && (
+          <div
+            ref={previewInnerRef}
+            className="pt-3"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              opacity: open ? 0 : 1,
+              transition: "opacity 140ms ease",
+              pointerEvents: open ? "none" : "auto",
+            }}
+          >
+            {dateKeys.length > 1 && previewDayKey && (
+              <div className="mb-2 text-sm font-bold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--muted)]">
+                {previewDayKey === todayKey()
+                  ? (locale === "sr" ? "Danas" : "Today")
+                  : fmtPillDate(previewDayKey, locale)}
+              </div>
+            )}
+            <table className="border-collapse text-sm">
+              <tbody>{previewSlots.map(renderSlotRow)}</tbody>
+            </table>
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="mt-2 text-[0.68rem] font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--subtle)] hover:text-[var(--muted)] transition-colors"
+            >
+              {locale === "sr" ? "Ceo raspored →" : "Full schedule →"}
+            </button>
+          </div>
+        )}
+
+        <div
+          ref={contentRef}
+          className="pt-4 border-t border-[var(--border)] mt-3"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            opacity: open ? 1 : 0,
+            transition: open ? "opacity 200ms ease 80ms" : "opacity 100ms ease",
+            pointerEvents: open ? "auto" : "none",
+          }}
+        >
 
             {/* Day selector pills */}
             {usePills && (
@@ -340,7 +426,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
                       key={dk}
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setSelectedDay(dk); }}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-sm font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide transition-colors"
                       style={{
                         background: isSelected ? "var(--ink)" : "var(--surface-2)",
                         color: isSelected ? "var(--surface)" : allPast ? "var(--subtle)" : "var(--muted)",
@@ -375,58 +461,11 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
                         </td>
                       </tr>
                     )}
-                    {byDate.get(dk)?.map((slot) => {
-                      const st = slotStatus(slot, now);
-                      const stageLabel = lang[slot.stage] ?? slot.stage;
-                      const catLabel = slot.category !== "senior" ? catShort[slot.category] ?? slot.category : null;
-
-                      return (
-                        <tr key={slot.id} style={{ opacity: st === "past" ? 0.45 : 1 }}>
-                          <td className="w-5 py-1 pr-2 align-middle">
-                            <span className="flex items-center justify-center w-4">
-                              {st === "active" ? (
-                                <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }} />
-                              ) : st === "imminent" ? (
-                                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" style={{ animation: "pulse-dot 1.8s ease-in-out infinite" }} />
-                              ) : st === "upcoming" ? (
-                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--ink)] shrink-0" />
-                              ) : st === "past" ? (
-                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--subtle)] shrink-0" />
-                              ) : (
-                                <span className="w-1.5 h-1.5 rounded-full bg-[var(--border-strong)] shrink-0" />
-                              )}
-                            </span>
-                          </td>
-                          <td className="py-1 pr-4 align-top whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">
-                            <div className="flex items-baseline gap-1 text-[var(--ink)]">
-                              {fmtTime(slot.startTime)}
-                              {slot.endTime && (
-                                <span className="text-[var(--subtle)]">– {fmtTime(slot.endTime)}</span>
-                              )}
-                            </div>
-                            {showDualTime && (
-                              <div className="flex items-baseline gap-1 text-[0.68rem] text-[var(--subtle)] leading-tight mt-0.5">
-                                {fmtTime(slot.startTime, timezone)}
-                                {slot.endTime && <span>– {fmtTime(slot.endTime, timezone)}</span>}
-                                <span className="opacity-70">{tzDiff(slot.startTime, timezone)}</span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-1 pr-4 align-middle whitespace-nowrap font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[var(--ink)] tracking-wide">
-                            {slot.disciplineCode}
-                          </td>
-                          <td className="py-1 align-middle text-[var(--muted)] text-xs">
-                            {stageLabel}
-                            {catLabel && <span className="ml-1.5 text-[var(--subtle)]">{catLabel}</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {byDate.get(dk)?.map(renderSlotRow)}
                   </Fragment>
                 ))}
               </tbody>
             </table>
-          </div>
         </div>
       </div>
 
@@ -437,6 +476,9 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
         }
         @media (prefers-reduced-motion: reduce) {
           [style*="pulse-dot"] { animation: none !important; }
+          .schedule-anim-wrap, .schedule-anim-wrap * {
+            transition: none !important;
+          }
         }
       `}</style>
     </section>

@@ -4,7 +4,7 @@ import { fetchAllCalendarEvents, normalizeEventName } from "@/lib/calendar/adapt
 import type { CalendarSource } from "@/lib/calendar/adapters";
 import { detectCompetitionLevel, isRiflePistolCompetition } from "@/lib/issf/competition-level";
 import { db } from "@/lib/db";
-import { competitions } from "@/lib/db/schema";
+import { competitions, countries } from "@/lib/db/schema";
 import { inArray, sql } from "drizzle-orm";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 
@@ -162,6 +162,7 @@ interface CommitEvent {
   dateFrom: string;
   dateTo: string | null;
   location: string | null;
+  country: string | null;
   issfId: string | null;
   level: CompetitionLevel;
 }
@@ -181,11 +182,22 @@ export async function POST(req: NextRequest) {
   const toInsert = events.filter((e) => e.dateFrom);
   if (!toInsert.length) return NextResponse.json({ inserted: 0, skipped: events.length });
 
+  const countryRows = await db
+    .select({ id: countries.id, code: countries.code, code2: countries.code2, nocCode: countries.nocCode, name: countries.name })
+    .from(countries);
+  const countryIds = new Map<string, number>();
+  for (const country of countryRows) {
+    for (const value of [country.code, country.code2, country.nocCode, country.name]) {
+      if (value) countryIds.set(value.trim().toLowerCase(), country.id);
+    }
+  }
+
   const makeValue = (e: CommitEvent) => ({
     name: e.name,
     date: e.dateFrom,
     dateEnd: e.dateTo && e.dateTo !== e.dateFrom ? e.dateTo : null,
     location: e.location ?? null,
+    countryId: countryIds.get(e.country?.trim().toLowerCase() ?? "") ?? null,
     level: e.level,
     organizer: e.source.toUpperCase(),
     externalId: e.key,
@@ -206,7 +218,7 @@ export async function POST(req: NextRequest) {
       .values(issfEvents.map(makeValue))
       .onConflictDoUpdate({
         target: competitions.issfId,
-        set: { tags: tagMergeSql },
+        set: { tags: tagMergeSql, countryId: sql`COALESCE(${competitions.countryId}, EXCLUDED.country_id)` },
       })
       .returning({ id: competitions.id });
     insertedCount += res.length;
@@ -219,7 +231,7 @@ export async function POST(req: NextRequest) {
       .onConflictDoUpdate({
         target: competitions.externalId,
         targetWhere: sql`${competitions.externalId} IS NOT NULL`,
-        set: { tags: tagMergeSql },
+        set: { tags: tagMergeSql, countryId: sql`COALESCE(${competitions.countryId}, EXCLUDED.country_id)` },
       })
       .returning({ id: competitions.id });
     insertedCount += res.length;

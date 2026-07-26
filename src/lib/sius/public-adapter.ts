@@ -29,6 +29,8 @@ export interface SiusLiveResult {
   inners: number | null; // NumberOfInnerTen — relevant for AP disciplines
   series: number[];      // per-series totals (summed shots within each group)
   siusAthleteId: string | null;
+  qualified: boolean;    // Result.Extensions["QualificationRemark"] === "Q"
+  remark: string | null; // ShooterGroupRemark (RPO) or StatusRemark (DSQ/DNS/DNF), whichever is set
 }
 
 // ── HTTP ──────────────────────────────────────────────────────────────────────
@@ -119,6 +121,7 @@ export async function fetchSiusSeries(
     const series = parseSeriesTotals(athlete.Series ?? []);
 
     const { firstName, lastName } = splitDisplayName(row.DisplayName ?? "");
+    const { qualified, remark } = parseRemark(row.Result?.Extensions ?? []);
 
     return [
       {
@@ -131,6 +134,8 @@ export async function fetchSiusSeries(
         inners: inners === 0 ? null : inners, // 0 = not applicable (AR disciplines)
         series,
         siusAthleteId: athlete.AthleteIdentifier?.Identifier ?? null,
+        qualified,
+        remark,
       },
     ];
   });
@@ -249,6 +254,24 @@ function parseSeriesTotals(
     .filter((v) => !isNaN(v));
 }
 
+/** Reads the per-row remark extensions SIUS attaches to `Result`:
+ *  - QualificationRemark "Q" → athlete officially qualified for the final
+ *  - ShooterGroupRemark "RPO" → ranking points only (nation qualification quota),
+ *    can never advance to the final regardless of rank
+ *  - StatusRemark "DSQ" | "DNS" | "DNF" → competition status
+ *  ShooterGroupRemark and StatusRemark are mutually exclusive with qualifying;
+ *  prefer StatusRemark (a DSQ overrides an RPO tag) when both are somehow present. */
+function parseRemark(extensions: Array<{ Key: string; Value: string }>): {
+  qualified: boolean;
+  remark: string | null;
+} {
+  const byKey = Object.fromEntries(extensions.map((e) => [e.Key, e.Value]));
+  return {
+    qualified: byKey.QualificationRemark === "Q",
+    remark: byKey.StatusRemark ?? byKey.ShooterGroupRemark ?? null,
+  };
+}
+
 /** SIUS: "HRBEKOVA Danka" → { lastName: "HRBEKOVA", firstName: "Danka" }
  *  Handles compound last names: "KOCHALUMKAL VINOD Vidarsa" → { lastName: "KOCHALUMKAL VINOD", firstName: "Vidarsa" }
  *  Rule: leading consecutive ALL-CAPS words = last name, rest = first name. */
@@ -288,6 +311,7 @@ interface RawSeries {
 
 interface RawSeriesRow {
   Rank?: { DisplayText: string };
+  Result?: { Order: number; Value: string; Extensions?: Array<{ Key: string; Value: string }> };
   DisplayName?: string;
   Nation?: string;
   AthletesSeries?: RawAthleteSeries[];

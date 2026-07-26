@@ -6,13 +6,16 @@ import { useRouter } from "next/navigation";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { LevelDropdown } from "@/components/ui/LevelDropdown";
 import { TranslatedNameInput } from "@/components/ui/TranslatedNameInput";
+import { CountryDropdown } from "@/components/ui/CountryDropdown";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
+
+type Country = { id: number; name: string; code2: string | null };
 
 function detectLang(text: string): "sr" | "en" {
   return /[čćšđžČĆŠĐŽ]/.test(text) ? "sr" : "en";
 }
 
-export function CompetitionFormClient() {
+export function CompetitionFormClient({ countries }: { countries: Country[] }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +28,7 @@ export function CompetitionFormClient() {
     location: "",
     locationSr: "",
     locationEn: "",
+    countryId: "",
     level: "national" as CompetitionLevel,
     issfId: "",
   });
@@ -130,6 +134,11 @@ export function CompetitionFormClient() {
               placeholder="npr. Beograd, SC Crvena zvezda"
               className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Država održavanja</label>
+            <CountryDropdown value={form.countryId} onChange={(value) => set("countryId", value)} countries={countries} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

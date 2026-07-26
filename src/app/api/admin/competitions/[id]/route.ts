@@ -22,10 +22,14 @@ export async function PATCH(
   if (isNaN(compId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const body = await req.json();
-  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, level, tags, issfId, siusId } = body;
+  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, countryId, level, tags, issfId, siusId } = body;
 
   if (!name?.trim() || !date || !level) {
     return NextResponse.json({ error: "Naziv, datum i nivo su obavezni" }, { status: 400 });
+  }
+  const parsedCountryId = countryId == null || countryId === "" ? null : Number(countryId);
+  if (parsedCountryId !== null && !Number.isInteger(parsedCountryId)) {
+    return NextResponse.json({ error: "Neispravna država" }, { status: 400 });
   }
 
   const [updated] = await db
@@ -39,6 +43,7 @@ export async function PATCH(
       location: location?.trim() || null,
       locationSr: locationSr?.trim() || null,
       locationEn: locationEn?.trim() || null,
+      countryId: parsedCountryId,
       level: level as CompetitionLevel,
       issfId: issfId?.trim() || null,
       siusId: siusId?.trim() || null,

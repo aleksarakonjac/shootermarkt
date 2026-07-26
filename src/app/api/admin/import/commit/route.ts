@@ -212,7 +212,10 @@ export async function POST(req: NextRequest) {
               ...(row.finalShootOff ? { shootOff: true } : {}),
             }
           : null,
-        remark: row.remark ?? null,
+        // A PDF/ISSF row's single `remark` field belongs to whichever stage
+        // this row actually represents — elim-only rows (no qual total) carry
+        // an elimination remark, everything else a qualification one.
+        ...(isElimOnly ? { elimRemark: row.remark ?? null } : { qualRemark: row.remark ?? null }),
         source: payload.source ?? "pdf_import",
       };
 

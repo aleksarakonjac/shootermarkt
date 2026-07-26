@@ -84,15 +84,17 @@ export default async function CompetitionPage({ params }: Props) {
       elimTotal: results.elimTotal,
       elimRank: results.elimRank,
       elimDetail: results.elimDetail,
+      elimRemark: results.elimRemark,
       qualTotal: results.qualTotal,
       qualRank: results.qualRank,
       qualInners: results.qualInners,
       qualified: results.qualified,
       qualDetail: results.qualDetail,
-      remark: results.remark,
+      qualRemark: results.qualRemark,
       finalTotal: results.finalTotal,
       finalRank: results.finalRank,
       finalDetail: results.finalDetail,
+      finalRemark: results.finalRemark,
     })
     .from(results)
     .innerJoin(shooters, eq(results.shooterId, shooters.id))
@@ -201,15 +203,17 @@ export default async function CompetitionPage({ params }: Props) {
       elimTotal: r.elimTotal,
       elimRank: r.elimRank,
       elimDetail: r.elimDetail,
+      elimRemark: r.elimRemark,
       qualTotal: r.qualTotal,
       qualRank: r.qualRank,
       qualInners: r.qualInners,
       qualified: r.qualified,
       qualDetail: r.qualDetail,
-      remark: r.remark,
+      qualRemark: r.qualRemark,
       finalTotal: r.finalTotal,
       finalRank: r.finalRank,
       finalDetail: r.finalDetail,
+      finalRemark: r.finalRemark,
     });
   }
 

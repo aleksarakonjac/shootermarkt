@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { LevelDropdown } from "@/components/ui/LevelDropdown";
 import { TranslatedNameInput } from "@/components/ui/TranslatedNameInput";
+import { CountryDropdown } from "@/components/ui/CountryDropdown";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 
 interface Competition {
@@ -18,12 +19,15 @@ interface Competition {
   location: string | null;
   locationSr?: string | null;
   locationEn?: string | null;
+  countryId?: number | null;
   level: CompetitionLevel;
   issfId?: string | null;
   siusId?: string | null;
   tags: string[];
   resultCount: number;
 }
+
+type Country = { id: number; name: string; code2: string | null };
 
 const TAG_SUGGESTIONS = ["SSS", "ISSF", "ESC", "10m", "25m", "50m"];
 
@@ -33,7 +37,7 @@ function detectLang(text: string): "sr" | "en" {
   return /[čćšđžČĆŠĐŽ]/.test(text) ? "sr" : "en";
 }
 
-export function CompetitionEditClient({ competition }: { competition: Competition }) {
+export function CompetitionEditClient({ competition, countries }: { competition: Competition; countries: Country[] }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -49,6 +53,7 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
     location: competition.location ?? "",
     locationSr: competition.locationSr ?? "",
     locationEn: competition.locationEn ?? "",
+    countryId: String(competition.countryId ?? ""),
     level: competition.level,
     issfId: competition.issfId ?? "",
     siusId: competition.siusId ?? "",
@@ -195,6 +200,11 @@ export function CompetitionEditClient({ competition }: { competition: Competitio
               placeholder="npr. Beograd, SC Crvena zvezda"
               className={inputCls}
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Država održavanja</label>
+            <CountryDropdown value={form.countryId} onChange={(value) => set("countryId", value)} countries={countries} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

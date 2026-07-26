@@ -1,7 +1,7 @@
 export const revalidate = 300;
 
 import { db } from "@/lib/db";
-import { shooters, results, competitions, disciplines, shooterFormaCache } from "@/lib/db/schema";
+import { shooters, results, competitions, countries, disciplines, shooterFormaCache } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -66,6 +66,9 @@ export default async function ShooterPage({ params }: Props) {
         competitionId: competitions.id,
         competitionName: competitions.name,
         competitionDate: competitions.date,
+        competitionLocation: competitions.location,
+        competitionCountry: countries.name,
+        competitionCountryCode2: countries.code2,
         competitionLevel: competitions.level,
         disciplineCode: disciplines.code,
         disciplineId: disciplines.id,
@@ -73,6 +76,7 @@ export default async function ShooterPage({ params }: Props) {
       })
       .from(results)
       .innerJoin(competitions, eq(results.competitionId, competitions.id))
+      .leftJoin(countries, eq(competitions.countryId, countries.id))
       .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
       .where(eq(results.shooterId, shooterId))
       .orderBy(asc(competitions.date)),

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { competitions, results } from "@/lib/db/schema";
+import { competitions, countries, results } from "@/lib/db/schema";
 import { eq, count } from "drizzle-orm";
 import { CompetitionEditClient } from "./competition-edit-client";
 import type { Metadata } from "next";
@@ -17,9 +17,10 @@ export default async function CompetitionEditPage({
   const compId = parseInt(id);
   if (isNaN(compId)) notFound();
 
-  const [comp, [{ resultCount }]] = await Promise.all([
+  const [comp, [{ resultCount }], countryRows] = await Promise.all([
     db.query.competitions.findFirst({ where: eq(competitions.id, compId) }),
     db.select({ resultCount: count() }).from(results).where(eq(results.competitionId, compId)),
+    db.select({ id: countries.id, name: countries.name, code2: countries.code2 }).from(countries).orderBy(countries.name),
   ]);
 
   if (!comp) notFound();
@@ -36,12 +37,14 @@ export default async function CompetitionEditPage({
         location: comp.location,
         locationSr: comp.locationSr,
         locationEn: comp.locationEn,
+        countryId: comp.countryId,
         level: comp.level as CompetitionLevel,
         issfId: comp.issfId,
         siusId: comp.siusId,
         tags: comp.tags ?? [],
         resultCount,
       }}
+      countries={countryRows}
     />
   );
 }

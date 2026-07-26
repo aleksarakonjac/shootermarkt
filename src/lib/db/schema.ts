@@ -495,24 +495,29 @@ export const results = pgTable(
     elimTotal: integer("elim_total"),
     elimRank: integer("elim_rank"),
     elimDetail: jsonb("elim_detail").$type<ElimDetail>(),
+    // ISSF/SIUS remark for the elimination performance: RPO, DSQ, DNS, DNF, SO —
+    // independent of qualRemark, since elim and qual are separate performances
+    // and a shooter can be penalized in one without the other.
+    elimRemark: varchar("elim_remark", { length: 10 }),
 
     // Qualification
     qualTotal: decimal("qual_total", { precision: 6, scale: 1 }),
     qualInners: integer("qual_inners"),
     qualRank: integer("qual_rank"),
     qualDetail: jsonb("qual_detail").$type<QualDetail>(),
+    // ISSF/SIUS remark for the qualification performance — see elimRemark above.
+    qualRemark: varchar("qual_remark", { length: 10 }),
 
     // Final
     qualified: boolean("qualified"),
     finalTotal: decimal("final_total", { precision: 7, scale: 1 }),
     finalRank: integer("final_rank"),
     finalDetail: jsonb("final_detail").$type<FinalDetail>(),
+    // ISSF/SIUS remark for the final performance — see elimRemark above.
+    finalRemark: varchar("final_remark", { length: 10 }),
 
     // Snapshot of competition forma_weight at time of recording (for audit/history)
     formaWeightSnapshot: decimal("forma_weight_snapshot", { precision: 3, scale: 2 }),
-
-    // ISSF/SIUS remark code: RPO, DSQ, DNS, DNF, SO — null = no remark
-    remark: varchar("remark", { length: 10 }),
 
     source: resultSourceEnum("source").notNull().default("manual"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

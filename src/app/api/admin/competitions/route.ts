@@ -28,10 +28,14 @@ export async function POST(req: NextRequest) {
   if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, level, issfId } = body;
+  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, countryId, level, issfId } = body;
 
   if (!name?.trim() || !date || !level) {
     return NextResponse.json({ error: "Naziv, datum i nivo su obavezni" }, { status: 400 });
+  }
+  const parsedCountryId = countryId == null || countryId === "" ? null : Number(countryId);
+  if (parsedCountryId !== null && !Number.isInteger(parsedCountryId)) {
+    return NextResponse.json({ error: "Neispravna država" }, { status: 400 });
   }
 
   const [comp] = await db
@@ -45,6 +49,7 @@ export async function POST(req: NextRequest) {
       location: location?.trim() || null,
       locationSr: locationSr?.trim() || null,
       locationEn: locationEn?.trim() || null,
+      countryId: parsedCountryId,
       level: level as CompetitionLevel,
       issfId: issfId ? String(issfId) : null,
     })

@@ -138,7 +138,8 @@ async function processCompetition(
             qualTotal: r.total.toFixed(1),
             qualInners: r.inners ?? null,
             qualRank: r.rank,
-            qualified: null,
+            qualified: r.qualified || null,
+            qualRemark: r.remark,
             ...(r.series.length > 0 ? { qualDetail: { series: r.series } } : {}),
             source: "issf_import",
           });
@@ -158,7 +159,8 @@ async function processCompetition(
               elimRound: round,
               elimTotal: Math.round(r.total),
               elimRank: r.rank,
-              qualified: null,
+              qualified: r.qualified || null,
+              elimRemark: r.remark,
               source: "issf_import",
             });
           }
@@ -200,7 +202,12 @@ async function processCompetition(
           qualTotal: sql`excluded.qual_total`,
           qualInners: sql`excluded.qual_inners`,
           qualRank: sql`excluded.qual_rank`,
-          qualified: sql`excluded.qualified`,
+          // SIUS only tags QualificationRemark/StatusRemark once that shooter's
+          // status is officially decided — until then the row has neither, so
+          // we push null. Coalesce so an in-progress fetch never clobbers an
+          // already-decided flag from an earlier run (or the ISSF path).
+          qualified: sql`coalesce(excluded.qualified, ${results.qualified})`,
+          qualRemark: sql`coalesce(excluded.qual_remark, ${results.qualRemark})`,
           qualDetail: sql`excluded.qual_detail`,
         },
       });
@@ -218,6 +225,8 @@ async function processCompetition(
           elimRound: sql`excluded.elim_round`,
           elimTotal: sql`excluded.elim_total`,
           elimRank: sql`excluded.elim_rank`,
+          qualified: sql`coalesce(excluded.qualified, ${results.qualified})`,
+          elimRemark: sql`coalesce(excluded.elim_remark, ${results.elimRemark})`,
         },
       });
   }

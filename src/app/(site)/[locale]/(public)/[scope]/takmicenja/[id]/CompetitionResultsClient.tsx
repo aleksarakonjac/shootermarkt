@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import type { QualDetail, FinalDetail, ElimDetail, AgeCategory } from "@/lib/db/schema";
@@ -39,15 +39,17 @@ export type DisciplineGroup = {
       elimTotal: number | null;
       elimRank: number | null;
       elimDetail: ElimDetail | null;
+      elimRemark: string | null;
       qualTotal: string | null;
       qualRank: number | null;
       qualInners: number | null;
       qualified: boolean | null;
       qualDetail: QualDetail | null;
-      remark: string | null;
+      qualRemark: string | null;
       finalTotal: string | null;
       finalRank: number | null;
       finalDetail: FinalDetail | null;
+      finalRemark: string | null;
     }>;
   }>;
 };
@@ -109,6 +111,10 @@ const PHASE_LABELS: Record<string, Record<string, string>> = {
   sr: { elim: "Eliminacije", qual: "Kvalifikacije", final: "Finale" },
   en: { elim: "Elimination", qual: "Qualification", final: "Final" },
 };
+
+function eliminationRoundLabel(round: number, locale: string): string {
+  return `${(PHASE_LABELS[locale] ?? PHASE_LABELS.en).elim} — ${locale === "en" ? "round" : "partija"} ${round}`;
+}
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
@@ -336,7 +342,7 @@ function SingleCatRows({
             <div className="flex items-center gap-2.5 min-w-0">
               <PhaseBadge label="E" elim />
               <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                {(PHASE_LABELS[locale] ?? PHASE_LABELS.en).elim} R{rnd}
+                {eliminationRoundLabel(rnd, locale)}
               </span>
               <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">
                 {count}
@@ -401,7 +407,7 @@ function PhaseBadge({
   if (elim) {
     return (
       <span
-        className="inline-flex items-center px-1.5 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
+        className="inline-flex items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)]"
         style={{
           background: "color-mix(in oklch, oklch(0.65 0.15 30) 12%, transparent)",
           color: "oklch(0.55 0.15 30)",
@@ -415,7 +421,7 @@ function PhaseBadge({
   if (accent) {
     return (
       <span
-        className="inline-flex items-center px-1.5 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
+        className="inline-flex items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)]"
         style={{
           background: "color-mix(in oklch, var(--brand-accent) 12%, transparent)",
           color: "var(--brand-accent)",
@@ -429,7 +435,7 @@ function PhaseBadge({
   if (active) {
     return (
       <span
-        className="inline-flex items-center px-1.5 rounded text-[1rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
+        className="inline-flex items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)]"
         style={{
           background: "color-mix(in oklch, var(--success) 12%, transparent)",
           color: "var(--success)",
@@ -441,7 +447,7 @@ function PhaseBadge({
     );
   }
   return (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)] bg-[var(--surface-2)] text-[var(--subtle)] border border-[var(--border)]">
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] bg-[var(--surface-2)] text-[var(--subtle)] border border-[var(--border)]">
       {label}
     </span>
   );
@@ -464,6 +470,11 @@ function CompetitionDetail({
   onBack: () => void;
   onStageChange: (stage: string, elimRound?: number) => void;
 }) {
+  const reducedMotion = useReducedMotion();
+  const selectorTransition = reducedMotion
+    ? { duration: 0 }
+    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const };
+
   if (selection.kind === "mixed") {
     const mixedGroup = mixedGroups.find((g) => g.code === selection.disciplineCode);
     const hasFinal = mixedGroup?.teams.some((t) => t.finalRank != null || t.finalTotal != null) ?? false;
@@ -557,7 +568,7 @@ function CompetitionDetail({
       qualInners: r.qualInners,
       qualified: r.qualified,
       qualDetail: r.qualDetail,
-      remark: r.remark,
+      remark: r.qualRemark,
       disciplineCode: group?.code ?? "",
       apparatus: group?.apparatus ?? null,
     })) ?? [];
@@ -570,15 +581,18 @@ function CompetitionDetail({
         id: r.id,
         shooterId: r.shooterId,
         name: `${r.lastName} ${r.firstName}`,
-        birthYear: null,
+        birthYear: r.birthYear,
         clubDisplay: r.clubName ?? r.clubNocCode ?? "",
         nationality: r.nationality,
         qualTotal: r.elimTotal != null ? String(r.elimTotal) : null,
         qualRank: r.elimRank,
         qualInners: null,
-        qualified: r.qualified,
+        // Elimination is a separate performance from qualification — no "Q"
+        // (qualified-for-final) badge here, but its own remark now flows
+        // through independently instead of being copied from qual.
+        qualified: null,
         qualDetail: r.elimDetail,
-        remark: null,
+        remark: r.elimRemark,
         disciplineCode: group?.code ?? "",
         apparatus: group?.apparatus ?? null,
       })) ?? [];
@@ -590,6 +604,7 @@ function CompetitionDetail({
         id: r.id,
         shooterId: r.shooterId,
         name: `${r.lastName} ${r.firstName}`,
+        birthYear: r.birthYear,
         clubDisplay: r.clubName ?? r.clubNocCode ?? "",
         nationality: r.nationality,
         finalTotal: r.finalTotal,
@@ -646,41 +661,70 @@ function CompetitionDetail({
       </div>
 
       {/* ── Stage toggle ─────────────────────────────────────────── */}
-      {stageOptions.length > 1 && (
-        <div className="flex items-center gap-0.5 mb-4 p-1 bg-[var(--surface)] rounded-lg w-fit border border-[var(--border)]">
-          {stageOptions.map((opt) => (
-            <button
-              key={opt.key}
-              onClick={() => onStageChange(opt.key, opt.key === "elim" ? currentElimRound : undefined)}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors duration-150 ${
-                effectiveStage === opt.key
-                  ? "bg-[var(--bg)] text-[var(--ink)] shadow-sm"
-                  : "text-[var(--muted)] hover:text-[var(--ink)]"
-              }`}
-            >
-              {opt.badge}
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {(stageOptions.length > 1 || (effectiveStage === "elim" && elimRounds.length > 1)) && (
+        <div className={`mb-4 inline-flex flex-col items-start ${elimRounds.length > 1 ? "min-h-[5rem]" : ""}`}>
+          {stageOptions.length > 1 && (
+            <div className={`flex items-center gap-0.5 border border-[var(--border)] bg-[var(--surface)] p-1 ${effectiveStage === "elim" && elimRounds.length > 1 ? "rounded-t-lg rounded-br-lg rounded-bl-none" : "rounded-lg"}`}>
+              {stageOptions.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => onStageChange(opt.key, opt.key === "elim" ? currentElimRound : undefined)}
+                  className={`relative flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors duration-150 ${
+                    effectiveStage === opt.key
+                      ? "text-[var(--ink)]"
+                      : "text-[var(--muted)] hover:text-[var(--ink)]"
+                  }`}
+                >
+                  {effectiveStage === opt.key && (
+                    <motion.span
+                      layoutId="active-stage-selector"
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-md bg-[var(--bg)] shadow-sm"
+                      transition={selectorTransition}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-1.5">
+                    {opt.badge}
+                    {opt.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
 
-      {/* ── Elim round selector ──────────────────────────────────── */}
-      {effectiveStage === "elim" && elimRounds.length > 1 && (
-        <div className="flex items-center gap-1.5 mb-4">
-          {elimRounds.map((rnd) => (
-            <button
-              key={rnd}
-              onClick={() => onStageChange("elim", rnd)}
-              className="px-2.5 py-1 rounded-sm text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide transition-colors"
-              style={{
-                background: currentElimRound === rnd ? "var(--ink)" : "var(--surface-2)",
-                color: currentElimRound === rnd ? "var(--surface)" : "var(--muted)",
-              }}
-            >
-              R{rnd}
-            </button>
-          ))}
+          <AnimatePresence initial={false}>
+            {effectiveStage === "elim" && elimRounds.length > 1 && (
+              <motion.div
+                initial={reducedMotion ? false : { opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+                transition={selectorTransition}
+                className={`${stageOptions.length > 1 ? "-mt-px rounded-br-lg rounded-bl-lg border-t-0" : "rounded-lg"} flex w-fit items-center gap-0.5 border border-[var(--border)] bg-[var(--surface)] p-1`}
+              >
+                {elimRounds.map((rnd) => (
+                  <button
+                    key={rnd}
+                    onClick={() => onStageChange("elim", rnd)}
+                    className={`relative px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors duration-150 ${
+                      currentElimRound === rnd
+                        ? "text-[var(--ink)]"
+                        : "text-[var(--muted)] hover:text-[var(--ink)]"
+                    }`}
+                  >
+                    {currentElimRound === rnd && (
+                      <motion.span
+                        layoutId="active-elim-round-selector"
+                        aria-hidden="true"
+                        className="absolute inset-0 rounded-md bg-[var(--bg)] shadow-sm"
+                        transition={selectorTransition}
+                      />
+                    )}
+                    <span className="relative z-10">{locale === "en" ? `Round ${rnd}` : `Partija ${rnd}`}</span>
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
@@ -690,8 +734,8 @@ function CompetitionDetail({
           <motion.div
             key={`elim-${currentElimRound}`}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1, transition: { duration: 0.15 } }}
-            exit={{ opacity: 0, transition: { duration: 0.1 } }}
+            animate={{ opacity: 1, transition: { duration: 0.22 } }}
+            exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
             <CompetitionQualTable results={elimRows} />
           </motion.div>
@@ -699,8 +743,8 @@ function CompetitionDetail({
           <motion.div
             key="qual"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1, transition: { duration: 0.15 } }}
-            exit={{ opacity: 0, transition: { duration: 0.1 } }}
+            animate={{ opacity: 1, transition: { duration: 0.22 } }}
+            exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
             <CompetitionQualTable results={qualRows} />
           </motion.div>
@@ -708,8 +752,8 @@ function CompetitionDetail({
           <motion.div
             key="final"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1, transition: { duration: 0.15 } }}
-            exit={{ opacity: 0, transition: { duration: 0.1 } }}
+            animate={{ opacity: 1, transition: { duration: 0.22 } }}
+            exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
             <CompetitionFinalTable results={finalRows} />
           </motion.div>
