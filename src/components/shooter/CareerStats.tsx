@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { trendColor, trendLabel, type Trend } from "@/lib/forma";
-import { DisciplineSelector } from "./DisciplineSelector";
+import { DISCIPLINE_COLOR } from "./DisciplineSelector";
 import { FormaScoreInfo } from "./FormaScoreHeading";
 
 export type CareerStat = {
@@ -33,6 +33,13 @@ export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: st
   const t = useTranslations("shooters.profile");
   const [selectedCode, setSelectedCode] = useState(stats[0]?.code ?? "");
   const stat = stats.find((item) => item.code === selectedCode) ?? stats[0];
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = stat && tabRefs.current[stat.code];
+    if (el) setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+  }, [stat]);
 
   if (!stat) return null;
 
@@ -64,7 +71,31 @@ export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: st
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)]">
       <div className="flex items-center gap-2.5 border-b border-[var(--border)] bg-[var(--surface-2)] px-4 py-2.5">
         {stats.length > 1 ? (
-          <DisciplineSelector options={stats.map(({ code, name }) => ({ code, label: name }))} value={stat.code} onChange={setSelectedCode} locale={locale} showLabel />
+          <div role="tablist" aria-label={locale === "en" ? "Select discipline" : "Izaberi disciplinu"} className="relative flex items-center gap-1 rounded-lg bg-[var(--surface)] p-0.5">
+            {indicator && (
+              <div
+                aria-hidden="true"
+                className="absolute top-0.5 bottom-0.5 rounded bg-[#C20000] transition-[left,width] duration-250 ease-out"
+                style={{ left: indicator.left, width: indicator.width }}
+              />
+            )}
+            {stats.map(({ code, name }) => (
+              <button
+                key={code}
+                ref={(el) => { tabRefs.current[code] = el; }}
+                type="button"
+                role="tab"
+                aria-selected={stat.code === code}
+                title={name}
+                onClick={() => setSelectedCode(code)}
+                className={`relative z-10 flex-1 rounded px-2 py-0.5 text-center font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold uppercase tracking-wide transition-colors duration-250 ${
+                  stat.code === code ? "text-white" : "text-[var(--muted)]"
+                }`}
+              >
+                {code}
+              </button>
+            ))}
+          </div>
         ) : (
           <>
             <span className="rounded bg-[var(--ink)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-white">{stat.code}</span>
