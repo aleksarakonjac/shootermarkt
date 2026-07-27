@@ -227,6 +227,8 @@ export async function POST(req: NextRequest) {
       if (existing) {
         existing.finalRank = r.rank;
         existing.finalTotal = r.total;
+        existing.mFinalSeries = r.athletes[0]?.series ?? [];
+        existing.fFinalSeries = r.athletes[1]?.series ?? [];
       } else {
         const [a1, a2] = r.athletes;
         byKey.set(key, {
@@ -246,12 +248,14 @@ export async function POST(req: NextRequest) {
           m_series: [],
           mInners: null,
           mTotal: 0,
+          mFinalSeries: a1?.series ?? [],
           fIssfId: a2?.siusAthleteId ?? null,
           fLastName: a2?.lastName ?? "",
           fFirstName: a2?.firstName ?? "",
           f_series: [],
           fInners: null,
           fTotal: 0,
+          fFinalSeries: a2?.series ?? [],
         });
       }
     }

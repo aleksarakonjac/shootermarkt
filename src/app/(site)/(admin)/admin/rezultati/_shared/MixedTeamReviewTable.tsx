@@ -24,6 +24,8 @@ export interface MixedTeamEntry {
   f_series: number[];
   fInners: number | null;
   fTotal: number;
+  mFinalSeries?: number[];
+  fFinalSeries?: number[];
 }
 
 const stickyHeader = "sticky z-20 bg-[var(--surface)]";
@@ -138,6 +140,7 @@ export function MixedTeamFinalsTable({
       {byDiscipline.map((discipline) => {
         const discFinalists = [...finalists.filter(({ e }) => e.disciplineCode === discipline)]
           .sort((a, b) => (a.e.finalRank ?? 99) - (b.e.finalRank ?? 99));
+        const seriesCount = Math.max(0, ...discFinalists.flatMap(({ e }) => [e.mFinalSeries?.length ?? 0, e.fFinalSeries?.length ?? 0]));
         const nocCounts = new Map<string, number>();
         for (const { e } of discFinalists) nocCounts.set(e.nocCode, (nocCounts.get(e.nocCode) ?? 0) + 1);
 
@@ -155,6 +158,9 @@ export function MixedTeamFinalsTable({
                     <th className="px-3 py-2.5 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
                     <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
                     <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Strelac</th>
+                    {Array.from({ length: seriesCount }, (_, i) => (
+                      <th key={i} className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">S{i + 1}</th>
+                    ))}
                     <th className={`${stickyHeader} ${stickyDivider} right-0 w-28 px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]`}>Tim ukupno</th>
                   </tr>
                 </thead>
@@ -165,10 +171,16 @@ export function MixedTeamFinalsTable({
                       <td rowSpan={2} className="px-3 py-2 text-center align-middle"><input type="checkbox" checked={e.skip} onChange={() => onToggleSkip(index)} className="accent-[var(--brand-primary)]" /></td>
                       <td rowSpan={2} className="px-3 py-2 align-middle"><TeamLabel nocCode={e.nocCode} teamNumber={e.teamNumber} showNumber={(nocCounts.get(e.nocCode) ?? 0) > 1} /></td>
                       <td className="px-3 py-2 font-medium text-[var(--ink)] whitespace-nowrap">{e.mLastName} {e.mFirstName}</td>
+                      {Array.from({ length: seriesCount }, (_, s) => (
+                        <td key={s} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{e.mFinalSeries?.[s] != null ? fmtFinal(e.mFinalSeries[s]) : "—"}</td>
+                      ))}
                       <td rowSpan={2} className={`${stickyCell} ${stickyDivider} right-0 w-28 px-3 py-2 text-right align-middle font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]`}>{e.finalTotal != null ? fmtFinal(e.finalTotal) : "—"}</td>
                     </tr>,
                     <tr key={`${index}-f`} className={e.skip ? "border-t border-[var(--border)] opacity-40" : "border-t border-[var(--border)] hover:bg-[var(--surface)]"}>
                       <td className="px-3 py-2 font-medium text-[var(--ink)] whitespace-nowrap">{e.fLastName} {e.fFirstName}</td>
+                      {Array.from({ length: seriesCount }, (_, s) => (
+                        <td key={s} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{e.fFinalSeries?.[s] != null ? fmtFinal(e.fFinalSeries[s]) : "—"}</td>
+                      ))}
                     </tr>,
                   ])}
                 </tbody>
