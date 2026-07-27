@@ -254,7 +254,7 @@
     "someDataUnavailable": "Some data could not be loaded.",
     "newsBadge": "News",
     "clubLeaderboard": "Club Leaderboard",
-    "clubLeaderboardMetric": "pts vs. discipline average",
+    "clubLeaderboardMetric": "avg. shooter percentile",
     "noClubData": "Not enough data for club ranking.",
     "activeShooters": "{count, plural, =1 {# shooter} other {# shooters}}",
     "today": "Today",

@@ -254,7 +254,7 @@
     "someDataUnavailable": "Neki podaci nisu učitani.",
     "newsBadge": "Vest",
     "clubLeaderboard": "Rang lista klubova",
-    "clubLeaderboardMetric": "poena od proseka discipline",
+    "clubLeaderboardMetric": "prosečni percentil strelaca",
     "noClubData": "Nedovoljno podataka za rangiranje klubova.",
     "activeShooters": "{count, plural, =1 {# strelac} other {# strelaca}}",
     "today": "Danas",

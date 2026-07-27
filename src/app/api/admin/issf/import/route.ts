@@ -180,8 +180,8 @@ export async function POST(req: NextRequest) {
     skip: boolean; nocCode: string; disciplineCode: string;
     qualRank: number | null; qualTotal: number | null; inners: number | null;
     qualified: boolean; finalRank: number | null; finalTotal: number | null;
-    mIssfId: string | null; mLastName: string; mFirstName: string; m_series: number[]; mTotal: number;
-    fIssfId: string | null; fLastName: string; fFirstName: string; f_series: number[]; fTotal: number;
+    mIssfId: string | null; mLastName: string; mFirstName: string; m_series: number[]; mInners: number | null; mTotal: number;
+    fIssfId: string | null; fLastName: string; fFirstName: string; f_series: number[]; fInners: number | null; fTotal: number;
   };
 
   const mixedEntries: MixedEntry[] = [];
@@ -198,8 +198,8 @@ export async function POST(req: NextRequest) {
             skip: false, nocCode: r.nocCode, disciplineCode,
             qualRank: r.rank, qualTotal: r.total, inners: r.inners, qualified: r.qualified,
             finalRank: null, finalTotal: null,
-            mIssfId: r.mIssfId, mLastName: r.mLastName, mFirstName: r.mFirstName, m_series: r.mSeries, mTotal: r.mTotal,
-            fIssfId: r.fIssfId, fLastName: r.fLastName, fFirstName: r.fFirstName, f_series: r.fSeries, fTotal: r.fTotal,
+            mIssfId: r.mIssfId, mLastName: r.mLastName, mFirstName: r.mFirstName, m_series: r.mSeries, mInners: r.mInners, mTotal: r.mTotal,
+            fIssfId: r.fIssfId, fLastName: r.fLastName, fFirstName: r.fFirstName, f_series: r.fSeries, fInners: r.fInners, fTotal: r.fTotal,
           });
         }
       } catch (e) { mixedErrors.push(`${disciplineCode} qual: ${e}`); }
@@ -221,8 +221,8 @@ export async function POST(req: NextRequest) {
               skip: false, nocCode: r.nocCode, disciplineCode,
               qualRank: null, qualTotal: null, inners: null, qualified: true,
               finalRank: r.rank, finalTotal: r.total,
-              mIssfId: r.mIssfId, mLastName: r.mLastName, mFirstName: r.mFirstName, m_series: [], mTotal: 0,
-              fIssfId: r.fIssfId, fLastName: r.fLastName, fFirstName: r.fFirstName, f_series: [], fTotal: 0,
+              mIssfId: r.mIssfId, mLastName: r.mLastName, mFirstName: r.mFirstName, m_series: [], mInners: null, mTotal: 0,
+              fIssfId: r.fIssfId, fLastName: r.fLastName, fFirstName: r.fFirstName, f_series: [], fInners: null, fTotal: 0,
             });
           }
         }

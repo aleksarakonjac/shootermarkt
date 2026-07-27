@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORY_LABEL, DISCIPLINE_META, type AgeCategory, type ReviewRow } from "@/lib/pdf-import/types";
+import { CATEGORY_LABEL, DISCIPLINE_META, type AgeCategory, type DisciplineCode, type ReviewRow } from "@/lib/pdf-import/types";
+import { NOC_LIST } from "@/lib/noc-list";
 import { ShooterMatchCell } from "./ShooterMatchCell";
 import { UnmatchedPanel } from "./UnmatchedPanel";
 
@@ -30,9 +31,34 @@ interface IndexedRow {
   index: number;
 }
 
+export interface MixedReviewEntry {
+  skip: boolean;
+  nocCode: string;
+  disciplineCode: DisciplineCode;
+  qualRank: number | null;
+  qualTotal: number | null;
+  finalRank: number | null;
+  finalTotal: number | null;
+  mLastName: string;
+  mFirstName: string;
+  m_series: number[];
+  mInners: number | null;
+  mTotal: number;
+  fLastName: string;
+  fFirstName: string;
+  f_series: number[];
+  fInners: number | null;
+  fTotal: number;
+}
+
 const stickyHeader = "sticky z-20 bg-[var(--surface)]";
 const stickyCell = "sticky z-10 bg-[var(--bg)]";
 const stickyDivider = "border-l-2 border-[var(--border-strong)] [box-shadow:-8px_0_12px_-6px_rgba(0,0,0,0.12)]";
+
+function NocFlag({ noc }: { noc: string }) {
+  const alpha2 = NOC_LIST.find((country) => country.noc === noc)?.alpha2;
+  return alpha2 ? <span className={`fi fi-${alpha2.toLowerCase()} shrink-0`} style={{ width: "14px", height: "10px", borderRadius: "1px" }} /> : null;
+}
 
 function ShotBreakdown({ groups, prefix = "S" }: { groups?: number[][] | null; prefix?: string }) {
   const shotCount = groups?.reduce((count, group) => count + group.length, 0) ?? 0;
@@ -101,7 +127,7 @@ function QualificationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowCh
                 <td className="px-3 py-2 text-center"><input type="checkbox" checked={!!row.skip} onChange={(event) => onRowChange(index, { skip: event.target.checked })} className="accent-[var(--brand-primary)]" /></td>
                 <td className="px-3 py-2"><input value={row.lastName} onChange={(event) => onRowChange(index, { lastName: event.target.value })} className="min-w-[90px] w-full border-b border-transparent bg-transparent py-0.5 text-sm text-[var(--ink)] hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none" /></td>
                 <td className="px-3 py-2"><input value={row.firstName} onChange={(event) => onRowChange(index, { firstName: event.target.value })} className="min-w-[80px] w-full border-b border-transparent bg-transparent py-0.5 text-sm text-[var(--ink)] hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none" /></td>
-                <td className="px-3 py-2"><input value={row.teamNoc} onChange={(event) => onRowChange(index, { teamNoc: event.target.value.toUpperCase().slice(0, 3) })} maxLength={3} className="w-12 border-b border-transparent bg-transparent py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold uppercase text-[var(--ink)] hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none" /></td>
+                <td className="px-3 py-2"><div className="flex items-center gap-1.5"><NocFlag noc={row.teamNoc} /><input value={row.teamNoc} onChange={(event) => onRowChange(index, { teamNoc: event.target.value.toUpperCase().slice(0, 3) })} maxLength={3} className="w-12 border-b border-transparent bg-transparent py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold uppercase text-[var(--ink)] hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none" /></div></td>
                 <td className="px-3 py-2"><input value={row.clubAbbr ?? ""} onChange={(event) => onRowChange(index, { clubAbbr: event.target.value || undefined })} placeholder="—" className="min-w-[70px] w-full border-b border-transparent bg-transparent py-0.5 text-xs text-[var(--muted)] hover:border-[var(--border)] focus:border-[var(--brand-primary)] focus:outline-none" /></td>
                 <td className="px-3 py-2"><select value={row.category} onChange={(event) => onRowChange(index, { category: event.target.value as ReviewRow["category"] })} className="bg-transparent text-xs text-[var(--ink)] focus:outline-none">{CATEGORY_OPTIONS.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></td>
                 {[0, 1, 2, 3, 4, 5].map((seriesIndex) => <td key={seriesIndex} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{series[seriesIndex] != null ? fmtScore(series[seriesIndex], row.disciplineCode) : "—"}</td>)}
@@ -115,6 +141,96 @@ function QualificationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowCh
       </table>
     </div>
   );
+}
+
+export function MixedQualificationTable({ entries, onSkipChange }: { entries: MixedReviewEntry[]; onSkipChange: (index: number, skip: boolean) => void }) {
+  const byDiscipline = Array.from(new Set(entries.map((entry) => entry.disciplineCode)));
+  const seriesCount = 3;
+
+  return <div className="space-y-5">
+    {byDiscipline.map((discipline) => {
+      const disciplineEntries = entries.flatMap((entry, index) => entry.disciplineCode === discipline ? [{ entry, index }] : []);
+      const hasInners = discipline === "APMT";
+      return <section key={discipline} className="overflow-hidden rounded-lg border border-[var(--border)]">
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <h3 className="text-sm font-semibold text-[var(--ink)]">{DISCIPLINE_META[discipline]?.label ?? discipline}</h3>
+          <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{disciplineEntries.length} kvalifikacija</span>
+        </div>
+        <div className="overflow-x-auto border-t border-[var(--border)]">
+          <table className="w-full min-w-[880px] text-sm">
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--surface)]">
+                <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">#</th>
+                <th className="px-3 py-2.5 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
+                <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
+                <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Strelac</th>
+                {Array.from({ length: seriesCount }, (_, index) => <th key={index} className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">S{index + 1}</th>)}
+                {hasInners && <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Inner tens</th>}
+                <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Ukupno</th>
+                <th className={`${stickyHeader} ${stickyDivider} right-0 w-24 px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]`}>Tim ukupno</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--border)]">
+              {disciplineEntries.flatMap(({ entry, index }) => [
+                <tr key={`${index}-m`} className={entry.skip ? "opacity-40" : "hover:bg-[var(--surface)]"}>
+                  <td rowSpan={2} className="px-3 py-2 text-right align-middle font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{entry.qualRank ?? "—"}</td>
+                  <td rowSpan={2} className="px-3 py-2 text-center align-middle"><input type="checkbox" checked={entry.skip} onChange={(event) => onSkipChange(index, event.target.checked)} className="accent-[var(--brand-primary)]" /></td>
+                  <td rowSpan={2} className="px-3 py-2 align-middle"><span className="flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)]"><NocFlag noc={entry.nocCode} />{entry.nocCode}</span></td>
+                  <td className="px-3 py-2 font-medium text-[var(--ink)] whitespace-nowrap">{entry.mLastName} {entry.mFirstName}</td>
+                  {Array.from({ length: seriesCount }, (_, series) => <td key={series} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{entry.m_series[series] != null ? fmtScore(entry.m_series[series], discipline) : "—"}</td>)}
+                  {hasInners && <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{entry.mInners != null ? `${entry.mInners}×` : "—"}</td>}
+                  <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]">{entry.mTotal ? fmtScore(entry.mTotal, discipline) : "—"}</td>
+                  <td rowSpan={2} className={`${stickyCell} ${stickyDivider} right-0 w-24 px-3 py-2 text-right align-middle font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]`}>{entry.qualTotal != null ? fmtScore(entry.qualTotal, discipline) : "—"}</td>
+                </tr>,
+                <tr key={`${index}-f`} className={entry.skip ? "border-t border-[var(--border)] opacity-40" : "border-t border-[var(--border)] hover:bg-[var(--surface)]"}>
+                  <td className="px-3 py-2 font-medium text-[var(--ink)] whitespace-nowrap">{entry.fLastName} {entry.fFirstName}</td>
+                  {Array.from({ length: seriesCount }, (_, series) => <td key={series} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{entry.f_series[series] != null ? fmtScore(entry.f_series[series], discipline) : "—"}</td>)}
+                  {hasInners && <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{entry.fInners != null ? `${entry.fInners}×` : "—"}</td>}
+                  <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]">{entry.fTotal ? fmtScore(entry.fTotal, discipline) : "—"}</td>
+                </tr>,
+              ])}
+            </tbody>
+          </table>
+        </div>
+      </section>;
+    })}
+  </div>;
+}
+
+export function MixedFinalsTable({ entries, onSkipChange }: { entries: MixedReviewEntry[]; onSkipChange: (index: number, skip: boolean) => void }) {
+  const finalists = entries.flatMap((entry, index) => entry.finalRank != null ? [{ entry, index }] : []);
+  if (finalists.length === 0) return null;
+
+  return <section className="overflow-hidden rounded-lg border border-[var(--border)]">
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <h3 className="text-sm font-semibold text-[var(--ink)]">Mešoviti tim · Finale</h3>
+      <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{finalists.length} timova</span>
+    </div>
+    <div className="overflow-x-auto border-t border-[var(--border)]">
+      <table className="w-full min-w-[680px] text-sm">
+        <thead><tr className="border-b border-[var(--border)] bg-[var(--surface)]">
+          <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">#</th>
+          <th className="px-3 py-2.5 text-center text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Skip</th>
+          <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Disciplina</th>
+          <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Zemlja</th>
+          <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Članovi tima</th>
+          <th className={`${stickyHeader} ${stickyDivider} right-0 w-28 px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]`}>Final ukupno</th>
+        </tr></thead>
+        <tbody className="divide-y divide-[var(--border)]">
+          {[...finalists].sort((a, b) => (a.entry.finalRank ?? 99) - (b.entry.finalRank ?? 99)).map(({ entry, index }) => (
+            <tr key={index} className={entry.skip ? "opacity-40" : "hover:bg-[var(--surface)]"}>
+              <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{entry.finalRank}</td>
+              <td className="px-3 py-2 text-center"><input type="checkbox" checked={entry.skip} onChange={(event) => onSkipChange(index, event.target.checked)} className="accent-[var(--brand-primary)]" /></td>
+              <td className="px-3 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)]">{entry.disciplineCode}</td>
+              <td className="px-3 py-2"><span className="flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)]"><NocFlag noc={entry.nocCode} />{entry.nocCode}</span></td>
+              <td className="px-3 py-2 text-[var(--ink)]">{entry.mLastName} {entry.mFirstName} <span className="text-[var(--subtle)]">/</span> {entry.fLastName} {entry.fFirstName}</td>
+              <td className={`${stickyCell} ${stickyDivider} right-0 w-28 px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]`}>{entry.finalTotal != null ? String(Math.round(entry.finalTotal)) : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>;
 }
 
 const R3P_POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"];
@@ -166,7 +282,7 @@ function EliminationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChan
                       <td className="px-3 py-2 text-center"><input type="checkbox" checked={!!row.skip} onChange={(event) => onRowChange(index, { skip: event.target.checked })} className="accent-[var(--brand-primary)]" /></td>
                       <td className="px-3 py-2 font-medium text-[var(--ink)]">{row.lastName}</td>
                       <td className="px-3 py-2 text-[var(--ink)]">{row.firstName}</td>
-                      <td className="px-3 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.teamNoc}</td>
+                      <td className="px-3 py-2"><span className="flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]"><NocFlag noc={row.teamNoc} />{row.teamNoc}</span></td>
                       {Array.from({ length: seriesCount }, (_, i) => <td key={i} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{row.elimSeries?.[i] != null ? Math.round(row.elimSeries[i]) : "—"}</td>)}
                       <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{row.elimInners != null ? `${row.elimInners}×` : "—"}</td>
                       <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]">{row.elimTotal != null ? Math.round(row.elimTotal) : "—"}</td>
@@ -213,7 +329,7 @@ function FinalsTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: P
                 <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--ink)]">{row.finalRank ?? "—"}</td>
                 <td className="px-3 py-2 font-medium text-[var(--ink)]">{row.lastName}</td>
                 <td className="px-3 py-2 text-[var(--ink)]">{row.firstName}</td>
-                <td className="px-3 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.teamNoc}</td>
+                <td className="px-3 py-2"><span className="flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]"><NocFlag noc={row.teamNoc} />{row.teamNoc}</span></td>
                 <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.qualRank ?? "—"}</td>
                 <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{row.qualTotal != null ? fmtScore(row.qualTotal, row.disciplineCode) : "—"}</td>
                 {Array.from({ length: intermediateCount }, (_, valueIndex) => isHitCountFinal ? <td key={valueIndex} className="px-3 py-1 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums"><div className="font-bold text-[var(--ink)]">{row.finalCumulative?.[valueIndex] ?? "—"}</div><div className="text-[var(--muted)]">{row.finalSeries?.[valueIndex] != null ? fmtFinal(row.finalSeries[valueIndex], row.disciplineCode) : "—"}</div></td> : <td key={valueIndex} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{values[valueIndex] != null ? fmtFinal(values[valueIndex], row.disciplineCode) : "—"}</td>)}
@@ -269,7 +385,11 @@ export function ReviewTable({ rows, nocFilter, onRowChange, onNocFilterChange, o
               </span>
               {qualRows.length > 0 && hiddenCount > 0 && (
                 <button
-                  onClick={() => setExpanded((prev) => { const next = new Set(prev); isExpanded ? next.delete(discipline) : next.add(discipline); return next; })}
+                  onClick={() => setExpanded((prev) => {
+                    const next = new Set(prev);
+                    if (isExpanded) next.delete(discipline); else next.add(discipline);
+                    return next;
+                  })}
                   className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"
                 >
                   {isExpanded ? "Skupi ↑" : `Prikaži sve ${qualRows.length} ↓`}

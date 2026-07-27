@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import type { ReviewRow, CommitPayload } from "@/lib/pdf-import/types";
-import { ReviewTable } from "../_shared/ReviewTable";
+import { MIXED_TEAM_CODES, type DisciplineCode, type ReviewRow, type CommitPayload } from "@/lib/pdf-import/types";
+import { MixedFinalsTable, MixedQualificationTable, ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
 
 type Step = "pick" | "disciplines" | "review" | "done";
@@ -11,11 +11,11 @@ interface DbComp { id: number; name: string; date: string; location: string | nu
 interface IssfEvent { code: string; label: string }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
 interface MixedEntry {
-  skip: boolean; nocCode: string; disciplineCode: string;
+  skip: boolean; nocCode: string; disciplineCode: DisciplineCode;
   qualRank: number | null; qualTotal: number | null; inners: number | null;
   qualified: boolean; finalRank: number | null; finalTotal: number | null;
-  mIssfId: string | null; mLastName: string; mFirstName: string; m_series: number[]; mTotal: number;
-  fIssfId: string | null; fLastName: string; fFirstName: string; f_series: number[]; fTotal: number;
+  mIssfId: string | null; mLastName: string; mFirstName: string; m_series: number[]; mInners: number | null; mTotal: number;
+  fIssfId: string | null; fLastName: string; fFirstName: string; f_series: number[]; fInners: number | null; fTotal: number;
 }
 
 // ── CompSearch ────────────────────────────────────────────────────────────────
@@ -237,8 +237,8 @@ export function IssfMode() {
               entries: discEntries.map((e) => ({
                 skip: e.skip, nocCode: e.nocCode,
                 qualRank: e.qualRank, qualTotal: e.qualTotal, qualified: e.qualified,
-                m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mTotal: e.mTotal,
-                f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fTotal: e.fTotal,
+                m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mInners: e.mInners, mTotal: e.mTotal,
+                f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
               })),
             }),
           });
@@ -336,7 +336,16 @@ export function IssfMode() {
             </div>
           ) : (
             <div>
-              <label className="block text-xs font-semibold text-[var(--muted)] mb-2">Discipline ({events.length} dostupno)</label>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-xs font-semibold text-[var(--muted)]">Discipline ({events.length} dostupno)</label>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCodes(new Set(events.filter((e) => MIXED_TEAM_CODES.includes(e.code as typeof MIXED_TEAM_CODES[number])).map((e) => e.code)))}
+                  className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"
+                >
+                  Samo miks
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {events.map((e) => {
                   const on = selectedCodes.has(e.code);
@@ -398,45 +407,17 @@ export function IssfMode() {
 
           <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))} />
 
-          {/* Mixed team review */}
           {mixedEntries.length > 0 && (
-            <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-              <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between">
-                <span className="text-xs font-semibold text-[var(--muted)]">Mešoviti tim · {activeMixedCount} za unos</span>
-                <span className="text-xs text-[var(--subtle)]">{mixedEntries.filter(e => e.skip).length} preskočeno</span>
-              </div>
-              <div className="divide-y divide-[var(--border)]">
-                {mixedEntries.map((e, idx) => (
-                  <div key={idx} className={`px-4 py-3 flex items-center gap-3 ${e.skip ? "opacity-40" : ""}`}>
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--muted)] w-12 shrink-0">{e.nocCode}</span>
-                    <span className="text-[0.7rem] font-semibold text-[var(--subtle)] w-16 shrink-0">{e.disciplineCode}</span>
-                    <div className="flex-1 min-w-0 text-sm text-[var(--ink)]">
-                      <span>{e.mLastName} {e.mFirstName}</span>
-                      <span className="text-[var(--subtle)] mx-1.5">/</span>
-                      <span>{e.fLastName} {e.fFirstName}</span>
-                    </div>
-                    {e.qualTotal != null && (
-                      <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] shrink-0">
-                        {e.qualTotal}{e.inners != null ? ` (${e.inners}x)` : ""}
-                      </span>
-                    )}
-                    {e.qualRank != null && (
-                      <span className="text-xs text-[var(--subtle)] shrink-0">#{e.qualRank}</span>
-                    )}
-                    <button
-                      onClick={() => setMixedEntries(prev => prev.map((m, i) => i === idx ? { ...m, skip: !m.skip } : m))}
-                      className="shrink-0 text-xs px-2 py-0.5 rounded border transition-colors"
-                      style={e.skip
-                        ? { borderColor: "var(--border)", color: "var(--subtle)" }
-                        : { borderColor: "var(--border-strong)", color: "var(--ink)" }
-                      }
-                    >
-                      {e.skip ? "uključi" : "preskoči"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <>
+              <MixedQualificationTable
+                entries={mixedEntries}
+                onSkipChange={(index, skip) => setMixedEntries((prev) => prev.map((entry, i) => i === index ? { ...entry, skip } : entry))}
+              />
+              <MixedFinalsTable
+                entries={mixedEntries}
+                onSkipChange={(index, skip) => setMixedEntries((prev) => prev.map((entry, i) => i === index ? { ...entry, skip } : entry))}
+              />
+            </>
           )}
 
           <div className="flex gap-3">
