@@ -100,6 +100,14 @@ const DISCIPLINE_NAMES: Record<string, { sr: string; en: string }> = {
   R3JW: { sr: "3×20 puška jr. Ž",    en: "3×20 rifle jr. W" },
 };
 
+// Keep the overview readable as a program, not as the order rows happened to
+// arrive from separate individual and mixed-result queries.
+const DISCIPLINE_ORDER = ["ARM", "ARW", "ARMT", "APM", "APW", "APMT", "R3PM", "R3PW", "R3JM", "R3JW", "SPW", "RFPM", "FPM"];
+function disciplineOrder(code: string) {
+  const index = DISCIPLINE_ORDER.indexOf(code);
+  return index === -1 ? DISCIPLINE_ORDER.length : index;
+}
+
 function disciplineName(code: string, locale: string): string {
   const entry = DISCIPLINE_NAMES[code];
   if (!entry) return code;
@@ -217,8 +225,8 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId, l
               setSelection(next);
               setSelectionUrl(next);
             }}
-            onSelectMixed={(code) => {
-              const next = { kind: "mixed" as const, disciplineCode: code, stage: "qual" as const };
+            onSelectMixed={(code, stage) => {
+              const next = { kind: "mixed" as const, disciplineCode: code, stage };
               setSelection(next);
               setSelectionUrl(next);
             }}
@@ -261,18 +269,23 @@ function CompetitionOverview({
   mixedGroups: MixedTeamGroup[];
   locale: string;
   onSelectIndividual: (code: string, category: AgeCategory, stage: Stage, elimRound?: number) => void;
-  onSelectMixed: (code: string) => void;
+  onSelectMixed: (code: string, stage: "qual" | "final") => void;
 }) {
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       {/* Individual disciplines */}
       {groups.map((g) => {
-        const totalShooters = g.categories.reduce((s, c) => s + c.results.length, 0);
+        const totalShooters = g.categories.reduce((count, category) => {
+          const eliminationRows = category.results.filter((result) => result.elimRound != null);
+          return count + (eliminationRows.length > 0
+            ? eliminationRows.length
+            : category.results.filter((result) => result.qualTotal != null).length);
+        }, 0);
         const singleCat = g.categories.length === 1;
         const singleCatData = singleCat ? g.categories[0] : null;
 
         return (
-          <div key={g.code}>
+          <div key={g.code} style={{ order: disciplineOrder(g.code) }}>
             <div className="flex items-center gap-2.5 mb-2">
               <span
                 className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded"
@@ -331,11 +344,11 @@ function CompetitionOverview({
 
       {/* Mixed team disciplines */}
       {mixedGroups.map((g) => (
-        <div key={g.code}>
+        <div key={g.code} style={{ order: disciplineOrder(g.code) }}>
           <div className="flex items-center gap-2.5 mb-2">
             <span
               className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded"
-              style={{ background: "var(--brand-accent, #7c3aed)", color: "#fff", letterSpacing: "0.06em" }}
+              style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
             >
               {g.code}
             </span>
@@ -345,25 +358,21 @@ function CompetitionOverview({
             </span>
           </div>
 
-          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
             <button
-              onClick={() => onSelectMixed(g.code)}
+              onClick={() => onSelectMixed(g.code, "qual")}
               className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-sm font-semibold text-[var(--ink)]">{locale === "en" ? "Mixed team" : "Mešoviti tim"}</span>
+                <PhaseBadge label="Q" active />
+                <span className="text-sm font-semibold text-[var(--ink)]">{(PHASE_LABELS[locale] ?? PHASE_LABELS.en).qual}</span>
                 <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">
                   {g.teams.length}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <PhaseBadge label="Q" active />
-                {g.teams.some((t) => t.finalRank != null || t.finalTotal != null) && (
-                  <PhaseBadge label="F" accent />
-                )}
-                <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150 ml-0.5" aria-hidden="true" />
-              </div>
+              <ChevronRight size={14} className="shrink-0 text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
             </button>
+            {g.teams.some((t) => t.finalRank != null || t.finalTotal != null) && <button onClick={() => onSelectMixed(g.code, "final")} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"><div className="flex items-center gap-2.5 min-w-0"><PhaseBadge label="F" accent /><span className="text-sm font-semibold text-[var(--ink)]">{(PHASE_LABELS[locale] ?? PHASE_LABELS.en).final}</span><span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">{g.teams.filter((t) => t.finalRank != null || t.finalTotal != null).length}</span></div><ChevronRight size={14} className="shrink-0 text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" /></button>}
           </div>
         </div>
       ))}
@@ -559,7 +568,7 @@ function CompetitionDetail({
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <span
                 className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded shrink-0"
-                style={{ background: "var(--brand-accent, #7c3aed)", color: "#fff", letterSpacing: "0.06em" }}
+                style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
               >
                 {selection.disciplineCode}
               </span>
