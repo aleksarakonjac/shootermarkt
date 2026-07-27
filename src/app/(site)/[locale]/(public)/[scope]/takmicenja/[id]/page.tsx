@@ -111,6 +111,7 @@ export default async function CompetitionPage({ params }: Props) {
       disciplineName: disciplines.name,
       apparatus: disciplines.apparatus,
       nocCode: mixedTeamResults.nocCode,
+      teamNumber: mixedTeamResults.teamNumber,
       shooter1Id: mixedTeamResults.shooter1Id,
       shooter2Id: mixedTeamResults.shooter2Id,
       shooter1Name: mixedTeamResults.shooter1Name,
