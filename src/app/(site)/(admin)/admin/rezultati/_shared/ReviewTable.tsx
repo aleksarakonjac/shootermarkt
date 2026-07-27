@@ -35,7 +35,7 @@ const stickyHeader = "sticky z-20 bg-[var(--surface)]";
 const stickyCell = "sticky z-10 bg-[var(--bg)]";
 const stickyDivider = "border-l-2 border-[var(--border-strong)] [box-shadow:-8px_0_12px_-6px_rgba(0,0,0,0.12)]";
 
-function NocFlag({ noc }: { noc: string }) {
+export function NocFlag({ noc }: { noc: string }) {
   const alpha2 = NOC_LIST.find((country) => country.noc === noc)?.alpha2;
   return alpha2 ? <span className={`fi fi-${alpha2.toLowerCase()} shrink-0`} style={{ width: "14px", height: "10px", borderRadius: "1px" }} /> : null;
 }

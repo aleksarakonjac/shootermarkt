@@ -77,14 +77,15 @@ export function GalleryBlock({ images }: { images: MediaDoc[] }) {
           )}
 
           <div
-            className="relative max-w-4xl max-h-[85vh] w-full"
+            className="relative max-w-4xl max-h-[85vh] w-full aspect-[4/3]"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={current.url}
               alt={current.alt || ""}
-              className="w-full h-full object-contain rounded-lg max-h-[85vh]"
+              fill
+              sizes="90vw"
+              className="object-contain rounded-lg"
             />
             {current.alt && (
               <p className="mt-2 text-center text-sm text-white/60">{current.alt}</p>

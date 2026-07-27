@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 import { DonePanel } from "../_shared/DonePanel";
-import { MixedTeamReviewTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
+import { MixedTeamQualTable, MixedTeamFinalsTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
 
 type Step = "select" | "review" | "done";
 
@@ -236,7 +236,8 @@ export function MixedTeamMode() {
             </div>
           )}
 
-          <MixedTeamReviewTable entries={entries} onToggleSkip={toggleSkip} />
+          <MixedTeamQualTable entries={entries} onToggleSkip={toggleSkip} />
+          <MixedTeamFinalsTable entries={entries} onToggleSkip={toggleSkip} />
 
           <div className="flex gap-3">
             <button

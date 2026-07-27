@@ -5,7 +5,7 @@ import type { ReviewRow, CommitPayload } from "@/lib/pdf-import/types";
 import type { SiusFinalEntry } from "@/app/api/admin/sius/public-import/route";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
-import { MixedTeamReviewTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
+import { MixedTeamQualTable, MixedTeamFinalsTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
 
 type Step = "pick" | "disciplines" | "review" | "done";
 
@@ -476,7 +476,8 @@ export function SiusMode() {
           {teamEntries.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-[var(--muted)]">Mešoviti timovi</p>
-              <MixedTeamReviewTable entries={teamEntries} onToggleSkip={toggleTeamSkip} />
+              <MixedTeamQualTable entries={teamEntries} onToggleSkip={toggleTeamSkip} />
+              <MixedTeamFinalsTable entries={teamEntries} onToggleSkip={toggleTeamSkip} />
             </div>
           )}
 

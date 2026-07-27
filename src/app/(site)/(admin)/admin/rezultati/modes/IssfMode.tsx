@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { MIXED_TEAM_CODES, type ReviewRow, type CommitPayload } from "@/lib/pdf-import/types";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
-import { MixedTeamReviewTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
+import { MixedTeamQualTable, MixedTeamFinalsTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
 
 type Step = "pick" | "disciplines" | "review" | "done";
 
@@ -402,12 +402,15 @@ export function IssfMode() {
 
           <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))} />
 
-          {mixedEntries.length > 0 && (
-            <MixedTeamReviewTable
-              entries={mixedEntries}
-              onToggleSkip={(index) => setMixedEntries((prev) => prev.map((entry, i) => i === index ? { ...entry, skip: !entry.skip } : entry))}
-            />
-          )}
+          {mixedEntries.length > 0 && (() => {
+            const toggleMixedSkip = (index: number) => setMixedEntries((prev) => prev.map((entry, i) => i === index ? { ...entry, skip: !entry.skip } : entry));
+            return (
+              <>
+                <MixedTeamQualTable entries={mixedEntries} onToggleSkip={toggleMixedSkip} />
+                <MixedTeamFinalsTable entries={mixedEntries} onToggleSkip={toggleMixedSkip} />
+              </>
+            );
+          })()}
 
           <div className="flex gap-3">
             <button onClick={handleCommit} disabled={loading || (activeCount === 0 && activeMixedCount === 0)} className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50">
