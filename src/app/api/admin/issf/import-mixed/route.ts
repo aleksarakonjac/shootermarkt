@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
   type MixedEntry = {
     skip: boolean;
     nocCode: string;
+    teamNumber: number;
     disciplineCode: string;
     qualRank: number | null;
     qualTotal: number | null;
@@ -45,11 +46,13 @@ export async function POST(req: NextRequest) {
     mLastName: string;
     mFirstName: string;
     m_series: number[];
+    mInners: number | null;
     mTotal: number;
     fIssfId: string | null;
     fLastName: string;
     fFirstName: string;
     f_series: number[];
+    fInners: number | null;
     fTotal: number;
   };
 
@@ -57,16 +60,23 @@ export async function POST(req: NextRequest) {
   const errors: string[] = [];
 
   for (const { disciplineCode, qualPhase, finalPhase } of mixedEvents) {
-    const byNoc = new Map<string, MixedEntry>();
+    // Same nation can enter 2 teams — key by nocCode + a running per-nation
+    // counter (assigned in the order teams appear in the qual table), not
+    // just nocCode, or the 2nd team silently overwrites the 1st.
+    const entries: MixedEntry[] = [];
+    const nocCounts = new Map<string, number>();
 
     // Qual
     if (qualPhase?.resultKey) {
       try {
         const qualRows = await fetchMixedTeamQualFromHtml(competitionId, qualPhase.resultKey);
         for (const r of qualRows) {
-          byNoc.set(r.nocCode, {
+          const teamNumber = (nocCounts.get(r.nocCode) ?? 0) + 1;
+          nocCounts.set(r.nocCode, teamNumber);
+          entries.push({
             skip: false,
             nocCode: r.nocCode,
+            teamNumber,
             disciplineCode,
             qualRank: r.rank,
             qualTotal: r.total,
@@ -78,11 +88,13 @@ export async function POST(req: NextRequest) {
             mLastName: r.mLastName,
             mFirstName: r.mFirstName,
             m_series: r.mSeries,
+            mInners: r.mInners,
             mTotal: r.mTotal,
             fIssfId: r.fIssfId,
             fLastName: r.fLastName,
             fFirstName: r.fFirstName,
             f_series: r.fSeries,
+            fInners: r.fInners,
             fTotal: r.fTotal,
           });
         }
@@ -91,12 +103,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Final — merge into existing qual entries (or create new if no qual)
+    // Final — merge into the matching qual entry, identified by shared athlete
+    // ISSF id (nocCode alone can't disambiguate 2 teams from the same nation).
     if (finalPhase?.resultKey) {
       try {
         const finalRows = await fetchMixedTeamFinalFromHtml(competitionId, finalPhase.resultKey);
         for (const r of finalRows) {
-          const existing = byNoc.get(r.nocCode);
+          const existing = entries.find(
+            (e) => e.nocCode === r.nocCode &&
+              ((r.mIssfId && e.mIssfId === r.mIssfId) || (r.fIssfId && e.fIssfId === r.fIssfId))
+          );
           if (existing) {
             existing.finalRank  = r.rank;
             existing.finalTotal = r.total;
@@ -105,9 +121,12 @@ export async function POST(req: NextRequest) {
             if (r.fIssfId && !existing.fIssfId) existing.fIssfId = r.fIssfId;
             if (r.fLastName && !existing.fLastName) { existing.fLastName = r.fLastName; existing.fFirstName = r.fFirstName; }
           } else {
-            byNoc.set(r.nocCode, {
+            const teamNumber = (nocCounts.get(r.nocCode) ?? 0) + 1;
+            nocCounts.set(r.nocCode, teamNumber);
+            entries.push({
               skip: false,
               nocCode: r.nocCode,
+              teamNumber,
               disciplineCode,
               qualRank: null,
               qualTotal: null,
@@ -119,11 +138,13 @@ export async function POST(req: NextRequest) {
               mLastName: r.mLastName,
               mFirstName: r.mFirstName,
               m_series: [],
+              mInners: null,
               mTotal: 0,
               fIssfId: r.fIssfId,
               fLastName: r.fLastName,
               fFirstName: r.fFirstName,
               f_series: [],
+              fInners: null,
               fTotal: 0,
             });
           }
@@ -133,7 +154,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    allEntries.push(...byNoc.values());
+    allEntries.push(...entries);
   }
 
   return NextResponse.json({ entries: allEntries, eventCount: mixedEvents.length, errors });

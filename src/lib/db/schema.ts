@@ -547,6 +547,8 @@ export const mixedTeamResults = pgTable(
     competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
     disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
     nocCode: varchar("noc_code", { length: 3 }).notNull(),
+    // A nation can enter 2 teams (e.g. "China 1", "China 2") — distinguishes them.
+    teamNumber: smallint("team_number").notNull().default(1),
     // Optional links to shooters in our DB
     shooter1Id: integer("shooter1_id").references(() => shooters.id, { onDelete: "set null" }),
     shooter2Id: integer("shooter2_id").references(() => shooters.id, { onDelete: "set null" }),
@@ -556,21 +558,24 @@ export const mixedTeamResults = pgTable(
     shooter1Name: varchar("shooter1_name", { length: 200 }),
     shooter2Name: varchar("shooter2_name", { length: 200 }),
     // Individual shooter series within the mixed team event (separate from individual discipline results)
-    shooter1Detail: jsonb("shooter1_detail").$type<{ series: number[]; total: number }>(),
-    shooter2Detail: jsonb("shooter2_detail").$type<{ series: number[]; total: number }>(),
+    shooter1Detail: jsonb("shooter1_detail").$type<{ series: number[]; inners?: number | null; total: number }>(),
+    shooter2Detail: jsonb("shooter2_detail").$type<{ series: number[]; inners?: number | null; total: number }>(),
     // Qualification
     qualRank: integer("qual_rank"),
     qualTotal: decimal("qual_total", { precision: 7, scale: 1 }),
+    qualInners: integer("qual_inners"), // APMT only (ARMT has no inners)
     qualified: boolean("qualified"),
+    qualRemark: varchar("qual_remark", { length: 10 }),
     // Final
     finalRank: integer("final_rank"),
     finalTotal: decimal("final_total", { precision: 7, scale: 1 }),
+    finalRemark: varchar("final_remark", { length: 200 }), // PenaltyRemark can be a long sentence
     source: resultSourceEnum("source").notNull().default("manual"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [
     index("mixed_team_results_comp_idx").on(t.competitionId),
-    uniqueIndex("mixed_team_results_comp_disc_noc_unique").on(t.competitionId, t.disciplineId, t.nocCode),
+    uniqueIndex("mixed_team_results_comp_disc_noc_unique").on(t.competitionId, t.disciplineId, t.nocCode, t.teamNumber),
   ]
 );
 

@@ -3,37 +3,13 @@
 import { useState } from "react";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
 import { DonePanel } from "../_shared/DonePanel";
+import { MixedTeamReviewTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
 
 type Step = "select" | "review" | "done";
 
-interface MixedEntry {
-  skip: boolean;
-  nocCode: string;
-  disciplineCode: string;
-  qualRank: number | null;
-  qualTotal: number | null;
-  inners: number | null;
-  qualified: boolean;
-  finalRank: number | null;
-  finalTotal: number | null;
-  mIssfId: string | null;
-  mLastName: string;
-  mFirstName: string;
-  m_series: number[];
-  mTotal: number;
-  fIssfId: string | null;
-  fLastName: string;
-  fFirstName: string;
-  f_series: number[];
-  fTotal: number;
-}
+type MixedEntry = MixedTeamEntry;
 
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
-
-const DISC_LABELS: Record<string, string> = {
-  APMT: "10m AP Mešoviti tim",
-  ARMT: "10m VP Mešoviti tim",
-};
 
 const LEVELS: { value: CompetitionLevel; label: string }[] = [
   { value: "world",         label: "Svetsko (ISSF)"  },
@@ -116,16 +92,19 @@ export function MixedTeamMode() {
             entries: discEntries.map((e) => ({
               skip: e.skip,
               nocCode: e.nocCode,
+              teamNumber: e.teamNumber,
               qualRank: e.qualRank,
               qualTotal: e.qualTotal,
               qualified: e.qualified,
               m_lastName: e.mLastName,
               m_firstName: e.mFirstName,
               m_series: e.m_series,
+              mInners: e.mInners,
               mTotal: e.mTotal,
               f_lastName: e.fLastName,
               f_firstName: e.fFirstName,
               f_series: e.f_series,
+              fInners: e.fInners,
               fTotal: e.fTotal,
             })),
           }),
@@ -149,6 +128,7 @@ export function MixedTeamMode() {
               isFinals: true,
               entries: finalists.map((e) => ({
                 nocCode: e.nocCode,
+                teamNumber: e.teamNumber,
                 finalRank: e.finalRank,
                 finalTotal: e.finalTotal,
               })),
@@ -256,65 +236,7 @@ export function MixedTeamMode() {
             </div>
           )}
 
-          <div className="rounded-xl border border-[var(--border)] overflow-hidden overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-[var(--surface)] border-b border-[var(--border)]">
-                <tr>
-                  <th className="px-3 py-2 text-left text-[var(--muted)] font-semibold">Disciplina</th>
-                  <th className="px-3 py-2 text-left text-[var(--muted)] font-semibold">NOC</th>
-                  <th className="px-3 py-2 text-left text-[var(--muted)] font-semibold">Rang Q</th>
-                  <th className="px-3 py-2 text-left text-[var(--muted)] font-semibold">Ukupno</th>
-                  <th className="px-3 py-2 text-left text-[var(--muted)] font-semibold">M strelac</th>
-                  <th className="px-3 py-2 text-left text-[var(--muted)] font-semibold">Ž strelac</th>
-                  <th className="px-3 py-2 text-left text-[var(--muted)] font-semibold">Finale</th>
-                  <th className="px-3 py-2 text-center text-[var(--muted)] font-semibold">Preskoči</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {entries.map((e, i) => (
-                  <tr
-                    key={i}
-                    className="transition-colors"
-                    style={{ background: e.skip ? "var(--surface)" : undefined, opacity: e.skip ? 0.5 : 1 }}
-                  >
-                    <td className="px-3 py-2.5 font-semibold" style={{ color: "var(--brand-primary)" }}>
-                      {e.disciplineCode}
-                      <span className="ml-1 font-normal text-[var(--muted)]">{DISC_LABELS[e.disciplineCode] ?? ""}</span>
-                    </td>
-                    <td className="px-3 py-2.5 font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">{e.nocCode}</td>
-                    <td className="px-3 py-2.5 text-[var(--muted)]">
-                      {e.qualRank != null ? `#${e.qualRank}` : "—"}
-                      {e.qualified && <span className="ml-1 text-[0.6rem] px-1 rounded" style={{ background: "var(--brand-primary)", color: "white" }}>Q</span>}
-                    </td>
-                    <td className="px-3 py-2.5 font-semibold text-[var(--ink)]">
-                      {e.qualTotal ?? "—"}
-                      {e.inners != null && <span className="ml-1 text-[var(--muted)]">{e.inners}x</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-[var(--ink)]">
-                      {e.mLastName ? `${e.mLastName} ${e.mFirstName}`.trim() : <span className="text-[var(--subtle)]">—</span>}
-                      {e.mTotal > 0 && <span className="ml-1 text-[var(--muted)]">({e.mTotal})</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-[var(--ink)]">
-                      {e.fLastName ? `${e.fLastName} ${e.fFirstName}`.trim() : <span className="text-[var(--subtle)]">—</span>}
-                      {e.fTotal > 0 && <span className="ml-1 text-[var(--muted)]">({e.fTotal})</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-[var(--muted)]">
-                      {e.finalRank != null ? `#${e.finalRank} · ${e.finalTotal ?? ""}` : "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <button
-                        onClick={() => toggleSkip(i)}
-                        className="rounded px-2 py-0.5 text-[0.65rem] font-semibold border border-[var(--border)] transition-colors hover:bg-[var(--surface)]"
-                        style={{ color: e.skip ? "var(--brand-primary)" : "var(--muted)" }}
-                      >
-                        {e.skip ? "Uključi" : "Preskoči"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <MixedTeamReviewTable entries={entries} onToggleSkip={toggleSkip} />
 
           <div className="flex gap-3">
             <button

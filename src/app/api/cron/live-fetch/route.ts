@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { competitions, competitionSchedule, disciplines, results, shooters } from "@/lib/db/schema";
+import { competitions, competitionSchedule, disciplines, mixedTeamResults, results, shooters } from "@/lib/db/schema";
 import type { AgeCategory } from "@/lib/db/schema";
 import { and, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
-import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml } from "@/lib/issf/adapter";
-import { fetchLiveSiusResults, type SiusLiveData } from "@/lib/sius/public-adapter";
+import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml, extractMixedTeamEvents, fetchMixedTeamQualFromHtml, fetchMixedTeamFinalFromHtml } from "@/lib/issf/adapter";
+import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@/lib/sius/public-adapter";
 import { matchShooter } from "@/lib/name-match";
 
 export const maxDuration = 30;
@@ -109,17 +109,30 @@ async function processCompetition(
     slots.map((s) => [`${s.disciplineId}|${s.category}|${s.stage.startsWith("qual") ? "qual" : s.stage}`, s])
   ).values()];
 
+  let mixedUpserted = 0;
+
   if (siusId) {
+    // Mixed team (ARMT/APMT) writes to mixed_team_results, not results —
+    // handle it separately, then fall through to the individual-discipline path.
+    const mixedSlots = dedupedSlots.filter((s) => MIXED_TEAM_CODES.has(s.disciplineCode));
+    if (mixedSlots.length > 0) {
+      mixedUpserted = await processMixedTeamSlots(competitionId, siusId, issfId, mixedSlots, allShooters, shooterByIssfId);
+    }
+
     // ── SIUS primary source ─────────────────────────────────────────────
-    const disciplineCodes = [...new Set(dedupedSlots.map((s) => s.disciplineCode))];
+    const disciplineCodes = [...new Set(
+      dedupedSlots.filter((s) => !MIXED_TEAM_CODES.has(s.disciplineCode)).map((s) => s.disciplineCode)
+    )];
 
     console.log("[cron] SIUS disciplineCodes:", disciplineCodes);
     let siusData: Map<string, SiusLiveData> = new Map();
-    try {
-      siusData = await fetchLiveSiusResults(siusId, disciplineCodes);
-      console.log("[cron] SIUS data:", [...siusData.entries()].map(([k, v]) => `${k}: qual=${v.qual.length} elim=${v.elim.length}`));
-    } catch (e) {
-      console.error("[cron] SIUS fetch failed:", e);
+    if (disciplineCodes.length > 0) {
+      try {
+        siusData = await fetchLiveSiusResults(siusId, disciplineCodes);
+        console.log("[cron] SIUS data:", [...siusData.entries()].map(([k, v]) => `${k}: qual=${v.qual.length} elim=${v.elim.length}`));
+      } catch (e) {
+        console.error("[cron] SIUS fetch failed:", e);
+      }
     }
 
     for (const slot of dedupedSlots) {
@@ -176,6 +189,11 @@ async function processCompetition(
   } else if (issfId) {
     // ── ISSF only ───────────────────────────────────────────────────────
     await fetchFromIssf(parseInt(issfId), dedupedSlots, competitionId, allShooters, shooterByIssfId, rows);
+
+    const mixedSlots = dedupedSlots.filter((s) => MIXED_TEAM_CODES.has(s.disciplineCode));
+    if (mixedSlots.length > 0) {
+      mixedUpserted = await processMixedTeamSlots(competitionId, null, issfId, mixedSlots, allShooters, shooterByIssfId);
+    }
   }
 
   // Defensive dedup: a single insert batch can't touch the same
@@ -187,7 +205,7 @@ async function processCompetition(
   ).values()];
 
   console.log(`[cron] comp ${competitionId}: ${rows.length} rows fetched, ${dedupedRows.length} after dedup`);
-  if (dedupedRows.length === 0) return 0;
+  if (dedupedRows.length === 0) return mixedUpserted;
 
   // Qual rows: upsert by (shooter, comp, disc, cat)
   const qualRows = dedupedRows.filter((r) => r.elimRound == null);
@@ -233,6 +251,101 @@ async function processCompetition(
       });
   }
 
+  return dedupedRows.length + mixedUpserted;
+}
+
+// ── Mixed team (ARMT / APMT) ─────────────────────────────────────────────────
+
+async function processMixedTeamSlots(
+  competitionId: number,
+  siusId: string | null,
+  issfId: string | null,
+  mixedSlots: Array<{ disciplineId: number; stage: string; disciplineCode: string }>,
+  allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>,
+  shooterByIssfId: Map<string, number>
+): Promise<number> {
+  const disciplineCodes = [...new Set(mixedSlots.map((s) => s.disciplineCode))];
+  const rows: Array<typeof mixedTeamResults.$inferInsert> = [];
+
+  if (siusId) {
+    let siusData;
+    try {
+      siusData = await fetchLiveSiusMixedTeamResults(siusId, disciplineCodes);
+    } catch (e) {
+      console.error("[cron] SIUS mixed-team fetch failed:", e);
+      siusData = new Map();
+    }
+
+    for (const slot of mixedSlots) {
+      const eventData = siusData.get(slot.disciplineCode);
+      if (!eventData) continue;
+
+      const push = async (r: SiusTeamResult, isFinal: boolean) => {
+        const [a1, a2] = r.athletes;
+        const shooter1Id = a1 ? await resolveOrCreateShooter({ ...a1, nation: r.nocCode }, allShooters) : null;
+        const shooter2Id = a2 ? await resolveOrCreateShooter({ ...a2, nation: r.nocCode }, allShooters) : null;
+        rows.push({
+          competitionId,
+          disciplineId: slot.disciplineId,
+          nocCode: r.nocCode,
+          teamNumber: r.teamNumber,
+          shooter1Id,
+          shooter2Id,
+          shooter1Name: a1 ? `${a1.lastName} ${a1.firstName}`.trim() : null,
+          shooter2Name: a2 ? `${a2.lastName} ${a2.firstName}`.trim() : null,
+          ...(a1 ? { shooter1Detail: { series: a1.series, inners: a1.inners, total: a1.total } } : {}),
+          ...(a2 ? { shooter2Detail: { series: a2.series, inners: a2.inners, total: a2.total } } : {}),
+          ...(isFinal
+            ? { finalRank: r.rank, finalTotal: r.total.toFixed(1), finalRemark: r.remark }
+            : { qualRank: r.rank, qualTotal: r.total.toFixed(1), qualInners: r.inners, qualified: r.qualified || null, qualRemark: r.remark }),
+          source: "issf_import",
+        });
+      };
+
+      if (slot.stage.startsWith("qual")) for (const r of eventData.qual) await push(r, false);
+      if (slot.stage === "final" || slot.stage === "elimination") for (const r of eventData.final) await push(r, true);
+    }
+  }
+
+  // SIUS gave nothing (not scheduled there, or no siusId at all) — fall back to
+  // the ISSF HTML scraper, same as the individual-discipline path above.
+  if (rows.length === 0 && issfId) {
+    await fetchMixedTeamFromIssf(parseInt(issfId), mixedSlots, competitionId, allShooters, shooterByIssfId, rows);
+  }
+
+  // Same (comp, disc, noc, teamNumber) can appear from both a qual and a final
+  // slot in one run — merge instead of letting the batch insert collide.
+  const merged = new Map<string, typeof mixedTeamResults.$inferInsert>();
+  for (const r of rows) {
+    const key = `${r.competitionId}|${r.disciplineId}|${r.nocCode}|${r.teamNumber}`;
+    merged.set(key, { ...merged.get(key), ...r });
+  }
+  const dedupedRows = [...merged.values()];
+  if (dedupedRows.length === 0) return 0;
+
+  await db
+    .insert(mixedTeamResults)
+    .values(dedupedRows)
+    .onConflictDoUpdate({
+      target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
+      set: {
+        shooter1Id: sql`coalesce(excluded.shooter1_id, ${mixedTeamResults.shooter1Id})`,
+        shooter2Id: sql`coalesce(excluded.shooter2_id, ${mixedTeamResults.shooter2Id})`,
+        shooter1Name: sql`excluded.shooter1_name`,
+        shooter2Name: sql`excluded.shooter2_name`,
+        shooter1Detail: sql`coalesce(excluded.shooter1_detail, ${mixedTeamResults.shooter1Detail})`,
+        shooter2Detail: sql`coalesce(excluded.shooter2_detail, ${mixedTeamResults.shooter2Detail})`,
+        qualRank: sql`coalesce(excluded.qual_rank, ${mixedTeamResults.qualRank})`,
+        qualTotal: sql`coalesce(excluded.qual_total, ${mixedTeamResults.qualTotal})`,
+        qualInners: sql`coalesce(excluded.qual_inners, ${mixedTeamResults.qualInners})`,
+        qualified: sql`coalesce(excluded.qualified, ${mixedTeamResults.qualified})`,
+        qualRemark: sql`coalesce(excluded.qual_remark, ${mixedTeamResults.qualRemark})`,
+        finalRank: sql`coalesce(excluded.final_rank, ${mixedTeamResults.finalRank})`,
+        finalTotal: sql`coalesce(excluded.final_total, ${mixedTeamResults.finalTotal})`,
+        finalRemark: sql`coalesce(excluded.final_remark, ${mixedTeamResults.finalRemark})`,
+      },
+    });
+
   return dedupedRows.length;
 }
 
@@ -266,6 +379,113 @@ async function resolveOrCreateShooter(
   }
 
   return null;
+}
+
+// ── ISSF HTML scraper (mixed team) ───────────────────────────────────────────
+
+async function fetchMixedTeamFromIssf(
+  issfCompId: number,
+  slots: Array<{ disciplineCode: string; stage: string; disciplineId: number }>,
+  competitionId: number,
+  allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>,
+  shooterByIssfId: Map<string, number>,
+  rows: Array<typeof mixedTeamResults.$inferInsert>
+) {
+  if (isNaN(issfCompId)) return;
+
+  let groups;
+  try {
+    groups = await fetchCompetitionResults(issfCompId);
+  } catch {
+    return;
+  }
+
+  const mixedEvents = extractMixedTeamEvents(groups);
+  const resolveId = (issfId: string | null, firstName: string, lastName: string, nocCode: string) => {
+    if (issfId && shooterByIssfId.has(issfId)) return shooterByIssfId.get(issfId)!;
+    const m = matchShooter(firstName, lastName, nocCode, allShooters);
+    return m.kind === "exact" ? m.id : null;
+  };
+
+  for (const slot of slots) {
+    const event = mixedEvents.find((e) => e.disciplineCode === slot.disciplineCode);
+    if (!event) continue;
+
+    // Same nation can enter 2 teams — number them in table order, and match
+    // final rows back to their qual entry by shared athlete issfId (nocCode
+    // alone can't tell the 2 teams apart).
+    const nocCounts = new Map<string, number>();
+    const teamRows: Array<typeof mixedTeamResults.$inferInsert & { mIssfId: string | null; fIssfId: string | null }> = [];
+
+    if (slot.stage.startsWith("qual") && event.qualPhase?.resultKey) {
+      let qualResults;
+      try {
+        qualResults = await fetchMixedTeamQualFromHtml(issfCompId, event.qualPhase.resultKey, true);
+      } catch { continue; }
+
+      for (const r of qualResults) {
+        const teamNumber = (nocCounts.get(r.nocCode) ?? 0) + 1;
+        nocCounts.set(r.nocCode, teamNumber);
+        teamRows.push({
+          competitionId,
+          disciplineId: slot.disciplineId,
+          nocCode: r.nocCode,
+          teamNumber,
+          mIssfId: r.mIssfId,
+          fIssfId: r.fIssfId,
+          shooter1Id: resolveId(r.mIssfId, r.mFirstName, r.mLastName, r.nocCode),
+          shooter2Id: resolveId(r.fIssfId, r.fFirstName, r.fLastName, r.nocCode),
+          shooter1Name: `${r.mLastName} ${r.mFirstName}`.trim() || null,
+          shooter2Name: `${r.fLastName} ${r.fFirstName}`.trim() || null,
+          shooter1Detail: { series: r.mSeries, inners: r.mInners, total: r.mTotal },
+          shooter2Detail: { series: r.fSeries, inners: r.fInners, total: r.fTotal },
+          qualRank: r.rank,
+          qualTotal: r.total.toString(),
+          qualInners: r.inners,
+          qualified: r.qualified,
+          source: "issf_import",
+        });
+      }
+    }
+
+    if ((slot.stage === "final" || slot.stage === "elimination") && event.finalPhase?.resultKey) {
+      let finalResults;
+      try {
+        finalResults = await fetchMixedTeamFinalFromHtml(issfCompId, event.finalPhase.resultKey, true);
+      } catch { continue; }
+
+      for (const r of finalResults) {
+        const existing = teamRows.find(
+          (t) => t.nocCode === r.nocCode &&
+            ((r.mIssfId && t.mIssfId === r.mIssfId) || (r.fIssfId && t.fIssfId === r.fIssfId))
+        );
+        if (existing) {
+          existing.finalRank = r.rank;
+          existing.finalTotal = r.total.toFixed(1);
+        } else {
+          const teamNumber = (nocCounts.get(r.nocCode) ?? 0) + 1;
+          nocCounts.set(r.nocCode, teamNumber);
+          teamRows.push({
+            competitionId,
+            disciplineId: slot.disciplineId,
+            nocCode: r.nocCode,
+            teamNumber,
+            mIssfId: r.mIssfId,
+            fIssfId: r.fIssfId,
+            shooter1Id: resolveId(r.mIssfId, r.mFirstName, r.mLastName, r.nocCode),
+            shooter2Id: resolveId(r.fIssfId, r.fFirstName, r.fLastName, r.nocCode),
+            shooter1Name: `${r.mLastName} ${r.mFirstName}`.trim() || null,
+            shooter2Name: `${r.fLastName} ${r.fFirstName}`.trim() || null,
+            finalRank: r.rank,
+            finalTotal: r.total.toFixed(1),
+            source: "issf_import",
+          });
+        }
+      }
+    }
+
+    rows.push(...teamRows.map(({ mIssfId: _m, fIssfId: _f, ...row }) => row));
+  }
 }
 
 // ── ISSF HTML scraper ─────────────────────────────────────────────────────────

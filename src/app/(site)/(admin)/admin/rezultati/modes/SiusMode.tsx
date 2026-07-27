@@ -5,6 +5,7 @@ import type { ReviewRow, CommitPayload } from "@/lib/pdf-import/types";
 import type { SiusFinalEntry } from "@/app/api/admin/sius/public-import/route";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
+import { MixedTeamReviewTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
 
 type Step = "pick" | "disciplines" | "review" | "done";
 
@@ -12,7 +13,7 @@ interface DbComp { id: number; name: string; date: string; location: string | nu
 interface SiusEvent { runningId: string; eventCode: string; name: string; state: string }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
 
-const SUPPORTED_CODES = new Set(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW", "RFPM"]);
+const SUPPORTED_CODES = new Set(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW", "ARMT", "APMT"]);
 
 const fmtVal = (v: number, code: string) =>
   (code.startsWith("AR") || code.startsWith("R3P") || code.startsWith("AP")) ? v.toFixed(1) : String(Math.round(v));
@@ -157,6 +158,7 @@ export function SiusMode() {
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [finalEntries, setFinalEntries] = useState<SiusFinalEntry[]>([]);
+  const [teamEntries, setTeamEntries] = useState<MixedTeamEntry[]>([]);
   const [eventCount, setEventCount] = useState(0);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [nocFilter, setNocFilter] = useState("");
@@ -202,6 +204,7 @@ export function SiusMode() {
       if (!res.ok) throw new Error(data.error ?? "Import failed");
       setRows(data.rows);
       setFinalEntries(data.finalEntries ?? []);
+      setTeamEntries(data.teamEntries ?? []);
       setEventCount(data.eventCount);
       setImportErrors(data.errors ?? []);
       setStep("review");
@@ -234,15 +237,86 @@ export function SiusMode() {
     });
 
     const payload: CommitPayload = { competitionId: selectedComp.id, rows: mergedRows };
+    let inserted = 0, skipped = 0;
+    const errors: string[] = [];
     try {
-      const res = await fetch("/api/admin/import/commit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Commit error");
-      setResult(data); setStep("done");
+      if (mergedRows.length > 0) {
+        const res = await fetch("/api/admin/import/commit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Commit error");
+        inserted += data.inserted ?? 0;
+        skipped += data.skipped ?? 0;
+        errors.push(...(data.errors ?? []));
+      }
+
+      // Mixed team entries commit through a separate endpoint, one call per discipline.
+      const byDisc = new Map<string, MixedTeamEntry[]>();
+      for (const e of teamEntries) {
+        if (!byDisc.has(e.disciplineCode)) byDisc.set(e.disciplineCode, []);
+        byDisc.get(e.disciplineCode)!.push(e);
+      }
+      for (const [disc, discEntries] of byDisc) {
+        const qualRes = await fetch("/api/admin/import/commit-mixed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            competitionId: selectedComp.id,
+            discipline: disc,
+            isFinals: false,
+            entries: discEntries.map((e) => ({
+              skip: e.skip,
+              nocCode: e.nocCode,
+              teamNumber: e.teamNumber,
+              qualRank: e.qualRank,
+              qualTotal: e.qualTotal,
+              qualified: e.qualified,
+              m_lastName: e.mLastName,
+              m_firstName: e.mFirstName,
+              m_series: e.m_series,
+              mInners: e.mInners,
+              mTotal: e.mTotal,
+              f_lastName: e.fLastName,
+              f_firstName: e.fFirstName,
+              f_series: e.f_series,
+              fInners: e.fInners,
+              fTotal: e.fTotal,
+            })),
+          }),
+        });
+        const qualData = await qualRes.json();
+        if (!qualRes.ok) { errors.push(qualData.error ?? `${disc}: commit error`); continue; }
+        inserted += qualData.inserted ?? 0;
+        skipped += qualData.skipped ?? 0;
+        errors.push(...(qualData.errors ?? []));
+
+        const finalists = discEntries.filter((e) => !e.skip && e.finalRank != null);
+        if (finalists.length > 0) {
+          const finalRes = await fetch("/api/admin/import/commit-mixed", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              competitionId: selectedComp.id,
+              discipline: disc,
+              isFinals: true,
+              entries: finalists.map((e) => ({
+                nocCode: e.nocCode,
+                teamNumber: e.teamNumber,
+                finalRank: e.finalRank,
+                finalTotal: e.finalTotal,
+              })),
+            }),
+          });
+          const finalData = await finalRes.json();
+          errors.push(...(finalData.errors ?? []));
+        }
+      }
+
+      setResult({ inserted, skipped, errors, competitionId: selectedComp.id });
+      setStep("done");
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }
@@ -251,8 +325,12 @@ export function SiusMode() {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
 
+  function toggleTeamSkip(idx: number) {
+    setTeamEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, skip: !e.skip } : e)));
+  }
+
   function reset() {
-    setStep("pick"); setRows([]); setFinalEntries([]); setResult(null); setError(null);
+    setStep("pick"); setRows([]); setFinalEntries([]); setTeamEntries([]); setResult(null); setError(null);
     setNocFilter(""); setImportErrors([]); setEvents([]);
     setSelectedCodes(new Set()); setSelectedComp(null); setSiusId("");
   }
@@ -261,7 +339,7 @@ export function SiusMode() {
     setStep("pick"); setEvents([]); setSelectedCodes(new Set()); setError(null);
   }
 
-  const activeCount = rows.filter((r) => !r.skip).length;
+  const activeCount = rows.filter((r) => !r.skip).length + teamEntries.filter((e) => !e.skip).length;
 
   if (step === "done" && result) {
     return <DonePanel result={result} onReset={reset} resetLabel="Uvezi još jedno takmičenje" />;
@@ -391,7 +469,16 @@ export function SiusMode() {
             </div>
           )}
 
-          <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))} />
+          {rows.length > 0 && (
+            <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))} />
+          )}
+
+          {teamEntries.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-[var(--muted)]">Mešoviti timovi</p>
+              <MixedTeamReviewTable entries={teamEntries} onToggleSkip={toggleTeamSkip} />
+            </div>
+          )}
 
           {/* Finals section — per discipline */}
           {finalEntries.length > 0 && (() => {

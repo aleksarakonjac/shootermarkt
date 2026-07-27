@@ -19,16 +19,19 @@ export async function POST(req: NextRequest) {
   interface QualEntry {
     skip?: boolean;
     nocCode: string;
+    teamNumber?: number;
     qualRank?: number | null;
     qualTotal?: number | null;
     qualified?: boolean | null;
     m_lastName?: string;
     m_firstName?: string;
     m_series?: number[];
+    mInners?: number | null;
     mTotal?: number;
     f_lastName?: string;
     f_firstName?: string;
     f_series?: number[];
+    fInners?: number | null;
     fTotal?: number;
     finalRank?: number | null;
     finalTotal?: number | null;
@@ -92,12 +95,13 @@ export async function POST(req: NextRequest) {
             competitionId,
             disciplineId: disc.id,
             nocCode: e.nocCode,
+            teamNumber: e.teamNumber ?? 1,
             finalRank: e.finalRank ?? null,
             finalTotal: e.finalTotal != null ? String(e.finalTotal) : null,
             source: "manual",
           })
           .onConflictDoUpdate({
-            target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.nocCode],
+            target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
             set: {
               finalRank: e.finalRank ?? null,
               finalTotal: e.finalTotal != null ? String(e.finalTotal) : null,
@@ -110,22 +114,23 @@ export async function POST(req: NextRequest) {
             competitionId,
             disciplineId: disc.id,
             nocCode: e.nocCode,
+            teamNumber: e.teamNumber ?? 1,
             shooter1Name: `${e.m_lastName} ${e.m_firstName}`.trim() || null,
             shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
-            shooter1Detail: { series: e.m_series ?? [], total: e.mTotal ?? 0 },
-            shooter2Detail: { series: e.f_series ?? [], total: e.fTotal ?? 0 },
+            shooter1Detail: { series: e.m_series ?? [], inners: e.mInners ?? null, total: e.mTotal ?? 0 },
+            shooter2Detail: { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
             qualRank: e.qualRank ?? null,
             qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
             qualified: e.qualified ?? null,
             source: "manual",
           })
           .onConflictDoUpdate({
-            target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.nocCode],
+            target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
             set: {
               shooter1Name: `${e.m_lastName} ${e.m_firstName}`.trim() || null,
               shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
-              shooter1Detail: { series: e.m_series ?? [], total: e.mTotal ?? 0 },
-              shooter2Detail: { series: e.f_series ?? [], total: e.fTotal ?? 0 },
+              shooter1Detail: { series: e.m_series ?? [], inners: e.mInners ?? null, total: e.mTotal ?? 0 },
+              shooter2Detail: { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
               qualRank: e.qualRank ?? null,
               qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
               qualified: e.qualified ?? null,

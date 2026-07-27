@@ -1,6 +1,6 @@
 const SIUS_PUB = "https://shootingsportscloud.com:8594/api/v1/pub";
 
-const MVP_CODES = new Set(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW", "RFPM"]);
+export const MIXED_TEAM_CODES = new Set(["ARMT", "APMT"]);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -243,6 +243,157 @@ export async function fetchLiveSiusResults(
   return out;
 }
 
+// ── Mixed team (ARMT / APMT) ────────────────────────────────────────────────────
+
+export interface SiusTeamAthlete {
+  siusAthleteId: string | null;
+  firstName: string;
+  lastName: string;
+  total: number;
+  inners: number | null;
+  series: number[];
+}
+
+export interface SiusTeamResult {
+  rank: number;
+  nocCode: string;
+  teamNumber: number; // trailing digit in DisplayName ("China 1" / "China 2")
+  total: number;
+  inners: number | null; // APMT qual only — ARMT and any final is plain decimal
+  qualified: boolean;
+  remark: string | null;
+  athletes: SiusTeamAthlete[]; // ordered by TeamIndex, len 2
+}
+
+export interface SiusMixedTeamData {
+  qual: SiusTeamResult[];
+  final: SiusTeamResult[];
+}
+
+/** SIUS team totals come as "591-32x" (total-inners) for APMT qual, or a plain
+ *  decimal string ("488.4") everywhere else (ARMT, and any final). */
+function parseTeamValue(value: string): { total: number; inners: number | null } {
+  const dash = value.indexOf("-");
+  if (dash === -1) return { total: parseFloat(value) || 0, inners: null };
+  const inners = parseInt(value.slice(dash + 1), 10);
+  return { total: parseFloat(value.slice(0, dash)) || 0, inners: isNaN(inners) ? null : inners };
+}
+
+function parseTeamRemark(extensions: Array<{ Key: string; Value: string }>): {
+  qualified: boolean;
+  remark: string | null;
+} {
+  const byKey = Object.fromEntries(extensions.map((e) => [e.Key, e.Value]));
+  return {
+    qualified: byKey.QualificationRemark === "Q",
+    remark: byKey.StatusRemark ?? byKey.PenaltyRemark ?? byKey.ShooterGroupRemark ?? null,
+  };
+}
+
+async function fetchSiusTeamSeries(
+  compUuid: string,
+  eventUuid: string,
+  subEventUuid: string
+): Promise<SiusTeamResult[]> {
+  const raw = await pub<RawTeamSeries | RawTeamSeries[]>(
+    `/series?runningCompetitionId=${compUuid}` +
+      `&runningCompetitionEventId=${eventUuid}` +
+      `&subEventId=${subEventUuid}` +
+      `&shooterGroup=Regulars&teamKind=TeamOfIndividuals`
+  );
+
+  const data: RawTeamSeries = Array.isArray(raw) ? (raw[0] ?? {}) : raw;
+  const rows = data["Series-TeamOfIndividuals"] ?? [];
+  return rows.flatMap((row) => {
+    const rank = parseInt(row.Rank?.DisplayText ?? "", 10);
+    if (isNaN(rank)) return [];
+
+    const { total, inners } = parseTeamValue(row.Result?.Value ?? "");
+    const teamNumMatch = (row.DisplayName ?? "").trim().match(/(\d+)\s*$/);
+    const teamNumber = teamNumMatch ? parseInt(teamNumMatch[1], 10) : 1;
+
+    const athletes: SiusTeamAthlete[] = (row.AthletesSeries ?? [])
+      .slice()
+      .sort((a, b) => (a.TeamIndex ?? 0) - (b.TeamIndex ?? 0))
+      .map((a) => {
+        const { firstName, lastName } = splitDisplayName(a.DisplayName ?? "");
+        const { total: aTotal, inners: aInners } = parseTeamValue(a.Result ?? "");
+        return {
+          siusAthleteId: a.AthleteIdentifier?.Identifier ?? null,
+          firstName,
+          lastName,
+          total: aTotal,
+          inners: aInners,
+          series: parseSeriesTotals(a.Series ?? []),
+        };
+      });
+
+    return [
+      {
+        rank,
+        nocCode: row.Nation ?? "",
+        teamNumber,
+        total,
+        inners,
+        athletes,
+        ...parseTeamRemark(row.Result?.Extensions ?? []),
+      },
+    ];
+  });
+}
+
+/** Fetch mixed-team qual + final for the given mixed-team discipline codes
+ *  (subset of MIXED_TEAM_CODES). Unlike individual finals, SIUS keeps the
+ *  whole mixed-team final in a single sub-event — eliminated teams simply
+ *  have blank trailing series instead of a separate elim sub-event. */
+export async function fetchLiveSiusMixedTeamResults(
+  compUuid: string,
+  disciplineCodes: string[]
+): Promise<Map<string, SiusMixedTeamData>> {
+  const out = new Map<string, SiusMixedTeamData>();
+
+  const allEvents = await fetchSiusEvents(compUuid);
+  const relevantEvents = allEvents.filter((e) => disciplineCodes.includes(e.eventCode));
+
+  await Promise.all(
+    relevantEvents.map(async (event) => {
+      let subEvents: SiusSubEvent[];
+      try {
+        subEvents = await fetchSiusSubEventsAll(compUuid, event.runningId);
+      } catch {
+        return;
+      }
+
+      const done = subEvents.filter((s) => s.state !== "Planned");
+      const qualSubs = done.filter((s) => !isFinalSubEvent(s.name));
+      const finalSub = done.find((s) => isFinalSubEvent(s.name));
+
+      const data: SiusMixedTeamData = { qual: [], final: [] };
+
+      const qualResults = await Promise.all(
+        qualSubs.map((sub) =>
+          fetchSiusTeamSeries(compUuid, event.runningId, sub.runningId).catch(() => [])
+        )
+      );
+      data.qual.push(...qualResults.flat());
+      if (qualSubs.length > 1 && data.qual.length > 0) {
+        data.qual.sort((a, b) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0));
+        data.qual.forEach((r, i) => { r.rank = i + 1; });
+      }
+
+      if (finalSub) {
+        try {
+          data.final = await fetchSiusTeamSeries(compUuid, event.runningId, finalSub.runningId);
+        } catch { /* ignore */ }
+      }
+
+      if (data.qual.length > 0 || data.final.length > 0) out.set(event.eventCode, data);
+    })
+  );
+
+  return out;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function parseSeriesTotals(
@@ -323,5 +474,26 @@ interface RawAthleteSeries {
   AthleteIdentifier?: { Identifier?: string };
   TotalScore?: number;
   NumberOfInnerTen?: number;
+  Series?: Array<Array<{ Order: number; Value: string }>>;
+}
+
+interface RawTeamSeries {
+  "Series-TeamOfIndividuals"?: RawTeamSeriesRow[];
+}
+
+interface RawTeamSeriesRow {
+  Rank?: { DisplayText: string };
+  Result?: { Order: number; Value: string; Extensions?: Array<{ Key: string; Value: string }> };
+  DisplayName?: string;
+  Nation?: string;
+  AthletesSeries?: RawTeamAthleteSeries[];
+}
+
+interface RawTeamAthleteSeries {
+  AthleteIdentifier?: { Identifier?: string };
+  DisplayName?: string;
+  Result?: string;
+  TeamIndex?: number;
+  Remark?: string;
   Series?: Array<Array<{ Order: number; Value: string }>>;
 }
