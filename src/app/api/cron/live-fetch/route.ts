@@ -130,7 +130,7 @@ async function processCompetition(
     if (disciplineCodes.length > 0) {
       try {
         siusData = await fetchLiveSiusResults(siusId, disciplineCodes);
-        console.log("[cron] SIUS data:", [...siusData.entries()].map(([k, v]) => `${k}: qual=${v.qual.length} elim=${v.elim.length}`));
+        console.log("[cron] SIUS data:", [...siusData.entries()].map(([k, v]) => `${k}: qual=${v.qual.length} elim=${v.elim.length} final=${v.final.length}`));
       } catch (e) {
         console.error("[cron] SIUS fetch failed:", e);
       }
@@ -181,6 +181,24 @@ async function processCompetition(
           }
         }
       }
+
+      if (slot.stage === "final" && eventData.final.length > 0) {
+        for (const r of eventData.final) {
+          const shooterId = await resolveOrCreateShooter(r, allShooters);
+          if (!shooterId) continue;
+          rows.push({
+            shooterId,
+            competitionId,
+            disciplineId: slot.disciplineId,
+            category: slot.category,
+            finalTotal: r.total.toFixed(1),
+            finalRank: r.rank,
+            finalRemark: r.remark,
+            ...(r.series.length > 0 ? { finalDetail: { format: "bulletin", scoring: "decimal", series: r.series } } : {}),
+            source: "issf_import",
+          });
+        }
+      }
     }
 
     // if SIUS returned nothing, fall back to ISSF
@@ -200,10 +218,12 @@ async function processCompetition(
   // Defensive dedup: a single insert batch can't touch the same
   // (shooter, comp, disc, cat) conflict target twice — Postgres throws
   // "ON CONFLICT DO UPDATE command cannot affect row a second time" and
-  // fails the whole batch. Keep the last occurrence per key.
-  const dedupedRows = [...new Map(
-    rows.map((r) => [`${r.shooterId}|${r.competitionId}|${r.disciplineId}|${r.category}`, r])
-  ).values()];
+  // fails the whole batch. Merge stages into one row per key.
+  const dedupedRows = [...rows.reduce((byKey, row) => {
+    const key = `${row.shooterId}|${row.competitionId}|${row.disciplineId}|${row.category}`;
+    byKey.set(key, { ...byKey.get(key), ...row });
+    return byKey;
+  }, new Map<string, typeof results.$inferInsert>()).values()];
 
   console.log(`[cron] comp ${competitionId}: ${rows.length} rows fetched, ${dedupedRows.length} after dedup`);
   if (dedupedRows.length === 0) return mixedUpserted;
@@ -229,6 +249,10 @@ async function processCompetition(
           qualified: sql`coalesce(excluded.qualified, ${results.qualified})`,
           qualRemark: sql`coalesce(excluded.qual_remark, ${results.qualRemark})`,
           qualDetail: sql`excluded.qual_detail`,
+          finalTotal: sql`coalesce(excluded.final_total, ${results.finalTotal})`,
+          finalRank: sql`coalesce(excluded.final_rank, ${results.finalRank})`,
+          finalDetail: sql`coalesce(excluded.final_detail, ${results.finalDetail})`,
+          finalRemark: sql`coalesce(excluded.final_remark, ${results.finalRemark})`,
         },
       });
   }

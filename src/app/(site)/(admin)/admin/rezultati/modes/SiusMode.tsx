@@ -237,6 +237,34 @@ export function SiusMode() {
       };
     });
 
+    // A final can be published before its qualification table reaches SIUS.
+    // Keep it importable instead of leaving this visible review row uncommitted.
+    for (const f of activeFinals) {
+      const matched = mergedRows.some((r) =>
+        f.disciplineCode === r.disciplineCode && (
+          (f.siusAthleteId && f.siusAthleteId === r.issfId) ||
+          (f.lastName.toLowerCase() === r.lastName.toLowerCase() &&
+           f.firstName.toLowerCase() === r.firstName.toLowerCase())
+        )
+      );
+      if (!matched) {
+        mergedRows.push({
+          issfId: f.siusAthleteId ?? undefined,
+          firstName: f.firstName,
+          lastName: f.lastName,
+          teamNoc: f.nation,
+          disciplineCode: f.disciplineCode as ReviewRow["disciplineCode"],
+          category: "senior",
+          qualTotal: null,
+          qualInners: null,
+          qualified: true,
+          finalTotal: f.total,
+          finalRank: f.rank,
+          finalSeries: f.series.length > 0 ? f.series : null,
+        });
+      }
+    }
+
     const payload: CommitPayload = { competitionId: selectedComp.id, rows: mergedRows };
     let inserted = 0, skipped = 0;
     const errors: string[] = [];

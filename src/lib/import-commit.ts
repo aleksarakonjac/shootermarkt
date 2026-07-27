@@ -149,7 +149,17 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
           target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
           set: { elimRound: sql`excluded.elim_round`, elimTotal: sql`excluded.elim_total`, elimRank: sql`excluded.elim_rank`, elimDetail: sql`excluded.elim_detail` },
         });
-      } else await db.insert(results).values(values).onConflictDoNothing();
+      } else await db.insert(results).values(values).onConflictDoUpdate({
+        target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
+        set: {
+          clubId: sql`excluded.club_id`,
+          qualTotal: sql`excluded.qual_total`, qualInners: sql`excluded.qual_inners`, qualRank: sql`excluded.qual_rank`, qualDetail: sql`excluded.qual_detail`,
+          qualified: sql`excluded.qualified`,
+          finalTotal: sql`excluded.final_total`, finalRank: sql`excluded.final_rank`, finalDetail: sql`excluded.final_detail`,
+          qualRemark: sql`excluded.qual_remark`, finalRemark: sql`excluded.final_remark`,
+          source: sql`excluded.source`,
+        },
+      });
       inserted++;
     } catch (error) {
       errors.push(`${row.lastName} ${row.firstName} (${row.teamNoc}): ${String(error)}`);

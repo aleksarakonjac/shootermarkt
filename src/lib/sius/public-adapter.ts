@@ -228,11 +228,12 @@ export async function fetchLiveSiusResults(
         } catch { /* ignore */ }
       }
 
-      if (data.qual.length > 0 || data.elim.length > 0) {
+      if (data.qual.length > 0 || data.elim.length > 0 || data.final.length > 0) {
         const existing = out.get(event.eventCode);
         if (existing) {
           if (data.qual.length > 0) existing.qual = data.qual;
           existing.elim.push(...data.elim);
+          if (data.final.length > 0) existing.final = data.final;
         } else {
           out.set(event.eventCode, data);
         }
