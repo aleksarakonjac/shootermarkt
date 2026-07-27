@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useTransition, Suspense } from "react";
 import { PageTransitionOverlay, startPageTransitionSplash } from "./PageTransitionOverlay";
+import { setPrefCookie } from "@/lib/client-prefs";
 
 function LocaleSwitcherInner() {
   const locale = useLocale();
@@ -17,6 +18,7 @@ function LocaleSwitcherInner() {
   function toggle() {
     const next = locale === "sr" ? "en" : "sr";
     const query = Object.fromEntries(searchParams.entries());
+    setPrefCookie("pref_locale", next);
     startPageTransitionSplash();
     startTransition(() => {
       router.replace({ pathname, query }, { locale: next });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import type { FinalDetail } from "@/lib/db/schema";
@@ -13,6 +14,7 @@ export type FinalResultRow = {
   firstName: string;
   lastName: string;
   birthYear: number | null;
+  avatarUrl: string | null;
   clubDisplay: string;
   nationality: string | null;
   finalTotal: string | null;
@@ -21,13 +23,30 @@ export type FinalResultRow = {
   remark: string | null | undefined;
 };
 
+function Avatar({ firstName, lastName, avatarUrl }: { firstName: string; lastName: string; avatarUrl: string | null }) {
+  const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
+  if (avatarUrl) {
+    return (
+      <div className="relative shrink-0 w-7 h-7 rounded-full ring-1 ring-[var(--border)] overflow-hidden">
+        <Image src={avatarUrl} alt="" fill sizes="28px" className="object-cover" />
+      </div>
+    );
+  }
+  return (
+    <div
+      className="shrink-0 w-7 h-7 rounded-full ring-1 ring-[var(--border)] flex items-center justify-center bg-[var(--surface-2)]"
+      aria-hidden="true"
+    >
+      <span className="text-[0.6rem] font-bold text-[var(--muted)]">{initials}</span>
+    </div>
+  );
+}
+
 interface Props {
   results: FinalResultRow[];
   /** world/olympic/continental (ISSF-level) fields — no clubs, only national teams. */
   competitionLevel?: string;
 }
-
-const NOC_ONLY_LEVELS = new Set(["world", "olympic", "continental"]);
 
 const MEDAL_COLOR: Record<number, string> = {
   1: "oklch(0.75 0.14 85)",
@@ -156,11 +175,13 @@ function buildColumns(rows: FinalResultRow[]): Column[] {
 // Fixed pixel widths — see CompetitionQualTable for why CSS Grid (not a real
 // <table>) is required.
 const RANK_W = "40px";
-const NAME_W = "minmax(140px, 1fr)";
-const CLUB_W = "minmax(80px, 140px)";
+const AVATAR_W = "40px";
+const NAME_W = "minmax(140px, 220px)";
+const CLUB_W = "minmax(80px, 1fr)";
 const TOTAL_W = "76px";
 const REMARK_W = "24px";
-const CHEVRON_W = "24px";
+
+const NOC_ONLY_LEVELS = new Set(["world", "olympic", "continental"]);
 
 const headerCellCls = "px-3 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center bg-[var(--surface)] border-b border-[var(--border)]";
 const narrowHeaderCellCls = "px-1 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center bg-[var(--surface)] border-b border-[var(--border)]";
@@ -191,12 +212,13 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
   const columns = buildColumns(sorted);
   const hasDetail = columns.length > 0;
 
-  const gridTemplateColumns = [RANK_W, NAME_W, CLUB_W, TOTAL_W, REMARK_W, hasDetail ? CHEVRON_W : ""]
+  const SERIES_COL_W = "56px";
+  const gridTemplateColumns = [RANK_W, AVATAR_W, NAME_W, CLUB_W, ...columns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W]
     .filter(Boolean)
     .join(" ");
   const mobileGridTemplateColumns = hasDetail
-    ? "32px minmax(110px, 1fr) minmax(48px, 80px) 64px 14px 18px"
-    : "32px minmax(110px, 1fr) minmax(48px, 80px) 64px 14px";
+    ? "32px 36px minmax(110px, 1fr) minmax(48px, 80px) 64px 14px 18px"
+    : "32px 36px minmax(110px, 1fr) minmax(48px, 80px) 64px 14px";
 
   const allExpanded = hasDetail && sorted.every((r) => expanded.has(r.id));
   const toggleAll = () => {
@@ -214,7 +236,7 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
   return (
     <div className="rounded-xl border border-[var(--border)] overflow-hidden">
       {hasDetail && (
-        <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border)] bg-[var(--surface)]">
+        <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border)] bg-[var(--surface)] sm:hidden">
           <button
             type="button"
             onClick={toggleAll}
@@ -233,13 +255,19 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
         >
           <div role="row" style={{ display: "contents" }}>
             <div role="columnheader" className={`${headerCellCls} justify-center`}>#</div>
+            <div role="columnheader" className={headerCellCls} aria-hidden="true" />
             <div role="columnheader" className={headerCellCls}>Strelac</div>
             <div role="columnheader" className={headerCellCls}>{clubHeaderLabel}</div>
+            {hasDetail && <div role="columnheader" className={`${narrowHeaderCellCls} sm:hidden`} aria-hidden="true" />}
+            {hasDetail && columns.map((col, i) => (
+              <div key={i} role="columnheader" className={`hidden sm:flex ${headerCellCls} justify-end`}>
+                {col.header}
+              </div>
+            ))}
             <div role="columnheader" className={`${headerCellCls} justify-end whitespace-nowrap`}>
               {isHitCountFinal ? "Pogoci" : "Σ"}
             </div>
             <div role="columnheader" className={narrowHeaderCellCls} aria-hidden="true" />
-            {hasDetail && <div role="columnheader" className={narrowHeaderCellCls} aria-hidden="true" />}
           </div>
 
           {sorted.map((r, idx) => {
@@ -252,8 +280,8 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
               <div key={r.id} role="rowgroup" style={{ display: "contents" }}>
                 <div
                   role="row"
-                  className="group"
-                  style={{ display: "contents", cursor: hasDetail ? "pointer" : undefined }}
+                  className={`group ${hasDetail ? "cursor-pointer sm:cursor-default" : ""}`}
+                  style={{ display: "contents" }}
                   onClick={hasDetail ? () => toggleRow(r.id) : undefined}
                 >
                   {/* Rank */}
@@ -267,6 +295,11 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
                     ) : (
                       <span className="text-[var(--subtle)]">—</span>
                     )}
+                  </div>
+
+                  {/* Avatar */}
+                  <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)]`}>
+                    <Avatar firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} />
                   </div>
 
                   {/* Name — mobile: last name and first name each fixed to their own
@@ -318,6 +351,31 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
                     </div>
                   </div>
 
+                  {/* Series values — desktop only; row fits every series in-line so no expand is needed.
+                      Cumulative running total stacked above each series value, widening the row. */}
+                  {hasDetail && (() => {
+                    let running = 0;
+                    let sawNull = false;
+                    return columns.map((col, i) => {
+                      const val = col.getValue(r);
+                      if (val == null) sawNull = true;
+                      else running += val;
+                      return (
+                        <div
+                          key={i}
+                          className={`hidden sm:flex ${cellCls} flex-col items-end justify-center gap-0.5 group-hover:bg-[var(--surface-2)]`}
+                        >
+                          <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">
+                            {sawNull ? "" : col.fmt(running)}
+                          </span>
+                          <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]">
+                            {val != null ? col.fmt(val) : ""}
+                          </span>
+                        </div>
+                      );
+                    });
+                  })()}
+
                   {/* Final total */}
                   <div className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`}>
                     {r.finalTotal ?? (
@@ -330,15 +388,15 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
                     {r.remark && <RemarkBadge remark={r.remark} />}
                   </div>
 
-                  {/* Expand chevron — rightmost */}
+                  {/* Expand chevron — mobile only, rightmost column; desktop shows series inline instead */}
                   {hasDetail && (
-                    <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)]`}>
+                    <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)] sm:hidden`}>
                       <ChevronIcon open={isExpanded} />
                     </div>
                   )}
                 </div>
 
-                {/* Expanded series detail — compact, labeled groups, spans full width */}
+                {/* Expanded series detail — mobile only; desktop shows series inline in the row */}
                 <AnimatePresence initial={false}>
                   {hasDetail && isExpanded && (
                     <motion.div
@@ -349,20 +407,37 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
                       exit={reducedMotion ? undefined : { height: 0, opacity: 0, transition: { duration: 0.18 } }}
                       transition={{ duration: reducedMotion ? 0 : 0.26, ease: [0.22, 1, 0.36, 1] }}
                       style={{ gridColumn: "1 / -1" }}
-                      className={`min-h-0 px-3 overflow-hidden ${isLastRow ? "" : "border-b border-[var(--border)]"}`}
+                      className={`min-h-0 px-3 overflow-hidden sm:hidden ${isLastRow ? "" : "border-b border-[var(--border)]"}`}
                     >
-                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 py-2">
+                      <div className="grid grid-flow-col auto-cols-fr gap-x-1 pt-2">
+                        {(() => {
+                          let running = 0;
+                          let sawNull = false;
+                          return columns.map((col, i) => {
+                            const val = col.getValue(r);
+                            if (val == null) sawNull = true;
+                            else running += val;
+                            return (
+                              <span
+                                key={i}
+                                className="min-w-0 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]"
+                              >
+                                {sawNull ? "" : col.fmt(running)}
+                              </span>
+                            );
+                          });
+                        })()}
+                      </div>
+                      <div className="grid grid-flow-col auto-cols-fr gap-x-1 pb-2">
                         {columns.map((col, i) => {
                           const val = col.getValue(r);
                           return (
-                            <div key={i} className="flex flex-col gap-0.5">
-                              <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
-                                {col.header}
-                              </span>
-                              <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">
-                                {val != null ? col.fmt(val) : "—"}
-                              </span>
-                            </div>
+                            <span
+                              key={i}
+                              className="min-w-0 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]"
+                            >
+                              {val != null ? col.fmt(val) : ""}
+                            </span>
                           );
                         })}
                       </div>

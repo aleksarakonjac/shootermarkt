@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { DEFAULT_SCOPE, VALID_SCOPES, type Scope } from "@/lib/scope";
 import { withScope } from "@/hooks/use-scoped-href";
+import { setPrefCookie } from "@/lib/client-prefs";
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,7 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
 
   function select(nextScope: Scope) {
     setOpen(false);
+    setPrefCookie("pref_scope", nextScope);
     router.push(scopeUrl(nextScope), locale ? { locale } : undefined);
   }
 

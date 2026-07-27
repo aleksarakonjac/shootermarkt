@@ -41,6 +41,7 @@ Za svaki event (tabela) u PDF-u izvuci:
     total — ukupan rezultat
     inners — broj centralnih desetki ("inner tens"), zapisan kao broj pored ukupnog rezultata sa oznakom x/X (npr. "23x" → 23). Prisutan kod Air Pistol (APM/APW) I MK puške trostav (R3PM/R3PW). Ako nema, null.
     qualified — true/false/null
+    remark — oznaka pored rezultata umesto/pored "Q": "RPO" (strelac van nacionalne kvote, ne može u finale bez obzira na plasman), "DSQ" (diskvalifikacija), "DNS" (nije nastupio), "DNF" (nije završio). Null ako nema oznake.
 
 Pravila:
 - Ignoriši TEAM, MIXED TEAM i KONTROLNI MEČ tabele
@@ -166,6 +167,7 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
         total: number;
         inners?: number | null;
         qualified?: boolean | null;
+        remark?: string | null;
       }>;
     }>;
   };
@@ -198,6 +200,7 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
         total: r.total,
         inners: r.inners ?? null,
         qualified: r.qualified ?? null,
+        remark: r.remark ?? null,
         shots: r.shots ?? null,
         cumulative: r.cumulative ?? null,
       })),

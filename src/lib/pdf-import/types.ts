@@ -72,6 +72,8 @@ export interface ParsedShooterResult {
   total: number;
   inners?: number | null;
   qualified?: boolean | null;
+  /** ISSF/SIUS remark: RPO, DSQ, DNS, DNF, SO */
+  remark?: string | null;
 }
 
 /**

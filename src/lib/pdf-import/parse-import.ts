@@ -47,6 +47,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
         qualRank: result.rank,
         qualSeries: result.series,
         qualified: result.qualified ?? null,
+        remark: result.remark ?? null,
       };
       if (!shooterId) row.warning = match.kind === "suggestion" ? `Možda: ${match.name}` : event.isInternational ? `Novi strelac (${nationality}) — biće kreiran` : "Novi strelac — biće kreiran";
       rows.push(row);

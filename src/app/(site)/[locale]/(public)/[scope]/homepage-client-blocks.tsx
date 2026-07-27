@@ -99,7 +99,7 @@ export function HomepageMainClient() {
   const t = useTranslations("home");
   const tComp = useTranslations("competition");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; isLive: boolean; discResults: Array<{ discCode: string; stage: string; isLive: boolean; isJunior: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; srbHighlights: Array<{ firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
+  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; isLive: boolean; discResults: Array<{ discCode: string; isLive: boolean; isJunior: boolean; phases: Array<{ stage: string; isLive: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; srbHighlights: Array<{ firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null }> }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
 
   useEffect(() => {
     const supabase = createClient();
@@ -120,7 +120,8 @@ export function HomepageMainClient() {
 
   type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
   type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
-  type DiscResult = { discCode: string; stage: string; isLive: boolean; isJunior: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
+  type Phase = { stage: string; isLive: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
+  type DiscResult = { discCode: string; isLive: boolean; isJunior: boolean; phases: Phase[] };
 
   function renderDiscResults(discResults: DiscResult[], level: string) {
     if (discResults.length === 0) return <p className="mt-4 text-sm italic text-[var(--muted)]">{t("noWinner")}</p>;
@@ -167,35 +168,42 @@ export function HomepageMainClient() {
     return (
       <div className="mt-3 divide-y divide-[var(--border)]">
         {discResults.map((disc) => {
-          if (disc.qualTop3.length === 0 && disc.srbHighlights.length === 0) return null;
+          const shownPhases = disc.phases.filter((p) => p.qualTop3.length > 0 || p.srbHighlights.length > 0);
+          if (shownPhases.length === 0) return null;
           const isAP = disc.discCode.startsWith("AP");
-          const decimals = disc.stage === "elimination" || isAP || disc.discCode === "SPW" ? 0 : 1;
           const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{disc.discCode}</span>;
           const junBadge = disc.isJunior ? <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>JUN</span> : null;
-          const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{disc.stage === "elimination" ? "E" : disc.stage === "final" ? "F" : "Q"}</span>;
           const liveBadge = disc.isLive ? <span className="shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">LIVE</span> : null;
           return (
-            <div key={`${disc.discCode}:${disc.stage}`} className="py-2 first:pt-0 last:pb-0">
-              {disc.qualTop3.length > 0 && inlinePlaces(disc.qualTop3, (e) => e.qualTotal, decimals, true, <>{discBadge}{stageBadge}{liveBadge}{junBadge}</>)}
-              {disc.srbHighlights.length > 0 && (
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  {disc.srbHighlights.map((h, i) => {
-                    const isFinalRow = h.finalRank != null && h.finalTotal != null;
-                    const rank = isFinalRow ? h.finalRank : h.qualRank;
-                    const total = isFinalRow ? h.finalTotal! : h.qualTotal;
-                    return (
-                      <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-primary)]/[0.08] pl-1.5 pr-2 py-0.5">
-                        <span className="fi fi-rs shrink-0" style={{ fontSize: 10 }} aria-hidden="true" />
-                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--brand-primary)] tabular-nums">
-                          {rank != null ? `${rank}.` : "—"}
-                        </span>
-                        <span className="text-xs font-semibold text-[var(--ink)]">{h.firstName ? `${h.lastName} ${h.firstName.charAt(0)}.` : h.lastName}</span>
-                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--brand-primary)] tabular-nums">{total.toFixed(decimals)}</span>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
+            <div key={`${disc.discCode}:${disc.isJunior}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
+              {shownPhases.map((phase) => {
+                const decimals = phase.stage === "elimination" || isAP || disc.discCode === "SPW" ? 0 : 1;
+                const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? "E" : phase.stage === "final" ? "F" : "Q"}</span>;
+                return (
+                  <div key={phase.stage}>
+                    {phase.qualTop3.length > 0 && inlinePlaces(phase.qualTop3, (e) => e.qualTotal, decimals, true, <>{discBadge}{stageBadge}{phase.isLive ? liveBadge : null}{junBadge}</>)}
+                    {phase.srbHighlights.length > 0 && (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {phase.srbHighlights.map((h, i) => {
+                          const isFinalRow = h.finalRank != null && h.finalTotal != null;
+                          const rank = isFinalRow ? h.finalRank : h.qualRank;
+                          const total = isFinalRow ? h.finalTotal! : h.qualTotal;
+                          return (
+                            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-primary)]/[0.08] pl-1.5 pr-2 py-0.5">
+                              <span className="fi fi-rs shrink-0" style={{ fontSize: 10 }} aria-hidden="true" />
+                              <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--brand-primary)] tabular-nums">
+                                {rank != null ? `${rank}.` : "—"}
+                              </span>
+                              <span className="text-xs font-semibold text-[var(--ink)]">{h.firstName ? `${h.lastName} ${h.firstName.charAt(0)}.` : h.lastName}</span>
+                              <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--brand-primary)] tabular-nums">{total.toFixed(decimals)}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -265,11 +273,11 @@ export function HomepageMainClient() {
                     {name}
                   </span>
                   <div className="shrink-0 flex items-center gap-2">
-                    {item.discResults[0]?.qualTop3[0] ? (
+                    {item.discResults[0]?.phases[0]?.qualTop3[0] ? (
                       <>
-                        <span className="text-xs text-[var(--muted)] hidden sm:block">{item.discResults[0].qualTop3[0].lastName}</span>
+                        <span className="text-xs text-[var(--muted)] hidden sm:block">{item.discResults[0].phases[0].qualTop3[0].lastName}</span>
                         <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--brand-primary)] tabular-nums">
-                          {item.discResults[0].qualTop3[0].qualTotal.toFixed(item.discResults[0].discCode.startsWith("AP") ? 0 : 1)}
+                          {item.discResults[0].phases[0].qualTop3[0].qualTotal.toFixed(item.discResults[0].discCode.startsWith("AP") ? 0 : 1)}
                         </span>
                       </>
                     ) : (

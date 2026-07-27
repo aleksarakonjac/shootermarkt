@@ -116,11 +116,10 @@ const NOC_ONLY_LEVELS = new Set(["world", "olympic", "continental"]);
 // Fixed pixel widths for the (now few) non-flexible columns — a CSS Grid
 // track's size is authoritative, unlike a real <table> under table-layout:auto.
 const RANK_W = "32px";
-const NAME_W = "minmax(96px, 1fr)";
-const CLUB_W = "minmax(52px, 120px)";
+const NAME_W = "minmax(96px, 200px)";
+const CLUB_W = "minmax(52px, 1fr)";
 const TOTAL_W = "92px";
 const REMARK_W = "28px";
-const CHEVRON_W = "24px";
 
 const headerCellCls = "px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-3 flex items-center bg-[var(--surface-2)] border-b border-[var(--border)]";
 
@@ -162,6 +161,34 @@ function buildDetailGroups(
   // Ungrouped flat series — one mini-group per series so the visual language
   // (label above values) stays consistent whether or not the discipline groups.
   return seriesArr.map((v, i) => ({ label: `S${i + 1}`, values: [v], bestIdx: v != null && i === bestIdx ? 0 : -1 }));
+}
+
+// Short per-column headers for the desktop inline series columns — one column
+// per individual series value (not per group), independent of any single row's
+// data so the header stays stable while rows fill in live results.
+function buildSeriesHeaders(
+  results: CompResultRow[],
+  isPositionsType: boolean,
+  flatGroups: FlatGroup[] | null,
+  posSeriesCounts: Record<(typeof POSITION_KEYS)[number], number> | null
+): string[] {
+  if (isPositionsType && posSeriesCounts) {
+    return POSITION_KEYS.filter((pos) => posSeriesCounts[pos] > 0).flatMap((pos, pi) =>
+      Array.from({ length: posSeriesCounts[pos] }, (_, i) => `${POSITION_LABELS[pi][0]}${i + 1}`)
+    );
+  }
+  if (flatGroups) {
+    return flatGroups.flatMap((g) => Array.from({ length: g.count }, (_, i) => `${g.label[0]}${i + 1}`));
+  }
+  const maxLen = Math.max(
+    0,
+    ...results.map((r) => (r.qualDetail && "series" in r.qualDetail ? (r.qualDetail as { series: number[] }).series.length : 0))
+  );
+  return Array.from({ length: maxLen }, (_, i) => `S${i + 1}`);
+}
+
+function flattenGroups(groups: DetailGroup[]): Array<{ value: number | null; isBest: boolean }> {
+  return groups.flatMap((g) => g.values.map((v, i) => ({ value: v, isBest: i === g.bestIdx })));
 }
 
 export function CompetitionQualTable({ results, competitionLevel }: Props) {
@@ -212,11 +239,13 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
     return a.qualRank - b.qualRank;
   });
 
-  const gridTemplateColumns = [RANK_W, NAME_W, CLUB_W, TOTAL_W, REMARK_W, hasSeriesDetail ? CHEVRON_W : ""]
+  const seriesHeaders = hasSeriesDetail ? buildSeriesHeaders(sorted, isPositionsType, flatGroups, posSeriesCounts) : [];
+  const SERIES_COL_W = "60px";
+  const gridTemplateColumns = [RANK_W, NAME_W, CLUB_W, ...seriesHeaders.map(() => SERIES_COL_W), TOTAL_W, REMARK_W]
     .filter(Boolean)
     .join(" ");
   const mobileGridTemplateColumns = hasSeriesDetail
-    ? "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 24px 18px"
+    ? "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 20px 14px"
     : "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 24px";
 
   const allExpanded = hasSeriesDetail && sorted.every((r) => expanded.has(r.id));
@@ -235,7 +264,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
   return (
     <div className="rounded-xl border border-[var(--border)] overflow-hidden">
       {hasSeriesDetail && (
-        <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border)] bg-[var(--surface)]">
+        <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border)] bg-[var(--surface)] sm:hidden">
           <button
             type="button"
             onClick={toggleAll}
@@ -257,9 +286,14 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
             <div role="columnheader" className={`${headerCellCls} justify-end`}>#</div>
             <div role="columnheader" className={headerCellCls}>Strelac</div>
             <div role="columnheader" className={headerCellCls}>{clubHeaderLabel}</div>
+            {hasSeriesDetail && seriesHeaders.map((h, i) => (
+              <div key={i} role="columnheader" className={`hidden sm:flex ${headerCellCls} justify-end`}>
+                {h}
+              </div>
+            ))}
             <div role="columnheader" className={`${headerCellCls} justify-end`}>Σ</div>
             <div role="columnheader" className={headerCellCls} aria-hidden="true" />
-            {hasSeriesDetail && <div role="columnheader" className={headerCellCls} aria-hidden="true" />}
+            {hasSeriesDetail && <div role="columnheader" className={`${headerCellCls} sm:hidden`} aria-hidden="true" />}
           </div>
 
           {/* Body rows */}
@@ -271,13 +305,14 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
             const rowBg = isOddRow ? "var(--surface)" : "var(--bg)";
             const showBottomBorder = !isLastRow || isExpanded;
             const cellCls = `px-2 py-2.5 text-sm sm:px-3 flex items-center transition-colors ${showBottomBorder ? "border-b border-[var(--border)]" : ""}`;
+            const seriesFlat = hasSeriesDetail ? flattenGroups(buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts)) : [];
 
             return (
               <div key={r.id} role="rowgroup" style={{ display: "contents" }}>
                 <div
                   role="row"
-                  className="group"
-                  style={{ display: "contents", cursor: hasSeriesDetail ? "pointer" : undefined }}
+                  className={`group ${hasSeriesDetail ? "cursor-pointer sm:cursor-default" : ""}`}
+                  style={{ display: "contents" }}
                   onClick={hasSeriesDetail ? () => toggleRow(r.id) : undefined}
                 >
                   {/* Rank */}
@@ -344,9 +379,29 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                     </div>
                   </div>
 
+                  {/* Series values — desktop only; row fits every series in-line so no expand is needed */}
+                  {hasSeriesDetail && seriesHeaders.map((_, i) => {
+                    const item = seriesFlat[i];
+                    return (
+                      <div
+                        key={i}
+                        className={`hidden sm:flex ${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] text-xs sm:text-sm tabular-nums group-hover:bg-[var(--surface-2)]`}
+                        style={{ background: rowBg }}
+                      >
+                        {item?.value != null ? (
+                          <span className={item.isBest ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>
+                            {fmt(item.value)}
+                          </span>
+                        ) : (
+                          <span className="text-[var(--subtle)]">—</span>
+                        )}
+                      </div>
+                    );
+                  })}
+
                   {/* Total — inner tens shown inline, right after the number */}
                   <div
-                    className={`${cellCls} justify-end gap-1.5 font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`}
+                    className={`${cellCls} justify-end gap-1.5 font-[family-name:var(--font-jetbrains-mono)] font-bold text-base tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`}
                     style={{ background: rowBg }}
                   >
                     {r.qualTotal != null
@@ -368,15 +423,15 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                     ) : null}
                   </div>
 
-                  {/* Expand chevron — rightmost, not next to rank (reads as a trend arrow there) */}
+                  {/* Expand chevron — mobile only, rightmost column; desktop shows series inline instead */}
                   {hasSeriesDetail && (
-                    <div className={`${cellCls} justify-center group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
+                    <div className={`${cellCls} !px-0.5 justify-center group-hover:bg-[var(--surface-2)] sm:hidden`} style={{ background: rowBg }}>
                       <ChevronIcon open={isExpanded} />
                     </div>
                   )}
                 </div>
 
-                {/* Expanded series detail — compact, labeled groups, spans full width */}
+                {/* Expanded series detail — mobile only; desktop shows series inline in the row */}
                 <AnimatePresence initial={false}>
                   {hasSeriesDetail && isExpanded && (
                     <motion.div
@@ -387,27 +442,40 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                       exit={reducedMotion ? undefined : { height: 0, opacity: 0, transition: { duration: 0.18 } }}
                       transition={{ duration: reducedMotion ? 0 : 0.26, ease: [0.22, 1, 0.36, 1] }}
                       style={{ gridColumn: "1 / -1", background: rowBg }}
-                      className={`min-h-0 px-3 overflow-hidden ${isLastRow ? "" : "border-b border-[var(--border)]"}`}
+                      className={`min-h-0 px-3 overflow-hidden sm:hidden ${isLastRow ? "" : "border-b border-[var(--border)]"}`}
                     >
-                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 py-2">
-                        {buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts).map((g, gi) => (
-                          <div key={gi} className="flex flex-col gap-0.5">
-                            <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
-                              {g.label}
-                            </span>
-                            <div className="flex gap-2 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">
-                              {g.values.map((v, vi) => (
-                                <span
-                                  key={vi}
-                                  className={vi === g.bestIdx ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}
-                                >
-                                  {v != null ? fmt(v) : "—"}
-                                </span>
-                              ))}
+                      {isPositionsType || flatGroups ? (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 py-2">
+                          {buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts).map((g, gi) => (
+                            <div key={gi} className="flex flex-col gap-0.5">
+                              <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
+                                {g.label}
+                              </span>
+                              <div className="flex gap-2 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">
+                                {g.values.map((v, vi) => (
+                                  <span
+                                    key={vi}
+                                    className={vi === g.bestIdx ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}
+                                  >
+                                    {v != null ? fmt(v) : "—"}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">
+                          {seriesFlat.map((item, i) => (
+                            <span
+                              key={i}
+                              className={item.isBest ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}
+                            >
+                              {item.value != null ? fmt(item.value) : "—"}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>

@@ -33,6 +33,7 @@ export type DisciplineGroup = {
       lastName: string;
       birthYear: number | null;
       nationality: string | null;
+      avatarUrl: string | null;
       clubName: string | null;
       clubNocCode: string | null;
       elimRound: number | null;
@@ -686,6 +687,7 @@ function CompetitionDetail({
         firstName: r.firstName,
         lastName: r.lastName,
         birthYear: r.birthYear,
+        avatarUrl: r.avatarUrl,
         clubDisplay: r.clubName ?? r.clubNocCode ?? "",
         nationality: r.nationality,
         finalTotal: r.finalTotal,
@@ -768,7 +770,7 @@ function CompetitionDetail({
                   )}
                   <span className="relative z-10 flex items-center gap-1.5">
                     {opt.badge}
-                    <span className="sm:hidden">{opt.shortLabel}</span>
+                    <span className="sm:hidden">{opt.key === "qual" && stageOptions.length === 2 ? opt.label : opt.shortLabel}</span>
                     <span className="hidden sm:inline">{opt.label}</span>
                   </span>
                 </button>

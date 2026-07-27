@@ -59,6 +59,14 @@ export function getTickerScheduleState<T extends TickerScheduleSlot>(slots: T[],
   return { active, next, lastCompleted };
 }
 
+// Sort order for stacking a discipline's phases within one homepage card:
+// qualification always precedes elimination, elimination precedes final.
+function stageOrder(stage: string): number {
+  if (stage.startsWith("qual")) return 0;
+  if (stage === "elimination") return 1;
+  return 2;
+}
+
 function tickerStageLabel(stage: string, locale: string) {
   const labels: Record<string, [string, string]> = {
     qual: ["Kvalifikacije", "Qualification"], qual_precision: ["Precizna paljba", "Precision"], qual_rapid: ["Brza paljba", "Rapid fire"], elimination: ["Eliminacije", "Elimination"], final: ["Finale", "Final"],
@@ -195,7 +203,14 @@ export async function getHomepageMain(scope: Scope) {
       db.select({ disciplineId: mixedTeamResults.disciplineId, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(eq(mixedTeamResults.competitionId, competition.id)),
     ]);
     type Entry = { id: string; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; rank: number; total: number };
-    const discResults = selectHomepageCurrentPhases(slots.flatMap((slot) => {
+    // A discipline/category can have multiple "qual" schedule rows at different
+    // times (e.g. SPW: precizna + brza paljba are separate time slots but share
+    // one combined qual ranking) — collapse to one slot per (discipline,
+    // category, stage-kind) so the same phase isn't rendered twice.
+    const dedupedSlots = [...new Map(
+      slots.map((s) => [`${s.disciplineId}|${s.category}|${s.stage.startsWith("qual") ? "qual" : s.stage}`, s])
+    ).values()];
+    const rawPhases = dedupedSlots.flatMap((slot) => {
       const isLive = isTickerSlotLive(slot, new Date());
       const stageKind = slot.stage.startsWith("qual") ? "qual" : slot.stage;
       const individual = individualRows.flatMap((row): Entry[] => {
@@ -217,13 +232,47 @@ export async function getHomepageMain(scope: Scope) {
       const shown = new Set(top3.map((entry) => entry.id));
       const srbHighlights = showSrbHighlight ? entries.filter((entry) => entry.nationality === "SRB" && !shown.has(entry.id)) : [];
       return [{ ...slot, isLive, hasSrb: entries.some((entry) => entry.nationality === "SRB"), discCode: slot.discCode, stage: slot.stage, isJunior: slot.category !== "senior", top3, srbHighlights }];
-    }), scope).map((phase) => ({
-      discCode: phase.discCode,
-      stage: phase.stage,
-      isJunior: phase.isJunior,
-      isLive: phase.isLive,
-      qualTop3: phase.top3.map(({ firstName, lastName, clubName, nationality, countryCode2, total, rank }) => ({ firstName, lastName, clubName, nationality, countryCode2, qualTotal: total, qualRank: rank, finalTotal: null, finalRank: null })),
-      srbHighlights: phase.srbHighlights.map(({ firstName, lastName, clubName, total, rank }) => ({ firstName, lastName, clubName, qualRank: rank, qualTotal: total, finalRank: null, finalTotal: null })),
+    });
+
+    // One discipline (senior vs junior counted separately) is one homepage
+    // item — qual/elimination/final all stack inside it instead of each
+    // phase competing separately for one of the top-4 slots.
+    const phaseGroups = new Map<string, typeof rawPhases>();
+    for (const phase of rawPhases) {
+      const key = `${phase.discCode}|${phase.isJunior}`;
+      phaseGroups.set(key, [...(phaseGroups.get(key) ?? []), phase]);
+    }
+    const groups = [...phaseGroups.values()].map((phases) => {
+      // Same recency/live/srb comparator selectHomepageCurrentPhases uses,
+      // applied within the group to pick which phase drives its ranking.
+      const representative = [...phases].sort((a, b) => {
+        if (a.isLive !== b.isLive) return Number(b.isLive) - Number(a.isLive);
+        if (showSrbHighlight && a.hasSrb !== b.hasSrb) return Number(b.hasSrb) - Number(a.hasSrb);
+        const aTime = a.isLive ? a.startTime.getTime() : (getTickerSlotEnd(a)?.getTime() ?? a.startTime.getTime());
+        const bTime = b.isLive ? b.startTime.getTime() : (getTickerSlotEnd(b)?.getTime() ?? b.startTime.getTime());
+        return bTime - aTime;
+      })[0];
+      return {
+        discCode: representative.discCode,
+        stage: representative.stage,
+        isJunior: representative.isJunior,
+        isLive: phases.some((p) => p.isLive),
+        hasSrb: phases.some((p) => p.hasSrb),
+        startTime: representative.startTime,
+        endTime: representative.endTime,
+        phases: [...phases].sort((a, b) => stageOrder(a.stage) - stageOrder(b.stage)),
+      };
+    });
+    const discResults = selectHomepageCurrentPhases(groups, scope).map((group) => ({
+      discCode: group.discCode,
+      isJunior: group.isJunior,
+      isLive: group.isLive,
+      phases: group.phases.map((phase) => ({
+        stage: phase.stage,
+        isLive: phase.isLive,
+        qualTop3: phase.top3.map(({ firstName, lastName, clubName, nationality, countryCode2, total, rank }) => ({ firstName, lastName, clubName, nationality, countryCode2, qualTotal: total, qualRank: rank, finalTotal: null, finalRank: null })),
+        srbHighlights: phase.srbHighlights.map(({ firstName, lastName, clubName, total, rank }) => ({ firstName, lastName, clubName, qualRank: rank, qualTotal: total, finalRank: null, finalTotal: null })),
+      })),
     }));
     return { ...competition, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), discResults };
   }));

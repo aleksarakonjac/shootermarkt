@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
         qualRank: r.rank,
         qualSeries: r.series.length > 0 ? r.series : undefined,
         qualified: null,
+        remark: r.remark,
         finalTotal: null,
         finalRank: null,
         warning: shooterId ? undefined : "Novi strelac — biće kreiran",
