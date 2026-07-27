@@ -1,7 +1,8 @@
-import { eq, inArray, isNotNull, and, sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { results, competitions, disciplines, shooterFormaCache } from "@/lib/db/schema";
-import { computeFormaFromEntries, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
+import { shooterFormaCache } from "@/lib/db/schema";
+import { computeFormaFromEntries } from "@/lib/forma";
+import { getFormaEntriesByDiscipline } from "@/lib/forma-query";
 import {
   computeAvgOfTopN,
   computeRecentAvg,
@@ -16,44 +17,13 @@ import {
  * Called after every result commit so pages can read pre-computed values.
  */
 export async function recomputeFormaCache(shooterIds?: number[]): Promise<void> {
-  const rows = await db
-    .select({
-      shooterId: results.shooterId,
-      qualTotal: results.qualTotal,
-      date: competitions.date,
-      level: competitions.level,
-      category: results.category,
-      disciplineCode: disciplines.code,
-    })
-    .from(results)
-    .innerJoin(competitions, eq(results.competitionId, competitions.id))
-    .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
-    .where(
-      shooterIds && shooterIds.length > 0
-        ? and(inArray(results.shooterId, shooterIds), isNotNull(results.qualTotal))
-        : isNotNull(results.qualTotal)
-    );
+  if (shooterIds && shooterIds.length === 0) return;
+  const groups = await getFormaEntriesByDiscipline(shooterIds);
 
-  // Group by (shooterId, disciplineCode)
-  type Entry = {
-    qualTotal: number;
-    date: string;
-    level: CompetitionLevel | null;
-    category: ResultCategory;
-  };
-  const groups = new Map<string, { shooterId: number; disciplineCode: string; entries: Entry[] }>();
-
-  for (const r of rows) {
-    const key = `${r.shooterId}:${r.disciplineCode}`;
-    if (!groups.has(key)) {
-      groups.set(key, { shooterId: r.shooterId, disciplineCode: r.disciplineCode, entries: [] });
-    }
-    groups.get(key)!.entries.push({
-      qualTotal: Number(r.qualTotal),
-      date: r.date,
-      level: r.level as CompetitionLevel | null,
-      category: r.category as ResultCategory,
-    });
+  // A deleted result can remove a whole shooter/discipline group. Clear targeted
+  // rows first so cache entries that no longer have source results cannot survive.
+  if (shooterIds?.length) {
+    await db.delete(shooterFormaCache).where(inArray(shooterFormaCache.shooterId, shooterIds));
   }
 
   const airSeasonYear = currentSeasonStartYear("vazdusna");

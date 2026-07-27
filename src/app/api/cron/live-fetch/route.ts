@@ -6,6 +6,7 @@ import { and, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml, extractMixedTeamEvents, fetchMixedTeamQualFromHtml, fetchMixedTeamFinalFromHtml } from "@/lib/issf/adapter";
 import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@/lib/sius/public-adapter";
 import { matchShooter } from "@/lib/name-match";
+import { recomputeFormaCache } from "@/lib/forma-cache";
 
 export const maxDuration = 30;
 
@@ -250,6 +251,8 @@ async function processCompetition(
         },
       });
   }
+
+  await recomputeFormaCache([...new Set(dedupedRows.map((row) => row.shooterId))]);
 
   return dedupedRows.length + mixedUpserted;
 }

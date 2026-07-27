@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import { CATEGORY_LABEL, DISCIPLINE_META, type AgeCategory, type ReviewRow } from "@/lib/pdf-import/types";
+import { REVIEW_DISCIPLINE_CODES } from "@/lib/discipline";
 import { NOC_LIST } from "@/lib/noc-list";
 import { ShooterMatchCell } from "./ShooterMatchCell";
 import { UnmatchedPanel } from "./UnmatchedPanel";
 
 const COLLAPSE_AT = 10;
-
-const ALL_DISCIPLINES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW"] as const;
 
 const isQualDecimal = (code: string) => code.startsWith("AR");
 const isFinalDecimal = (code: string) => code.startsWith("AR") || code.startsWith("R3P") || code.startsWith("AP");
@@ -238,7 +237,7 @@ export function ReviewTable({ rows, nocFilter, onRowChange, onNocFilterChange, o
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const allNocs = Array.from(new Set(rows.map((row) => row.teamNoc))).sort();
   const filtered = nocFilter ? rows.filter((row) => row.teamNoc === nocFilter) : rows;
-  const byDiscipline = ALL_DISCIPLINES.map((discipline) => ({
+  const byDiscipline = REVIEW_DISCIPLINE_CODES.map((discipline) => ({
     discipline,
     rows: filtered.flatMap((row) => row.disciplineCode === discipline ? [{ row, index: rows.indexOf(row) }] : []),
   })).filter((group) => group.rows.length > 0);

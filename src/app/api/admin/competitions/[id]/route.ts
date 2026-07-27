@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { competitions, results } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type { CompetitionLevel } from "@/lib/pdf-import/types";
+import { recomputeFormaCache } from "@/lib/forma-cache";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -69,9 +70,15 @@ export async function DELETE(
   const compId = parseInt(id);
   if (isNaN(compId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
+  const affectedShooterIds = await db
+    .select({ shooterId: results.shooterId })
+    .from(results)
+    .where(eq(results.competitionId, compId));
+
   // Delete results first (no CASCADE in schema)
   await db.delete(results).where(eq(results.competitionId, compId));
   await db.delete(competitions).where(eq(competitions.id, compId));
+  await recomputeFormaCache(affectedShooterIds.map((row) => row.shooterId));
 
   return NextResponse.json({ ok: true });
 }

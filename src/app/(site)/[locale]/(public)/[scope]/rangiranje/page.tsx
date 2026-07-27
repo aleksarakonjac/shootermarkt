@@ -11,6 +11,7 @@ import { type AgeCategory, CATEGORY_RANK } from "@/lib/pdf-import/types";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import { type Scope } from "@/lib/scope";
+import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { RangiranjeClient, type RangiranjeShooter, type RangiranjeLabels } from "./RangiranjeClient";
 
 export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
@@ -156,6 +157,7 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
           and(
             inArray(shooterFormaCache.shooterId, uniqueShooterIds),
             eq(shooterFormaCache.disciplineCode, activeCode),
+            rankedFormaCacheFilter(),
           )
         )
     : [];

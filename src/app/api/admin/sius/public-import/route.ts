@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, MIXED_TEAM_CODES } from "@/lib/sius/public-adapter";
+import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, MIXED_TEAM_CODES } from "@/lib/sius/public-adapter";
 import { db } from "@/lib/db";
 import { shooters } from "@/lib/db/schema";
 import type { ReviewRow } from "@/lib/pdf-import/types";
@@ -186,14 +186,19 @@ export async function POST(req: NextRequest) {
     }
 
     const byKey = new Map<string, MixedTeamEntry>();
-    const keyOf = (nocCode: string, teamNumber: number) => `${nocCode}#${teamNumber}`;
+    const nocCounts = new Map<string, number>();
+    const nextTeamNumber = (nocCode: string) => {
+      const teamNumber = (nocCounts.get(nocCode) ?? 0) + 1;
+      nocCounts.set(nocCode, teamNumber);
+      return teamNumber;
+    };
 
     for (const r of data.qual) {
       const [a1, a2] = r.athletes;
-      byKey.set(keyOf(r.nocCode, r.teamNumber), {
+      byKey.set(mixedTeamIdentity(r.athletes), {
         skip: false,
         nocCode: r.nocCode,
-        teamNumber: r.teamNumber,
+        teamNumber: nextTeamNumber(r.nocCode),
         disciplineCode,
         qualRank: r.rank,
         qualTotal: r.total,
@@ -217,7 +222,7 @@ export async function POST(req: NextRequest) {
     }
 
     for (const r of data.final) {
-      const key = keyOf(r.nocCode, r.teamNumber);
+      const key = mixedTeamIdentity(r.athletes);
       const existing = byKey.get(key);
       if (existing) {
         existing.finalRank = r.rank;
@@ -227,7 +232,7 @@ export async function POST(req: NextRequest) {
         byKey.set(key, {
           skip: false,
           nocCode: r.nocCode,
-          teamNumber: r.teamNumber,
+          teamNumber: nextTeamNumber(r.nocCode),
           disciplineCode,
           qualRank: null,
           qualTotal: null,

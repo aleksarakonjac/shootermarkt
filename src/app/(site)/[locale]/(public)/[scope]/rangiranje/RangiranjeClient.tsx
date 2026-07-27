@@ -7,7 +7,6 @@ import { NOC_LIST, displayNoc } from "@/lib/noc-list";
 import {
   trendLabel,
   trendColor,
-  RANKING_MIN_SAMPLE,
   type Trend,
   type CompetitionLevel,
 } from "@/lib/forma";
@@ -263,7 +262,7 @@ export function RangiranjeClient({
     switch (activeView) {
       case "forma":
         return [...zFiltered]
-          .filter((s) => s.formaSampleSize >= RANKING_MIN_SAMPLE)
+          .filter((s) => s.forma !== null)
           .sort((a, b) => {
             const fa = a.forma ?? 0, fb = b.forma ?? 0;
             if (fb !== fa) return fb - fa;

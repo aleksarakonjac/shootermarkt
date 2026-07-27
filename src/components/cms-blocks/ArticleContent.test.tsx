@@ -43,6 +43,6 @@ describe("ArticleContent", () => {
 
   it("renders a fallback message for a shooter-embed block whose shooter no longer exists", async () => {
     render(await ArticleContent({ content: lexicalContent }));
-    expect(screen.getByText("Podaci nisu dostupni.")).toBeInTheDocument();
+    expect(screen.getByText("Podaci o strelacu nisu dostupni.")).toBeInTheDocument();
   });
 });

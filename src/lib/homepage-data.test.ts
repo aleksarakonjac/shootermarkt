@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTickerNextTime, getTickerScheduleState, groupTopFormaScores, isCompetitionLive, selectTickerUpcoming } from "./homepage-data";
+import { formatTickerNextTime, getTickerScheduleState, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectTickerUpcoming } from "./homepage-data";
 import { getTickerSlotEnd, isTickerSlotLive } from "./ticker-schedule";
 
 describe("selectTickerUpcoming", () => {
@@ -40,6 +40,24 @@ describe("getTickerScheduleState", () => {
     ];
 
     expect(getTickerScheduleState(slots, now)).toMatchObject({ active: { name: "ARW qual" }, lastCompleted: { name: "ARM qual" }, next: { name: "ARM final" } });
+  });
+});
+
+describe("selectHomepageCurrentPhases", () => {
+  const at = (hour: number) => new Date(`2026-07-21T${String(hour).padStart(2, "0")}:00:00Z`);
+  const phase = (discCode: string, isLive: boolean, hasSrb: boolean, start: number, end: number) => ({ discCode, stage: "qual", isLive, hasSrb, startTime: at(start), endTime: at(end) });
+
+  it("keeps live result phases first and uses Serbian relevance only in the srb scope", () => {
+    const phases = [
+      phase("ARM", false, false, 8, 10),
+      phase("ARW", true, false, 10, 12),
+      phase("R3PM", true, true, 9, 11),
+      phase("SPW", false, true, 11, 12),
+      phase("APM", false, false, 12, 13),
+    ];
+
+    expect(selectHomepageCurrentPhases(phases, "srb").map((item) => item.discCode)).toEqual(["R3PM", "ARW", "SPW", "APM"]);
+    expect(selectHomepageCurrentPhases(phases, "issf").map((item) => item.discCode)).toEqual(["ARW", "R3PM", "APM", "SPW"]);
   });
 });
 

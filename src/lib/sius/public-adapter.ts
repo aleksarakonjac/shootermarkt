@@ -249,6 +249,7 @@ export interface SiusTeamAthlete {
   siusAthleteId: string | null;
   firstName: string;
   lastName: string;
+  nation: string;
   total: number;
   inners: number | null;
   series: number[];
@@ -257,7 +258,6 @@ export interface SiusTeamAthlete {
 export interface SiusTeamResult {
   rank: number;
   nocCode: string;
-  teamNumber: number; // trailing digit in DisplayName ("China 1" / "China 2")
   total: number;
   inners: number | null; // APMT qual only — ARMT and any final is plain decimal
   qualified: boolean;
@@ -268,6 +268,22 @@ export interface SiusTeamResult {
 export interface SiusMixedTeamData {
   qual: SiusTeamResult[];
   final: SiusTeamResult[];
+}
+
+/** A team row can retain an athlete's historical federation (e.g. RUS), while
+ * its members carry the competition NOC (AIN). Prefer the shared member NOC. */
+export function resolveTeamNoc(teamNoc: string, athletes: Pick<SiusTeamAthlete, "nation">[]): string {
+  const athleteNocs = [...new Set(athletes.map((a) => a.nation).filter(Boolean))];
+  return athleteNocs.length === 1 ? athleteNocs[0] : teamNoc;
+}
+
+/** Stable across qualification/final and independent from a federation label.
+ * AIN combines multiple federations, so a displayed team number is not unique. */
+export function mixedTeamIdentity(athletes: Pick<SiusTeamAthlete, "siusAthleteId" | "firstName" | "lastName">[]): string {
+  return athletes
+    .map((a) => a.siusAthleteId ?? `${a.lastName}\u0000${a.firstName}`)
+    .sort()
+    .join("|");
 }
 
 /** SIUS team totals come as "591-32x" (total-inners) for APMT qual, or a plain
@@ -309,9 +325,6 @@ async function fetchSiusTeamSeries(
     if (isNaN(rank)) return [];
 
     const { total, inners } = parseTeamValue(row.Result?.Value ?? "");
-    const teamNumMatch = (row.DisplayName ?? "").trim().match(/(\d+)\s*$/);
-    const teamNumber = teamNumMatch ? parseInt(teamNumMatch[1], 10) : 1;
-
     const athletes: SiusTeamAthlete[] = (row.AthletesSeries ?? [])
       .slice()
       .sort((a, b) => (a.TeamIndex ?? 0) - (b.TeamIndex ?? 0))
@@ -322,6 +335,7 @@ async function fetchSiusTeamSeries(
           siusAthleteId: a.AthleteIdentifier?.Identifier ?? null,
           firstName,
           lastName,
+          nation: a.Nation ?? "",
           total: aTotal,
           inners: aInners,
           series: parseSeriesTotals(a.Series ?? []),
@@ -331,8 +345,7 @@ async function fetchSiusTeamSeries(
     return [
       {
         rank,
-        nocCode: row.Nation ?? "",
-        teamNumber,
+        nocCode: resolveTeamNoc(row.Nation ?? "", athletes),
         total,
         inners,
         athletes,
@@ -492,6 +505,7 @@ interface RawTeamSeriesRow {
 interface RawTeamAthleteSeries {
   AthleteIdentifier?: { Identifier?: string };
   DisplayName?: string;
+  Nation?: string;
   Result?: string;
   TeamIndex?: number;
   Remark?: string;

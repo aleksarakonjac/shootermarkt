@@ -1,4 +1,5 @@
 import { parseCategory, type ParsedBilten, type ParsedEvent, type DisciplineCode } from "./types";
+import { normalizeDisciplineCode } from "@/lib/discipline";
 
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
@@ -176,12 +177,9 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
   }
   if (!Array.isArray(parsed?.events)) throw new Error("Gemini odgovor nema 'events' listu — format biltena možda nije prepoznat.");
 
-  const LEGACY_DISCIPLINE_CODES: Record<string, DisciplineCode> = { RFM: "R3PM", RFW: "R3PW" };
-  const VALID_CODES = new Set<DisciplineCode>(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW"]);
-
   const events: ParsedEvent[] = parsed.events
-    .map((e) => ({ ...e, discipline: LEGACY_DISCIPLINE_CODES[e.discipline.toUpperCase()] ?? e.discipline.toUpperCase() as DisciplineCode }))
-    .filter((e) => VALID_CODES.has(e.discipline))
+    .map((e) => ({ ...e, discipline: normalizeDisciplineCode(e.discipline) }))
+    .filter((e): e is typeof e & { discipline: DisciplineCode } => e.discipline !== null)
     .map((e) => ({
       discipline: e.discipline,
       stage: e.stage === "final" ? "final" : "qualification",

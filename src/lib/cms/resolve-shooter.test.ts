@@ -47,6 +47,7 @@ describe("resolveShooter", () => {
       nationality: "SRB",
       clubName: "SK Pančevo 1813",
       forma: null,
+      disciplineCode: null,
     });
   });
 });

@@ -9,7 +9,7 @@ import { eq, asc, ilike, or, and, isNotNull, inArray, sql, desc, gte } from "dri
 import type { SQL } from "drizzle-orm";
 import { NOC_LIST, displayNoc } from "@/lib/noc-list";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
-import { RANKING_MIN_SAMPLE } from "@/lib/forma";
+import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { StrelciFilterBar } from "./StrelciFilterBar";
 import { getLocale, getTranslations } from "next-intl/server";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@/lib/pdf-import/types";
@@ -312,8 +312,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
       .leftJoin(clubs, eq(shooters.clubId, clubs.id))
       .where(and(
         inArray(shooterFormaCache.disciplineCode, ["ARM", "ARW", "APM", "APW"]),
-        isNotNull(shooterFormaCache.forma),
-        gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE),
+        rankedFormaCacheFilter(),
       ))
       .orderBy(asc(shooterFormaCache.disciplineCode), desc(shooterFormaCache.forma)),
   ]);

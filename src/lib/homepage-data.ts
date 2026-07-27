@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { clubs, competitionSchedule, competitions, countries, disciplines, mixedTeamResults, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@/lib/db/schema";
-import { RANKING_MIN_SAMPLE } from "@/lib/forma";
+import { NOC_LIST } from "@/lib/noc-list";
+import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
 import { getTickerSlotEnd, isTickerSlotLive } from "@/lib/ticker-schedule";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
@@ -16,7 +17,7 @@ type HomepagePhaseCandidate = {
   endTime: Date | null;
 };
 
-export function selectHomepageCurrentPhases<T extends HomepagePhaseCandidate>(phases: T[], now: Date, scope: Scope) {
+export function selectHomepageCurrentPhases<T extends HomepagePhaseCandidate>(phases: T[], scope: Scope) {
   return phases
     .sort((a, b) => {
       if (a.isLive !== b.isLive) return Number(b.isLive) - Number(a.isLive);
@@ -183,7 +184,7 @@ export async function getHomepageMain(scope: Scope) {
   const activeFirst = sql`CASE WHEN ${competitions.date} <= ${today} AND COALESCE(${competitions.dateEnd}, ${competitions.date}) >= ${today} THEN 1 ELSE 0 END`;
   const [recentComps, cacheRows, upcoming] = await Promise.all([
     db.select().from(competitions).where(and(sql`${competitions.date} <= ${today}`, competitionScope)).orderBy(desc(activeFirst), desc(competitions.date)).limit(3),
-    db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE), isNotNull(shooterFormaCache.forma))),
+    db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, rankedFormaCacheFilter())),
     db.select().from(competitions).where(and(sql`${competitions.date} >= ${today} AND ${competitions.date} < ${upcomingDeadline}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
   ]);
   const showSrbHighlight = scope === 'srb';
@@ -208,7 +209,7 @@ export async function getHomepageMain(scope: Scope) {
         const rank = stageKind === "final" ? row.finalRank : row.qualRank;
         const total = stageKind === "final" ? row.finalTotal : row.qualTotal;
         const names = [row.shooter1Name, row.shooter2Name].filter(Boolean).join(" / ");
-        return rank != null && total != null ? [{ id: `team:${row.nocCode}:${names}`, firstName: "", lastName: names || row.nocCode, clubName: null, nationality: row.nocCode, countryCode2: row.countryCode2 ?? null, rank, total: Number(total) }] : [];
+        return rank != null && total != null ? [{ id: `team:${row.nocCode}:${names}`, firstName: "", lastName: names || row.nocCode, clubName: null, nationality: row.nocCode, countryCode2: row.countryCode2 ?? NOC_LIST.find((country) => country.noc === row.nocCode)?.alpha2 ?? null, rank, total: Number(total) }] : [];
       });
       const entries = [...individual, ...mixed].sort((a, b) => a.rank - b.rank);
       if (!entries.length || (!isLive && (getTickerSlotEnd(slot) == null || getTickerSlotEnd(slot)! >= new Date()))) return [];
@@ -216,13 +217,12 @@ export async function getHomepageMain(scope: Scope) {
       const shown = new Set(top3.map((entry) => entry.id));
       const srbHighlights = showSrbHighlight ? entries.filter((entry) => entry.nationality === "SRB" && !shown.has(entry.id)) : [];
       return [{ ...slot, isLive, hasSrb: entries.some((entry) => entry.nationality === "SRB"), discCode: slot.discCode, stage: slot.stage, isJunior: slot.category !== "senior", top3, srbHighlights }];
-    }), new Date(), scope).map((phase) => ({
+    }), scope).map((phase) => ({
       discCode: phase.discCode,
       stage: phase.stage,
       isJunior: phase.isJunior,
       isLive: phase.isLive,
       qualTop3: phase.top3.map(({ firstName, lastName, clubName, nationality, countryCode2, total, rank }) => ({ firstName, lastName, clubName, nationality, countryCode2, qualTotal: total, qualRank: rank, finalTotal: null, finalRank: null })),
-      finalTop3: [],
       srbHighlights: phase.srbHighlights.map(({ firstName, lastName, clubName, total, rank }) => ({ firstName, lastName, clubName, qualRank: rank, qualTotal: total, finalRank: null, finalTotal: null })),
     }));
     return { ...competition, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), discResults };
@@ -244,7 +244,7 @@ export async function getHomepageMain(scope: Scope) {
 
 export async function getHomepageClubs(scope: Scope) {
   const nationalityFilter = scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined;
-  const rows = await db.select({ clubId: shooters.clubId, clubName: clubs.name, clubCity: clubs.city, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).innerJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE), isNotNull(shooterFormaCache.forma)));
+  const rows = await db.select({ clubId: shooters.clubId, clubName: clubs.name, clubCity: clubs.city, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).innerJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, rankedFormaCacheFilter()));
 
   // forma svih strelaca po disciplini (rastuce sortirano) — baza za percentil, spaja discipline u jedan unit-less broj
   const disciplineValues = new Map<string, number[]>();

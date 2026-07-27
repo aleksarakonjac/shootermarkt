@@ -1,9 +1,10 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { shooters, clubs, results, competitions, disciplines } from "@/lib/db/schema";
+import { shooters, clubs, results } from "@/lib/db/schema";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
-import { computeFormaFromEntries, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
+import { computeFormaFromEntries } from "@/lib/forma";
+import { getFormaEntriesForShooter } from "@/lib/forma-query";
 
 export interface ShooterCompareStats {
   id: number;
@@ -58,52 +59,14 @@ export async function compareShooters(idA: number, idB: number): Promise<Compari
 
     if (!s) return null;
 
-    // Fetch all results
-    const resList = await db
-      .select({
-        qualTotal: results.qualTotal,
-        date: competitions.date,
-        level: competitions.level,
-        category: results.category,
-        discCode: disciplines.code,
-        maxScore: disciplines.maxQualScore,
-      })
-      .from(results)
-      .innerJoin(competitions, eq(results.competitionId, competitions.id))
-      .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
-      .where(and(eq(results.shooterId, id), isNotNull(results.qualTotal)));
-
-    // Group results by discipline
-    const discMap: {
-      [code: string]: {
-        qualTotal: number;
-        date: string;
-        level: CompetitionLevel;
-        category: ResultCategory;
-      }[];
-    } = {};
-    const maxScores: { [code: string]: number } = {};
-
-    for (const r of resList) {
-      const code = r.discCode;
-      if (!discMap[code]) {
-        discMap[code] = [];
-      }
-      discMap[code].push({
-        qualTotal: parseFloat(r.qualTotal!),
-        date: r.date,
-        level: r.level,
-        category: r.category,
-      });
-      maxScores[code] = parseFloat(r.maxScore);
-    }
+    const entryGroups = await getFormaEntriesForShooter(id);
 
     const disciplinesStats: ShooterCompareStats["disciplines"] = {};
-    for (const [code, entries] of Object.entries(discMap)) {
+    for (const { disciplineCode, entries } of entryGroups) {
       const peak = Math.max(...entries.map((e) => e.qualTotal));
-      const forma = computeFormaFromEntries(entries, { code });
+      const forma = computeFormaFromEntries(entries, { code: disciplineCode });
 
-      disciplinesStats[code] = {
+      disciplinesStats[disciplineCode] = {
         peak,
         forma: forma.forma,
         matchesCount: entries.length,
