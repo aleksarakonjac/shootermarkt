@@ -178,7 +178,8 @@ export async function POST(req: NextRequest) {
   }
 
   const teamEntries: MixedTeamEntry[] = [];
-  for (const [disciplineCode, data] of mixedData) {
+  for (const [disciplineCodeRaw, data] of mixedData) {
+    const disciplineCode = disciplineCodeRaw as MixedTeamEntry["disciplineCode"];
     if (data.qual.length === 0 && data.final.length === 0) {
       errors.push(`${disciplineCode}: no results`);
       continue;

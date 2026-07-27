@@ -1,11 +1,32 @@
 import { db } from "@/lib/db";
-import { clubs, competitionSchedule, competitions, countries, disciplines, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@/lib/db/schema";
+import { clubs, competitionSchedule, competitions, countries, disciplines, mixedTeamResults, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@/lib/db/schema";
 import { RANKING_MIN_SAMPLE } from "@/lib/forma";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
 import { getTickerSlotEnd, isTickerSlotLive } from "@/lib/ticker-schedule";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
-const DISC_CODES = ["ARM", "ARW", "APM", "APW"] as const;
+const FORMA_DISC_CODES = ["ARM", "ARW", "APM", "APW"] as const;
+
+type HomepagePhaseCandidate = {
+  discCode: string;
+  stage: string;
+  isLive: boolean;
+  hasSrb: boolean;
+  startTime: Date;
+  endTime: Date | null;
+};
+
+export function selectHomepageCurrentPhases<T extends HomepagePhaseCandidate>(phases: T[], now: Date, scope: Scope) {
+  return phases
+    .sort((a, b) => {
+      if (a.isLive !== b.isLive) return Number(b.isLive) - Number(a.isLive);
+      if (scope === "srb" && a.hasSrb !== b.hasSrb) return Number(b.hasSrb) - Number(a.hasSrb);
+      const aTime = a.isLive ? a.startTime.getTime() : (getTickerSlotEnd(a)?.getTime() ?? a.startTime.getTime());
+      const bTime = b.isLive ? b.startTime.getTime() : (getTickerSlotEnd(b)?.getTime() ?? b.startTime.getTime());
+      return bTime - aTime;
+    })
+    .slice(0, 4);
+}
 
 export function selectTickerUpcoming<T extends { date: string }>(competitions: T[], today: string) {
   const deadline = new Date(`${today}T00:00:00Z`);
@@ -167,66 +188,53 @@ export async function getHomepageMain(scope: Scope) {
   ]);
   const showSrbHighlight = scope === 'srb';
   const recent = await Promise.all(recentComps.map(async (competition) => {
-    // ponytail: fetches all qualifying rows per competition (bounded by event size); result is cached
-    // Always global (no nationality filter) — this is the true top-3, not a nationally-filtered subset.
-    const [rows, srbRows] = await Promise.all([
-      db.select({ shooterId: results.shooterId, discCode: disciplines.code, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, qualTotal: results.qualTotal, finalTotal: results.finalTotal, finalRank: results.finalRank }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).innerJoin(disciplines, eq(results.disciplineId, disciplines.id)).where(and(eq(results.competitionId, competition.id), isNotNull(results.qualTotal), inArray(disciplines.code, [...DISC_CODES]))).orderBy(asc(disciplines.code), desc(results.qualTotal)), // bounded to one competition's ~4 disciplines; a fixed limit here previously truncated disciplines ordered later
-      // Every Serbian result for this competition, regardless of standing — used to highlight them below the global top-3 with their real rank.
-      showSrbHighlight
-        ? db.select({ shooterId: results.shooterId, discCode: disciplines.code, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, qualTotal: results.qualTotal, qualRank: results.qualRank, finalTotal: results.finalTotal, finalRank: results.finalRank }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).innerJoin(disciplines, eq(results.disciplineId, disciplines.id)).where(and(eq(results.competitionId, competition.id), eq(shooters.nationality, 'SRB'), isNotNull(results.qualTotal), inArray(disciplines.code, [...DISC_CODES])))
-        : Promise.resolve([]),
+    const [slots, individualRows, mixedRows] = await Promise.all([
+      db.select({ discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(eq(competitionSchedule.competitionId, competition.id)),
+      db.select({ shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(eq(results.competitionId, competition.id)),
+      db.select({ disciplineId: mixedTeamResults.disciplineId, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(eq(mixedTeamResults.competitionId, competition.id)),
     ]);
-    type DE = { shooterId: number; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
-    const preferredCat = new Map<string, string>();
-    for (const row of rows) { const cur = preferredCat.get(row.discCode); if (!cur || (row.category === 'senior' && cur !== 'senior')) preferredCat.set(row.discCode, row.category); }
-    const qualMap = new Map<string, DE[]>();
-    const finalMap = new Map<string, DE[]>();
-    for (const row of rows) {
-      const cat = preferredCat.get(row.discCode);
-      if (row.category !== cat) continue;
-      const entry: DE = { shooterId: row.shooterId, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality: row.nationality ?? null, countryCode2: row.countryCode2 ?? null, qualTotal: parseFloat(row.qualTotal!), finalTotal: row.finalTotal != null ? parseFloat(row.finalTotal) : null, finalRank: row.finalRank };
-      const qual = qualMap.get(row.discCode) ?? [];
-      if (qual.length < 3) { qual.push(entry); qualMap.set(row.discCode, qual); }
-      if (row.finalRank != null && row.finalRank >= 1 && row.finalRank <= 3) { const fins = finalMap.get(row.discCode) ?? []; fins.push(entry); finalMap.set(row.discCode, fins); }
-    }
-    for (const [, fins] of finalMap) fins.sort((a, b) => (a.finalRank ?? 99) - (b.finalRank ?? 99));
-
-    // Serbian shooters already shown in the global top-3 don't need a duplicate highlight row.
-    const shownIds = new Set<number>();
-    for (const arr of qualMap.values()) for (const e of arr) shownIds.add(e.shooterId);
-    for (const arr of finalMap.values()) for (const e of arr) shownIds.add(e.shooterId);
-    type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
-    const srbByDisc = new Map<string, SrbHighlight[]>();
-    for (const row of srbRows) {
-      const cat = preferredCat.get(row.discCode);
-      if (cat && row.category !== cat) continue;
-      if (shownIds.has(row.shooterId)) continue;
-      const entry: SrbHighlight = { firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, qualRank: row.qualRank, qualTotal: parseFloat(row.qualTotal!), finalRank: row.finalRank, finalTotal: row.finalTotal != null ? parseFloat(row.finalTotal) : null };
-      const arr = srbByDisc.get(row.discCode) ?? [];
-      arr.push(entry);
-      srbByDisc.set(row.discCode, arr);
-    }
-    for (const arr of srbByDisc.values()) arr.sort((a, b) => (a.finalRank ?? a.qualRank ?? 999) - (b.finalRank ?? b.qualRank ?? 999));
-
-    const discResults = DISC_CODES.map((code) => {
-      const cat = preferredCat.get(code);
-      if (!cat) return null;
-      const qualTop3 = qualMap.get(code) ?? [];
-      const finalTop3 = finalMap.get(code) ?? [];
-      const srbHighlights = srbByDisc.get(code) ?? [];
-      if (qualTop3.length === 0 && finalTop3.length === 0 && srbHighlights.length === 0) return null;
-      return { discCode: code, isJunior: cat !== 'senior', category: cat, hasFinale: finalTop3.length > 0, qualTop3, finalTop3, srbHighlights };
-    }).filter((x): x is NonNullable<typeof x> => x !== null);
+    type Entry = { id: string; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; rank: number; total: number };
+    const discResults = selectHomepageCurrentPhases(slots.flatMap((slot) => {
+      const isLive = isTickerSlotLive(slot, new Date());
+      const stageKind = slot.stage.startsWith("qual") ? "qual" : slot.stage;
+      const individual = individualRows.flatMap((row): Entry[] => {
+        if (row.disciplineId !== slot.disciplineId || row.category !== slot.category) return [];
+        const rank = stageKind === "elimination" ? row.elimRank : stageKind === "final" ? row.finalRank : row.qualRank;
+        const total = stageKind === "elimination" ? row.elimTotal : stageKind === "final" ? row.finalTotal : row.qualTotal;
+        return rank != null && total != null ? [{ id: `shooter:${row.shooterId}`, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality: row.nationality ?? null, countryCode2: row.countryCode2 ?? null, rank, total: Number(total) }] : [];
+      });
+      const mixed = stageKind === "elimination" ? [] : mixedRows.flatMap((row): Entry[] => {
+        if (row.disciplineId !== slot.disciplineId) return [];
+        const rank = stageKind === "final" ? row.finalRank : row.qualRank;
+        const total = stageKind === "final" ? row.finalTotal : row.qualTotal;
+        const names = [row.shooter1Name, row.shooter2Name].filter(Boolean).join(" / ");
+        return rank != null && total != null ? [{ id: `team:${row.nocCode}:${names}`, firstName: "", lastName: names || row.nocCode, clubName: null, nationality: row.nocCode, countryCode2: row.countryCode2 ?? null, rank, total: Number(total) }] : [];
+      });
+      const entries = [...individual, ...mixed].sort((a, b) => a.rank - b.rank);
+      if (!entries.length || (!isLive && (getTickerSlotEnd(slot) == null || getTickerSlotEnd(slot)! >= new Date()))) return [];
+      const top3 = entries.slice(0, 3);
+      const shown = new Set(top3.map((entry) => entry.id));
+      const srbHighlights = showSrbHighlight ? entries.filter((entry) => entry.nationality === "SRB" && !shown.has(entry.id)) : [];
+      return [{ ...slot, isLive, hasSrb: entries.some((entry) => entry.nationality === "SRB"), discCode: slot.discCode, stage: slot.stage, isJunior: slot.category !== "senior", top3, srbHighlights }];
+    }), new Date(), scope).map((phase) => ({
+      discCode: phase.discCode,
+      stage: phase.stage,
+      isJunior: phase.isJunior,
+      isLive: phase.isLive,
+      qualTop3: phase.top3.map(({ firstName, lastName, clubName, nationality, countryCode2, total, rank }) => ({ firstName, lastName, clubName, nationality, countryCode2, qualTotal: total, qualRank: rank, finalTotal: null, finalRank: null })),
+      finalTop3: [],
+      srbHighlights: phase.srbHighlights.map(({ firstName, lastName, clubName, total, rank }) => ({ firstName, lastName, clubName, qualRank: rank, qualTotal: total, finalRank: null, finalTotal: null })),
+    }));
     return { ...competition, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), discResults };
   }));
-  const topByDisc = Object.fromEntries(DISC_CODES.map((code) => [code, cacheRows.filter((row) => row.discCode === code).sort((a, b) => Number(b.forma) - Number(a.forma)).slice(0, 5)])) as Record<typeof DISC_CODES[number], typeof cacheRows>;
+  const topByDisc = Object.fromEntries(FORMA_DISC_CODES.map((code) => [code, cacheRows.filter((row) => row.discCode === code).sort((a, b) => Number(b.forma) - Number(a.forma)).slice(0, 5)])) as Record<typeof FORMA_DISC_CODES[number], typeof cacheRows>;
   const ids = [...new Set(Object.values(topByDisc).flat().map((row) => row.shooterId))];
   const scoreRows = ids.length
     ? await db.select({ shooterId: results.shooterId, discCode: disciplines.code, qualTotal: results.qualTotal })
       .from(results)
       .innerJoin(competitions, eq(results.competitionId, competitions.id))
       .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
-      .where(and(inArray(results.shooterId, ids), inArray(disciplines.code, [...DISC_CODES]), isNotNull(results.qualTotal)))
+      .where(and(inArray(results.shooterId, ids), inArray(disciplines.code, [...FORMA_DISC_CODES]), isNotNull(results.qualTotal)))
       .orderBy(desc(competitions.date))
     : [];
   const scores = groupTopFormaScores(scoreRows);
