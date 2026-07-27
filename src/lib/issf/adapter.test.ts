@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchElimResultsFromHtml, searchAthletes } from "./adapter";
+import { fetchElimResultsFromHtml, fetchMixedTeamQualFromHtml, searchAthletes } from "./adapter";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -30,6 +30,20 @@ describe("fetchElimResultsFromHtml", () => {
 
     await expect(fetchElimResultsFromHtml(1, "R3PW")).resolves.toMatchObject([
       { total: 573, inners: 21 },
+    ]);
+  });
+});
+
+describe("fetchMixedTeamQualFromHtml", () => {
+  it("keeps each APMT shooter's inner tens", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(`
+      <tr><td>1</td><td>12</td><td>SRB</td><td>570-18x</td><td>Q</td></tr>
+      <tr><td></td><td>12</td><td><a href="/athletes/SHSRBM123">DOE John</a></td><td></td><td>96</td><td>95</td><td>96</td><td>287-10x</td></tr>
+      <tr><td></td><td>12</td><td><a href="/athletes/SHSRBW456">DOE Jane</a></td><td></td><td>94</td><td>95</td><td>94</td><td>283-8x</td></tr>
+    `)));
+
+    await expect(fetchMixedTeamQualFromHtml(1, "APMT")).resolves.toMatchObject([
+      { mInners: 10, mTotal: 287, fInners: 8, fTotal: 283 },
     ]);
   });
 });

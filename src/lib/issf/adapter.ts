@@ -772,11 +772,13 @@ export interface ISSFMixedTeamQualEntry {
   mLastName: string;
   mFirstName: string;
   mSeries: number[];
+  mInners: number | null;
   mTotal: number;
   fIssfId: string | null;
   fLastName: string;
   fFirstName: string;
   fSeries: number[];
+  fInners: number | null;
   fTotal: number;
   total: number;
   inners: number | null;
@@ -860,9 +862,9 @@ export async function fetchMixedTeamQualFromHtml(
     const qualified = remarkCells.some((c) => /^Q/.test(c.trim()));
 
     let mInfo: { issfId: string; lastName: string; firstName: string } | null = null;
-    let mSeries: number[] = [], mTotal = 0;
+    let mSeries: number[] = [], mInners: number | null = null, mTotal = 0;
     let fInfo: { issfId: string; lastName: string; firstName: string } | null = null;
-    let fSeries: number[] = [], fTotal = 0;
+    let fSeries: number[] = [], fInners: number | null = null, fTotal = 0;
 
     for (let j = i + 1; j <= i + 2 && j < trs.length; j++) {
       const subTr = trs[j];
@@ -877,27 +879,28 @@ export async function fetchMixedTeamQualFromHtml(
       const subTotalRaw = subCells[7] ?? "";
       const subTotalMatch = subTotalRaw.match(/^(\d+)\s*(?:-\s*(\d+)x\s*)?$/);
       const subTotal = subTotalMatch ? parseInt(subTotalMatch[1]) : 0;
+      const subInners = subTotalMatch?.[2] ? parseInt(subTotalMatch[2]) : null;
       const series = [s1, s2, s3].filter((n) => n > 0);
 
       // Gender from ISSF ID: SH{NOC3}{G}... → index 5 is M/W/F
       const genderChar = ath.issfId[5]?.toUpperCase();
       if (!mInfo && genderChar === "M") {
-        mInfo = ath; mSeries = series; mTotal = subTotal;
+        mInfo = ath; mSeries = series; mInners = subInners; mTotal = subTotal;
       } else if (!fInfo && (genderChar === "W" || genderChar === "F")) {
-        fInfo = ath; fSeries = series; fTotal = subTotal;
+        fInfo = ath; fSeries = series; fInners = subInners; fTotal = subTotal;
       } else if (!mInfo) {
-        mInfo = ath; mSeries = series; mTotal = subTotal;
+        mInfo = ath; mSeries = series; mInners = subInners; mTotal = subTotal;
       } else {
-        fInfo = ath; fSeries = series; fTotal = subTotal;
+        fInfo = ath; fSeries = series; fInners = subInners; fTotal = subTotal;
       }
     }
 
     results.push({
       rank, nocCode,
       mIssfId: mInfo?.issfId ?? null, mLastName: mInfo?.lastName ?? "", mFirstName: mInfo?.firstName ?? "",
-      mSeries, mTotal,
+      mSeries, mInners, mTotal,
       fIssfId: fInfo?.issfId ?? null, fLastName: fInfo?.lastName ?? "", fFirstName: fInfo?.firstName ?? "",
-      fSeries, fTotal,
+      fSeries, fInners, fTotal,
       total, inners, qualified,
     });
   }
