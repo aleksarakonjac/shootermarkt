@@ -9,9 +9,11 @@ export interface MixedTeamEntry {
   qualRank: number | null;
   qualTotal: number | null;
   inners: number | null;
+  qualRemark?: string | null;
   qualified: boolean;
   finalRank: number | null;
   finalTotal: number | null;
+  finalRemark?: string | null;
   mIssfId: string | null;
   mLastName: string;
   mFirstName: string;

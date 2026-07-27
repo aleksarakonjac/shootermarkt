@@ -119,9 +119,12 @@ export default async function CompetitionPage({ params }: Props) {
       shooter2Detail: mixedTeamResults.shooter2Detail,
       qualRank: mixedTeamResults.qualRank,
       qualTotal: mixedTeamResults.qualTotal,
+      qualInners: mixedTeamResults.qualInners,
+      qualRemark: mixedTeamResults.qualRemark,
       qualified: mixedTeamResults.qualified,
       finalRank: mixedTeamResults.finalRank,
       finalTotal: mixedTeamResults.finalTotal,
+      finalRemark: mixedTeamResults.finalRemark,
     })
     .from(mixedTeamResults)
     .innerJoin(disciplines, eq(mixedTeamResults.disciplineId, disciplines.id))

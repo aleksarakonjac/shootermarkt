@@ -17,7 +17,7 @@ export async function commitMixedTeams(competitionId: number, entries: MixedTeam
     const qualification = await fetch("/api/admin/import/commit-mixed", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ competitionId, discipline, isFinals: false, entries: rows.map((e) => ({
-        skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber, qualRank: e.qualRank, qualTotal: e.qualTotal, qualified: e.qualified,
+        skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber, qualRank: e.qualRank, qualTotal: e.qualTotal, qualInners: e.inners, qualRemark: e.qualRemark, qualified: e.qualified,
         m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mInners: e.mInners, mTotal: e.mTotal,
         f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
       })) }),
@@ -29,7 +29,7 @@ export async function commitMixedTeams(competitionId: number, entries: MixedTeam
     if (!finalists.length) continue;
     const finals = await fetch("/api/admin/import/commit-mixed", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ competitionId, discipline, isFinals: true, entries: finalists.map((e) => ({ nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal })) }),
+      body: JSON.stringify({ competitionId, discipline, isFinals: true, entries: finalists.map((e) => ({ nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark })) }),
     });
     const finalData = await finals.json() as CommitResult & { error?: string };
     if (!finals.ok) errors.push(finalData.error ?? `${discipline}: finals commit error`);

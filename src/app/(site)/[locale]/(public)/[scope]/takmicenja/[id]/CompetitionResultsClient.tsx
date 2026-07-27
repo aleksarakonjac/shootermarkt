@@ -596,7 +596,11 @@ function CompetitionDetail({
           </div>
         )}
 
-        <MixedTeamQualTable teams={mixedGroup?.teams ?? []} apparatus={mixedGroup?.apparatus ?? null} />
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={selection.stage} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.22 } }} exit={{ opacity: 0, transition: { duration: 0.16 } }}>
+            <MixedTeamQualTable teams={mixedGroup?.teams ?? []} apparatus={mixedGroup?.apparatus ?? null} stage={selection.stage === "final" ? "final" : "qual"} />
+          </motion.div>
+        </AnimatePresence>
       </div>
     );
   }

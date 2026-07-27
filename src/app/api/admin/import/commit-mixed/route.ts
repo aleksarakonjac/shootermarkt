@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
     teamNumber?: number;
     qualRank?: number | null;
     qualTotal?: number | null;
+    qualInners?: number | null;
+    qualRemark?: string | null;
     qualified?: boolean | null;
     m_lastName?: string;
     m_firstName?: string;
@@ -36,6 +38,7 @@ export async function POST(req: NextRequest) {
     fTotal?: number;
     finalRank?: number | null;
     finalTotal?: number | null;
+    finalRemark?: string | null;
   }
 
   const body = await req.json();
@@ -99,6 +102,7 @@ export async function POST(req: NextRequest) {
             teamNumber: e.teamNumber ?? 1,
             finalRank: e.finalRank ?? null,
             finalTotal: e.finalTotal != null ? String(e.finalTotal) : null,
+            finalRemark: e.finalRemark ?? null,
             source: "manual",
           })
           .onConflictDoUpdate({
@@ -106,6 +110,7 @@ export async function POST(req: NextRequest) {
             set: {
               finalRank: e.finalRank ?? null,
               finalTotal: e.finalTotal != null ? String(e.finalTotal) : null,
+              finalRemark: e.finalRemark ?? null,
             },
           });
       } else {
@@ -122,6 +127,8 @@ export async function POST(req: NextRequest) {
             shooter2Detail: { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
             qualRank: e.qualRank ?? null,
             qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
+            qualInners: e.qualInners ?? null,
+            qualRemark: e.qualRemark ?? null,
             qualified: e.qualified ?? null,
             source: "manual",
           })
@@ -134,6 +141,8 @@ export async function POST(req: NextRequest) {
               shooter2Detail: { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
               qualRank: e.qualRank ?? null,
               qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
+              qualInners: e.qualInners ?? null,
+              qualRemark: e.qualRemark ?? null,
               qualified: e.qualified ?? null,
             },
           });

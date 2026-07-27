@@ -203,6 +203,7 @@ export async function POST(req: NextRequest) {
         qualRank: r.rank,
         qualTotal: r.total,
         inners: r.inners,
+        qualRemark: r.remark,
         qualified: r.qualified,
         finalRank: null,
         finalTotal: null,
@@ -227,6 +228,7 @@ export async function POST(req: NextRequest) {
       if (existing) {
         existing.finalRank = r.rank;
         existing.finalTotal = r.total;
+        existing.finalRemark = r.remark;
         existing.mFinalSeries = r.athletes[0]?.series ?? [];
         existing.fFinalSeries = r.athletes[1]?.series ?? [];
       } else {
@@ -239,9 +241,11 @@ export async function POST(req: NextRequest) {
           qualRank: null,
           qualTotal: null,
           inners: null,
+          qualRemark: null,
           qualified: true,
           finalRank: r.rank,
           finalTotal: r.total,
+          finalRemark: r.remark,
           mIssfId: a1?.siusAthleteId ?? null,
           mLastName: a1?.lastName ?? "",
           mFirstName: a1?.firstName ?? "",
