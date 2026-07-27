@@ -241,6 +241,8 @@
     "noWinner": "Bez rezultata",
     "srbResult": "SRB rezultat",
     "showLess": "manje",
+    "showLessQualificationResults": "Prikaži manje rezultata kvalifikacija",
+    "showMoreQualificationResults": "Prikaži još {count} rezultata kvalifikacija",
     "viewAll": "Vidi sve →",
     "upcomingEvents": "Predstojeća Takmičenja",
     "upcomingAnnounced": "{count} najavljeno",

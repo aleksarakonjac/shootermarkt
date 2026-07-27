@@ -310,6 +310,8 @@ export async function getHomepageMain(scope: Scope) {
   return { recent, upcoming, topForma: { ARM: topByDisc.ARM.map(map), ARW: topByDisc.ARW.map(map), APM: topByDisc.APM.map(map), APW: topByDisc.APW.map(map) } };
 }
 
+export type HomepageMainData = Awaited<ReturnType<typeof getHomepageMain>>;
+
 export async function getHomepageClubs(scope: Scope) {
   const nationalityFilter = scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined;
   const rows = await db.select({ clubId: shooters.clubId, clubName: clubs.name, clubCity: clubs.city, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).innerJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, rankedFormaCacheFilter()));

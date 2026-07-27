@@ -11,6 +11,7 @@ import { TopFormaClient } from "./top-forma-client";
 import { useHomepageDataStatus } from "./homepage-data-status";
 import { LEVEL_STYLE } from "@/lib/competition-utils";
 import { MIXED_TEAM_CODES } from "@/lib/pdf-import/types";
+import type { HomepageMainData } from "@/lib/homepage-data";
 
 function phaseHref(competitionId: number, discCode: string, stage: string, category: string) {
   const urlStage = stage === "elimination" ? "elim" : stage.startsWith("qual") ? "qual" : stage;
@@ -23,12 +24,13 @@ function phaseHref(competitionId: number, discCode: string, stage: string, categ
 const FALLBACK_LEVEL_STYLE = { background: "var(--level-club-bg)", color: "var(--level-club-fg)" };
 const INTL_LEVELS = new Set(["olympic", "world", "continental", "international"]);
 
-function useHomepageData<T>(path: string, refreshMs?: number) {
+function useHomepageData<T>(path: string, refreshMs?: number, initialData?: T) {
   const locale = useLocale();
   const { scope } = useParams<{ scope?: string }>();
-  const [data, setData] = useState<T | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [data, setData] = useState<T | null>(initialData ?? null);
+  const [state, setState] = useState<"loading" | "ready" | "error">(initialData ? "ready" : "loading");
   const [attempt, setAttempt] = useState(0);
+  const hasInitialData = useRef(initialData != null);
   const autoRetried = useRef<string | null>(null);
   const { clearFailure, reportFailure } = useHomepageDataStatus();
   const retry = useCallback(() => {
@@ -37,6 +39,10 @@ function useHomepageData<T>(path: string, refreshMs?: number) {
   }, []);
 
   useEffect(() => {
+    if (hasInitialData.current) {
+      hasInitialData.current = false;
+      return;
+    }
     const controller = new AbortController();
     clearFailure(path);
     fetch(`${path}?scope=${scope ?? "srb"}&locale=${locale}`, { signal: controller.signal })
@@ -103,7 +109,7 @@ export function HomepageTickerClient() {
   return <Ticker liveItems={liveItems} upcomingItems={upcomingItems} />;
 }
 
-export function HomepageMainClient() {
+export function HomepageMainClient({ initialData }: { initialData?: HomepageMainData }) {
   const locale = useLocale();
   const t = useTranslations("home");
   const tComp = useTranslations("competition");
@@ -115,7 +121,7 @@ export function HomepageMainClient() {
     else next.add(key);
     return next;
   });
-  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; isLive: boolean; discResults: Array<{ discCode: string; isLive: boolean; isJunior: boolean; phases: Array<{ stage: string; category: string; isLive: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; srbHighlights: Array<{ firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null }> }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
+  const { data, state, retry } = useHomepageData<HomepageMainData>("/api/homepage/main", undefined, initialData);
 
   useEffect(() => {
     const supabase = createClient();
@@ -202,38 +208,47 @@ export function HomepageMainClient() {
                 const qualKey = `${competitionId}:${disc.discCode}:${phase.category}:qual`;
                 const qualExpanded = expandedQual.has(qualKey);
                 const shownEntries = phase.stage.startsWith("qual") && hasFinal && !qualExpanded ? phase.qualTop3.slice(0, 1) : phase.qualTop3;
+                const extraQualificationResults = phase.qualTop3.length - 1;
                 const qualToggle = phase.stage.startsWith("qual") && hasFinal && phase.qualTop3.length > 1 ? (
-                  <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleQual(qualKey); }} className="shrink-0 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline">
-                    {qualExpanded ? t("showLess") : `+${phase.qualTop3.length - 1}`}
+                  <button
+                    type="button"
+                    onClick={() => toggleQual(qualKey)}
+                    aria-expanded={qualExpanded}
+                    aria-label={qualExpanded ? t("showLessQualificationResults") : t("showMoreQualificationResults", { count: extraQualificationResults })}
+                    className="flex size-11 shrink-0 items-center justify-center text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
+                  >
+                    {qualExpanded ? t("showLess") : `+${extraQualificationResults}`}
                   </button>
                 ) : null;
                 return (
-                  <ScopedLink
-                    key={phase.stage}
-                    href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)}
-                    className="block no-underline hover:opacity-80 transition-opacity"
-                  >
-                    {shownEntries.length > 0 && inlinePlaces(shownEntries, (e) => e.qualTotal, decimals, true, <>{stageBadge}{phase.isLive ? liveBadge : null}</>, qualToggle)}
-                    {phase.srbHighlights.length > 0 && (
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        {phase.srbHighlights.map((h, i) => {
-                          const isFinalRow = h.finalRank != null && h.finalTotal != null;
-                          const rank = isFinalRow ? h.finalRank : h.qualRank;
-                          const total = isFinalRow ? h.finalTotal! : h.qualTotal;
-                          return (
-                            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-primary)]/[0.08] pl-1.5 pr-2 py-0.5">
-                              <span className="fi fi-rs shrink-0" style={{ fontSize: 10 }} aria-hidden="true" />
-                              <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--brand-primary)] tabular-nums">
-                                {rank != null ? `${rank}.` : "—"}
+                  <div key={phase.stage} className="flex items-start gap-2">
+                    <ScopedLink
+                      href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)}
+                      className="min-w-0 flex-1 no-underline hover:opacity-80 transition-opacity"
+                    >
+                      {shownEntries.length > 0 && inlinePlaces(shownEntries, (e) => e.qualTotal, decimals, true, <>{stageBadge}{phase.isLive ? liveBadge : null}</>)}
+                      {phase.srbHighlights.length > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          {phase.srbHighlights.map((h, i) => {
+                            const isFinalRow = h.finalRank != null && h.finalTotal != null;
+                            const rank = isFinalRow ? h.finalRank : h.qualRank;
+                            const total = isFinalRow ? h.finalTotal! : h.qualTotal;
+                            return (
+                              <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-primary)]/[0.08] pl-1.5 pr-2 py-0.5">
+                                <span className="fi fi-rs shrink-0" style={{ fontSize: 10 }} aria-hidden="true" />
+                                <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--brand-primary)] tabular-nums">
+                                  {rank != null ? `${rank}.` : "—"}
+                                </span>
+                                <span className="text-xs font-semibold text-[var(--ink)]">{h.firstName ? `${h.lastName} ${h.firstName.charAt(0)}.` : h.lastName}</span>
+                                <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--brand-primary)] tabular-nums">{total.toFixed(decimals)}</span>
                               </span>
-                              <span className="text-xs font-semibold text-[var(--ink)]">{h.firstName ? `${h.lastName} ${h.firstName.charAt(0)}.` : h.lastName}</span>
-                              <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--brand-primary)] tabular-nums">{total.toFixed(decimals)}</span>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </ScopedLink>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </ScopedLink>
+                    {qualToggle}
+                  </div>
                 );
               })}
             </div>

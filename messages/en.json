@@ -241,6 +241,8 @@
     "noWinner": "No results",
     "srbResult": "SRB result",
     "showLess": "less",
+    "showLessQualificationResults": "Show fewer qualification results",
+    "showMoreQualificationResults": "Show {count} more qualification results",
     "viewAll": "View all →",
     "upcomingEvents": "Upcoming Competitions",
     "upcomingAnnounced": "{count} upcoming",
