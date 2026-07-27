@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import { Ticker, type TickerItem } from "../ticker";
@@ -99,7 +99,13 @@ export function HomepageMainClient() {
   const t = useTranslations("home");
   const tComp = useTranslations("competition");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; isLive: boolean; discResults: Array<{ discCode: string; isJunior: boolean; category: string; hasFinale: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; finalTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
+  const [expandedQual, setExpandedQual] = useState<Set<string>>(new Set());
+  const toggleQual = (key: string) => setExpandedQual((prev) => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
+  });
+  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; isLive: boolean; discResults: Array<{ discCode: string; isJunior: boolean; category: string; hasFinale: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; finalTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; srbHighlights: Array<{ firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
 
   useEffect(() => {
     const supabase = createClient();
@@ -117,9 +123,10 @@ export function HomepageMainClient() {
   const [lead, ...recent] = data.recent;
 
   type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
-  type DiscResult = { discCode: string; isJunior: boolean; hasFinale: boolean; qualTop3: Shooter[]; finalTop3: Shooter[] };
+  type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
+  type DiscResult = { discCode: string; isJunior: boolean; hasFinale: boolean; qualTop3: Shooter[]; finalTop3: Shooter[]; srbHighlights: SrbHighlight[] };
 
-  function renderDiscResults(discResults: DiscResult[], level: string) {
+  function renderDiscResults(discResults: DiscResult[], level: string, compId: number) {
     if (discResults.length === 0) return <p className="mt-4 text-sm italic text-[var(--muted)]">{t("noWinner")}</p>;
     const isIntl = INTL_LEVELS.has(level.toLowerCase());
     const aff = (e: Shooter) => {
@@ -132,52 +139,90 @@ export function HomepageMainClient() {
         </span>
       );
     };
+    // Inline "1. Name 632.2  2. Name 631.8  3. Name …" row. First place reads larger/bold; 2nd-3rd are compact.
+    function inlinePlaces(entries: Shooter[], score: (e: Shooter) => number | null, decimals: number, scoreForAllPlaces = true, prefix?: ReactNode, trailing?: ReactNode) {
+      return (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {prefix}
+          {entries.map((e, i) => {
+            const lead = i === 0;
+            const value = (scoreForAllPlaces || lead) ? score(e) : null;
+            return (
+              <span key={i} className="inline-flex items-center gap-1">
+                <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums"}>
+                  {i + 1}.
+                </span>
+                <span className={lead ? "text-sm font-semibold text-[var(--ink)]" : "text-xs text-[var(--muted)]"}>
+                  {e.lastName} {e.firstName.charAt(0)}.
+                </span>
+                {aff(e)}
+                {value != null && (
+                  <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums"}>
+                    {value.toFixed(decimals)}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+          {trailing}
+        </div>
+      );
+    }
     return (
       <div className="mt-4 divide-y divide-[var(--border)]">
         {discResults.map((disc) => {
-          if (disc.qualTop3.length === 0 && disc.finalTop3.length === 0) return null;
+          if (disc.qualTop3.length === 0 && disc.finalTop3.length === 0 && disc.srbHighlights.length === 0) return null;
           const isAP = disc.discCode.startsWith("AP");
           const discBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--subtle)]">{disc.discCode}</span>;
           const junBadge = disc.isJunior ? <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>JUN</span> : null;
+          const qBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--subtle)]">Q</span>;
           return (
             <div key={disc.discCode} className="py-2.5 first:pt-0 last:pb-0">
-              {disc.hasFinale && disc.finalTop3[0] ? (
+              {disc.finalTop3.length > 0 ? (
                 <>
-                  <div className="flex items-center gap-2">
-                    {discBadge}{junBadge}
-                    <span className="flex-1 min-w-0 text-sm font-semibold text-[var(--ink)] truncate">{disc.finalTop3[0].lastName} {disc.finalTop3[0].firstName.charAt(0)}.</span>
-                    {aff(disc.finalTop3[0])}
-                    <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums">{disc.finalTop3[0].finalTotal?.toFixed(1) ?? "—"}</span>
-                  </div>
-                  {disc.finalTop3.length > 1 && (
-                    <p className="mt-0.5 text-xs text-[var(--muted)]">
-                      {disc.finalTop3.slice(1).map((r, i) => `${i + 2}. ${r.lastName} ${r.firstName.charAt(0)}.`).join("  ·  ")}
-                    </p>
-                  )}
-                  {disc.qualTop3[0] && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--subtle)]">Q</span>
-                      <span className="flex-1 min-w-0 text-xs text-[var(--muted)] truncate">{disc.qualTop3[0].lastName} {disc.qualTop3[0].firstName.charAt(0)}.</span>
-                      {aff(disc.qualTop3[0])}
-                      <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums">{disc.qualTop3[0].qualTotal.toFixed(isAP ? 0 : 1)}</span>
-                    </div>
-                  )}
+                  {inlinePlaces(disc.finalTop3, (e) => e.finalTotal, 1, false, <>{discBadge}{junBadge}</>)}
+                  {disc.qualTop3.length > 0 && (() => {
+                    const qualKey = `${compId}:${disc.discCode}:qual`;
+                    const qualExpanded = expandedQual.has(qualKey);
+                    const shown = qualExpanded ? disc.qualTop3 : disc.qualTop3.slice(0, 1);
+                    const toggle = disc.qualTop3.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleQual(qualKey); }}
+                        className="shrink-0 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
+                      >
+                        {qualExpanded ? t("showLess") : `+${disc.qualTop3.length - 1}`}
+                      </button>
+                    ) : null;
+                    return (
+                      <div className="mt-1.5">
+                        {inlinePlaces(shown, (e) => e.qualTotal, isAP ? 0 : 1, true, qBadge, toggle)}
+                      </div>
+                    );
+                  })()}
                 </>
-              ) : disc.qualTop3[0] ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    {discBadge}{junBadge}
-                    <span className="flex-1 min-w-0 text-sm font-semibold text-[var(--ink)] truncate">{disc.qualTop3[0].lastName} {disc.qualTop3[0].firstName.charAt(0)}.</span>
-                    {aff(disc.qualTop3[0])}
-                    <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums">{disc.qualTop3[0].qualTotal.toFixed(isAP ? 0 : 1)}</span>
-                  </div>
-                  {disc.qualTop3.length > 1 && (
-                    <p className="mt-0.5 text-xs text-[var(--muted)]">
-                      {disc.qualTop3.slice(1).map((r, i) => `${i + 2}. ${r.lastName} ${r.firstName.charAt(0)}. ${r.qualTotal.toFixed(isAP ? 0 : 1)}`).join("  ·  ")}
-                    </p>
-                  )}
-                </>
+              ) : disc.qualTop3.length > 0 ? (
+                inlinePlaces(disc.qualTop3, (e) => e.qualTotal, isAP ? 0 : 1, true, <>{discBadge}{junBadge}</>)
               ) : null}
+              {disc.srbHighlights.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {disc.srbHighlights.map((h, i) => {
+                    const isFinalRow = h.finalRank != null && h.finalTotal != null;
+                    const rank = isFinalRow ? h.finalRank : h.qualRank;
+                    const total = isFinalRow ? h.finalTotal! : h.qualTotal;
+                    return (
+                      <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-primary)]/[0.08] pl-1.5 pr-2 py-0.5">
+                        <span className="fi fi-rs shrink-0" style={{ fontSize: 10 }} aria-hidden="true" />
+                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--brand-primary)] tabular-nums">
+                          {rank != null ? `${rank}.` : "—"}
+                        </span>
+                        <span className="text-xs font-semibold text-[var(--ink)]">{h.lastName} {h.firstName.charAt(0)}.</span>
+                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--brand-primary)] tabular-nums">{total.toFixed(isAP ? 0 : 1)}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
@@ -204,19 +249,19 @@ export function HomepageMainClient() {
             href={`/takmicenja/${lead.id}`}
             className="group block rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 hover:border-[var(--brand-primary)] transition-colors no-underline"
           >
-            <div className="flex items-center gap-2 flex-wrap">
-              {lead.isLive && <span className="inline-flex items-center gap-1 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white"><span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />{t("inProgress")}</span>}
-              <span className="text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
+            <div className="flex items-center gap-2 flex-nowrap">
+              {lead.isLive && <span className="shrink-0 inline-flex items-center gap-1 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white"><span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />{t("inProgress")}</span>}
+              <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
                 {leadLevelLabel}
               </span>
-              <span className="text-xs text-[var(--muted)]">
+              <span className="flex-1 min-w-0 truncate text-xs text-[var(--muted)]">
                 {lead.date.split("-").reverse().join(".")}{lead.location ? ` · ${lead.location}` : ""}
               </span>
             </div>
             <h3 className="mt-2 font-[family-name:var(--font-barlow-condensed)] text-xl sm:text-2xl font-extrabold uppercase leading-tight line-clamp-2 group-hover:text-[var(--brand-primary)] transition-colors">
               {name}
             </h3>
-            {renderDiscResults(lead.discResults, lead.level)}
+            {renderDiscResults(lead.discResults, lead.level, lead.id)}
             <p className="mt-4 pt-3 border-t border-[var(--border)] text-sm font-semibold text-[var(--brand-primary)] group-hover:underline">
               {t("viewResults")} →
             </p>
@@ -270,7 +315,7 @@ export function HomepageMainClient() {
                 <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                   <div className="overflow-hidden">
                     <div className="px-4 pb-4">
-                      {renderDiscResults(item.discResults, item.level)}
+                      {renderDiscResults(item.discResults, item.level, item.id)}
                       <ScopedLink
                         href={`/takmicenja/${item.id}`}
                         className="mt-4 pt-3 border-t border-[var(--border)] text-sm font-semibold text-[var(--brand-primary)] hover:underline flex no-underline"

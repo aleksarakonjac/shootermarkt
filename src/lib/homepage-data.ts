@@ -153,10 +153,18 @@ export async function getHomepageMain(scope: Scope) {
     db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE), isNotNull(shooterFormaCache.forma))),
     db.select().from(competitions).where(and(sql`${competitions.date} >= ${today} AND ${competitions.date} < ${upcomingDeadline}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
   ]);
+  const showSrbHighlight = scope === 'srb';
   const recent = await Promise.all(recentComps.map(async (competition) => {
     // ponytail: fetches all qualifying rows per competition (bounded by event size); result is cached
-    const rows = await db.select({ discCode: disciplines.code, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, qualTotal: results.qualTotal, finalTotal: results.finalTotal, finalRank: results.finalRank }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).innerJoin(disciplines, eq(results.disciplineId, disciplines.id)).where(and(eq(results.competitionId, competition.id), isNotNull(results.qualTotal), inArray(disciplines.code, [...DISC_CODES]), nationalityFilter)).orderBy(asc(disciplines.code), desc(results.qualTotal)).limit(200);
-    type DE = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
+    // Always global (no nationality filter) — this is the true top-3, not a nationally-filtered subset.
+    const [rows, srbRows] = await Promise.all([
+      db.select({ shooterId: results.shooterId, discCode: disciplines.code, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, qualTotal: results.qualTotal, finalTotal: results.finalTotal, finalRank: results.finalRank }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).innerJoin(disciplines, eq(results.disciplineId, disciplines.id)).where(and(eq(results.competitionId, competition.id), isNotNull(results.qualTotal), inArray(disciplines.code, [...DISC_CODES]))).orderBy(asc(disciplines.code), desc(results.qualTotal)), // bounded to one competition's ~4 disciplines; a fixed limit here previously truncated disciplines ordered later
+      // Every Serbian result for this competition, regardless of standing — used to highlight them below the global top-3 with their real rank.
+      showSrbHighlight
+        ? db.select({ shooterId: results.shooterId, discCode: disciplines.code, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, qualTotal: results.qualTotal, qualRank: results.qualRank, finalTotal: results.finalTotal, finalRank: results.finalRank }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).innerJoin(disciplines, eq(results.disciplineId, disciplines.id)).where(and(eq(results.competitionId, competition.id), eq(shooters.nationality, 'SRB'), isNotNull(results.qualTotal), inArray(disciplines.code, [...DISC_CODES])))
+        : Promise.resolve([]),
+    ]);
+    type DE = { shooterId: number; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
     const preferredCat = new Map<string, string>();
     for (const row of rows) { const cur = preferredCat.get(row.discCode); if (!cur || (row.category === 'senior' && cur !== 'senior')) preferredCat.set(row.discCode, row.category); }
     const qualMap = new Map<string, DE[]>();
@@ -164,13 +172,39 @@ export async function getHomepageMain(scope: Scope) {
     for (const row of rows) {
       const cat = preferredCat.get(row.discCode);
       if (row.category !== cat) continue;
-      const entry: DE = { firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality: row.nationality ?? null, countryCode2: row.countryCode2 ?? null, qualTotal: parseFloat(row.qualTotal!), finalTotal: row.finalTotal != null ? parseFloat(row.finalTotal) : null, finalRank: row.finalRank };
+      const entry: DE = { shooterId: row.shooterId, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality: row.nationality ?? null, countryCode2: row.countryCode2 ?? null, qualTotal: parseFloat(row.qualTotal!), finalTotal: row.finalTotal != null ? parseFloat(row.finalTotal) : null, finalRank: row.finalRank };
       const qual = qualMap.get(row.discCode) ?? [];
       if (qual.length < 3) { qual.push(entry); qualMap.set(row.discCode, qual); }
       if (row.finalRank != null && row.finalRank >= 1 && row.finalRank <= 3) { const fins = finalMap.get(row.discCode) ?? []; fins.push(entry); finalMap.set(row.discCode, fins); }
     }
     for (const [, fins] of finalMap) fins.sort((a, b) => (a.finalRank ?? 99) - (b.finalRank ?? 99));
-    const discResults = DISC_CODES.map((code) => { const cat = preferredCat.get(code); if (!cat) return null; const qualTop3 = qualMap.get(code) ?? []; const finalTop3 = finalMap.get(code) ?? []; if (qualTop3.length === 0 && finalTop3.length === 0) return null; return { discCode: code, isJunior: cat !== 'senior', category: cat, hasFinale: finalTop3.length > 0, qualTop3, finalTop3 }; }).filter((x): x is NonNullable<typeof x> => x !== null);
+
+    // Serbian shooters already shown in the global top-3 don't need a duplicate highlight row.
+    const shownIds = new Set<number>();
+    for (const arr of qualMap.values()) for (const e of arr) shownIds.add(e.shooterId);
+    for (const arr of finalMap.values()) for (const e of arr) shownIds.add(e.shooterId);
+    type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
+    const srbByDisc = new Map<string, SrbHighlight[]>();
+    for (const row of srbRows) {
+      const cat = preferredCat.get(row.discCode);
+      if (cat && row.category !== cat) continue;
+      if (shownIds.has(row.shooterId)) continue;
+      const entry: SrbHighlight = { firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, qualRank: row.qualRank, qualTotal: parseFloat(row.qualTotal!), finalRank: row.finalRank, finalTotal: row.finalTotal != null ? parseFloat(row.finalTotal) : null };
+      const arr = srbByDisc.get(row.discCode) ?? [];
+      arr.push(entry);
+      srbByDisc.set(row.discCode, arr);
+    }
+    for (const arr of srbByDisc.values()) arr.sort((a, b) => (a.finalRank ?? a.qualRank ?? 999) - (b.finalRank ?? b.qualRank ?? 999));
+
+    const discResults = DISC_CODES.map((code) => {
+      const cat = preferredCat.get(code);
+      if (!cat) return null;
+      const qualTop3 = qualMap.get(code) ?? [];
+      const finalTop3 = finalMap.get(code) ?? [];
+      const srbHighlights = srbByDisc.get(code) ?? [];
+      if (qualTop3.length === 0 && finalTop3.length === 0 && srbHighlights.length === 0) return null;
+      return { discCode: code, isJunior: cat !== 'senior', category: cat, hasFinale: finalTop3.length > 0, qualTop3, finalTop3, srbHighlights };
+    }).filter((x): x is NonNullable<typeof x> => x !== null);
     return { ...competition, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), discResults };
   }));
   const topByDisc = Object.fromEntries(DISC_CODES.map((code) => [code, cacheRows.filter((row) => row.discCode === code).sort((a, b) => Number(b.forma) - Number(a.forma)).slice(0, 5)])) as Record<typeof DISC_CODES[number], typeof cacheRows>;

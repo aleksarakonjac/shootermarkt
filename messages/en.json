@@ -45,7 +45,7 @@
       "national": "National",
       "international": "International",
       "continental": "Continental",
-      "world": "ISSF–World",
+      "world": "ISSF",
       "olympic": "Olympic"
     },
     "list": {
@@ -239,6 +239,8 @@
     "viewResults": "View results",
     "inProgress": "In progress",
     "noWinner": "No results",
+    "srbResult": "SRB result",
+    "showLess": "less",
     "viewAll": "View all →",
     "upcomingEvents": "Upcoming Competitions",
     "upcomingAnnounced": "{count} upcoming",

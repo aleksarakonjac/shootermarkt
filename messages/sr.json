@@ -45,7 +45,7 @@
       "national": "Državno",
       "international": "Međunarodno",
       "continental": "Kontinentalno",
-      "world": "ISSF–Svetsko",
+      "world": "ISSF",
       "olympic": "Olimpijsko"
     },
     "list": {
@@ -239,6 +239,8 @@
     "viewResults": "Pogledaj rezultate",
     "inProgress": "U toku",
     "noWinner": "Bez rezultata",
+    "srbResult": "SRB rezultat",
+    "showLess": "manje",
     "viewAll": "Vidi sve →",
     "upcomingEvents": "Predstojeća Takmičenja",
     "upcomingAnnounced": "{count} najavljeno",
