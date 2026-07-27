@@ -106,10 +106,10 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
         }
       `}</style>
       {/* Widget Header with Tabs */}
-      <div className="relative flex flex-nowrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--brand-primary)] px-4 py-2">
-        <h3 className="flex min-h-10 shrink-0 items-center gap-1.5 leading-none font-[family-name:var(--font-barlow-condensed)] text-base font-bold uppercase tracking-wider text-white sm:text-lg">
+      <div className="relative flex flex-nowrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--brand-primary)] px-4 py-1.5">
+        <h3 className="flex min-h-8 shrink-0 items-center gap-1.5 leading-none font-[family-name:var(--font-barlow-condensed)] text-base font-bold uppercase tracking-wider text-white sm:text-lg">
           <span>Top</span>
-          <span className="inline-flex h-7 items-center gap-1 rounded bg-white/95 px-1.5">
+          <span className="inline-flex h-6 items-center gap-1 rounded bg-white/95 px-1.5">
             <FormaScoreMark size="md" />
             <FormaScoreInfo locale={locale} buttonMarginTop={0} />
           </span>
@@ -133,7 +133,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
                 key={tab.code}
                 onClick={() => handleTabClick(tab.code)}
                 aria-pressed={active}
-                className="relative z-10 min-h-10 flex-1 rounded px-2.5 py-1 text-xs font-semibold uppercase transition-[color,transform] duration-150 active:scale-95"
+                className="relative z-10 min-h-8 flex-1 rounded px-2.5 py-1 text-xs font-semibold uppercase transition-[color,transform] duration-150 active:scale-95"
                 style={{ color: active ? "var(--brand-primary)" : "rgba(255,255,255,0.85)" }}
               >
                 {tab.code}

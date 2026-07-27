@@ -1,12 +1,11 @@
 import { db } from "@/lib/db";
-import { clubs, competitionSchedule, competitions, countries, disciplines, results, shooterFormaCache, shooters, tickerLiveOverrides } from "@/lib/db/schema";
+import { clubs, competitionSchedule, competitions, countries, disciplines, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@/lib/db/schema";
 import { RANKING_MIN_SAMPLE } from "@/lib/forma";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
 import { getTickerSlotEnd, isTickerSlotLive } from "@/lib/ticker-schedule";
-import { and, asc, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 const DISC_CODES = ["ARM", "ARW", "APM", "APW"] as const;
-const MAX_SCORE_BY_DISCIPLINE: Record<string, number> = { ARM: 654, ARW: 654, APM: 600, APW: 600 };
 
 export function selectTickerUpcoming<T extends { date: string }>(competitions: T[], today: string) {
   const deadline = new Date(`${today}T00:00:00Z`);
@@ -73,10 +72,11 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
   const today = now.toISOString().slice(0, 10);
   const fields = { id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, dateEnd: competitions.dateEnd, level: competitions.level, location: competitions.location, countryCode2: countries.code2, nocCode: countries.nocCode };
   const scopeFilter = buildCompetitionScopeFilter(scope);
-  const [liveRows, futureRows, activeOverrides] = await Promise.all([
+  const [liveRows, futureRows, activeOverrides, customUpcomingRows] = await Promise.all([
     db.select(fields).from(competitions).leftJoin(countries, eq(competitions.countryId, countries.id)).where(and(sql`${competitions.date} <= ${today} AND COALESCE(${competitions.dateEnd}, ${competitions.date}) >= ${today}`, scopeFilter)).orderBy(competitions.date),
     db.select(fields).from(competitions).leftJoin(countries, eq(competitions.countryId, countries.id)).where(and(sql`${competitions.date} > ${today}`, scopeFilter)).orderBy(competitions.date).limit(8),
     db.select({ type: tickerLiveOverrides.type, competitionId: tickerLiveOverrides.competitionId, label: tickerLiveOverrides.label, href: tickerLiveOverrides.href, customSlides: tickerLiveOverrides.customSlides }).from(tickerLiveOverrides).where(eq(tickerLiveOverrides.isActive, true)),
+    db.select().from(tickerCustomUpcoming).where(or(isNull(tickerCustomUpcoming.displayUntil), gte(tickerCustomUpcoming.displayUntil, today))),
   ]);
   const liveIds = liveRows.map((competition) => competition.id);
 
@@ -137,7 +137,19 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
 
   const liveIdSet = new Set(live.map((c) => c.id));
   const filteredFuture = futureRows.filter((c) => !liveIdSet.has(c.id));
-  return { today, live, upcoming: selectTickerUpcoming(filteredFuture, today).map((competition) => ({ ...competition, name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name) })) };
+  const futureUpcoming = selectTickerUpcoming(filteredFuture, today).map((competition) => ({
+    id: competition.id,
+    name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name),
+    date: competition.date,
+    level: competition.level,
+    location: competition.location,
+    href: `/takmicenja/${competition.id}`,
+  }));
+  const customUpcoming = customUpcomingRows
+    .filter((row) => !row.date || row.date > today)
+    .map((row) => ({ id: -row.id, name: row.text, date: row.date ?? today, level: "custom", location: null, href: row.href }));
+  const upcoming = [...futureUpcoming, ...customUpcoming].sort((a, b) => a.date.localeCompare(b.date));
+  return { today, live, upcoming };
 }
 
 export async function getHomepageMain(scope: Scope) {
@@ -225,7 +237,13 @@ export async function getHomepageMain(scope: Scope) {
 export async function getHomepageClubs(scope: Scope) {
   const nationalityFilter = scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined;
   const rows = await db.select({ clubId: shooters.clubId, clubName: clubs.name, clubCity: clubs.city, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).innerJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE), isNotNull(shooterFormaCache.forma)));
-  const grouped = new Map<number, { name: string; city: string | null; scores: number[] }>();
-  for (const row of rows) if (row.clubId) { const club = grouped.get(row.clubId) ?? { name: row.clubName, city: row.clubCity, scores: [] }; club.scores.push((Number(row.forma) / (MAX_SCORE_BY_DISCIPLINE[row.discCode] ?? 630)) * 100); grouped.set(row.clubId, club); }
-  return Array.from(grouped.entries()).map(([clubId, club]) => ({ clubId, name: club.name, city: club.city, avgPct: Math.round((club.scores.reduce((sum, value) => sum + value, 0) / club.scores.length) * 10) / 10, activeShooters: club.scores.length })).sort((a, b) => b.avgPct - a.avgPct).slice(0, 5);
+
+  // prosek forme po disciplini u istom kvalifikovanom pool-u — baseline za "poena iznad proseka"
+  const disciplineSums = new Map<string, { total: number; count: number }>();
+  for (const row of rows) { const bucket = disciplineSums.get(row.discCode) ?? { total: 0, count: 0 }; bucket.total += Number(row.forma); bucket.count += 1; disciplineSums.set(row.discCode, bucket); }
+  const disciplineAvg = new Map(Array.from(disciplineSums, ([discCode, { total, count }]) => [discCode, total / count]));
+
+  const grouped = new Map<number, { name: string; city: string | null; deltas: number[] }>();
+  for (const row of rows) if (row.clubId) { const club = grouped.get(row.clubId) ?? { name: row.clubName, city: row.clubCity, deltas: [] }; club.deltas.push(Number(row.forma) - disciplineAvg.get(row.discCode)!); grouped.set(row.clubId, club); }
+  return Array.from(grouped.entries()).map(([clubId, club]) => ({ clubId, name: club.name, city: club.city, avgFormaDelta: Math.round((club.deltas.reduce((sum, value) => sum + value, 0) / club.deltas.length) * 10) / 10, activeShooters: club.deltas.length })).sort((a, b) => b.avgFormaDelta - a.avgFormaDelta).slice(0, 5);
 }

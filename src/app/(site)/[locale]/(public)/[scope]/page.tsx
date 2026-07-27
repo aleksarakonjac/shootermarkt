@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ scope: Sc
 export default function HomePage() {
   return <HomepageDataStatusProvider>
     <HomepageTickerClient />
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 pt-5 pb-8 sm:px-6 lg:px-8">
       <HomepageRetryNotice />
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <main className="lg:col-span-2"><HomepageMainClient /></main>

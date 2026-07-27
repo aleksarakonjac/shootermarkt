@@ -321,8 +321,8 @@ export function TickerAdminClient({
       {/* ── Section 1: Live status ────────────────────────────────────────── */}
       <section>
         <SectionHeader
-          title="Live ticker (gornji)"
-          subtitle="Šta se trenutno prikazuje u gornjem ticker traku"
+          title="Ticker"
+          subtitle="Šta se trenutno prikazuje u tickeru (jedan strip — live/uskoro ciklus ili uskoro marquee kad nema live)"
           live={isAnythingLive}
         />
 
@@ -335,10 +335,10 @@ export function TickerAdminClient({
           onDelete={deleteLinkedItem}
         />
 
-        {/* All upper ticker overrides (live, uskoro, article, custom) */}
+        {/* All ticker overrides (live, uskoro, article, custom) */}
         <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
           <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
-            <span className="text-xs font-semibold text-[var(--ink)]">Forsiran sadržaj gornjeg tickera</span>
+            <span className="text-xs font-semibold text-[var(--ink)]">Forsiran sadržaj tickera</span>
             <span className="text-xs text-[var(--muted)]">{forcedOverrides.filter((override) => override.isActive).length} aktivnih</span>
           </div>
 
@@ -389,7 +389,7 @@ export function TickerAdminClient({
 
         {!isAnythingLive && uskoroAutoComps.length === 0 && (
           <p className="mt-3 text-xs text-[var(--muted)] text-center">
-            Gornji ticker je skriven. Dodaj satnice, forsir live/uskoro, ili dodaj custom sadržaj.
+            Ticker prelazi na uskoro marquee (ispod nema live/uskoro sadržaja za ciklus). Dodaj satnice, forsir live/uskoro, ili dodaj custom sadržaj.
           </p>
         )}
       </section>
@@ -461,11 +461,11 @@ export function TickerAdminClient({
         )}
       </section>
 
-      {/* ── Section 3: Custom upcoming (bottom bar) ───────────────────────── */}
+      {/* ── Section 3: Custom upcoming (uskoro marquee) ───────────────────── */}
       <section>
         <SectionHeader
-          title="Custom najave (donji ticker)"
-          subtitle="Ručne stavke u donjem traku pored automatskih iz baze"
+          title="Custom najave (uskoro marquee)"
+          subtitle="Ručne stavke u uskoro marquee-u, pored automatskih iz baze — prikazuju se samo kad ticker nije u live/uskoro ciklusu"
         />
 
         <div className="rounded-lg border border-[var(--border)] overflow-hidden">

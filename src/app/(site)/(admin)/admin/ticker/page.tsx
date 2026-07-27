@@ -79,7 +79,7 @@ export default async function AdminTickerPage() {
       .from(tickerLiveOverrides)
       .orderBy(asc(tickerLiveOverrides.priority)),
 
-    // Custom upcoming (bottom bar)
+    // Custom upcoming (uskoro marquee)
     db.select()
       .from(tickerCustomUpcoming)
       .orderBy(asc(tickerCustomUpcoming.date)),

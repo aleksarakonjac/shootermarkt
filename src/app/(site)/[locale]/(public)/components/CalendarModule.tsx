@@ -178,14 +178,14 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)]">
       {/* Header */}
-      <div className="relative flex items-center justify-center sm:justify-between rounded-t-xl bg-[var(--brand-primary)] px-4 py-1">
-        <h3 className="hidden sm:block font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-white">
+      <div className="relative flex items-center justify-between rounded-t-xl bg-[var(--brand-primary)] px-4 py-1.5">
+        <h3 className="font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-white">
           {t("title")}
         </h3>
         <div className="flex items-center gap-1">
           <button
             onClick={prevMonth}
-            className="h-11 w-11 flex items-center justify-center rounded text-white hover:bg-white/15 transition-colors text-sm font-bold"
+            className="h-8 w-8 flex items-center justify-center rounded text-white hover:bg-white/15 transition-colors text-sm font-bold"
             aria-label={locale === "en" ? "Previous month" : "Prethodni mesec"}
           >
             ‹
@@ -194,7 +194,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
           {/* Month/year label — opens picker */}
           <button
             onClick={openPicker}
-            className="min-w-[110px] rounded px-2 py-1 text-center text-sm font-semibold text-white transition-colors hover:bg-white/15"
+            className="min-h-8 min-w-[110px] rounded px-2 py-1 text-center text-sm font-semibold text-white transition-colors hover:bg-white/15"
             aria-label={locale === "en" ? "Select month and year" : "Izaberi mesec i godinu"}
             aria-expanded={pickerOpen}
             aria-controls="calendar-picker"
@@ -204,7 +204,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
 
           <button
             onClick={nextMonth}
-            className="h-11 w-11 flex items-center justify-center rounded text-white hover:bg-white/15 transition-colors text-sm font-bold"
+            className="h-8 w-8 flex items-center justify-center rounded text-white hover:bg-white/15 transition-colors text-sm font-bold"
             aria-label={locale === "en" ? "Next month" : "Sledeći mesec"}
           >
             ›

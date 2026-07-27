@@ -37,6 +37,17 @@ export const USKORO_LEAD_DAYS: Record<string, number> = {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+// Competitions starting this soon get pulled into the live cycle instead of waiting in the marquee.
+const IMMINENT_LEAD_DAYS = 2;
+
+function isImminent(dateStr: string): boolean {
+  const target = new Date(dateStr + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays >= 0 && diffDays <= IMMINENT_LEAD_DAYS;
+}
+
 export function Ticker({
   liveItems = [],
   upcomingItems = [],
@@ -47,17 +58,21 @@ export function Ticker({
   const t = useTranslations("common");
   const locale = useLocale();
 
-  // Upper bar: live + uskoro + custom
-  const upperItems = liveItems;
-  const upcoming   = upcomingItems;
+  // Single strip: while something is live, cycle live + imminent (≤2d) upcoming.
+  // Otherwise the whole strip becomes the upcoming marquee.
+  const hasLive     = liveItems.length > 0;
+  const cycleItems  = hasLive ? [...liveItems, ...upcomingItems.filter((item) => isImminent(item.date))] : [];
+  const marqueeItems = hasLive ? [] : upcomingItems;
+
+  if (cycleItems.length === 0 && marqueeItems.length === 0) return null;
 
   return (
     <div
       className="w-full"
       style={{ borderTop: "2px solid var(--brand-primary)", borderBottom: "1px solid var(--border)" }}
     >
-      {upperItems.length > 0 && <UpperBar items={upperItems} live={t("live")} upcoming={t("upcoming")} locale={locale} />}
-      {upcoming.length > 0 && <UpcomingBar items={upcoming} upcoming={t("upcoming")} locale={locale} />}
+      {cycleItems.length > 0 && <UpperBar items={cycleItems} live={t("live")} upcoming={t("upcoming")} locale={locale} />}
+      {marqueeItems.length > 0 && <UpcomingBar items={marqueeItems} upcoming={t("upcoming")} locale={locale} />}
     </div>
   );
 }
@@ -104,11 +119,11 @@ function LiveDetail({ item }: { item: TickerItem }) {
       style={{ opacity: visible ? 1 : 0, transition: "opacity 0.3s ease", minWidth: 80 }}
     >
       {current.label && (
-        <span className="font-extrabold uppercase" style={{ fontSize: 9, letterSpacing: "0.08em", color: "rgba(255,255,255,0.5)" }}>
+        <span className="font-extrabold uppercase" style={{ fontSize: 9, lineHeight: 1, letterSpacing: "0.08em", color: "rgba(255,255,255,0.5)" }}>
           {current.label}
         </span>
       )}
-      <span className="font-bold" style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 11, color: "rgba(255,255,255,0.9)" }}>
+      <span className="font-bold" style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.9)" }}>
         {current.text}
       </span>
     </span>
@@ -189,7 +204,7 @@ function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: 
     <span
       ref={textRef}
       key={`${segment.item.id}-${idx}`}
-      className="inline-block whitespace-nowrap font-semibold text-xs"
+      className="inline-block whitespace-nowrap font-semibold text-xs leading-none"
       style={{ color: "white", ...scrollStyle }}
     >
       {segment.text}
@@ -203,10 +218,10 @@ function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: 
         {isUpcoming && <MobileStatusBadge label={upcoming.toUpperCase()} />}
         {segment.item.status === "CUSTOM" && segment.item.label && <MobileStatusBadge label={segment.item.label} />}
         <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
-        <div ref={viewportRef} className="min-w-0 flex-1 overflow-hidden">
-          {segment.href ? <Link href={scopedHref(segment.href)} className="block hover:opacity-80">{text}</Link> : text}
+        <div ref={viewportRef} className="min-w-0 flex-1 overflow-hidden flex items-center h-full">
+          {segment.href ? <Link href={scopedHref(segment.href)} className="block hover:opacity-80 leading-none">{text}</Link> : text}
         </div>
-        {segment.href && <span className="shrink-0" style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }} aria-hidden="true">→</span>}
+        {segment.href && <span className="shrink-0" style={{ fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.45)" }} aria-hidden="true">→</span>}
       </div>
     </div>
   );
@@ -214,7 +229,7 @@ function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: 
 
 function MobileStatusBadge({ label, live = false }: { label: string; live?: boolean }) {
   return (
-    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded px-1.5 font-extrabold select-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: live ? "var(--brand-primary)" : "#92400e", background: live ? "white" : "#fefce8" }}>
+    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded px-1.5 font-extrabold select-none leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: live ? "var(--brand-primary)" : "#92400e", background: live ? "white" : "#fefce8" }}>
       {live && <span className="shrink-0 rounded-full" style={{ width: 5, height: 5, background: "var(--brand-primary)", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />}
       {label}
     </span>
@@ -263,7 +278,7 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
       {/* Status badge */}
       {isLive && (
         <span
-          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5"
+          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 leading-none"
           style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--brand-primary)", background: "white", height: 20 }}
         >
           <span
@@ -276,7 +291,7 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
 
       {isUskoro && (
         <span
-          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5"
+          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 leading-none"
           style={{ fontSize: 11, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}
         >
           <span
@@ -289,7 +304,7 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
 
       {item.status === "CUSTOM" && item.label && (
         <span
-          className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5"
+          className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 leading-none"
           style={{ fontSize: 11, letterSpacing: "0.06em", color: "var(--brand-primary)", background: "white", height: 20 }}
         >
           {item.label}
@@ -303,16 +318,16 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
       {(() => {
         const s = LEVEL_STYLE[item.level] ?? { background: "var(--surface)", color: "var(--ink)" };
         return (
-          <span className="hidden sm:inline-flex items-center gap-1.5 shrink-0 rounded px-1.5" style={{ background: "white", height: 20 }}>
-            <span className="inline-flex items-center rounded font-extrabold uppercase px-1 h-full" style={{ fontSize: 11, letterSpacing: "0.06em", background: s.background, color: s.color }}>
+          <span className="hidden sm:inline-flex items-center gap-1.5 shrink-0 rounded px-1.5 leading-none" style={{ background: "white", height: 20 }}>
+            <span className="inline-flex items-center rounded font-extrabold uppercase px-1 h-full leading-none" style={{ fontSize: 11, letterSpacing: "0.06em", background: s.background, color: s.color }}>
               {LEVEL_LABEL[item.level] ?? item.level}
             </span>
             {item.countryCode2 && (
               <>
-                <span style={{ color: "rgba(0,0,0,0.2)", fontSize: 9 }}>·</span>
+                <span style={{ color: "rgba(0,0,0,0.2)", fontSize: 9, lineHeight: 1 }}>·</span>
                 <span className={`fi fi-${item.countryCode2.toLowerCase()}`} style={{ fontSize: 11, borderRadius: 2 }} />
                 {item.nocCode && (
-                  <span className="font-bold" style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 11, fontWeight: 800, color: "var(--ink)", letterSpacing: "0.06em" }}>
+                  <span className="font-bold" style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 11, lineHeight: 1, fontWeight: 800, color: "var(--ink)", letterSpacing: "0.06em" }}>
                     {item.nocCode}
                   </span>
                 )}
@@ -324,7 +339,7 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
 
       {/* Name + detail */}
       <span className="flex items-center gap-2 flex-1 min-w-0">
-        <span className="font-semibold text-xs truncate min-w-0" style={{ color: "white" }}>
+        <span className="font-semibold text-xs leading-none truncate min-w-0" style={{ color: "white" }}>
           {item.name}
         </span>
 
@@ -338,20 +353,20 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
       </span>
 
       {item.href && (
-        <span className="shrink-0" style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }} aria-hidden="true">→</span>
+        <span className="shrink-0" style={{ fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.45)" }} aria-hidden="true">→</span>
       )}
 
       {/* Date + location */}
       {(item.location || item.endDate) && (
         <span className="hidden md:flex items-center gap-1.5 shrink-0 ml-auto pl-3">
           {item.location && (
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.95)", fontWeight: 600 }}>{item.location}</span>
+            <span style={{ fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.95)", fontWeight: 600 }}>{item.location}</span>
           )}
           {item.location && item.date && (
-            <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 11 }}>·</span>
+            <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, lineHeight: 1 }}>·</span>
           )}
           {item.date && (
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.95)", fontWeight: 600 }}>
+            <span style={{ fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.95)", fontWeight: 600 }}>
               {formatDateRange(item.date, locale, item.endDate)}
             </span>
           )}
@@ -407,7 +422,7 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
   return (
     <div
       className="w-full overflow-hidden"
-      style={{ height: 32, background: "var(--surface-2)", borderTop: "1px solid var(--border)" }}
+      style={{ height: 32, background: "var(--brand-primary)" }}
       role="region"
       aria-label="Najava takmičenja"
       onMouseEnter={() => { cancelResume(); setPaused(true); }}
@@ -420,12 +435,16 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
 
         {/* Static label */}
         <span
-          className="shrink-0 font-extrabold uppercase rounded px-1.5"
-          style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--muted)", height: 20, display: "inline-flex", alignItems: "center" }}
+          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 leading-none"
+          style={{ fontSize: 11, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}
         >
-          {upcoming}
+          <span
+            className="rounded-full shrink-0"
+            style={{ width: 5, height: 5, background: "#f59e0b", display: "inline-block", animation: "ticker-pulse 2s ease-in-out infinite" }}
+          />
+          {upcoming.toUpperCase()}
         </span>
-        <span className="shrink-0" style={{ width: 1, height: 10, background: "var(--border)", display: "inline-block" }} aria-hidden="true" />
+        <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
 
         {/* Marquee track */}
         <div className="flex-1 overflow-hidden min-w-0">
@@ -444,7 +463,7 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
             >
               {doubled.map((item, i) => (
                 <div key={`${item.id}-${i}`} className="flex items-center shrink-0">
-                  <span className="px-3 shrink-0" style={{ color: "var(--border)", fontSize: 13, lineHeight: 1, userSelect: "none" }} aria-hidden="true">·</span>
+                  <span className="px-3 shrink-0" style={{ color: "rgba(255,255,255,0.3)", fontSize: 13, lineHeight: 1, userSelect: "none" }} aria-hidden="true">·</span>
                   <UpcomingItem item={item} locale={locale} />
                 </div>
               ))}
@@ -463,10 +482,10 @@ function UpcomingItem({ item, locale }: { item: TickerItem; locale: string }) {
 
   const content = (
     <span className="flex items-center gap-1.5">
-      <span className="font-bold shrink-0" style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 10, color: "var(--muted)" }}>
+      <span className="font-bold shrink-0" style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 10, lineHeight: 1, color: "rgba(255,255,255,0.7)" }}>
         {dateStr}
       </span>
-      <span className="font-medium whitespace-nowrap" style={{ fontSize: 11, color: "var(--ink)" }}>
+      <span className="font-medium whitespace-nowrap" style={{ fontSize: 11, lineHeight: 1, color: "white" }}>
         {item.name}
       </span>
     </span>

@@ -77,8 +77,8 @@ export function QuickH2HClient() {
     : [];
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)]">
-      <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+    <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+      <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
         <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-[var(--ink)] uppercase tracking-wider">Direktni duel</h3>
       </div>
       <div className="p-4 flex flex-col gap-4">
