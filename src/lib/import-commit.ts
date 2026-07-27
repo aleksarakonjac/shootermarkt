@@ -26,8 +26,9 @@ function distanceTags(codes: string[]) {
 
 async function addCompetitionTags(competitionId: number, tags: string[]) {
   if (!tags.length) return;
+  const tagArray = sql`ARRAY[${sql.join(tags.map((tag) => sql`${tag}`), sql`, `)}]::varchar[]`;
   await db.update(competitions).set({
-    tags: sql`array(SELECT DISTINCT unnest(array_cat(${competitions.tags}, ${tags}::varchar[])))`,
+    tags: sql`array(SELECT DISTINCT unnest(array_cat(${competitions.tags}, ${tagArray})))`,
   }).where(eq(competitions.id, competitionId));
 }
 
