@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { clubs, competitionSchedule, competitions, countries, disciplines, mixedTeamResults, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@/lib/db/schema";
-import { NOC_LIST } from "@/lib/noc-list";
+import { displayNoc, NOC_LIST } from "@/lib/noc-list";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
 import { getTickerSlotEnd, isTickerSlotLive } from "@/lib/ticker-schedule";
@@ -17,16 +17,32 @@ type HomepagePhaseCandidate = {
   endTime: Date | null;
 };
 
-export function selectHomepageCurrentPhases<T extends HomepagePhaseCandidate>(phases: T[], scope: Scope) {
-  return phases
-    .sort((a, b) => {
+function comparePhaseRecency(a: HomepagePhaseCandidate, b: HomepagePhaseCandidate) {
+  if (a.isLive !== b.isLive) return Number(b.isLive) - Number(a.isLive);
+  const aTime = a.isLive ? a.startTime.getTime() : (getTickerSlotEnd(a)?.getTime() ?? a.startTime.getTime());
+  const bTime = b.isLive ? b.startTime.getTime() : (getTickerSlotEnd(b)?.getTime() ?? b.startTime.getTime());
+  return bTime - aTime;
+}
+
+function hasCurrentSrbPriority(phase: HomepagePhaseCandidate, now: Date) {
+  if (!phase.hasSrb) return false;
+  const dateKey = (value: Date) => value.toLocaleDateString("sv-SE", { timeZone: "Europe/Belgrade" });
+  const toUtc = (key: string) => new Date(`${key}T00:00:00Z`).getTime();
+  const dayDiff = Math.round((toUtc(dateKey(now)) - toUtc(dateKey(phase.startTime))) / 86_400_000);
+  return dayDiff === 0 || dayDiff === 1;
+}
+
+export function selectHomepageCurrentPhases<T extends HomepagePhaseCandidate>(phases: T[], scope: Scope, now = new Date()) {
+  const selected = phases
+    .toSorted((a, b) => {
       if (a.isLive !== b.isLive) return Number(b.isLive) - Number(a.isLive);
-      if (scope === "srb" && a.hasSrb !== b.hasSrb) return Number(b.hasSrb) - Number(a.hasSrb);
-      const aTime = a.isLive ? a.startTime.getTime() : (getTickerSlotEnd(a)?.getTime() ?? a.startTime.getTime());
-      const bTime = b.isLive ? b.startTime.getTime() : (getTickerSlotEnd(b)?.getTime() ?? b.startTime.getTime());
-      return bTime - aTime;
+      const aSrbPriority = hasCurrentSrbPriority(a, now);
+      const bSrbPriority = hasCurrentSrbPriority(b, now);
+      if (scope === "srb" && aSrbPriority !== bSrbPriority) return Number(bSrbPriority) - Number(aSrbPriority);
+      return comparePhaseRecency(a, b);
     })
     .slice(0, 4);
+  return selected.toSorted(comparePhaseRecency);
 }
 
 export function selectTickerUpcoming<T extends { date: string }>(competitions: T[], today: string) {
@@ -183,7 +199,8 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
 }
 
 export async function getHomepageMain(scope: Scope) {
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
   const twoMonthsOut = new Date(`${today}T00:00:00Z`);
   twoMonthsOut.setUTCMonth(twoMonthsOut.getUTCMonth() + 2);
   const upcomingDeadline = twoMonthsOut.toISOString().slice(0, 10);
@@ -217,7 +234,8 @@ export async function getHomepageMain(scope: Scope) {
         if (row.disciplineId !== slot.disciplineId || row.category !== slot.category) return [];
         const rank = stageKind === "elimination" ? row.elimRank : stageKind === "final" ? row.finalRank : row.qualRank;
         const total = stageKind === "elimination" ? row.elimTotal : stageKind === "final" ? row.finalTotal : row.qualTotal;
-        return rank != null && total != null ? [{ id: `shooter:${row.shooterId}`, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality: row.nationality ?? null, countryCode2: row.countryCode2 ?? null, rank, total: Number(total) }] : [];
+        const nationality = displayNoc(row.nationality);
+        return rank != null && total != null ? [{ id: `shooter:${row.shooterId}`, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality, countryCode2: nationality === "AIN" ? "AIN" : row.countryCode2 ?? null, rank, total: Number(total) }] : [];
       });
       const mixed = stageKind === "elimination" ? [] : mixedRows.flatMap((row): Entry[] => {
         if (row.disciplineId !== slot.disciplineId) return [];
@@ -243,15 +261,9 @@ export async function getHomepageMain(scope: Scope) {
       phaseGroups.set(key, [...(phaseGroups.get(key) ?? []), phase]);
     }
     const groups = [...phaseGroups.values()].map((phases) => {
-      // Same recency/live/srb comparator selectHomepageCurrentPhases uses,
-      // applied within the group to pick which phase drives its ranking.
-      const representative = [...phases].sort((a, b) => {
-        if (a.isLive !== b.isLive) return Number(b.isLive) - Number(a.isLive);
-        if (showSrbHighlight && a.hasSrb !== b.hasSrb) return Number(b.hasSrb) - Number(a.hasSrb);
-        const aTime = a.isLive ? a.startTime.getTime() : (getTickerSlotEnd(a)?.getTime() ?? a.startTime.getTime());
-        const bTime = b.isLive ? b.startTime.getTime() : (getTickerSlotEnd(b)?.getTime() ?? b.startTime.getTime());
-        return bTime - aTime;
-      })[0];
+      // The group's newest/current phase determines its position; Serbian
+      // relevance is applied only when choosing the four displayed groups.
+      const representative = phases.toSorted(comparePhaseRecency)[0];
       return {
         discCode: representative.discCode,
         stage: representative.stage,
@@ -263,17 +275,24 @@ export async function getHomepageMain(scope: Scope) {
         phases: [...phases].sort((a, b) => stageOrder(a.stage) - stageOrder(b.stage)),
       };
     });
-    const discResults = selectHomepageCurrentPhases(groups, scope).map((group) => ({
+    const discResults = selectHomepageCurrentPhases(groups, scope, now).map((group) => {
+      // Once qualification results exist, the elimination phase is redundant noise
+      // on the homepage — only show it when there's no qual phase for this discipline.
+      const hasQual = group.phases.some((phase) => phase.stage.startsWith("qual"));
+      const visiblePhases = hasQual ? group.phases.filter((phase) => phase.stage !== "elimination") : group.phases;
+      return {
       discCode: group.discCode,
       isJunior: group.isJunior,
       isLive: group.isLive,
-      phases: group.phases.map((phase) => ({
+      phases: visiblePhases.map((phase) => ({
         stage: phase.stage,
+        category: phase.category,
         isLive: phase.isLive,
         qualTop3: phase.top3.map(({ firstName, lastName, clubName, nationality, countryCode2, total, rank }) => ({ firstName, lastName, clubName, nationality, countryCode2, qualTotal: total, qualRank: rank, finalTotal: null, finalRank: null })),
         srbHighlights: phase.srbHighlights.map(({ firstName, lastName, clubName, total, rank }) => ({ firstName, lastName, clubName, qualRank: rank, qualTotal: total, finalRank: null, finalTotal: null })),
       })),
-    }));
+      };
+    });
     return { ...competition, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), discResults };
   }));
   const topByDisc = Object.fromEntries(FORMA_DISC_CODES.map((code) => [code, cacheRows.filter((row) => row.discCode === code).sort((a, b) => Number(b.forma) - Number(a.forma)).slice(0, 5)])) as Record<typeof FORMA_DISC_CODES[number], typeof cacheRows>;

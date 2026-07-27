@@ -7,6 +7,7 @@ import { Link } from "@/i18n/navigation";
 import type { FinalDetail } from "@/lib/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@/lib/noc-list";
+import { RemarkBadge, RemarkLegend, assignRemarkCodes, type RemarkLegendItem } from "./RemarkBadge";
 
 export type FinalResultRow = {
   id: number;
@@ -64,25 +65,6 @@ function MedalIcon({ rank }: { rank: number }) {
       aria-label={`Mesto ${rank}`}
     >
       {rank}
-    </span>
-  );
-}
-
-// Same palette as CompetitionQualTable's remark badge — DSQ/A-codes red,
-// everything else (e.g. SO — shoot-off decided who's out of the final) muted.
-function remarkColor(remark: string): string {
-  if (remark === "DSQ" || /^A\d/.test(remark)) return "var(--danger)";
-  return "var(--muted)";
-}
-
-function RemarkBadge({ remark }: { remark: string }) {
-  return (
-    <span
-      className="font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none"
-      style={{ color: remarkColor(remark) }}
-      title={remark}
-    >
-      {remark}
     </span>
   );
 }
@@ -200,6 +182,11 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
       return a.finalRank - b.finalRank;
     });
 
+  const remarkCodes = assignRemarkCodes(sorted.map((r) => r.remark));
+  const remarkLegend: RemarkLegendItem[] = sorted
+    .map((r, idx) => (remarkCodes[idx] ? { code: remarkCodes[idx]!, remark: r.remark!, label: `${r.lastName} ${r.firstName}` } : null))
+    .filter((item): item is RemarkLegendItem => item != null);
+
   if (sorted.length === 0) {
     return (
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center">
@@ -247,7 +234,7 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
           </button>
         </div>
       )}
-      <div className="overflow-x-auto">
+      <div>
         <div
           role="table"
           className="text-sm grid [grid-template-columns:var(--mobile-grid)] sm:[grid-template-columns:var(--desktop-grid)]"
@@ -385,7 +372,7 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
 
                   {/* Remark — e.g. SO (shoot-off decided who's out of the final) */}
                   <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)]`}>
-                    {r.remark && <RemarkBadge remark={r.remark} />}
+                    {r.remark && <RemarkBadge remark={r.remark} code={remarkCodes[idx]} label={`${r.lastName} ${r.firstName}`} className="" />}
                   </div>
 
                   {/* Expand chevron — mobile only, rightmost column; desktop shows series inline instead */}
@@ -449,6 +436,7 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
           })}
         </div>
       </div>
+      <RemarkLegend items={remarkLegend} />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import type { QualDetail, PositionsQualDetail } from "@/lib/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@/lib/noc-list";
+import { RemarkBadge, RemarkLegend, assignRemarkCodes, type RemarkLegendItem } from "./RemarkBadge";
 
 const POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"] as const;
 const POSITION_KEYS = ["kneeling", "prone", "standing"] as const;
@@ -50,33 +51,6 @@ export type CompResultRow = {
   apparatus: string | null;
 };
 
-// Boja po značenju kazne/napomene — bez box-a, samo obojeno slovo/oznaka.
-// DSQ i A-kaznene oznake (A1, A2...) su diskvalifikacije → crveno (--danger).
-// RPO nije kazna niti neuspeh — strelac je punopravno odshootao, samo ne može
-// u finale zbog nacionalne kvote (max 3/nacija) → posebna (amber) boja, da se
-// razlikuje i od diskvalifikacije i od DNS/DNF (koji nemaju rezultat uopšte).
-// --warning token je presvetao za tekst (2.5:1 na belom) pa koristimo tamniju
-// nijansu istog hue-a koja prolazi AA kontrast.
-const RPO_COLOR = "oklch(0.55 0.16 75)";
-
-function remarkColor(remark: string): string {
-  if (remark === "DSQ" || /^A\d/.test(remark)) return "var(--danger)";
-  if (remark === "RPO") return RPO_COLOR;
-  return "var(--muted)";
-}
-
-function RemarkBadge({ remark, className = "ml-1.5" }: { remark: string; className?: string }) {
-  return (
-    <span
-      className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none ${className}`}
-      style={{ color: remarkColor(remark) }}
-      title={remark}
-    >
-      {remark}
-    </span>
-  );
-}
-
 function QualifiedBadge() {
   return (
     <span
@@ -119,7 +93,7 @@ const RANK_W = "32px";
 const NAME_W = "minmax(96px, 200px)";
 const CLUB_W = "minmax(52px, 1fr)";
 const TOTAL_W = "92px";
-const REMARK_W = "28px";
+const REMARK_W = "44px";
 
 const headerCellCls = "px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-3 flex items-center bg-[var(--surface-2)] border-b border-[var(--border)]";
 
@@ -239,14 +213,19 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
     return a.qualRank - b.qualRank;
   });
 
+  const remarkCodes = assignRemarkCodes(sorted.map((r) => r.remark));
+  const remarkLegend: RemarkLegendItem[] = sorted
+    .map((r, idx) => (remarkCodes[idx] ? { code: remarkCodes[idx]!, remark: r.remark!, label: `${r.lastName} ${r.firstName}` } : null))
+    .filter((item): item is RemarkLegendItem => item != null);
+
   const seriesHeaders = hasSeriesDetail ? buildSeriesHeaders(sorted, isPositionsType, flatGroups, posSeriesCounts) : [];
   const SERIES_COL_W = "60px";
   const gridTemplateColumns = [RANK_W, NAME_W, CLUB_W, ...seriesHeaders.map(() => SERIES_COL_W), TOTAL_W, REMARK_W]
     .filter(Boolean)
     .join(" ");
   const mobileGridTemplateColumns = hasSeriesDetail
-    ? "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 20px 14px"
-    : "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 24px";
+    ? "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 30px 14px"
+    : "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 34px";
 
   const allExpanded = hasSeriesDetail && sorted.every((r) => expanded.has(r.id));
   const toggleAll = () => {
@@ -275,7 +254,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
           </button>
         </div>
       )}
-      <div className="overflow-x-auto">
+      <div>
         <div
           role="table"
           className="text-sm grid [grid-template-columns:var(--mobile-grid)] sm:[grid-template-columns:var(--desktop-grid)]"
@@ -417,7 +396,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                   {/* Remark / Q badge — own narrow column, not inline with the total */}
                   <div className={`${cellCls} justify-center group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
                     {r.remark ? (
-                      <RemarkBadge remark={r.remark} className="" />
+                      <RemarkBadge remark={r.remark} code={remarkCodes[idx]} label={`${r.lastName} ${r.firstName}`} className="" />
                     ) : isTopQual ? (
                       <QualifiedBadge />
                     ) : null}
@@ -451,7 +430,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                               <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
                                 {g.label}
                               </span>
-                              <div className="flex gap-2 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">
+                              <div className="flex gap-2 font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums">
                                 {g.values.map((v, vi) => (
                                   <span
                                     key={vi}
@@ -465,7 +444,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                           ))}
                         </div>
                       ) : (
-                        <div className="flex flex-wrap gap-2 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">
+                        <div className="flex flex-wrap gap-2 py-2 font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums">
                           {seriesFlat.map((item, i) => (
                             <span
                               key={i}
@@ -484,6 +463,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
           })}
         </div>
       </div>
+      <RemarkLegend items={remarkLegend} />
     </div>
   );
 }

@@ -166,12 +166,16 @@ function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: 
   }), [items]);
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
+  const [badgeVisible, setBadgeVisible] = useState(true);
   const [travelPx, setTravelPx] = useState(0);
   const viewportRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const segment = segments[Math.min(idx, segments.length - 1)];
-  const travelDuration = Math.max(2200, Math.ceil(travelPx / 0.05));
+  const travelDuration = Math.max(2200, Math.ceil(travelPx / 0.02));
   const segmentDuration = travelPx > 0 ? travelDuration * 2 + 1200 : 4000;
+
+  const badgeKeyFor = (s: MobileTickerSegment) =>
+    s.item.status === "CUSTOM" ? s.item.label ?? null : s.item.status;
 
   useEffect(() => {
     const measure = () => setTravelPx(Math.max(0, (textRef.current?.scrollWidth ?? 0) - (viewportRef.current?.clientWidth ?? 0)));
@@ -183,14 +187,20 @@ function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: 
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      const nextIdx = (idx + 1) % segments.length;
+      const badgeChanges = badgeKeyFor(segments[idx]) !== badgeKeyFor(segments[nextIdx]);
       setVisible(false);
+      if (badgeChanges) setBadgeVisible(false);
       setTimeout(() => {
-        setIdx((current) => (current + 1) % segments.length);
-        requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
+        setIdx(nextIdx);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          setVisible(true);
+          setBadgeVisible(true);
+        }));
       }, 220);
     }, segmentDuration);
     return () => clearTimeout(timer);
-  }, [segmentDuration, segments.length]);
+  }, [idx, segmentDuration, segments]);
 
   const isLive = segment.item.status === "LIVE";
   const isUpcoming = segment.item.status === "USKORO";
@@ -213,15 +223,19 @@ function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: 
 
   return (
     <div className="h-8 overflow-hidden" style={{ background: "var(--brand-primary)" }} role="status" aria-label={`Ticker: ${segment.text}`}>
-      <div className="mx-auto flex h-full max-w-7xl items-center gap-2 px-4" style={{ opacity: visible ? 1 : 0, transition: "opacity 0.22s ease" }}>
-        {isLive && <MobileStatusBadge label={live} live />}
-        {isUpcoming && <MobileStatusBadge label={upcoming.toUpperCase()} />}
-        {segment.item.status === "CUSTOM" && segment.item.label && <MobileStatusBadge label={segment.item.label} />}
-        <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
-        <div ref={viewportRef} className="min-w-0 flex-1 overflow-hidden flex items-center h-full">
-          {segment.href ? <Link href={scopedHref(segment.href)} className="block hover:opacity-80 leading-none">{text}</Link> : text}
+      <div className="mx-auto flex h-full max-w-7xl items-center gap-2 px-4">
+        <div className="flex items-center gap-2 shrink-0" style={{ opacity: badgeVisible ? 1 : 0, transition: "opacity 0.22s ease" }}>
+          {isLive && <MobileStatusBadge label={live} live />}
+          {isUpcoming && <MobileStatusBadge label={upcoming.toUpperCase()} />}
+          {segment.item.status === "CUSTOM" && segment.item.label && <MobileStatusBadge label={segment.item.label} />}
         </div>
-        {segment.href && <span className="shrink-0" style={{ fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.45)" }} aria-hidden="true">→</span>}
+        <div className="flex min-w-0 flex-1 items-center gap-2" style={{ opacity: visible ? 1 : 0, transition: "opacity 0.22s ease" }}>
+          <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
+          <div ref={viewportRef} className="min-w-0 flex-1 overflow-hidden flex items-center h-full">
+            {segment.href ? <Link href={scopedHref(segment.href)} className="block hover:opacity-80 leading-none">{text}</Link> : text}
+          </div>
+          {segment.href && <span className="shrink-0" style={{ fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.45)" }} aria-hidden="true">→</span>}
+        </div>
       </div>
     </div>
   );
@@ -237,30 +251,23 @@ function MobileStatusBadge({ label, live = false }: { label: string; live?: bool
 }
 
 function DesktopUpperBar({ items, live, upcoming, locale }: { items: TickerItem[]; live: string; upcoming: string; locale: string }) {
-  const [idx, setIdx]     = useState(0);
-  const [slide, setSlide] = useState<"in" | "out" | "enter">("in");
+  const [idx, setIdx]         = useState(0);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     if (items.length <= 1) return;
     const interval = setInterval(() => {
-      setSlide("out");
-      setTimeout(() => {
-        setIdx((i) => (i + 1) % items.length);
-        setSlide("enter");
-        requestAnimationFrame(() => requestAnimationFrame(() => setSlide("in")));
-      }, 320);
+      setVisible(false);
+      setTimeout(() => { setIdx((i) => (i + 1) % items.length); setVisible(true); }, 320);
     }, 6000);
     return () => clearInterval(interval);
   }, [items.length]);
 
   const item = items[Math.min(idx, items.length - 1)];
 
-  const transform = slide === "out" ? "translateY(-32px)" : slide === "enter" ? "translateY(32px)" : "translateY(0)";
-  const transition = slide === "enter" ? "none" : "transform 0.32s ease";
-
   return (
     <div style={{ height: 32, background: "var(--brand-primary)", overflow: "hidden" }} role="status" aria-label={`Ticker: ${item.name}`}>
-      <div style={{ transform, transition, height: 32 }}>
+      <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.32s ease", height: 32 }}>
         <LiveBarInner item={item} live={live} upcoming={upcoming} locale={locale} />
       </div>
     </div>
@@ -390,7 +397,20 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
   const [smoothReturn, setSmoothReturn] = useState(false);
   const touchStartX = useRef(0);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [trackWidth, setTrackWidth] = useState(0);
   const doubled = [...items, ...items];
+
+  useEffect(() => {
+    const measure = () => setTrackWidth(trackRef.current?.scrollWidth ?? 0);
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (trackRef.current) observer.observe(trackRef.current);
+    return () => observer.disconnect();
+  }, [items]);
+
+  // Constant reading speed (~25px/s) so long text isn't rushed just because there's more of it.
+  const duration = trackWidth > 0 ? Math.max(8, trackWidth / 2 / 25) : doubled.length * 7;
 
   function cancelResume() {
     if (resumeTimer.current) clearTimeout(resumeTimer.current);
@@ -454,9 +474,10 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
             transition: smoothReturn ? "transform 250ms ease-out" : "none",
           }}>
             <div
+              ref={trackRef}
               className="flex items-center"
               style={{
-                animation: `ticker-scroll ${doubled.length * 7}s linear infinite`,
+                animation: `ticker-scroll ${duration}s linear infinite`,
                 animationPlayState: paused ? "paused" : "running",
                 width: "max-content",
               }}

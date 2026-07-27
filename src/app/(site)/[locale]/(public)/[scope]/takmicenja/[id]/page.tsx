@@ -26,6 +26,8 @@ import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
 import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 import { ScheduleSection, type ScheduleSlot } from "./ScheduleSection";
+import { matchShooter } from "@/lib/name-match";
+import { splitDisplayName } from "@/lib/sius/public-adapter";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
 
@@ -127,11 +129,36 @@ export default async function CompetitionPage({ params }: Props) {
       finalRank: mixedTeamResults.finalRank,
       finalTotal: mixedTeamResults.finalTotal,
       finalRemark: mixedTeamResults.finalRemark,
+      shooter1FinalDetail: mixedTeamResults.shooter1FinalDetail,
+      shooter2FinalDetail: mixedTeamResults.shooter2FinalDetail,
     })
     .from(mixedTeamResults)
     .innerJoin(disciplines, eq(mixedTeamResults.disciplineId, disciplines.id))
     .where(eq(mixedTeamResults.competitionId, compId))
     .orderBy(asc(mixedTeamResults.qualRank));
+
+  // SIUS import often can't match international athletes to an ISSF id at commit time —
+  // fall back to a name+nation match against our shooters table so the profile link still works.
+  const needsShooterMatch = mixedResults.some(
+    (r) => (!r.shooter1Id && r.shooter1Name) || (!r.shooter2Id && r.shooter2Name)
+  );
+  if (needsShooterMatch) {
+    const allShootersLite = await db
+      .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality })
+      .from(shooters);
+    for (const r of mixedResults) {
+      if (!r.shooter1Id && r.shooter1Name) {
+        const { firstName, lastName } = splitDisplayName(r.shooter1Name);
+        const match = matchShooter(firstName, lastName, r.nocCode, allShootersLite);
+        if (match.kind === "exact") r.shooter1Id = match.id;
+      }
+      if (!r.shooter2Id && r.shooter2Name) {
+        const { firstName, lastName } = splitDisplayName(r.shooter2Name);
+        const match = matchShooter(firstName, lastName, r.nocCode, allShootersLite);
+        if (match.kind === "exact") r.shooter2Id = match.id;
+      }
+    }
+  }
 
   // Fetch schedule slots
   const scheduleRows = await db

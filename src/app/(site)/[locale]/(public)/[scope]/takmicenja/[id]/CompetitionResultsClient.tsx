@@ -93,8 +93,8 @@ const DISCIPLINE_NAMES: Record<string, { sr: string; en: string }> = {
   APW:  { sr: "Vazdušni pištolj Ž",  en: "Air pistol W" },
   R3PM: { sr: "3×20 puška M",        en: "3×20 rifle M" },
   R3PW: { sr: "3×20 puška Ž",        en: "3×20 rifle W" },
-  APMT: { sr: "10m pištolj miks",    en: "10m pistol mixed" },
-  ARMT: { sr: "10m puška miks",      en: "10m rifle mixed" },
+  APMT: { sr: "10m pištolj miks",    en: "Air Pistol Mixed Team" },
+  ARMT: { sr: "10m puška miks",      en: "Air Rifle Mixed Team" },
   SPW:  { sr: "Sport pištolj Ž",     en: "Sport pistol W" },
   RFPM: { sr: "Brza vatra M",        en: "Rapid fire M" },
   R3JM: { sr: "3×20 puška jr. M",    en: "3×20 rifle jr. M" },
@@ -565,18 +565,13 @@ function CompetitionDetail({
             <ChevronLeft size={14} aria-hidden="true" />
             {locale === "en" ? "Back" : "Nazad"}
 </button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span
-                className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded shrink-0"
-                style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
-              >
-                {selection.disciplineCode}
-              </span>
-              <span className="text-[0.72rem] font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                {locale === "en" ? "Mixed team" : "Mešoviti tim"}
-              </span>
-            </div>
+          <div className="min-w-0 flex items-center gap-2 flex-wrap">
+            <span
+              className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded shrink-0"
+              style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
+            >
+              {selection.disciplineCode}
+            </span>
             <h3
               className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase truncate"
               style={{ fontSize: "1.1rem", letterSpacing: "-0.02em", lineHeight: 1.2 }}

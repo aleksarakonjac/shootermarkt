@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
     finalRank?: number | null;
     finalTotal?: number | null;
     finalRemark?: string | null;
+    mFinalSeries?: number[];
+    fFinalSeries?: number[];
   }
 
   const body = await req.json();
@@ -103,6 +105,8 @@ export async function POST(req: NextRequest) {
             finalRank: e.finalRank ?? null,
             finalTotal: e.finalTotal != null ? String(e.finalTotal) : null,
             finalRemark: e.finalRemark ?? null,
+            shooter1FinalDetail: e.mFinalSeries?.length ? { series: e.mFinalSeries } : null,
+            shooter2FinalDetail: e.fFinalSeries?.length ? { series: e.fFinalSeries } : null,
             source: "manual",
           })
           .onConflictDoUpdate({
@@ -111,6 +115,8 @@ export async function POST(req: NextRequest) {
               finalRank: e.finalRank ?? null,
               finalTotal: e.finalTotal != null ? String(e.finalTotal) : null,
               finalRemark: e.finalRemark ?? null,
+              shooter1FinalDetail: e.mFinalSeries?.length ? { series: e.mFinalSeries } : null,
+              shooter2FinalDetail: e.fFinalSeries?.length ? { series: e.fFinalSeries } : null,
             },
           });
       } else {

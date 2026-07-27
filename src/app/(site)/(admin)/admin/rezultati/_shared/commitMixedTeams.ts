@@ -29,7 +29,7 @@ export async function commitMixedTeams(competitionId: number, entries: MixedTeam
     if (!finalists.length) continue;
     const finals = await fetch("/api/admin/import/commit-mixed", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ competitionId, discipline, isFinals: true, entries: finalists.map((e) => ({ nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark })) }),
+      body: JSON.stringify({ competitionId, discipline, isFinals: true, entries: finalists.map((e) => ({ nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark, mFinalSeries: e.mFinalSeries, fFinalSeries: e.fFinalSeries })) }),
     });
     const finalData = await finals.json() as CommitResult & { error?: string };
     if (!finals.ok) errors.push(finalData.error ?? `${discipline}: finals commit error`);

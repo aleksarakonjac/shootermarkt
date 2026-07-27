@@ -47,17 +47,18 @@ describe("selectHomepageCurrentPhases", () => {
   const at = (hour: number) => new Date(`2026-07-21T${String(hour).padStart(2, "0")}:00:00Z`);
   const phase = (discCode: string, isLive: boolean, hasSrb: boolean, start: number, end: number) => ({ discCode, stage: "qual", isLive, hasSrb, startTime: at(start), endTime: at(end) });
 
-  it("keeps live result phases first and uses Serbian relevance only in the srb scope", () => {
+  it("uses Serbian relevance to keep a phase visible, while display order stays current then recent", () => {
     const phases = [
-      phase("ARM", false, false, 8, 10),
+      phase("ARM", false, false, 8, 14),
       phase("ARW", true, false, 10, 12),
       phase("R3PM", true, true, 9, 11),
       phase("SPW", false, true, 11, 12),
       phase("APM", false, false, 12, 13),
     ];
 
-    expect(selectHomepageCurrentPhases(phases, "srb").map((item) => item.discCode)).toEqual(["R3PM", "ARW", "SPW", "APM"]);
-    expect(selectHomepageCurrentPhases(phases, "issf").map((item) => item.discCode)).toEqual(["ARW", "R3PM", "APM", "SPW"]);
+    expect(selectHomepageCurrentPhases(phases, "srb", at(16)).map((item) => item.discCode)).toEqual(["ARW", "R3PM", "ARM", "SPW"]);
+    expect(selectHomepageCurrentPhases(phases, "issf", at(16)).map((item) => item.discCode)).toEqual(["ARW", "R3PM", "ARM", "APM"]);
+    expect(selectHomepageCurrentPhases(phases, "srb", new Date("2026-07-23T12:00:00Z")).map((item) => item.discCode)).toEqual(["ARW", "R3PM", "ARM", "APM"]);
   });
 });
 

@@ -560,6 +560,9 @@ export const mixedTeamResults = pgTable(
     // Individual shooter series within the mixed team event (separate from individual discipline results)
     shooter1Detail: jsonb("shooter1_detail").$type<{ series: number[]; inners?: number | null; total: number }>(),
     shooter2Detail: jsonb("shooter2_detail").$type<{ series: number[]; inners?: number | null; total: number }>(),
+    // Per-shooter final series (elimination shoot-off totals) — separate from qual shooter*Detail above
+    shooter1FinalDetail: jsonb("shooter1_final_detail").$type<{ series: number[] }>(),
+    shooter2FinalDetail: jsonb("shooter2_final_detail").$type<{ series: number[] }>(),
     // Qualification
     qualRank: integer("qual_rank"),
     qualTotal: decimal("qual_total", { precision: 7, scale: 1 }),

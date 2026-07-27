@@ -442,7 +442,7 @@ function parseRemark(extensions: Array<{ Key: string; Value: string }>): {
 /** SIUS: "HRBEKOVA Danka" → { lastName: "HRBEKOVA", firstName: "Danka" }
  *  Handles compound last names: "KOCHALUMKAL VINOD Vidarsa" → { lastName: "KOCHALUMKAL VINOD", firstName: "Vidarsa" }
  *  Rule: leading consecutive ALL-CAPS words = last name, rest = first name. */
-function splitDisplayName(displayName: string): {
+export function splitDisplayName(displayName: string): {
   firstName: string;
   lastName: string;
 } {

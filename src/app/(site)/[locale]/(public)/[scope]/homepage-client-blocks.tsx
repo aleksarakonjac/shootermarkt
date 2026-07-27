@@ -10,6 +10,15 @@ import { ScopedLink } from "../components/ScopedLink";
 import { TopFormaClient } from "./top-forma-client";
 import { useHomepageDataStatus } from "./homepage-data-status";
 import { LEVEL_STYLE } from "@/lib/competition-utils";
+import { MIXED_TEAM_CODES } from "@/lib/pdf-import/types";
+
+function phaseHref(competitionId: number, discCode: string, stage: string, category: string) {
+  const urlStage = stage === "elimination" ? "elim" : stage.startsWith("qual") ? "qual" : stage;
+  const params = new URLSearchParams({ disc: discCode, stage: urlStage });
+  if ((MIXED_TEAM_CODES as readonly string[]).includes(discCode)) params.set("result", "mixed");
+  else params.set("category", category);
+  return `/takmicenja/${competitionId}?${params.toString()}`;
+}
 
 const FALLBACK_LEVEL_STYLE = { background: "var(--level-club-bg)", color: "var(--level-club-fg)" };
 const INTL_LEVELS = new Set(["olympic", "world", "continental", "international"]);
@@ -99,7 +108,14 @@ export function HomepageMainClient() {
   const t = useTranslations("home");
   const tComp = useTranslations("competition");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; isLive: boolean; discResults: Array<{ discCode: string; isLive: boolean; isJunior: boolean; phases: Array<{ stage: string; isLive: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; srbHighlights: Array<{ firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null }> }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
+  const [expandedQual, setExpandedQual] = useState<Set<string>>(new Set());
+  const toggleQual = (key: string) => setExpandedQual((previous) => {
+    const next = new Set(previous);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
+  const { data, state, retry } = useHomepageData<{ recent: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string; isLive: boolean; discResults: Array<{ discCode: string; isLive: boolean; isJunior: boolean; phases: Array<{ stage: string; category: string; isLive: boolean; qualTop3: Array<{ firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null }>; srbHighlights: Array<{ firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null }> }> }> }>; upcoming: Array<{ id: number; name: string; nameSr: string | null; nameEn: string | null; date: string; location: string | null; level: string }>; topForma: Record<string, unknown[]> }>("/api/homepage/main");
 
   useEffect(() => {
     const supabase = createClient();
@@ -120,10 +136,10 @@ export function HomepageMainClient() {
 
   type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
   type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
-  type Phase = { stage: string; isLive: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
+  type Phase = { stage: string; category: string; isLive: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
   type DiscResult = { discCode: string; isLive: boolean; isJunior: boolean; phases: Phase[] };
 
-  function renderDiscResults(discResults: DiscResult[], level: string) {
+  function renderDiscResults(discResults: DiscResult[], level: string, competitionId: number) {
     if (discResults.length === 0) return <p className="mt-4 text-sm italic text-[var(--muted)]">{t("noWinner")}</p>;
     const isIntl = INTL_LEVELS.has(level.toLowerCase());
     const aff = (e: Shooter) => {
@@ -168,7 +184,9 @@ export function HomepageMainClient() {
     return (
       <div className="mt-3 divide-y divide-[var(--border)]">
         {discResults.map((disc) => {
-          const shownPhases = disc.phases.filter((p) => p.qualTop3.length > 0 || p.srbHighlights.length > 0);
+          const shownPhases = disc.phases
+            .filter((p) => p.qualTop3.length > 0 || p.srbHighlights.length > 0)
+            .toSorted((a, b) => Number(b.stage === "final") - Number(a.stage === "final"));
           if (shownPhases.length === 0) return null;
           const isAP = disc.discCode.startsWith("AP");
           const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{disc.discCode}</span>;
@@ -176,12 +194,26 @@ export function HomepageMainClient() {
           const liveBadge = disc.isLive ? <span className="shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">LIVE</span> : null;
           return (
             <div key={`${disc.discCode}:${disc.isJunior}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
+              <div className="flex items-center gap-1">{discBadge}{junBadge}</div>
               {shownPhases.map((phase) => {
                 const decimals = phase.stage === "elimination" || isAP || disc.discCode === "SPW" ? 0 : 1;
                 const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? "E" : phase.stage === "final" ? "F" : "Q"}</span>;
+                const hasFinal = shownPhases.some((item) => item.stage === "final");
+                const qualKey = `${competitionId}:${disc.discCode}:${phase.category}:qual`;
+                const qualExpanded = expandedQual.has(qualKey);
+                const shownEntries = phase.stage.startsWith("qual") && hasFinal && !qualExpanded ? phase.qualTop3.slice(0, 1) : phase.qualTop3;
+                const qualToggle = phase.stage.startsWith("qual") && hasFinal && phase.qualTop3.length > 1 ? (
+                  <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); toggleQual(qualKey); }} className="shrink-0 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline">
+                    {qualExpanded ? t("showLess") : `+${phase.qualTop3.length - 1}`}
+                  </button>
+                ) : null;
                 return (
-                  <div key={phase.stage}>
-                    {phase.qualTop3.length > 0 && inlinePlaces(phase.qualTop3, (e) => e.qualTotal, decimals, true, <>{discBadge}{stageBadge}{phase.isLive ? liveBadge : null}{junBadge}</>)}
+                  <ScopedLink
+                    key={phase.stage}
+                    href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)}
+                    className="block no-underline hover:opacity-80 transition-opacity"
+                  >
+                    {shownEntries.length > 0 && inlinePlaces(shownEntries, (e) => e.qualTotal, decimals, true, <>{stageBadge}{phase.isLive ? liveBadge : null}</>, qualToggle)}
                     {phase.srbHighlights.length > 0 && (
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         {phase.srbHighlights.map((h, i) => {
@@ -201,7 +233,7 @@ export function HomepageMainClient() {
                         })}
                       </div>
                     )}
-                  </div>
+                  </ScopedLink>
                 );
               })}
             </div>
@@ -226,27 +258,26 @@ export function HomepageMainClient() {
         const leadLevelLabel = tComp.has(levelKey) ? tComp(levelKey) : lead.level;
         const leadLevelStyle = LEVEL_STYLE[lead.level.toLowerCase()] ?? FALLBACK_LEVEL_STYLE;
         return (
-          <ScopedLink
-            href={`/takmicenja/${lead.id}`}
-            className="group block rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 hover:border-[var(--brand-primary)] transition-colors no-underline"
-          >
-            <div className="flex items-center gap-2 flex-nowrap">
-              {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
-              <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
-                {leadLevelLabel}
-              </span>
-              <span className="flex-1 min-w-0 truncate text-xs text-[var(--muted)]">
-                {lead.date.split("-").reverse().join(".")}{lead.location ? ` · ${lead.location}` : ""}
-              </span>
-            </div>
-            <h3 className="mt-1.5 font-[family-name:var(--font-barlow-condensed)] text-xl sm:text-2xl font-extrabold uppercase leading-tight line-clamp-2 group-hover:text-[var(--brand-primary)] transition-colors">
-              {name}
-            </h3>
-            {renderDiscResults(lead.discResults, lead.level)}
-            <p className="mt-4 pt-3 border-t border-[var(--border)] text-sm font-semibold text-[var(--brand-primary)] group-hover:underline">
+          <div className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-4 hover:border-[var(--brand-primary)] transition-colors">
+            <ScopedLink href={`/takmicenja/${lead.id}`} className="block no-underline">
+              <div className="flex items-center gap-2 flex-nowrap">
+                {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
+                <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
+                  {leadLevelLabel}
+                </span>
+                <span className="flex-1 min-w-0 truncate text-xs text-[var(--muted)]">
+                  {lead.date.split("-").reverse().join(".")}{lead.location ? ` · ${lead.location}` : ""}
+                </span>
+              </div>
+              <h3 className="mt-1.5 font-[family-name:var(--font-barlow-condensed)] text-xl sm:text-2xl font-extrabold uppercase leading-tight line-clamp-2 group-hover:text-[var(--brand-primary)] transition-colors">
+                {name}
+              </h3>
+            </ScopedLink>
+            {renderDiscResults(lead.discResults, lead.level, lead.id)}
+            <ScopedLink href={`/takmicenja/${lead.id}`} className="mt-4 pt-3 border-t border-[var(--border)] text-sm font-semibold text-[var(--brand-primary)] hover:underline flex no-underline">
               {t("viewResults")} →
-            </p>
-          </ScopedLink>
+            </ScopedLink>
+          </div>
         );
       })()}
 
@@ -296,7 +327,7 @@ export function HomepageMainClient() {
                 <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                   <div className="overflow-hidden">
                     <div className="px-4 pb-4">
-                      {renderDiscResults(item.discResults, item.level)}
+                      {renderDiscResults(item.discResults, item.level, item.id)}
                       <ScopedLink
                         href={`/takmicenja/${item.id}`}
                         className="mt-4 pt-3 border-t border-[var(--border)] text-sm font-semibold text-[var(--brand-primary)] hover:underline flex no-underline"

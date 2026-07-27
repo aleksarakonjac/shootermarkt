@@ -183,6 +183,13 @@
       "when": 1785145302417,
       "tag": "0025_melodic_photon",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1785183848615,
+      "tag": "0026_rare_stellaris",
+      "breakpoints": true
     }
   ]
 }
