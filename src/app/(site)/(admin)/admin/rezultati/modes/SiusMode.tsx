@@ -6,6 +6,7 @@ import type { SiusFinalEntry } from "@/app/api/admin/sius/public-import/route";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
 import { MixedTeamQualTable, MixedTeamFinalsTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
+import { commitMixedTeams } from "../_shared/commitMixedTeams";
 
 type Step = "pick" | "disciplines" | "review" | "done";
 
@@ -253,67 +254,10 @@ export function SiusMode() {
         errors.push(...(data.errors ?? []));
       }
 
-      // Mixed team entries commit through a separate endpoint, one call per discipline.
-      const byDisc = new Map<string, MixedTeamEntry[]>();
-      for (const e of teamEntries) {
-        if (!byDisc.has(e.disciplineCode)) byDisc.set(e.disciplineCode, []);
-        byDisc.get(e.disciplineCode)!.push(e);
-      }
-      for (const [disc, discEntries] of byDisc) {
-        const qualRes = await fetch("/api/admin/import/commit-mixed", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            competitionId: selectedComp.id,
-            discipline: disc,
-            isFinals: false,
-            entries: discEntries.map((e) => ({
-              skip: e.skip,
-              nocCode: e.nocCode,
-              teamNumber: e.teamNumber,
-              qualRank: e.qualRank,
-              qualTotal: e.qualTotal,
-              qualified: e.qualified,
-              m_lastName: e.mLastName,
-              m_firstName: e.mFirstName,
-              m_series: e.m_series,
-              mInners: e.mInners,
-              mTotal: e.mTotal,
-              f_lastName: e.fLastName,
-              f_firstName: e.fFirstName,
-              f_series: e.f_series,
-              fInners: e.fInners,
-              fTotal: e.fTotal,
-            })),
-          }),
-        });
-        const qualData = await qualRes.json();
-        if (!qualRes.ok) { errors.push(qualData.error ?? `${disc}: commit error`); continue; }
-        inserted += qualData.inserted ?? 0;
-        skipped += qualData.skipped ?? 0;
-        errors.push(...(qualData.errors ?? []));
-
-        const finalists = discEntries.filter((e) => !e.skip && e.finalRank != null);
-        if (finalists.length > 0) {
-          const finalRes = await fetch("/api/admin/import/commit-mixed", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              competitionId: selectedComp.id,
-              discipline: disc,
-              isFinals: true,
-              entries: finalists.map((e) => ({
-                nocCode: e.nocCode,
-                teamNumber: e.teamNumber,
-                finalRank: e.finalRank,
-                finalTotal: e.finalTotal,
-              })),
-            }),
-          });
-          const finalData = await finalRes.json();
-          errors.push(...(finalData.errors ?? []));
-        }
-      }
+      const mixed = await commitMixedTeams(selectedComp.id, teamEntries);
+      inserted += mixed.inserted;
+      skipped += mixed.skipped;
+      errors.push(...mixed.errors);
 
       setResult({ inserted, skipped, errors, competitionId: selectedComp.id });
       setStep("done");

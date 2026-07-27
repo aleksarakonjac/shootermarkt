@@ -5,13 +5,13 @@ import { MIXED_TEAM_CODES, type ReviewRow, type CommitPayload } from "@/lib/pdf-
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
 import { MixedTeamQualTable, MixedTeamFinalsTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
+import { commitMixedTeams } from "../_shared/commitMixedTeams";
 
 type Step = "pick" | "disciplines" | "review" | "done";
 
 interface DbComp { id: number; name: string; date: string; location: string | null; issfId?: string | null }
 interface IssfEvent { code: string; label: string }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
-type MixedEntry = MixedTeamEntry;
 
 // ── CompSearch ────────────────────────────────────────────────────────────────
 
@@ -147,7 +147,7 @@ export function IssfMode() {
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set());
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
-  const [mixedEntries, setMixedEntries] = useState<MixedEntry[]>([]);
+  const [mixedEntries, setMixedEntries] = useState<MixedTeamEntry[]>([]);
   const [eventCount, setEventCount] = useState(0);
   const [nocFilter, setNocFilter] = useState("");
   const [result, setResult] = useState<CommitResult | null>(null);
@@ -213,44 +213,12 @@ export function IssfMode() {
 
       const resolvedCompId: number = data.competitionId;
 
-      // 2. Commit mixed team entries (per discipline)
       const activeMixed = mixedEntries.filter((e) => !e.skip);
       if (activeMixed.length > 0) {
-        const byDisc = new Map<string, MixedEntry[]>();
-        for (const e of activeMixed) {
-          if (!byDisc.has(e.disciplineCode)) byDisc.set(e.disciplineCode, []);
-          byDisc.get(e.disciplineCode)!.push(e);
-        }
-        for (const [disc, discEntries] of byDisc) {
-          await fetch("/api/admin/import/commit-mixed", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              competitionId: resolvedCompId,
-              discipline: disc,
-              isFinals: false,
-              entries: discEntries.map((e) => ({
-                skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber,
-                qualRank: e.qualRank, qualTotal: e.qualTotal, qualified: e.qualified,
-                m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mInners: e.mInners, mTotal: e.mTotal,
-                f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
-              })),
-            }),
-          });
-          const finalists = discEntries.filter((e) => e.finalRank != null);
-          if (finalists.length > 0) {
-            await fetch("/api/admin/import/commit-mixed", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                competitionId: resolvedCompId,
-                discipline: disc,
-                isFinals: true,
-                entries: finalists.map((e) => ({ nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal })),
-              }),
-            });
-          }
-        }
+        const mixed = await commitMixedTeams(resolvedCompId, activeMixed);
+        data.inserted += mixed.inserted;
+        data.skipped += mixed.skipped;
+        data.errors.push(...mixed.errors);
       }
 
       setResult(data); setStep("done");

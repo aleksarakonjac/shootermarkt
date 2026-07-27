@@ -4,7 +4,7 @@ import { competitions, competitionSchedule, disciplines, mixedTeamResults, resul
 import type { AgeCategory } from "@/lib/db/schema";
 import { and, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml, extractMixedTeamEvents, fetchMixedTeamQualFromHtml, fetchMixedTeamFinalFromHtml } from "@/lib/issf/adapter";
-import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@/lib/sius/public-adapter";
+import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@/lib/sius/public-adapter";
 import { matchShooter } from "@/lib/name-match";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 
@@ -269,6 +269,8 @@ async function processMixedTeamSlots(
 ): Promise<number> {
   const disciplineCodes = [...new Set(mixedSlots.map((s) => s.disciplineCode))];
   const rows: Array<typeof mixedTeamResults.$inferInsert> = [];
+  const teamNumbersByDiscipline = new Map<string, Map<string, number>>();
+  const nocCountsByDiscipline = new Map<string, Map<string, number>>();
 
   if (siusId) {
     let siusData;
@@ -283,6 +285,20 @@ async function processMixedTeamSlots(
       const eventData = siusData.get(slot.disciplineCode);
       if (!eventData) continue;
 
+      const teamNumbers = teamNumbersByDiscipline.get(slot.disciplineCode) ?? new Map<string, number>();
+      teamNumbersByDiscipline.set(slot.disciplineCode, teamNumbers);
+      const nocCounts = nocCountsByDiscipline.get(slot.disciplineCode) ?? new Map<string, number>();
+      nocCountsByDiscipline.set(slot.disciplineCode, nocCounts);
+      const teamNumberFor = (r: SiusTeamResult) => {
+        const identity = mixedTeamIdentity(r.athletes);
+        const existing = teamNumbers.get(identity);
+        if (existing) return existing;
+        const teamNumber = (nocCounts.get(r.nocCode) ?? 0) + 1;
+        nocCounts.set(r.nocCode, teamNumber);
+        teamNumbers.set(identity, teamNumber);
+        return teamNumber;
+      };
+
       const push = async (r: SiusTeamResult, isFinal: boolean) => {
         const [a1, a2] = r.athletes;
         const shooter1Id = a1 ? await resolveOrCreateShooter({ ...a1, nation: r.nocCode }, allShooters) : null;
@@ -291,7 +307,7 @@ async function processMixedTeamSlots(
           competitionId,
           disciplineId: slot.disciplineId,
           nocCode: r.nocCode,
-          teamNumber: r.teamNumber,
+          teamNumber: teamNumberFor(r),
           shooter1Id,
           shooter2Id,
           shooter1Name: a1 ? `${a1.lastName} ${a1.firstName}`.trim() : null,
