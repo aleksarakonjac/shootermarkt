@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
   interface QualEntry {
     skip?: boolean;
     nocCode: string;
@@ -143,5 +144,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ inserted, skipped, errors, competitionId });
+    return NextResponse.json({ inserted, skipped, errors, competitionId });
+  } catch (error) {
+    console.error("Mixed-team import commit failed", error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Mixed-team commit failed" }, { status: 500 });
+  }
 }

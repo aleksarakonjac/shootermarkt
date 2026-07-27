@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof CommitValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    throw error;
+    console.error("Result import commit failed", error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Commit failed" }, { status: 500 });
   }
 }
