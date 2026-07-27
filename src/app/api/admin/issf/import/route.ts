@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
 
   // ── Mixed team ───────────────────────────────────────────────────────────────
   type MixedEntry = {
-    skip: boolean; nocCode: string; disciplineCode: string;
+    skip: boolean; nocCode: string; teamNumber: number; disciplineCode: string;
     qualRank: number | null; qualTotal: number | null; inners: number | null;
     qualified: boolean; finalRank: number | null; finalTotal: number | null;
     mIssfId: string | null; mLastName: string; mFirstName: string; m_series: number[]; mInners: number | null; mTotal: number;
@@ -188,14 +188,20 @@ export async function POST(req: NextRequest) {
   const mixedErrors: string[] = [];
 
   for (const { disciplineCode, qualPhase, finalPhase } of mixedEvents) {
-    const byNoc = new Map<string, MixedEntry>();
+    // Same nation can enter 2 teams — number them in table order, and match
+    // final rows back to their qual entry by shared athlete issfId (nocCode
+    // alone can't tell the 2 teams apart).
+    const entries: MixedEntry[] = [];
+    const nocCounts = new Map<string, number>();
 
     if (qualPhase?.resultKey) {
       try {
         const qualRows = await fetchMixedTeamQualFromHtml(competitionId, qualPhase.resultKey);
         for (const r of qualRows) {
-          byNoc.set(r.nocCode, {
-            skip: false, nocCode: r.nocCode, disciplineCode,
+          const teamNumber = (nocCounts.get(r.nocCode) ?? 0) + 1;
+          nocCounts.set(r.nocCode, teamNumber);
+          entries.push({
+            skip: false, nocCode: r.nocCode, teamNumber, disciplineCode,
             qualRank: r.rank, qualTotal: r.total, inners: r.inners, qualified: r.qualified,
             finalRank: null, finalTotal: null,
             mIssfId: r.mIssfId, mLastName: r.mLastName, mFirstName: r.mFirstName, m_series: r.mSeries, mInners: r.mInners, mTotal: r.mTotal,
@@ -209,7 +215,10 @@ export async function POST(req: NextRequest) {
       try {
         const finalRows = await fetchMixedTeamFinalFromHtml(competitionId, finalPhase.resultKey);
         for (const r of finalRows) {
-          const ex = byNoc.get(r.nocCode);
+          const ex = entries.find(
+            (e) => e.nocCode === r.nocCode &&
+              ((r.mIssfId && e.mIssfId === r.mIssfId) || (r.fIssfId && e.fIssfId === r.fIssfId))
+          );
           if (ex) {
             ex.finalRank = r.rank; ex.finalTotal = r.total;
             if (r.mIssfId && !ex.mIssfId) ex.mIssfId = r.mIssfId;
@@ -217,8 +226,10 @@ export async function POST(req: NextRequest) {
             if (r.fIssfId && !ex.fIssfId) ex.fIssfId = r.fIssfId;
             if (r.fLastName && !ex.fLastName) { ex.fLastName = r.fLastName; ex.fFirstName = r.fFirstName; }
           } else {
-            byNoc.set(r.nocCode, {
-              skip: false, nocCode: r.nocCode, disciplineCode,
+            const teamNumber = (nocCounts.get(r.nocCode) ?? 0) + 1;
+            nocCounts.set(r.nocCode, teamNumber);
+            entries.push({
+              skip: false, nocCode: r.nocCode, teamNumber, disciplineCode,
               qualRank: null, qualTotal: null, inners: null, qualified: true,
               finalRank: r.rank, finalTotal: r.total,
               mIssfId: r.mIssfId, mLastName: r.mLastName, mFirstName: r.mFirstName, m_series: [], mInners: null, mTotal: 0,
@@ -229,7 +240,7 @@ export async function POST(req: NextRequest) {
       } catch (e) { mixedErrors.push(`${disciplineCode} final: ${e}`); }
     }
 
-    mixedEntries.push(...byNoc.values());
+    mixedEntries.push(...entries);
   }
 
   return NextResponse.json({

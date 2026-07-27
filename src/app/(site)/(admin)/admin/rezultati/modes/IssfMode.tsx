@@ -1,22 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { MIXED_TEAM_CODES, type DisciplineCode, type ReviewRow, type CommitPayload } from "@/lib/pdf-import/types";
-import { MixedFinalsTable, MixedQualificationTable, ReviewTable } from "../_shared/ReviewTable";
+import { MIXED_TEAM_CODES, type ReviewRow, type CommitPayload } from "@/lib/pdf-import/types";
+import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
+import { MixedTeamReviewTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
 
 type Step = "pick" | "disciplines" | "review" | "done";
 
 interface DbComp { id: number; name: string; date: string; location: string | null; issfId?: string | null }
 interface IssfEvent { code: string; label: string }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
-interface MixedEntry {
-  skip: boolean; nocCode: string; disciplineCode: DisciplineCode;
-  qualRank: number | null; qualTotal: number | null; inners: number | null;
-  qualified: boolean; finalRank: number | null; finalTotal: number | null;
-  mIssfId: string | null; mLastName: string; mFirstName: string; m_series: number[]; mInners: number | null; mTotal: number;
-  fIssfId: string | null; fLastName: string; fFirstName: string; f_series: number[]; fInners: number | null; fTotal: number;
-}
+type MixedEntry = MixedTeamEntry;
 
 // ── CompSearch ────────────────────────────────────────────────────────────────
 
@@ -235,7 +230,7 @@ export function IssfMode() {
               discipline: disc,
               isFinals: false,
               entries: discEntries.map((e) => ({
-                skip: e.skip, nocCode: e.nocCode,
+                skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber,
                 qualRank: e.qualRank, qualTotal: e.qualTotal, qualified: e.qualified,
                 m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mInners: e.mInners, mTotal: e.mTotal,
                 f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
@@ -251,7 +246,7 @@ export function IssfMode() {
                 competitionId: resolvedCompId,
                 discipline: disc,
                 isFinals: true,
-                entries: finalists.map((e) => ({ nocCode: e.nocCode, finalRank: e.finalRank, finalTotal: e.finalTotal })),
+                entries: finalists.map((e) => ({ nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal })),
               }),
             });
           }
@@ -408,16 +403,10 @@ export function IssfMode() {
           <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))} />
 
           {mixedEntries.length > 0 && (
-            <>
-              <MixedQualificationTable
-                entries={mixedEntries}
-                onSkipChange={(index, skip) => setMixedEntries((prev) => prev.map((entry, i) => i === index ? { ...entry, skip } : entry))}
-              />
-              <MixedFinalsTable
-                entries={mixedEntries}
-                onSkipChange={(index, skip) => setMixedEntries((prev) => prev.map((entry, i) => i === index ? { ...entry, skip } : entry))}
-              />
-            </>
+            <MixedTeamReviewTable
+              entries={mixedEntries}
+              onToggleSkip={(index) => setMixedEntries((prev) => prev.map((entry, i) => i === index ? { ...entry, skip: !entry.skip } : entry))}
+            />
           )}
 
           <div className="flex gap-3">
