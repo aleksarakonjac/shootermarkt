@@ -336,8 +336,8 @@ async function processMixedTeamSlots(
           shooter2Id,
           shooter1Name: a1 ? `${a1.lastName} ${a1.firstName}`.trim() : null,
           shooter2Name: a2 ? `${a2.lastName} ${a2.firstName}`.trim() : null,
-          ...(a1 ? { shooter1Detail: { series: a1.series, inners: a1.inners, total: a1.total } } : {}),
-          ...(a2 ? { shooter2Detail: { series: a2.series, inners: a2.inners, total: a2.total } } : {}),
+          ...(a1 ? isFinal ? { shooter1FinalDetail: { series: a1.series } } : { shooter1Detail: { series: a1.series, inners: a1.inners, total: a1.total } } : {}),
+          ...(a2 ? isFinal ? { shooter2FinalDetail: { series: a2.series } } : { shooter2Detail: { series: a2.series, inners: a2.inners, total: a2.total } } : {}),
           ...(isFinal
             ? { finalRank: r.rank, finalTotal: r.total.toFixed(1), finalRemark: r.remark }
             : { qualRank: r.rank, qualTotal: r.total.toFixed(1), qualInners: r.inners, qualified: r.qualified || null, qualRemark: r.remark }),
@@ -385,6 +385,8 @@ async function processMixedTeamSlots(
         qualRemark: sql`coalesce(excluded.qual_remark, ${mixedTeamResults.qualRemark})`,
         finalRank: sql`coalesce(excluded.final_rank, ${mixedTeamResults.finalRank})`,
         finalTotal: sql`coalesce(excluded.final_total, ${mixedTeamResults.finalTotal})`,
+        shooter1FinalDetail: sql`coalesce(excluded.shooter1_final_detail, ${mixedTeamResults.shooter1FinalDetail})`,
+        shooter2FinalDetail: sql`coalesce(excluded.shooter2_final_detail, ${mixedTeamResults.shooter2FinalDetail})`,
         finalRemark: sql`coalesce(excluded.final_remark, ${mixedTeamResults.finalRemark})`,
       },
     });

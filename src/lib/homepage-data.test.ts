@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTickerNextTime, getTickerScheduleState, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectTickerUpcoming } from "./homepage-data";
+import { formatTickerNextTime, getTickerScheduleState, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectHomepageDisplayPhases, selectTickerUpcoming } from "./homepage-data";
 import { getTickerSlotEnd, isTickerSlotLive } from "./ticker-schedule";
 
 describe("selectTickerUpcoming", () => {
@@ -59,6 +59,26 @@ describe("selectHomepageCurrentPhases", () => {
     expect(selectHomepageCurrentPhases(phases, "srb", at(16)).map((item) => item.discCode)).toEqual(["ARW", "R3PM", "ARM", "SPW"]);
     expect(selectHomepageCurrentPhases(phases, "issf", at(16)).map((item) => item.discCode)).toEqual(["ARW", "R3PM", "ARM", "APM"]);
     expect(selectHomepageCurrentPhases(phases, "srb", new Date("2026-07-23T12:00:00Z")).map((item) => item.discCode)).toEqual(["ARW", "R3PM", "ARM", "APM"]);
+  });
+});
+
+describe("selectHomepageDisplayPhases", () => {
+  const entry = (id: string, nationality: string | null) => ({ id, nationality });
+  const phase = (stage: string, entries: ReturnType<typeof entry>[]) => ({ stage, top3: entries, srbHighlights: [] as ReturnType<typeof entry>[] });
+
+  it("keeps elimination only for a Serbian shooter missing from qualification", () => {
+    const phases = [
+      phase("qual", [entry("shooter:1", "SRB"), entry("shooter:2", "GER")]),
+      phase("elimination", [entry("shooter:1", "SRB"), entry("shooter:3", "SRB")]),
+      phase("final", [entry("shooter:2", "GER")]),
+    ];
+
+    expect(selectHomepageDisplayPhases(phases, "issf").map((item) => item.stage)).toEqual(["qual", "final"]);
+    expect(selectHomepageDisplayPhases(phases, "srb")).toEqual([
+      phases[0],
+      phases[2],
+      { ...phases[1], top3: [], srbHighlights: [entry("shooter:3", "SRB")] },
+    ]);
   });
 });
 

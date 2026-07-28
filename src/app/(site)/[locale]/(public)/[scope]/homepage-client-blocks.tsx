@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import { Ticker, type TickerItem } from "../ticker";
@@ -12,6 +12,54 @@ import { useHomepageDataStatus } from "./homepage-data-status";
 import { LEVEL_STYLE } from "@/lib/competition-utils";
 import { MIXED_TEAM_CODES } from "@/lib/pdf-import/types";
 import type { HomepageMainData } from "@/lib/homepage-data";
+
+type ResultPlace = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
+
+function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveToggleSpace = false }: { entries: ResultPlace[]; score: (entry: ResultPlace) => number | null; decimals: number; prefix?: ReactNode; renderAff: (entry: ResultPlace) => ReactNode; reserveToggleSpace?: boolean }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const firstSecondRef = useRef<HTMLDivElement>(null);
+  const secondThirdRef = useRef<HTMLDivElement>(null);
+  const [pairFirstSecond, setPairFirstSecond] = useState(false);
+
+  const place = (entry: ResultPlace, index: number) => {
+    const lead = index === 0;
+    const value = score(entry);
+    return <span key={index} className="inline-flex items-center gap-1 whitespace-nowrap">
+      <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums"}>{index + 1}.</span>
+      <span className={lead ? "text-sm font-semibold text-[var(--ink)]" : "text-xs text-[var(--muted)]"}>{entry.firstName ? `${entry.lastName} ${entry.firstName.charAt(0)}.` : entry.lastName}</span>
+      {renderAff(entry)}
+      {value != null && <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums"}>{value.toFixed(decimals)}</span>}
+    </span>;
+  };
+
+  useLayoutEffect(() => {
+    if (entries.length !== 3) return;
+    const measure = () => {
+      const row = containerRef.current?.closest<HTMLElement>("[data-phase-row]");
+      const available = (row?.clientWidth ?? containerRef.current?.clientWidth ?? 0) - (reserveToggleSpace ? 44 : 0);
+      const secondThirdFits = (secondThirdRef.current?.offsetWidth ?? 0) <= available;
+      const firstSecondFits = (firstSecondRef.current?.offsetWidth ?? 0) <= available;
+      setPairFirstSecond(!secondThirdFits && firstSecondFits);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    const row = containerRef.current?.closest<HTMLElement>("[data-phase-row]");
+    if (row) observer.observe(row);
+    return () => observer.disconnect();
+  }, [entries, reserveToggleSpace]);
+
+  const useFallback = entries.length === 3 && pairFirstSecond;
+  const firstRow = useFallback ? entries.slice(0, 2) : entries.slice(0, 1);
+  const secondRow = useFallback ? entries.slice(2) : entries.slice(1);
+  return <div ref={containerRef} className="relative">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">{prefix}{firstRow.map(place)}</div>
+    {secondRow.length > 0 && <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">{secondRow.map((entry, index) => place(entry, useFallback ? index + 2 : index + 1))}</div>}
+    <div className="pointer-events-none absolute invisible whitespace-nowrap" aria-hidden="true">
+      <div ref={firstSecondRef} className="flex items-center gap-x-3">{prefix}{place(entries[0], 0)}{entries[1] && place(entries[1], 1)}</div>
+      <div ref={secondThirdRef} className="flex items-center gap-x-3">{entries[1] && place(entries[1], 1)}{entries[2] && place(entries[2], 2)}</div>
+    </div>
+  </div>;
+}
 
 function phaseHref(competitionId: number, discCode: string, stage: string, category: string) {
   const urlStage = stage === "elimination" ? "elim" : stage.startsWith("qual") ? "qual" : stage;
@@ -140,7 +188,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
   const upcoming = data.upcoming.map((item) => ({ ...item, name: locale === "en" ? (item.nameEn ?? item.name) : (item.nameSr ?? item.name) }));
   const [lead, ...recent] = data.recent;
 
-  type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
+  type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
   type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
   type Phase = { stage: string; category: string; isLive: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
   type DiscResult = { discCode: string; isLive: boolean; isJunior: boolean; phases: Phase[] };
@@ -154,39 +202,10 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
       return (
         <span className="shrink-0 flex items-center gap-0.5">
           {e.countryCode2 && <span className={`fi fi-${e.countryCode2.toLowerCase()}`} style={{ fontSize: 11 }} aria-hidden="true" />}
-          <span className="font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold text-[var(--muted)]">{e.nationality}</span>
+          <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--muted)]">{e.nationality}</span>
         </span>
       );
     };
-    // Inline "1. Name 632.2  2. Name 631.8  3. Name …" row. First place reads larger/bold; 2nd-3rd are compact.
-    function inlinePlaces(entries: Shooter[], score: (e: Shooter) => number | null, decimals: number, scoreForAllPlaces = true, prefix?: ReactNode, trailing?: ReactNode) {
-      return (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {prefix}
-          {entries.map((e, i) => {
-            const lead = i === 0;
-            const value = (scoreForAllPlaces || lead) ? score(e) : null;
-            return (
-              <span key={i} className="inline-flex items-center gap-1">
-                <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums"}>
-                  {i + 1}.
-                </span>
-                <span className={lead ? "text-sm font-semibold text-[var(--ink)]" : "text-xs text-[var(--muted)]"}>
-                  {e.firstName ? `${e.lastName} ${e.firstName.charAt(0)}.` : e.lastName}
-                </span>
-                {aff(e)}
-                {value != null && (
-                  <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums"}>
-                    {value.toFixed(decimals)}
-                  </span>
-                )}
-              </span>
-            );
-          })}
-          {trailing}
-        </div>
-      );
-    }
     return (
       <div className="mt-3 divide-y divide-[var(--border)]">
         {discResults.map((disc) => {
@@ -203,7 +222,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
               <div className="flex items-center gap-1">{discBadge}{junBadge}</div>
               {shownPhases.map((phase) => {
                 const decimals = phase.stage === "elimination" || isAP || disc.discCode === "SPW" ? 0 : 1;
-                const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[9px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? "E" : phase.stage === "final" ? "F" : "Q"}</span>;
+                const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? "E" : phase.stage === "final" ? "F" : "Q"}</span>;
                 const hasFinal = shownPhases.some((item) => item.stage === "final");
                 const qualKey = `${competitionId}:${disc.discCode}:${phase.category}:qual`;
                 const qualExpanded = expandedQual.has(qualKey);
@@ -215,18 +234,19 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                     onClick={() => toggleQual(qualKey)}
                     aria-expanded={qualExpanded}
                     aria-label={qualExpanded ? t("showLessQualificationResults") : t("showMoreQualificationResults", { count: extraQualificationResults })}
-                    className="flex size-11 shrink-0 items-center justify-center text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
+                    className="absolute left-full top-0 ml-1 flex size-11 -translate-y-0.5 items-start justify-start pt-1 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
                   >
                     {qualExpanded ? t("showLess") : `+${extraQualificationResults}`}
                   </button>
                 ) : null;
                 return (
-                  <div key={phase.stage} className="flex items-start gap-2">
-                    <ScopedLink
-                      href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)}
-                      className="min-w-0 flex-1 no-underline hover:opacity-80 transition-opacity"
-                    >
-                      {shownEntries.length > 0 && inlinePlaces(shownEntries, (e) => e.qualTotal, decimals, true, <>{stageBadge}{phase.isLive ? liveBadge : null}</>)}
+                  <div key={phase.stage} className="w-full" data-phase-row>
+                    <div className={`relative min-w-0 w-fit ${qualToggle ? "max-w-[calc(100%-2.75rem)]" : "max-w-full"}`}>
+                      <ScopedLink
+                        href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)}
+                        className="block min-w-0 w-fit max-w-full no-underline hover:opacity-80 transition-opacity"
+                      >
+                        {shownEntries.length > 0 && <InlinePlaces entries={shownEntries} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} reserveToggleSpace={qualToggle != null} />}
                       {phase.srbHighlights.length > 0 && (
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           {phase.srbHighlights.map((h, i) => {
@@ -246,8 +266,9 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                           })}
                         </div>
                       )}
-                    </ScopedLink>
-                    {qualToggle}
+                      </ScopedLink>
+                      {qualToggle}
+                    </div>
                   </div>
                 );
               })}
@@ -304,6 +325,13 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
             const levelKey = `levels.${item.level.toLowerCase()}`;
             const rowLevelLabel = tComp.has(levelKey) ? tComp(levelKey) : item.level;
             const rowLevelStyle = LEVEL_STYLE[item.level.toLowerCase()] ?? FALLBACK_LEVEL_STYLE;
+            const previewPhase = item.discResults[0]?.phases
+              .toSorted((a, b) => (a.stage === "final" ? -1 : a.stage.startsWith("qual") ? 0 : 1) - (b.stage === "final" ? -1 : b.stage.startsWith("qual") ? 0 : 1))
+              .find((phase) => phase.qualTop3[0] || phase.srbHighlights[0]);
+            const preview = previewPhase && (previewPhase.qualTop3[0] ?? previewPhase.srbHighlights[0]);
+            const previewIsSrbHighlight = preview != null && preview === previewPhase?.srbHighlights[0];
+            const previewNoc = previewIsSrbHighlight ? "SRB" : preview?.nationality;
+            const previewCountryCode2 = previewIsSrbHighlight ? "rs" : preview?.countryCode2;
             return (
               <div key={item.id}>
                 <button
@@ -318,12 +346,16 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   <span className="flex-1 min-w-0 text-sm font-semibold text-[var(--ink)] truncate">
                     {name}
                   </span>
-                  <div className="shrink-0 flex items-center gap-2">
-                    {item.discResults[0]?.phases[0]?.qualTop3[0] ? (
+                  <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                    {preview ? (
                       <>
-                        <span className="text-xs text-[var(--muted)] hidden sm:block">{item.discResults[0].phases[0].qualTop3[0].lastName}</span>
+                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--muted)]">{previewPhase!.stage === "final" ? "F" : previewPhase!.stage === "elimination" ? "E" : "Q"}</span>
+                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums">{preview.qualRank != null ? `${preview.qualRank}.` : "—"}</span>
+                        <span className="text-xs text-[var(--muted)]">{preview.firstName ? `${preview.lastName} ${preview.firstName.charAt(0)}.` : preview.lastName}</span>
+                        {previewCountryCode2 && <span className={`fi fi-${previewCountryCode2.toLowerCase()} shrink-0`} style={{ fontSize: 10 }} aria-hidden="true" />}
+                        {previewNoc && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--muted)]">{previewNoc}</span>}
                         <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--brand-primary)] tabular-nums">
-                          {item.discResults[0].phases[0].qualTop3[0].qualTotal.toFixed(item.discResults[0].discCode.startsWith("AP") ? 0 : 1)}
+                          {preview.qualTotal.toFixed(item.discResults[0].discCode.startsWith("AP") ? 0 : 1)}
                         </span>
                       </>
                     ) : (

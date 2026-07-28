@@ -67,11 +67,16 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual" }: Props) 
   const seriesHeaders = Array.from({ length: seriesLen }, (_, i) => `S${i + 1}`);
   const SERIES_COL_W = "64px";
   const mobileColumns = ["32px", "0px", "minmax(70px, 100px)", "minmax(150px, 1fr)", "72px", "24px", hasSeries ? "18px" : ""].filter(Boolean).join(" ");
-  const desktopColumns = ["32px", "minmax(90px, 200px)", "80px", "minmax(120px, 180px)", ...seriesHeaders.map(() => SERIES_COL_W), "minmax(56px, 140px)", "minmax(72px, 1fr)", "40px"].join(" ");
+  const desktopColumns = ["32px", "minmax(90px, 200px)", "80px", "minmax(120px, 180px)", ...seriesHeaders.map(() => SERIES_COL_W), "minmax(56px, 140px)", "minmax(72px, 1fr)", "40px", "28px"].join(" ");
   const header = "flex items-center border-b border-[var(--border)] bg-[var(--surface-2)] px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-3";
 
   if (!sorted.length) return <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center"><p className="text-sm text-[var(--muted)]">{isFinal ? "Nema finalnih rezultata." : "Nema rezultata za ovu disciplinu."}</p></div>;
-  const toggle = (id: number) => setExpanded((previous) => { const next = new Set(previous); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  const toggle = (id: number) => setExpanded((previous) => {
+    const next = new Set(previous);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
 
   return <div className="overflow-hidden rounded-xl border border-[var(--border)]">
     {hasSeries && <div className="flex items-center justify-end border-b border-[var(--border)] bg-[var(--surface)] px-3 py-2 sm:hidden"><button type="button" onClick={() => setExpanded(allExpanded ? new Set() : new Set(sorted.map((team) => team.id)))} className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--muted)] transition-colors hover:text-[var(--ink)]">{allExpanded ? "Sakrij serije" : "Prikaži sve serije"}<ChevronIcon open={allExpanded} /></button></div>}
@@ -85,6 +90,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual" }: Props) 
         <div role="columnheader" className={`hidden sm:flex ${header} justify-end`} aria-hidden="true" />
         <div role="columnheader" className={`${header} justify-end`}>Σ</div>
         <div role="columnheader" className={header} aria-hidden="true" />
+        <div role="columnheader" className={`hidden sm:flex ${header}`} aria-hidden="true" />
         {hasSeries && <div role="columnheader" className={`${header} sm:hidden`} aria-hidden="true" />}
       </div>
       {sorted.map((team, index) => {
@@ -105,13 +111,14 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual" }: Props) 
             <div className={`${cell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
               <span className="flex shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">{alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }} />}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span>
             </div>
-            <div className={`${memberCell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}><TeamMember id={team.shooter1Id} name={team.shooter1Name} total={team.shooter1Detail?.total ?? null} inners={team.shooter1Detail?.inners} showInners={showInners} fmt={fmt} /></div>
+            <div className={`${memberCell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}><TeamMember id={team.shooter1Id} name={team.shooter1Name} total={shooterTotal1(team)} inners={isFinal ? null : team.shooter1Detail?.inners} showInners={showInners} fmt={fmt} /></div>
             {hasSeries && seriesHeaders.map((_, i) => { const s1 = detail1(team)?.series; const v = s1?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s1 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}
             <div className={subtotalCell} style={{ gridRow: r1, background: rowBg }}>{shooterTotal1(team) != null ? fmt(shooterTotal1(team)!) : <span className="text-[var(--subtle)]">—</span>}</div>
             <div className={`${cell} justify-end gap-1 font-[family-name:var(--font-jetbrains-mono)] text-lg font-bold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{total(team) != null ? <>{fmt(Number(total(team)))}{showInners && team.qualInners != null && <span className="text-xs font-normal text-[var(--muted)]">{team.qualInners}<span className="text-[0.6rem]">×</span></span>}</> : <span className="font-normal text-[var(--subtle)]">—</span>}</div>
             <div className={`${cell} justify-end pr-4 font-[family-name:var(--font-jetbrains-mono)] text-base font-bold text-[var(--success)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{remark(team) ? <RemarkBadge remark={remark(team)!} code={remarkCodes[index]} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className="" /> : !isFinal && team.qualified ? "Q" : null}</div>
+            <div className={`${cell} hidden justify-center !px-0.5 group-hover:bg-[var(--surface-2)] sm:flex`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}><ChevronIcon open={hasSeries && isExpanded} /></div>
             {hasSeries && <div className={`${cell} justify-center group-hover:bg-[var(--surface-2)] sm:hidden`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}><ChevronIcon open={isExpanded} /></div>}
-            <div className={`${memberCell} ${!isLast || isExpanded ? "border-b border-[var(--border)]" : ""} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r2, background: rowBg }}><TeamMember id={team.shooter2Id} name={team.shooter2Name} total={team.shooter2Detail?.total ?? null} inners={team.shooter2Detail?.inners} showInners={showInners} fmt={fmt} /></div>
+            <div className={`${memberCell} ${!isLast || isExpanded ? "border-b border-[var(--border)]" : ""} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r2, background: rowBg }}><TeamMember id={team.shooter2Id} name={team.shooter2Name} total={shooterTotal2(team)} inners={isFinal ? null : team.shooter2Detail?.inners} showInners={showInners} fmt={fmt} /></div>
             {hasSeries && seriesHeaders.map((_, i) => { const s2 = detail2(team)?.series; const v = s2?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r2, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s2 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}
             <div className={subtotalCell} style={{ gridRow: r2, background: rowBg }}>{shooterTotal2(team) != null ? fmt(shooterTotal2(team)!) : <span className="text-[var(--subtle)]">—</span>}</div>
           </div>

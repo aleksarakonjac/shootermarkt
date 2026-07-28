@@ -4,6 +4,7 @@ import { displayNoc, NOC_LIST } from "@/lib/noc-list";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
 import { getTickerSlotEnd, isTickerSlotLive } from "@/lib/ticker-schedule";
+import { splitDisplayName } from "@/lib/sius/public-adapter";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 const FORMA_DISC_CODES = ["ARM", "ARW", "APM", "APW"] as const;
@@ -81,6 +82,30 @@ function stageOrder(stage: string): number {
   if (stage.startsWith("qual")) return 0;
   if (stage === "elimination") return 1;
   return 2;
+}
+
+type HomepageDisplayEntry = { id: string; nationality: string | null };
+type HomepageDisplayPhase<T extends HomepageDisplayEntry> = { stage: string; top3: T[]; srbHighlights: T[] };
+
+export function selectHomepageDisplayPhases<T extends HomepageDisplayEntry, P extends HomepageDisplayPhase<T>>(phases: P[], scope: Scope): P[] {
+  if (!phases.some((phase) => phase.stage.startsWith("qual"))) return phases;
+
+  const standardPhases = phases.filter((phase) => phase.stage !== "elimination");
+  if (scope !== "srb") return standardPhases;
+
+  const qualificationIds = new Set(
+    phases
+      .filter((phase) => phase.stage.startsWith("qual"))
+      .flatMap((phase) => [...phase.top3, ...phase.srbHighlights].map((entry) => entry.id)),
+  );
+  const eliminationHighlight = phases
+    .filter((phase) => phase.stage === "elimination")
+    .flatMap((phase) => [...phase.top3, ...phase.srbHighlights])
+    .filter((entry) => entry.nationality === "SRB" && !qualificationIds.has(entry.id));
+
+  if (!eliminationHighlight.length) return standardPhases;
+  const elimination = phases.find((phase) => phase.stage === "elimination")!;
+  return [...standardPhases, { ...elimination, top3: [], srbHighlights: eliminationHighlight } as P];
 }
 
 function tickerStageLabel(stage: string, locale: string) {
@@ -241,7 +266,13 @@ export async function getHomepageMain(scope: Scope) {
         if (row.disciplineId !== slot.disciplineId) return [];
         const rank = stageKind === "final" ? row.finalRank : row.qualRank;
         const total = stageKind === "final" ? row.finalTotal : row.qualTotal;
-        const names = [row.shooter1Name, row.shooter2Name].filter(Boolean).join(" / ");
+        const names = [row.shooter1Name, row.shooter2Name]
+          .filter((name): name is string => Boolean(name))
+          .map((name) => {
+            const { firstName, lastName } = splitDisplayName(name);
+            return firstName ? `${lastName} ${firstName.charAt(0)}.` : lastName;
+          })
+          .join(" / ");
         return rank != null && total != null ? [{ id: `team:${row.nocCode}:${names}`, firstName: "", lastName: names || row.nocCode, clubName: null, nationality: row.nocCode, countryCode2: row.countryCode2 ?? NOC_LIST.find((country) => country.noc === row.nocCode)?.alpha2 ?? null, rank, total: Number(total) }] : [];
       });
       const entries = [...individual, ...mixed].sort((a, b) => a.rank - b.rank);
@@ -276,10 +307,9 @@ export async function getHomepageMain(scope: Scope) {
       };
     });
     const discResults = selectHomepageCurrentPhases(groups, scope, now).map((group) => {
-      // Once qualification results exist, the elimination phase is redundant noise
-      // on the homepage — only show it when there's no qual phase for this discipline.
-      const hasQual = group.phases.some((phase) => phase.stage.startsWith("qual"));
-      const visiblePhases = hasQual ? group.phases.filter((phase) => phase.stage !== "elimination") : group.phases;
+      // Once qualification results exist, elimination is redundant except for a
+      // Serbian shooter who appeared in E but has no qualification result.
+      const visiblePhases = selectHomepageDisplayPhases(group.phases, scope);
       return {
       discCode: group.discCode,
       isJunior: group.isJunior,
