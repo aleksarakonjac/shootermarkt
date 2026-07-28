@@ -1,0 +1,39 @@
+{
+  "name": "@shootermarkt/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./pdf-import-types": "./src/pdf-import-types.ts",
+    "./name-match": "./src/name-match.ts",
+    "./retry": "./src/retry.ts",
+    "./noc-list": "./src/noc-list.ts",
+    "./discipline": "./src/discipline.ts",
+    "./upload-avatar": "./src/upload-avatar.ts"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx --env-file=../../.env.local src/seed.ts",
+    "db:seed-demo": "tsx --env-file=../../.env.local src/seed-demo.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9",
+    "sharp": "^0.35.2",
+    "@supabase/supabase-js": "^2.108.2"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10",
+    "dotenv": "^17.4.2",
+    "tsx": "^4.22.4",
+    "typescript": "^5",
+    "vitest": "^3.2.6"
+  }
+}

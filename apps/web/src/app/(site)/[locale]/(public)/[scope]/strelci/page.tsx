@@ -1,0 +1,744 @@
+export const revalidate = 300;
+
+import { Suspense, type CSSProperties } from "react";
+import { ScopedLink } from "../../components/ScopedLink";
+import Image from "next/image";
+import { db } from "@shootermarkt/db";
+import { shooters, clubs, results, competitions, shooterFormaCache } from "@shootermarkt/db/schema";
+import { eq, asc, ilike, or, and, isNotNull, inArray, sql, desc, gte } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
+import { MVP_APPARATUS } from "@/lib/mvp-scope";
+import { rankedFormaCacheFilter } from "@/lib/forma-query";
+import { StrelciFilterBar } from "./StrelciFilterBar";
+import { getLocale, getTranslations } from "next-intl/server";
+import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@shootermarkt/db/pdf-import-types";
+import { buildAlternates } from "@/i18n/alternates";
+import type { Metadata } from "next";
+import { type Scope } from "@/lib/scope";
+
+export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await params;
+  const [t, locale] = await Promise.all([getTranslations("shooters"), getLocale()]);
+  return {
+    title: t("title"),
+    description: t("subtitle"),
+    alternates: buildAlternates(locale, scope, "/strelci"),
+  };
+}
+
+const PAGE_SIZE = 50;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function getDiscCode(apparatus: string | null, gender: string | null): string | null {
+  const isRifle  = apparatus === "rifle"  || apparatus === "air_rifle";
+  const isPistol = apparatus === "pistol" || apparatus === "air_pistol";
+  if (isRifle)  return gender === "F" ? "ARW" : "ARM";
+  if (isPistol) return gender === "F" ? "APW" : "APM";
+  return null;
+}
+
+type FormaEntry = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+  clubName: string | null;
+  forma: number;
+  trend: "up" | "down" | "stable";
+};
+
+// ── Forma Leader Row ─────────────────────────────────────────────────────────
+
+type TFunc = (key: string) => string;
+
+function FormaLeaderRow({
+  s,
+  rank,
+  t,
+}: {
+  s: FormaEntry;
+  rank: number;
+  t: TFunc;
+}) {
+  const inner = (
+    <>
+      <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-bold text-[var(--subtle)] w-3 shrink-0 tabular-nums text-center">
+        {rank}
+      </span>
+      <div className="shrink-0 w-7 h-7 rounded-full bg-[var(--surface-2)] flex items-center justify-center overflow-hidden border border-[var(--border)]">
+        {s.avatarUrl ? (
+          <Image src={s.avatarUrl} alt="" width={28} height={28} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-[0.6rem] font-bold text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)] leading-none select-none">
+            {s.firstName[0]}{s.lastName[0]}
+          </span>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-sm text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors truncate leading-snug">
+          {s.lastName} {s.firstName}
+        </div>
+        {s.clubName && (
+          <div className="text-[0.7rem] text-[var(--muted)] truncate leading-none mt-0.5">
+            {s.clubName}
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)] tabular-nums text-sm">
+          {s.forma.toFixed(1)}
+        </span>
+        <span
+          className="text-xs font-bold w-3 text-center leading-none"
+          style={{
+            color:
+              s.trend === "up"   ? "var(--success)"        :
+              s.trend === "down" ? "var(--brand-primary)"  :
+                                   "var(--subtle)",
+          }}
+          aria-label={s.trend === "up" ? t("trendUp") : s.trend === "down" ? t("trendDown") : t("trendStable")}
+        >
+          {s.trend === "up" ? "↑" : s.trend === "down" ? "↓" : "→"}
+        </span>
+      </div>
+    </>
+  );
+
+  const rowClass = "flex items-center gap-3 py-2.5 -mx-2 px-2 rounded-lg transition-colors group border-b border-[var(--border)] last:border-0";
+
+  return (
+    <ScopedLink href={`/strelci/${s.id}`} className={`${rowClass} hover:bg-[var(--surface-2)]`}>
+      {inner}
+    </ScopedLink>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+type SortCol = "name" | "godiste" | "disc";
+type SortDir = "asc" | "desc";
+
+function SortIcon({ col, activeSort, activeDir }: { col: SortCol; activeSort: SortCol; activeDir: SortDir }) {
+  if (activeSort !== col) return <span className="ml-1 opacity-30">↕</span>;
+  return <span className="ml-1">{activeDir === "asc" ? "↑" : "↓"}</span>;
+}
+
+function DiscPanel({ code, label, show, t, className = "" }: { code: string; label: string; show: Record<string, FormaEntry[]>; t: TFunc; className?: string }) {
+  const rows = show[code] ?? [];
+  return (
+    <div className={`p-3 sm:p-5 ${className}`}>
+      <div className="flex items-baseline gap-1.5 mb-2 sm:mb-4">
+        <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[1.05rem] tracking-tight text-[var(--ink)] leading-none">
+          {label}
+        </h3>
+        <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)] shrink-0">
+          {code}
+        </span>
+      </div>
+      {rows.length > 0 ? (
+        <div>
+        {rows.map((s, i) => (
+          <FormaLeaderRow key={s.id} s={s} rank={i + 1} t={t} />
+        ))}
+        </div>
+      ) : (
+        <p className="py-2 text-xs text-[var(--subtle)]">{t("topFormNoData")}</p>
+      )}
+    </div>
+  );
+}
+
+type Props = {
+  params: Promise<{ scope: Scope }>;
+  searchParams: Promise<{
+    q?: string;
+    zemlja?: string;
+    pol?: string;
+    aparat?: string;
+    page?: string;
+    sort?: string;
+    dir?: string;
+  }>;
+};
+
+export default async function StrelciPage({ params, searchParams }: Props) {
+  const { scope } = await params;
+  const locale       = await getLocale();
+  const t            = await getTranslations("shooters");
+  const tProfile     = await getTranslations("shooters.profile");
+
+  const DISC_STYLE: Record<string, { label: string }> = {
+    ARM: { label: locale === "en" ? "Rifle Men" : "Puška M" },
+    ARW: { label: locale === "en" ? "Rifle Women" : "Puška Ž" },
+    APM: { label: locale === "en" ? "Pistol Men" : "Pištolj M" },
+    APW: { label: locale === "en" ? "Pistol Women" : "Pištolj Ž" },
+  };
+
+  const sp           = await searchParams;
+  const activeQ      = sp.q?.trim() ?? "";
+  const activeZemlja = sp.zemlja === "all" ? "" : (sp.zemlja ?? (scope === "srb" ? "SRB" : ""));
+  const activePol    = sp.pol ?? "";
+  const activeAparat = sp.aparat ?? "";
+  const page         = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
+  const offset       = (page - 1) * PAGE_SIZE;
+  const thisYear     = String(new Date().getFullYear());
+  const activeSort   = (["name", "godiste", "disc"].includes(sp.sort ?? "") ? sp.sort : "name") as SortCol;
+  const activeDir    = (sp.dir === "desc" ? "desc" : "asc") as SortDir;
+  const conditions: (SQL | undefined)[] = [
+    inArray(shooters.apparatus, [...MVP_APPARATUS]),
+    activeQ
+      ? and(
+          ...activeQ
+            .split(/\s+/)
+            .filter(Boolean)
+            .map((word) =>
+              or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`))
+            )
+        )
+      : undefined,
+    activeZemlja ? eq(shooters.nationality, activeZemlja) : undefined,
+    activePol    ? eq(shooters.gender, activePol) : undefined,
+    activeAparat ? eq(shooters.apparatus, activeAparat) : undefined,
+  ].filter((c): c is SQL => c !== undefined);
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [
+    data,
+    [{ totalCount }],
+    nocRows,
+    statsActiveRows,
+    statsApparatus,
+    [{ totalAll }],
+  ] = await Promise.all([
+    db
+      .select({
+        id:          shooters.id,
+        firstName:   shooters.firstName,
+        lastName:    shooters.lastName,
+        birthYear:   shooters.birthYear,
+        gender:      shooters.gender,
+        verified:    shooters.verified,
+        nationality: shooters.nationality,
+        apparatus:   shooters.apparatus,
+        avatarUrl:   shooters.avatarUrl,
+        clubName:    clubs.name,
+        clubCity:    clubs.city,
+      })
+      .from(shooters)
+      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
+      .where(where)
+      .orderBy(
+        ...(activeSort === "godiste"
+          ? [activeDir === "desc" ? desc(shooters.birthYear) : asc(shooters.birthYear), asc(shooters.lastName)]
+          : activeSort === "disc"
+          ? [activeDir === "desc" ? desc(shooters.apparatus) : asc(shooters.apparatus), asc(shooters.lastName)]
+          : [activeDir === "desc" ? desc(shooters.lastName) : asc(shooters.lastName), asc(shooters.firstName)]
+        )
+      )
+      .limit(PAGE_SIZE)
+      .offset(offset),
+
+    db
+      .select({ totalCount: sql<number>`COUNT(*)::int` })
+      .from(shooters)
+      .where(where),
+
+    db
+      .selectDistinct({ noc: shooters.nationality })
+      .from(shooters)
+      .where(isNotNull(shooters.nationality))
+      .orderBy(asc(shooters.nationality)),
+
+    // Active this year = at least 1 result in current year
+    db
+      .selectDistinct({ id: results.shooterId })
+      .from(results)
+      .innerJoin(competitions, eq(results.competitionId, competitions.id))
+      .innerJoin(shooters, eq(results.shooterId, shooters.id))
+      .where(and(
+        gte(competitions.date, `${thisYear}-01-01`),
+        inArray(shooters.apparatus, [...MVP_APPARATUS]),
+      )),
+
+    // Breakdown by apparatus (global, unfiltered)
+    db
+      .select({ apparatus: shooters.apparatus, count: sql<number>`COUNT(*)::int` })
+      .from(shooters)
+      .where(inArray(shooters.apparatus, [...MVP_APPARATUS]))
+      .groupBy(shooters.apparatus),
+
+    // Total shooters in MVP scope (unfiltered)
+    db
+      .select({ totalAll: sql<number>`COUNT(*)::int` })
+      .from(shooters)
+      .where(inArray(shooters.apparatus, [...MVP_APPARATUS])),
+
+  ]);
+
+  const shooterIds = data.map((s) => s.id);
+  // Build disc-code map so we can match each shooter to their cache entry
+  const shooterDiscMap = new Map(data.map((s) => [s.id, getDiscCode(s.apparatus, s.gender)]));
+
+  const [pageCacheRows, leaderCacheRows] = await Promise.all([
+    shooterIds.length > 0
+      ? db
+          .select({
+            shooterId:      shooterFormaCache.shooterId,
+            disciplineCode: shooterFormaCache.disciplineCode,
+            forma:          shooterFormaCache.forma,
+            trend:          shooterFormaCache.trend,
+            sampleSize:     shooterFormaCache.sampleSize,
+          })
+          .from(shooterFormaCache)
+          .where(inArray(shooterFormaCache.shooterId, shooterIds))
+      : Promise.resolve([] as { shooterId: number; disciplineCode: string; forma: string | null; trend: string | null; sampleSize: number }[]),
+
+    db
+      .select({
+        shooterId:      shooterFormaCache.shooterId,
+        disciplineCode: shooterFormaCache.disciplineCode,
+        forma:          shooterFormaCache.forma,
+        trend:          shooterFormaCache.trend,
+        firstName:      shooters.firstName,
+        lastName:       shooters.lastName,
+        avatarUrl:      shooters.avatarUrl,
+        clubName:       clubs.name,
+      })
+      .from(shooterFormaCache)
+      .innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id))
+      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
+      .where(and(
+        inArray(shooterFormaCache.disciplineCode, ["ARM", "ARW", "APM", "APW"]),
+        rankedFormaCacheFilter(),
+      ))
+      .orderBy(asc(shooterFormaCache.disciplineCode), desc(shooterFormaCache.forma)),
+  ]);
+
+  // Map page shooters to their cached forma (matching by discipline code)
+  const pageCacheMap = new Map<number, { forma: number | null; trend: "up"|"down"|"stable"; sampleSize: number }>();
+  for (const r of pageCacheRows) {
+    if (shooterDiscMap.get(r.shooterId) === r.disciplineCode) {
+      pageCacheMap.set(r.shooterId, {
+        forma:      r.forma != null ? Number(r.forma) : null,
+        trend:      (r.trend ?? "stable") as "up"|"down"|"stable",
+        sampleSize: r.sampleSize,
+      });
+    }
+  }
+
+  const enrichedData = data.map((s) => {
+    const cached = pageCacheMap.get(s.id);
+    return { ...s, forma: cached?.forma ?? null, trend: (cached?.trend ?? "stable") as "up"|"down"|"stable", resultCount: cached?.sampleSize ?? 0 };
+  });
+
+  // Forma leaders — cache already ordered by (disc, forma desc), slice top 3 per disc
+  const top3ByDisc: Record<string, FormaEntry[]> = { ARM: [], ARW: [], APM: [], APW: [] };
+  for (const r of leaderCacheRows) {
+    const disc = r.disciplineCode;
+    if (disc in top3ByDisc && top3ByDisc[disc].length < 3) {
+      top3ByDisc[disc].push({
+        id:        r.shooterId,
+        firstName: r.firstName,
+        lastName:  r.lastName,
+        avatarUrl: r.avatarUrl,
+        clubName:  r.clubName,
+        forma:     Number(r.forma),
+        trend:     (r.trend ?? "stable") as "up"|"down"|"stable",
+      });
+    }
+  }
+
+  const totalPages    = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const availableNocs = nocRows.map((r) => r.noc).filter(Boolean) as string[];
+
+  // Stats bar
+  const activeCount    = statsActiveRows.length;
+  const puskaCount     = statsApparatus.find((r) => r.apparatus === "rifle")?.count   ?? 0;
+  const pistolijCount  = statsApparatus.find((r) => r.apparatus === "pistol")?.count  ?? 0;
+
+  function sortUrl(col: SortCol) {
+    const p = new URLSearchParams();
+    if (activeQ)      p.set("q",      activeQ);
+    if (activeZemlja) p.set("zemlja", activeZemlja);
+    if (activePol)    p.set("pol",    activePol);
+    if (activeAparat) p.set("aparat", activeAparat);
+    p.set("sort", col);
+    p.set("dir", activeSort === col && activeDir === "asc" ? "desc" : "asc");
+    return `/strelci?${p.toString()}`;
+  }
+
+  function pageUrl(p: number) {
+    const params = new URLSearchParams();
+    if (activeQ)      params.set("q",      activeQ);
+    if (activeZemlja) params.set("zemlja", activeZemlja);
+    if (activePol)    params.set("pol",    activePol);
+    if (activeAparat) params.set("aparat", activeAparat);
+    if (activeSort !== "name") params.set("sort", activeSort);
+    if (activeDir  !== "asc")  params.set("dir",  activeDir);
+    if (p > 1) params.set("page", String(p));
+    const qs = params.toString();
+    return qs ? `/strelci?${qs}` : "/strelci";
+  }
+
+
+  return (
+    <main className="_strelci-page mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+      <style>{`
+        @keyframes _strelci-page-in {
+          from { opacity: 0.84; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes _strelci-row-in {
+          from { opacity: 0.72; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        ._strelci-page {
+          animation: _strelci-page-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        ._strelci-result-row {
+          animation: _strelci-row-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          animation-delay: calc(var(--strelci-row-index) * 30ms);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          ._strelci-page, ._strelci-result-row { animation: none; }
+        }
+      `}</style>
+
+      {/* ── Header ── */}
+      <div className="mb-5">
+        <h1
+          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)]"
+          style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
+        >
+          {t("title")}
+        </h1>
+      </div>
+
+      {/* ── Stats bar ── */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-6 text-[0.8125rem] text-[var(--muted)]">
+        <span>
+          <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)]">
+            {totalAll}
+          </span>{" "}{t("totalCount")}
+        </span>
+        <span className="text-[var(--border-strong)] hidden sm:inline" aria-hidden="true">·</span>
+        <span>
+          <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)]">
+            {activeCount}
+          </span>{" "}{t("activeThisYear")} {thisYear}.
+        </span>
+        <span className="text-[var(--border-strong)] hidden sm:inline" aria-hidden="true">·</span>
+        <span>
+          <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)]">
+            {puskaCount}
+          </span>{" "}{t("statRifle")}
+        </span>
+        <span className="text-[var(--border-strong)] hidden sm:inline" aria-hidden="true">·</span>
+        <span>
+          <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)]">
+            {pistolijCount}
+          </span>{" "}{t("statPistol")}
+        </span>
+      </div>
+
+      {/* ── Forma leaders ── */}
+      {(() => {
+        const show = top3ByDisc as Record<string, FormaEntry[]>;
+        const hasAny = ["ARM","ARW","APM","APW"].some((d) => (show[d]?.length ?? 0) > 0);
+        if (!hasAny) return null;
+
+
+        return (
+          <section
+            aria-label="Strelci na vrhu forme"
+            className="mb-8 bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+              {(["ARM", "ARW", "APM", "APW"] as const).map((code) => (
+                <DiscPanel
+                  key={code}
+                  code={code}
+                  label={DISC_STYLE[code].label}
+                  show={show}
+                  t={t}
+                  className={{
+                    ARM: "border-b border-[var(--border)] sm:border-r lg:border-b-0",
+                    ARW: "border-b border-[var(--border)] lg:border-r lg:border-b-0",
+                    APM: "border-b border-[var(--border)] sm:border-r sm:border-b-0 lg:border-b-0",
+                    APW: "",
+                  }[code]}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
+      {/* ── Filter bar ── */}
+      <Suspense fallback={<div className="h-20 rounded-lg bg-[var(--surface)] mb-6 animate-pulse" />}>
+        <StrelciFilterBar
+          availableNocs={availableNocs}
+          currentQ={activeQ}
+          currentZemlja={activeZemlja}
+          currentPol={activePol}
+          currentAparat={activeAparat}
+          totalCount={totalCount}
+          shownCount={data.length}
+          page={page}
+          totalPages={totalPages}
+        />
+      </Suspense>
+
+      {/* ── Table ── */}
+      <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+        {enrichedData.length === 0 ? (
+          <div className="py-20 text-center">
+            <p className="text-sm text-[var(--muted)]">
+              {totalCount === 0
+                ? t("noResults")
+                : t("noResultsPage")}
+            </p>
+            {(activeQ || activeZemlja || activePol || activeAparat) && (
+              <ScopedLink
+                href="/strelci"
+                className="mt-3 inline-block text-xs font-semibold text-[var(--brand-primary)] hover:underline"
+              >
+                {t("resetFilters")}
+              </ScopedLink>
+            )}
+          </div>
+        ) : (
+          <div>
+            <table className="w-full table-fixed text-sm border-collapse sm:table-auto sm:min-w-[520px]">
+              <thead>
+                <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
+                  <th scope="col" className="w-[54%] px-3 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-2/5 sm:px-4">
+                    <ScopedLink href={sortUrl("name")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
+                      {tProfile("shooter")}<SortIcon col="name" activeSort={activeSort} activeDir={activeDir} />
+                    </ScopedLink>
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden md:table-cell">
+                    <ScopedLink href={sortUrl("godiste")} className="inline-flex items-center justify-end hover:text-[var(--ink)] transition-colors">
+                      {tProfile("birthYear")}<SortIcon col="godiste" activeSort={activeSort} activeDir={activeDir} />
+                    </ScopedLink>
+                  </th>
+                  <th scope="col" className="w-[18%] px-2 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
+                    <ScopedLink href={sortUrl("disc")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
+                      {tProfile("discipline")}<SortIcon col="disc" activeSort={activeSort} activeDir={activeDir} />
+                    </ScopedLink>
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
+                    {locale === "en" ? "Category" : "Kategorija"}
+                  </th>
+                  <th scope="col" className="w-[18%] px-2 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
+                    {tProfile("form")}
+                  </th>
+                  <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
+                    {tProfile("competitions")}
+                  </th>
+                  <th scope="col" className="w-8 px-2 py-3 sm:px-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {enrichedData.map((s, index) => {
+                  const noc = displayNoc(s.nationality);
+                  const alpha2  = noc
+                    ? NOC_LIST.find((n) => n.noc === noc)?.alpha2
+                    : undefined;
+                  const disc    = getDiscCode(s.apparatus, s.gender);
+                  const discSty = disc ? DISC_STYLE[disc] : null;
+                  const currentCategory = s.birthYear ? computeAgeCategoryFromBirthYear(s.birthYear) : null;
+
+
+                  return (
+                    <tr
+                      key={s.id}
+                      className="_strelci-result-row border-b border-[var(--border)] last:border-b-0 hover:bg-[var(--surface)] transition-colors group"
+                      style={{ "--strelci-row-index": Math.min(index, 8) } as CSSProperties}
+                    >
+                      {/* Name + club + nationality inline */}
+                      <td className="px-3 py-2.5 sm:px-4">
+                        <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+                          {/* Avatar / initials */}
+                          <div className="shrink-0 w-7 h-7 rounded-full overflow-hidden bg-[var(--surface-2)] flex items-center justify-center">
+                            {s.avatarUrl ? (
+                              <Image
+                                src={s.avatarUrl}
+                                alt=""
+                                width={28}
+                                height={28}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-[0.6rem] font-bold text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)] leading-none select-none">
+                                {s.firstName[0]}{s.lastName[0]}
+                              </span>
+                            )}
+                          </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="sm:flex sm:items-center sm:gap-2">
+                          <ScopedLink
+                            href={`/strelci/${s.id}`}
+                            className="block min-w-0 font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors leading-tight"
+                          >
+                            <span className="block truncate sm:hidden">{s.lastName}</span>
+                            <span className="flex min-w-0 items-center gap-1 sm:hidden">
+                              <span className="truncate">{s.firstName}</span>
+                              {s.nationality && (
+                                <span className="flex shrink-0 items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-semibold text-[var(--muted)]">
+                                  {alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "2px", display: "inline-block" }} />}
+                                  {noc}
+                                </span>
+                              )}
+                            </span>
+                            <span className="hidden truncate sm:block">{s.lastName} {s.firstName}</span>
+                          </ScopedLink>
+                          {s.nationality && (
+                            <span className="hidden shrink-0 items-center gap-1 sm:inline-flex sm:self-center">
+                              {alpha2 && (
+                                <span
+                                  className={`fi fi-${alpha2.toLowerCase()}`}
+                                  style={{ width: "16px", height: "12px", borderRadius: "2px", display: "inline-block", flexShrink: 0 }}
+                                />
+                              )}
+                              <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--muted)]">
+                                {noc}
+                              </span>
+                            </span>
+                          )}
+                          </div>
+                        </div>
+                        {s.clubName && (
+                          <div className="mt-1 hidden max-w-[200px] truncate text-xs leading-none text-[var(--muted)] sm:block">
+                            {s.clubName}
+                            {s.clubCity && (
+                              <span className="text-[var(--subtle)] ml-1">{s.clubCity}</span>
+                            )}
+                          </div>
+                        )}
+                        </div>
+                      </td>
+
+                      {/* Godište */}
+                      <td className="px-4 py-2.5 text-right hidden md:table-cell">
+                        {s.birthYear ? (
+                          <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--ink)]">
+                            {s.birthYear}
+                            <span className="text-[var(--muted)] ml-1 text-xs">
+                              ({new Date().getFullYear() - s.birthYear})
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-[var(--subtle)]">—</span>
+                        )}
+                      </td>
+
+                      {/* Discipline badge */}
+                      <td className="px-2 py-2.5 sm:px-4">
+                        {disc && discSty ? (
+                          <span className="inline-block rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-xs font-semibold leading-none whitespace-nowrap text-[var(--muted)]">
+                            <span className="sm:hidden">{disc}</span>
+                            <span className="hidden sm:inline">{discSty.label}</span>
+                          </span>
+                        ) : (
+                          <span className="text-[var(--subtle)]">—</span>
+                        )}
+                      </td>
+
+                      {/* Uzrasna kategorija */}
+                      <td className="px-4 py-2.5 text-xs font-semibold text-[var(--muted)] hidden sm:table-cell">
+                        {currentCategory ? (
+                          CATEGORY_LABEL[currentCategory]
+                        ) : (
+                          <span className="text-[var(--subtle)]">—</span>
+                        )}
+                      </td>
+
+                      {/* Forma + trend */}
+                      <td className="px-2 py-2.5 text-right sm:px-4">
+                        {s.forma !== null ? (
+                          <div className="inline-flex items-center justify-end gap-1.5">
+                            <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] tabular-nums text-sm">
+                              {s.forma.toFixed(1)}
+                            </span>
+                            <span
+                              className="text-xs font-bold leading-none w-3 text-center"
+                              style={{
+                                color:
+                                  s.trend === "up"
+                                    ? "var(--success)"
+                                    : s.trend === "down"
+                                    ? "var(--brand-primary)"
+                                    : "var(--subtle)",
+                              }}
+                              aria-label={
+                                s.trend === "up" ? t("trendUp") : s.trend === "down" ? t("trendDown") : t("trendStable")
+                              }
+                            >
+                              {s.trend === "up" ? "↑" : s.trend === "down" ? "↓" : "→"}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] text-sm">
+                            —
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Result count */}
+                      <td className="px-4 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] text-sm tabular-nums hidden sm:table-cell">
+                        {s.resultCount > 0 ? (
+                          s.resultCount
+                        ) : (
+                          <span className="text-[var(--subtle)]">—</span>
+                        )}
+                      </td>
+
+                      {/* Chevron */}
+                      <td className="px-2 py-2.5 sm:px-3">
+                        <svg
+                          width="12" height="12" viewBox="0 0 12 12"
+                          className="text-[var(--border-strong)] group-hover:text-[var(--muted)] transition-colors"
+                          aria-hidden="true"
+                        >
+                          <path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                        </svg>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom pagination */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-1">
+          <ScopedLink
+            href={pageUrl(page - 1)}
+            aria-disabled={page <= 1}
+            className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${page <= 1 ? "pointer-events-none opacity-30 text-[var(--muted)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"}`}
+          >
+            {locale === "en" ? "← Previous" : "← Prethodna"}
+          </ScopedLink>
+          <span className="text-xs text-[var(--muted)] px-3 font-[family-name:var(--font-jetbrains-mono)]">
+            {page} / {totalPages}
+          </span>
+          <ScopedLink
+            href={pageUrl(page + 1)}
+            aria-disabled={page >= totalPages}
+            className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${page >= totalPages ? "pointer-events-none opacity-30 text-[var(--muted)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"}`}
+          >
+            {locale === "en" ? "Next →" : "Sledeća →"}
+          </ScopedLink>
+        </div>
+      )}
+
+    </main>
+  );
+}
