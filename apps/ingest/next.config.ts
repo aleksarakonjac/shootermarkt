@@ -3,7 +3,6 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../../"),
-  serverExternalPackages: ["sharp"],
 };
 
 export default nextConfig;

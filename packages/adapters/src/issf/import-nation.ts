@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
-import { uploadAvatarFromUrl } from "@shootermarkt/db/upload-avatar";
+import { uploadAvatarFromUrlRaw as uploadAvatarFromUrl } from "@shootermarkt/db/upload-avatar-raw";
 import { fetchAthleteProfile, inferApparatus, searchAthletes } from "./adapter";
 
 export async function importIssfNation(noc: string, signal?: AbortSignal) {

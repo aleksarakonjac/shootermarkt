@@ -13,7 +13,8 @@
     "./retry": "./src/retry.ts",
     "./noc-list": "./src/noc-list.ts",
     "./discipline": "./src/discipline.ts",
-    "./upload-avatar": "./src/upload-avatar.ts"
+    "./upload-avatar": "./src/upload-avatar.ts",
+    "./upload-avatar-raw": "./src/upload-avatar-raw.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",

@@ -2,6 +2,17 @@ packages:
   - "apps/*"
   - "packages/*"
 
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - x64
+  libc:
+    - current
+    - glibc
+
 allowBuilds:
   '@parcel/watcher': true
   '@swc/core': true
