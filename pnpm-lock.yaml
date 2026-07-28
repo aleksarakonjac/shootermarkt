@@ -116,6 +116,9 @@ importers:
       payload:
         specifier: ^3.85.2
         version: 3.85.2(graphql@16.14.2)(typescript@5.9.3)
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
       react:
         specifier: 19.2.4
         version: 19.2.4
