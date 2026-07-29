@@ -54,17 +54,17 @@ export function ShooterAvatarLightbox({ src, alt }: Props) {
               aria-label={alt}
             >
               <motion.div
-                className="relative h-[min(82vh,56rem)] w-[min(92vw,56rem)]"
+                className="pointer-events-none relative h-[min(82vh,56rem)] w-[min(92vw,56rem)]"
                 initial={reducedMotion ? false : { opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={reducedMotion ? undefined : { opacity: 0, scale: 0.96 }}
                 transition={{ duration: reducedMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
               >
-                <Image src={src} alt={alt} fill sizes="92vw" className="object-contain" />
+                <Image src={src} alt={alt} fill sizes="92vw" className="pointer-events-auto object-contain" />
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-black/65 text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                  className="pointer-events-auto absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-black/65 text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                   aria-label="Zatvori fotografiju"
                 >
                   <X size={20} aria-hidden="true" />
