@@ -17,33 +17,18 @@ export function SeriesQualDisplay({ detail, hasDecimals = false, inners }: Props
     hasDecimals ? v.toFixed(1) : Math.round(v).toString();
 
   return (
-    <div className="overflow-x-auto">
-      <table className="border-collapse" style={{ minWidth: `${series.length * 64 + 80}px` }}>
-        <thead>
-          <tr>
-            {series.map((_, i) => (
-              <th
-                key={i}
-                className="px-3 py-1.5 text-center font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--muted)] text-[0.65rem] border-r border-[var(--border)] last:border-r-0"
-                style={{ width: "60px" }}
-              >
-                S{i + 1}
-              </th>
-            ))}
-            <th
-              className="px-3 py-1.5 text-center font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--ink)] text-[0.65rem]"
-              style={{ width: "76px" }}
-            >
-              Σ
-            </th>
-          </tr>
-        </thead>
+    <div>
+      <table className="w-full table-fixed border-collapse">
+        <colgroup>
+          {series.map((_, i) => <col key={i} style={{ width: `${80 / series.length}%` }} />)}
+          <col style={{ width: "20%" }} />
+        </colgroup>
         <tbody>
           <tr>
             {series.map((v, i) => (
               <td
                 key={i}
-                className={`px-3 py-2 text-center font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums border-r border-[var(--border)] last:border-r-0 ${
+                className={`whitespace-nowrap px-1 py-1.5 text-center font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums border-r border-[var(--border)] last:border-r-0 sm:px-2 sm:text-sm ${
                   i === bestIdx
                     ? "text-[var(--ink)] bg-[var(--surface-2)]"
                     : "text-[var(--muted)]"
@@ -52,10 +37,10 @@ export function SeriesQualDisplay({ detail, hasDecimals = false, inners }: Props
                 {fmt(v)}
               </td>
             ))}
-            <td className="px-3 py-2 text-center font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold tabular-nums text-[var(--ink)]">
+            <td className="whitespace-nowrap px-1 py-1.5 text-center font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold tabular-nums text-[var(--ink)] sm:px-2 sm:text-sm">
               {fmt(total)}
               {inners != null && (
-                <span className="block text-[0.6rem] font-normal text-[var(--muted)] leading-none mt-0.5">
+                <span className="ml-0.5 text-[0.6rem] font-normal text-[var(--muted)]">
                   {inners}
                   <span className="text-[0.55rem]">×</span>
                 </span>

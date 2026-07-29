@@ -10,6 +10,12 @@ const CATEGORY_SHORT: Record<string, string> = {
   mladji_senior: "U23", senior: "SR", master: "MST", open: "OPN",
 };
 
+const MEDAL_COLOR: Record<number, string> = {
+  1: "oklch(0.75 0.14 85)",
+  2: "oklch(0.75 0.01 85)",
+  3: "oklch(0.60 0.10 55)",
+};
+
 export type ResultRowData = {
   id: number;
   qualTotal: string | null;
@@ -99,7 +105,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
           <tbody>
             {filtered.map((r) => {
               const isExpanded = expanded.has(r.id);
-              const canExpand = r.qualDetail != null || r.finalDetail != null;
+              const canExpand = r.qualDetail != null || (r.finalDetail?.format === "bulletin" && (r.finalDetail.series?.length ?? 0) > 0);
               const qualDecimals = r.disciplineCode.startsWith("AR");
               const finalDecimals = r.disciplineCode.startsWith("AR") || r.disciplineCode.startsWith("R3P") || r.disciplineCode.startsWith("AP");
               const hasDecimals = qualDecimals; // kept for series/detail downstream
@@ -156,7 +162,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                       )}
                     </td>
                     <td className="whitespace-nowrap px-1 py-2.5 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] sm:px-4 sm:py-3">
-                      <span className="inline-flex items-center gap-1">
+                      <span className="flex items-center justify-end gap-1">
                         {r.finalTotal != null ? fmtFinal(r.finalTotal) : <span className="text-[var(--subtle)]">—</span>}
                         {canExpand && (
                         <ChevronDown
@@ -168,6 +174,15 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                         />
                         )}
                       </span>
+                      {r.finalRank != null && (
+                        MEDAL_COLOR[r.finalRank] ? (
+                          <span className="ml-auto mt-0.5 flex h-5 w-5 items-center justify-center rounded-full text-[0.65rem] font-bold text-white" style={{ background: MEDAL_COLOR[r.finalRank] }} aria-label={`Mesto ${r.finalRank}`}>
+                            {r.finalRank}
+                          </span>
+                        ) : (
+                          <span className="block text-[0.65rem] text-[var(--subtle)] sm:text-xs">#{r.finalRank}</span>
+                        )
+                      )}
                     </td>
                   </tr>
 
@@ -182,6 +197,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr" }
                           <ResultDetailPanel
                             qualDetail={r.qualDetail}
                             finalDetail={r.finalDetail}
+                            finalScore={r.finalTotal != null ? fmtFinal(r.finalTotal) : null}
                             hasDecimals={hasDecimals}
                             inners={r.qualInners}
                           />
