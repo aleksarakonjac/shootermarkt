@@ -18,6 +18,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
 import { RelatedNewsSection } from "@/components/RelatedNewsSection";
+import { ArrowRight } from "lucide-react";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
 
@@ -59,6 +60,10 @@ export default async function ShooterPage({ params }: Props) {
         qualRank: results.qualRank,
         qualInners: results.qualInners,
         qualified: results.qualified,
+        elimTotal: results.elimTotal,
+        elimRank: results.elimRank,
+        elimRound: results.elimRound,
+        elimDetail: results.elimDetail,
         finalTotal: results.finalTotal,
         finalRank: results.finalRank,
         qualDetail: results.qualDetail,
@@ -66,6 +71,7 @@ export default async function ShooterPage({ params }: Props) {
         competitionId: competitions.id,
         competitionName: competitions.name,
         competitionDate: competitions.date,
+        competitionDateEnd: competitions.dateEnd,
         competitionLocation: competitions.location,
         competitionCountry: countries.name,
         competitionCountryCode2: countries.code2,
@@ -121,6 +127,10 @@ export default async function ShooterPage({ params }: Props) {
   const activeSince = shooterResults.length > 0
     ? new Date(shooterResults[0].competitionDate).getFullYear()
     : null;
+  const recentCompetitionIds = new Set(
+    [...shooterResults].reverse().map((result) => result.competitionId).filter((id, index, ids) => ids.indexOf(id) === index).slice(0, 5),
+  );
+  const recentResults = shooterResults.filter((result) => recentCompetitionIds.has(result.competitionId));
 
   // Trenutna uzrasna kategorija — uvek iz godine rođenja (ISSF standard), nezavisno
   // od kategorije zabeleženih rezultata (koja je istorijska, po konkretnom takmičenju).
@@ -397,18 +407,21 @@ export default async function ShooterPage({ params }: Props) {
       )}
 
       {/* ── Results history ───────────────────────────────────────────────────── */}
-      <div>
-        <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-tight text-[var(--ink)] mb-4">
-          {tProfile("resultsHistory")}
-        </h2>
+      <div className="mb-10">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-tight text-[var(--ink)]">
+            {tProfile("recentResults")}
+          </h2>
+          {recentResults.length > 0 && <ScopedLink href={`/strelci/${shooterId}/rezultati`} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 px-1 text-sm font-semibold text-[var(--brand-primary)] transition-colors hover:text-[var(--ink)]">{tProfile("viewAllResults")}<ArrowRight size={16} aria-hidden="true" /></ScopedLink>}
+        </div>
 
-        {shooterResults.length === 0 ? (
+        {recentResults.length === 0 ? (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center">
             <p className="mx-auto text-sm text-[var(--muted)]">{tProfile("noResults")}</p>
           </div>
         ) : (
           <ResultsHistoryTable
-            results={shooterResults}
+            results={recentResults}
             allLabel={tProfile("allDisciplines")}
             locale={locale}
           />
