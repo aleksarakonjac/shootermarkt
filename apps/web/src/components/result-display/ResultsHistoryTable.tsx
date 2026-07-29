@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment, type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useParams } from "next/navigation";
 import type { ElimDetail, QualDetail, FinalDetail } from "@shootermarkt/db/schema";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 import { ResultDetailPanel } from "./ResultDetailPanel";
 
@@ -53,6 +54,8 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
   const scopedHref = useScopedHref();
   const params = useParams();
   const activeLocale = typeof params?.locale === "string" ? params.locale : "sr";
+  const reducedMotion = useReducedMotion();
+  const selectorLayoutId = useId();
 
   const availableDiscs = Array.from(new Set(results.map(r => r.disciplineCode))).sort();
   const showFilter = availableDiscs.length > 1;
@@ -81,25 +84,27 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
           {showFilter && <div className="flex shrink-0 flex-nowrap gap-1 sm:gap-1.5">
           <button
             onClick={() => setSelectedDisc(null)}
-            className={`text-[11px] font-extrabold font-[family-name:var(--font-barlow-condensed)] tracking-wider uppercase px-2.5 py-1 rounded transition-colors ${
+            className={`relative overflow-hidden text-[11px] font-extrabold font-[family-name:var(--font-barlow-condensed)] tracking-wider uppercase px-2.5 py-1 rounded transition-colors ${
               selectedDisc === null
-                ? "bg-[var(--ink)] text-[var(--bg)]"
+                ? "text-[var(--bg)]"
                 : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)]"
             }`}
           >
-            {allLabel}
+            {selectedDisc === null && <motion.span layoutId={`results-history-filter-${selectorLayoutId}`} className="absolute inset-0 rounded bg-[var(--ink)]" transition={{ duration: reducedMotion ? 0 : 0.18, ease: "easeOut" }} />}
+            <span className="relative">{allLabel}</span>
           </button>
           {availableDiscs.map(code => (
             <button
               key={code}
               onClick={() => setSelectedDisc(code)}
-              className={`text-[11px] font-extrabold font-[family-name:var(--font-barlow-condensed)] tracking-wider uppercase px-2.5 py-1 rounded transition-colors ${
+              className={`relative overflow-hidden text-[11px] font-extrabold font-[family-name:var(--font-barlow-condensed)] tracking-wider uppercase px-2.5 py-1 rounded transition-colors ${
                 selectedDisc === code
-                  ? "bg-[var(--ink)] text-[var(--bg)]"
+                  ? "text-[var(--bg)]"
                   : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)]"
               }`}
             >
-              {code}
+              {selectedDisc === code && <motion.span layoutId={`results-history-filter-${selectorLayoutId}`} className="absolute inset-0 rounded bg-[var(--ink)]" transition={{ duration: reducedMotion ? 0 : 0.18, ease: "easeOut" }} />}
+              <span className="relative">{code}</span>
             </button>
           ))}
           </div>}
@@ -107,7 +112,14 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
         </div>
       )}
 
-      <div>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={selectedDisc ?? "all"}
+          initial={reducedMotion ? false : { opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reducedMotion ? undefined : { opacity: 0, y: -4 }}
+          transition={{ duration: reducedMotion ? 0 : 0.16, ease: "easeOut" }}
+        >
         <table className="w-full table-fixed text-xs sm:text-sm">
           <tbody>
             {groupedResults.length === 0 && emptyContent && <tr><td colSpan={4} className="px-4 py-16 text-center text-sm text-[var(--muted)]">{emptyContent}</td></tr>}
@@ -161,7 +173,8 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
             })}
           </tbody>
         </table>
-      </div>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
