@@ -5,7 +5,6 @@ import {
   processIssfDirectImport,
   processIssfImport,
   processPdfImport,
-  processSiusImport,
 } from "@/lib/inngest/functions";
 
 export const maxDuration = 300;
@@ -16,7 +15,6 @@ export const { GET, POST, PUT } = serve({
     processPdfImport,
     cleanupExpiredPdfImports,
     processIssfImport,
-    processSiusImport,
     processIssfDirectImport,
   ],
 });

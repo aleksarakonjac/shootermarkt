@@ -631,23 +631,6 @@ export const issfImportJobs = pgTable(
   (t) => [index("issf_import_jobs_status_idx").on(t.status)]
 );
 
-export const siusImportJobs = pgTable(
-  "sius_import_jobs",
-  {
-    id: serial("id").primaryKey(),
-    input: jsonb("input").$type<{ guid: string; events: string[]; name: string }>().notNull(),
-    status: varchar("status", { length: 20 }).notNull().default("queued"),
-    result: jsonb("result").$type<{ rows: ReviewRow[]; eventCount: number; errors: string[] } | null>(),
-    error: text("error"),
-    attempts: integer("attempts").notNull().default(0),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    startedAt: timestamp("started_at"),
-    completedAt: timestamp("completed_at"),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (t) => [index("sius_import_jobs_status_idx").on(t.status)]
-);
-
 export const issfDirectImportJobs = pgTable(
   "issf_direct_import_jobs",
   {

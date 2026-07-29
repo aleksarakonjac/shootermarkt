@@ -375,7 +375,6 @@ export default async function AdminDashboardPage() {
                   { href: "/admin/takmicenja/novi", label: "Novo takmičenje", desc: "Unesi manifestaciju" },
                   { href: "/admin/import", label: "PDF import", desc: "Bilten → pregled" },
                   { href: "/admin/takmicenja/sync", label: "Sync takmičenja", desc: "ISSF / SSS / ESC" },
-                  { href: "/admin/sius", label: "SIUS rezultati", desc: "XML / strukturiran uvoz" },
                 ].map((action) => (
                   <Link
                     key={action.href}

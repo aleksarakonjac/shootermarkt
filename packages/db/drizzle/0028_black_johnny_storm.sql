@@ -1,0 +1,1 @@
+DROP TABLE "sius_import_jobs" CASCADE;

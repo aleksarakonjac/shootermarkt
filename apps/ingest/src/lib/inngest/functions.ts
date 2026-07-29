@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
-import { issfDirectImportJobs, issfImportJobs, pdfImportJobs, siusImportJobs, shooters, clubs } from "@shootermarkt/db/schema";
+import { issfDirectImportJobs, issfImportJobs, pdfImportJobs, shooters, clubs } from "@shootermarkt/db/schema";
 import { importIssfNation } from "@shootermarkt/adapters/issf/import-nation";
 import {
   extractMixedTeamEvents,
@@ -14,12 +14,9 @@ import {
 } from "@shootermarkt/adapters/issf/adapter";
 import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { matchShooter } from "@shootermarkt/db/name-match";
-import { foldName } from "@shootermarkt/db/name-match";
 import { parsePdfImport } from "@shootermarkt/adapters/pdf-import/parse-import";
 import { downloadPdfImport, removePdfImports, uploadPdfImport } from "@shootermarkt/adapters/pdf-import/storage";
-import { parsePdfWithGemini } from "@shootermarkt/adapters/pdf-import/gemini-adapter";
-import { deriveFinalRankProgression, mergeFinalsIntoRows, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
-import { downloadSiusPdf, fetchElimFile, fetchQualFile } from "@shootermarkt/adapters/sius/adapter";
+import { deriveFinalRankProgression, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import { inngest } from "@shootermarkt/queue";
 import { randomUUID } from "crypto";
 
@@ -172,156 +169,6 @@ export const processIssfImport = inngest.createFunction(
       .returning({ status: issfImportJobs.status });
     if (updated?.status === "processing") await inngest.send({ name: "issf-import/next", data: { jobId } });
     return { noc, current, total: job.total };
-  }
-);
-
-export const processSiusImport = inngest.createFunction(
-  {
-    id: "process-sius-import",
-    retries: 2,
-    triggers: [{ event: "sius-import/queued" }],
-    onFailure: async ({ event, error }) => {
-      const jobId = Number(event.data.event.data.jobId);
-      if (!Number.isInteger(jobId)) return;
-      await db.update(siusImportJobs)
-        .set({ status: "failed", error: error.message, completedAt: new Date(), updatedAt: new Date() })
-        .where(and(eq(siusImportJobs.id, jobId), eq(siusImportJobs.status, "processing")));
-    },
-  },
-  async ({ event }) => {
-    const jobId = event.data.jobId;
-    const [job] = await db.update(siusImportJobs)
-      .set({ status: "processing", startedAt: new Date(), updatedAt: new Date(), attempts: sql`${siusImportJobs.attempts} + 1` })
-      .where(and(eq(siusImportJobs.id, jobId), inArray(siusImportJobs.status, ["queued", "processing"])))
-      .returning();
-    if (!job) return { skipped: true };
-
-    const { guid, events, name } = job.input;
-    const [allClubs, allShooters] = await Promise.all([
-      db.select().from(clubs),
-      db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality }).from(shooters),
-    ]);
-
-    const rows: ReviewRow[] = [];
-    let eventCount = 0;
-    const errors: string[] = [];
-
-    for (const ev of events) {
-      const disciplineCode = ev as ReviewRow["disciplineCode"];
-
-      let qualFile: string | null;
-      try {
-        qualFile = await fetchQualFile(guid, ev);
-      } catch (e) {
-        errors.push(`${ev}: file list error — ${e}`);
-        continue;
-      }
-      if (!qualFile) {
-        errors.push(`${ev}: qualification individual ranklist not found`);
-        continue;
-      }
-
-      let pdfBuffer: Buffer;
-      try {
-        pdfBuffer = await downloadSiusPdf(guid, qualFile);
-      } catch (e) {
-        errors.push(`${ev}: PDF download failed — ${e}`);
-        continue;
-      }
-
-      let bilten;
-      try {
-        bilten = await parsePdfWithGemini(pdfBuffer);
-      } catch (e) {
-        errors.push(`${ev}: Gemini parse failed — ${e}`);
-        continue;
-      }
-
-      const parsedEvent = bilten.events.find((e) => e.discipline === disciplineCode && e.stage === "qualification");
-      if (!parsedEvent) {
-        errors.push(`${ev}: no matching event in parsed PDF`);
-        continue;
-      }
-      eventCount++;
-
-      for (const result of parsedEvent.results as Array<{
-        rank: number; lastName: string; firstName: string; teamNoc: string; clubName?: string;
-        series: number[]; total: number; inners?: number | null; qualified?: boolean | null;
-      }>) {
-        const matchedShooter = allShooters.find(
-          (s) => s.lastName.toLowerCase() === result.lastName.toLowerCase() &&
-            s.firstName.toLowerCase() === result.firstName.toLowerCase() &&
-            (!s.nationality || s.nationality === result.teamNoc)
-        );
-        const matchedClub = result.clubName
-          ? allClubs.find((c) => c.nocCode?.toLowerCase() === result.clubName?.toLowerCase() || c.name.toLowerCase().includes(result.clubName!.toLowerCase()))
-          : undefined;
-
-        rows.push({
-          shooterId: matchedShooter?.id,
-          firstName: result.firstName,
-          lastName: result.lastName,
-          teamNoc: result.teamNoc,
-          clubAbbr: result.clubName,
-          clubId: matchedClub?.id,
-          disciplineCode,
-          category: "senior",
-          qualTotal: result.total,
-          qualInners: result.inners,
-          qualRank: result.rank,
-          qualSeries: result.series,
-          qualified: result.qualified,
-          finalTotal: null,
-          finalRank: null,
-          warning: matchedShooter ? undefined : "Novi strelac — biće kreiran",
-        });
-      }
-    }
-
-    if (eventCount === 0) {
-      await db.update(siusImportJobs)
-        .set({ status: "failed", error: errors.join("; ") || "No events parsed successfully", completedAt: new Date(), updatedAt: new Date() })
-        .where(eq(siusImportJobs.id, job.id));
-      return { failed: true };
-    }
-
-    const r3pEvents = events.filter((e) => e === "R3PM" || e === "R3PW");
-    for (const ev of r3pEvents) {
-      let elimFile: string | null;
-      try {
-        elimFile = await fetchElimFile(guid, ev);
-      } catch {
-        errors.push(`${ev} elim: file list error`);
-        continue;
-      }
-      if (!elimFile) continue;
-
-      let elimBuf: Buffer;
-      try {
-        elimBuf = await downloadSiusPdf(guid, elimFile);
-      } catch (e) {
-        errors.push(`${ev} elim: PDF download failed — ${e}`);
-        continue;
-      }
-
-      let elimBilten;
-      try {
-        elimBilten = await parsePdfWithGemini(elimBuf);
-      } catch (e) {
-        errors.push(`${ev} elim: Gemini parse failed — ${e}`);
-        continue;
-      }
-
-      const { matchedFinals, unmatchedFinals } = mergeFinalsIntoRows(rows, elimBilten.events, foldName);
-      if (matchedFinals === 0 && unmatchedFinals > 0) {
-        errors.push(`${ev} elim: parsed ${unmatchedFinals} final results but none matched qual rows`);
-      }
-    }
-
-    await db.update(siusImportJobs)
-      .set({ status: "completed", result: { rows, eventCount, errors }, completedAt: new Date(), updatedAt: new Date() })
-      .where(eq(siusImportJobs.id, job.id));
-    return { jobId: job.id, name, eventCount, rows: rows.length };
   }
 );
 
