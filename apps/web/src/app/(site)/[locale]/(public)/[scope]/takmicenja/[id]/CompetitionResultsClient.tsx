@@ -206,9 +206,6 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId, l
         <p className="mx-auto text-sm font-medium text-[var(--muted)]">
           {locale === "en" ? "No results entered for this competition." : "Nema unetih rezultata za ovo takmičenje."}
         </p>
-        <p className="mx-auto text-xs text-[var(--subtle)] mt-1">
-          {locale === "en" ? "Admin can import results from a PDF bulletin or ISSF." : "Admin može uvesti rezultate iz PDF biltena ili ISSF-a."}
-        </p>
       </div>
     );
   }

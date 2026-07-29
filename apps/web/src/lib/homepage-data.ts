@@ -68,12 +68,34 @@ export function groupTopFormaScores(rows: Array<{ shooterId: number; discCode: s
 }
 
 type TickerScheduleSlot = { discCode: string; stage: string; startTime: Date; endTime: Date | null };
+export type TickerStatus = "LIVE" | "USKORO" | "NEXT" | "NEUTRAL" | "REVIEW";
 
 export function getTickerScheduleState<T extends TickerScheduleSlot>(slots: T[], now: Date) {
   const active = slots.filter((slot) => isTickerSlotLive(slot, now)).sort((a, b) => b.startTime.getTime() - a.startTime.getTime())[0] ?? null;
   const next = slots.filter((slot) => slot.startTime > now).sort((a, b) => a.startTime.getTime() - b.startTime.getTime())[0] ?? null;
   const lastCompleted = slots.filter((slot) => { const end = getTickerSlotEnd(slot); return end != null && end < now; }).sort((a, b) => (getTickerSlotEnd(b)?.getTime() ?? 0) - (getTickerSlotEnd(a)?.getTime() ?? 0))[0] ?? null;
   return { active, next, lastCompleted };
+}
+
+export function getTickerScheduleStatus(
+  state: { active: TickerScheduleSlot | null; next: TickerScheduleSlot | null; lastCompleted: TickerScheduleSlot | null },
+  now: Date,
+): TickerStatus {
+  if (state.active) return "LIVE";
+  if (state.next) return state.next.startTime.getTime() - now.getTime() <= 20 * 60_000 ? "USKORO" : "NEXT";
+  return state.lastCompleted ? "REVIEW" : "NEUTRAL";
+}
+
+function tickerStagePriority(stage: string) {
+  if (stage === "final") return 0;
+  if (stage.startsWith("qual")) return 1;
+  if (stage === "elimination") return 2;
+  return 3;
+}
+
+export function selectTickerCompletedSlots<T extends { stage: string }>(slots: T[], hasResults: (slot: T) => boolean, getKey: (slot: T) => string) {
+  const seen = new Set<string>();
+  return slots.filter(hasResults).sort((a, b) => tickerStagePriority(a.stage) - tickerStagePriority(b.stage)).filter((slot) => !seen.has(getKey(slot)) && (seen.add(getKey(slot)), true));
 }
 
 // Sort order for stacking a discipline's phases within one homepage card:
@@ -172,17 +194,22 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
     return ranked.map((row, index) => `${index + 1}. ${row.lastName} ${Number(isFinal ? row.finalTotal : row.qualTotal).toFixed(!isFinal && slot.discCode.startsWith("AP") ? 0 : 1)}`).join(" · ");
   };
   const live = liveRows.map((competition) => {
-    const state = getTickerScheduleState(slots.filter((slot) => slot.competitionId === competition.id), now);
+    const competitionSlots = slots.filter((slot) => slot.competitionId === competition.id);
+    const state = getTickerScheduleState(competitionSlots, now);
+    const tickerStatus = getTickerScheduleStatus(state, now);
     const activePhase = state.active && `${state.active.discCode} · ${tickerStageLabel(state.active.stage, locale)}`;
-    const completedPhase = state.lastCompleted && `${state.lastCompleted.discCode} · ${tickerStageLabel(state.lastCompleted.stage, locale)}`;
+    const completedSlots = selectTickerCompletedSlots(
+      competitionSlots.filter((slot) => { const end = getTickerSlotEnd(slot); return end != null && end < now; }).sort((a, b) => (getTickerSlotEnd(b)?.getTime() ?? 0) - (getTickerSlotEnd(a)?.getTime() ?? 0)),
+      (slot) => topThree(slot) != null,
+      (slot) => slot.discCode,
+    ).slice(0, 3);
     const nextPhase = state.next && `${state.next.discCode} · ${tickerStageLabel(state.next.stage, locale)} · ${formatTickerNextTime(state.next.startTime, now, locale)} (${tickerCountdown(state.next.startTime, now, locale)})`;
     const activeTopThree = topThree(state.active);
-    const completedTopThree = topThree(state.lastCompleted);
     const detailItems = state.active
       ? [{ label: locale === "en" ? "NOW" : "U TOKU", text: activePhase! }, ...(activeTopThree ? [{ label: "TOP 3", text: activeTopThree }] : [])]
       : [
           ...(nextPhase ? [{ label: locale === "en" ? "NEXT" : "SLEDEĆE", text: nextPhase }] : []),
-          ...(completedPhase && completedTopThree ? [{ label: locale === "en" ? "RESULTS" : "REZULTATI", text: `${completedPhase} · ${completedTopThree}` }] : []),
+          ...completedSlots.map((slot) => ({ text: `${slot.discCode} · ${tickerStageLabel(slot.stage, locale)} · ${topThree(slot)!}`, status: "REVIEW" as const })),
         ];
     const linkedItems = activeOverrides
       .filter((override) => override.type === "linked" && override.competitionId === competition.id)
@@ -192,7 +219,7 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
         href: override.href ?? undefined,
       }))
       .filter((item) => item.text);
-    return { ...competition, name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name), detailItems: [...detailItems, ...linkedItems], forceStatus: null as "LIVE" | "USKORO" | null };
+    return { ...competition, name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name), detailItems: [...detailItems, ...linkedItems], forceStatus: null as "LIVE" | "USKORO" | null, tickerStatus };
   });
 
   // Inject forced overrides (competitions not currently live) into the live array
@@ -203,7 +230,7 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
     if (!comp) continue;
     const forceStatus = override.type === "live" ? "LIVE" : override.type === "uskoro" ? "USKORO" : null;
     if (!forceStatus) continue;
-    live.push({ ...comp, name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name), detailItems: [], forceStatus });
+    live.push({ ...comp, name: locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name), detailItems: [], forceStatus, tickerStatus: forceStatus });
   }
 
   const liveIdSet = new Set(live.map((c) => c.id));

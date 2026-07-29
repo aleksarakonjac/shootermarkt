@@ -136,7 +136,7 @@ function HomepageError({ retry, compact = false }: { retry: () => void; compact?
 export function HomepageTickerClient() {
   const t = useTranslations("home");
   const common = useTranslations("common");
-  const { data, state, retry } = useHomepageData<{ live: Array<{ id: number; name: string; date: string; dateEnd: string | null; level: string; detailItems: TickerItem["detailItems"]; nocCode: string | null; countryCode2: string | null; forceStatus: "LIVE" | "USKORO" | null }>; upcoming: Array<{ id: number; name: string; date: string; level: string; location: string | null; href: string | null }> }>("/api/homepage/ticker", 60_000);
+  const { data, state, retry } = useHomepageData<{ live: Array<{ id: number; name: string; date: string; dateEnd: string | null; level: string; detailItems: TickerItem["detailItems"]; nocCode: string | null; countryCode2: string | null; forceStatus: "LIVE" | "USKORO" | null; tickerStatus: "LIVE" | "USKORO" | "NEXT" | "NEUTRAL" | "REVIEW" }>; upcoming: Array<{ id: number; name: string; date: string; level: string; location: string | null; href: string | null }> }>("/api/homepage/ticker", 60_000);
 
   // Realtime: re-fetch immediately when admin changes ticker overrides
   useEffect(() => {
@@ -152,7 +152,7 @@ export function HomepageTickerClient() {
   if (state === "loading") return <div aria-busy="true" className="h-10 animate-pulse bg-[var(--surface)]" />;
   if (state === "error" || !data) return <HomepageError retry={retry} compact />;
 
-  const liveItems: TickerItem[] = data.live.map((item) => ({ id: item.id, name: item.name, date: item.date, endDate: item.dateEnd ?? undefined, level: item.level, status: item.forceStatus ?? "LIVE", detailItems: item.detailItems?.length ? item.detailItems : [{ text: item.forceStatus === "USKORO" ? (item.date) : t("inProgress") }], href: `/takmicenja/${item.id}`, nocCode: item.nocCode ?? undefined, countryCode2: item.countryCode2 ?? undefined }));
+  const liveItems: TickerItem[] = data.live.map((item) => ({ id: item.id, name: item.name, date: item.date, endDate: item.dateEnd ?? undefined, level: item.level, status: item.forceStatus ?? item.tickerStatus, detailItems: item.detailItems?.length ? item.detailItems : item.forceStatus === "LIVE" ? [{ text: t("inProgress") }] : undefined, href: `/takmicenja/${item.id}`, nocCode: item.nocCode ?? undefined, countryCode2: item.countryCode2 ?? undefined }));
   const upcomingItems: TickerItem[] = data.upcoming.map((item) => ({ id: item.id, name: item.name, date: item.date, level: item.level, status: "USKORO", detailText: item.location || common("serbia"), href: item.href ?? undefined }));
   return <Ticker liveItems={liveItems} upcomingItems={upcomingItems} />;
 }
@@ -187,6 +187,14 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
 
   const upcoming = data.upcoming.map((item) => ({ ...item, name: locale === "en" ? (item.nameEn ?? item.name) : (item.nameSr ?? item.name) }));
   const [lead, ...recent] = data.recent;
+  const formatCompetitionDate = (date: string, dateEnd: string | null) => {
+    const [year, month, day] = date.split("-");
+    if (!dateEnd || dateEnd === date) return `${day}.${month}.${year}.`;
+    const [endYear, endMonth, endDay] = dateEnd.split("-");
+    if (year === endYear && month === endMonth) return `${day}.-${endDay}.${month}.${year}.`;
+    if (year === endYear) return `${day}.${month}.-${endDay}.${endMonth}.${year}.`;
+    return `${day}.${month}.${year}.-${endDay}.${endMonth}.${endYear}.`;
+  };
 
   type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
   type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
@@ -302,7 +310,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   {leadLevelLabel}
                 </span>
                 <span className="flex-1 min-w-0 truncate text-xs text-[var(--muted)]">
-                  {lead.date.split("-").reverse().join(".")}{lead.location ? ` · ${lead.location}` : ""}
+                  {formatCompetitionDate(lead.date, lead.dateEnd)}{lead.location ? ` · ${lead.location}` : ""}
                 </span>
               </div>
               <h3 className="mt-1.5 font-[family-name:var(--font-barlow-condensed)] text-xl sm:text-2xl font-extrabold uppercase leading-tight line-clamp-2 group-hover:text-[var(--brand-primary)] transition-colors">
