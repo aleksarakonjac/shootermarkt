@@ -6,7 +6,6 @@ import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ScopedLink } from "../../../components/ScopedLink";
-import Image from "next/image";
 import { ResultsHistoryTable } from "@/components/result-display/ResultsHistoryTable";
 import { FormaChart } from "@/components/shooter/FormaChart";
 import type { ChartPoint, FormaScore } from "@/components/shooter/FormaChart";
@@ -19,6 +18,7 @@ import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
 import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 import { ArrowRight } from "lucide-react";
+import { ShooterAvatarLightbox } from "@/components/shooter/ShooterAvatarLightbox";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
 
@@ -239,15 +239,10 @@ export default async function ShooterPage({ params }: Props) {
           className="shrink-0"
         >
           {shooter.avatarUrl ? (
-            <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl ring-1 ring-[var(--border)] overflow-hidden">
-              <Image
-                src={shooter.avatarUrl}
-                alt={`${shooter.firstName} ${shooter.lastName}`}
-                fill
-                sizes="(min-width: 640px) 112px, 96px"
-                className="object-cover"
-              />
-            </div>
+            <ShooterAvatarLightbox
+              src={shooter.avatarUrl}
+              alt={`${shooter.firstName} ${shooter.lastName}`}
+            />
           ) : (
             <div
               className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl flex items-center justify-center font-[family-name:var(--font-barlow-condensed)] font-extrabold text-3xl text-white ring-1 ring-[var(--border)]"
@@ -274,11 +269,16 @@ export default async function ShooterPage({ params }: Props) {
               {nocEntry && (
                 <div className="flex min-w-0 items-center gap-1 text-sm">
                   <dt className="sr-only">{tProfile("nationality")}</dt>
-                  <dd className="text-[var(--ink)] flex items-center gap-1">
+                  <dd>
+                    <ScopedLink
+                      href={`/strelci?zemlja=${encodeURIComponent(shooter.nationality!)}`}
+                      className="flex items-center gap-1 text-[var(--ink)] transition-colors hover:text-[var(--brand-primary)]"
+                    >
                     {nocEntry.alpha2 && (
                       <span className={`fi fi-${nocEntry.alpha2.toLowerCase()} shrink-0`} style={{ fontSize: "0.9em", borderRadius: 2 }} aria-hidden="true" />
                     )}
                     {displayedNoc}
+                    </ScopedLink>
                   </dd>
                 </div>
               )}
@@ -286,7 +286,14 @@ export default async function ShooterPage({ params }: Props) {
                 <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{tProfile("discipline")}:</dt>
                   <dd className="min-w-0 text-[var(--ink)]">
-                    {shooter.apparatus === "rifle" ? t("aparatRifle") : shooter.apparatus === "pistol" ? t("aparatPistol") : tProfile("bothApparatus")}
+                    {shooter.apparatus === "rifle" || shooter.apparatus === "pistol" ? (
+                      <ScopedLink
+                        href={`/strelci?aparat=${shooter.apparatus}`}
+                        className="transition-colors hover:text-[var(--brand-primary)]"
+                      >
+                        {shooter.apparatus === "rifle" ? t("aparatRifle") : t("aparatPistol")}
+                      </ScopedLink>
+                    ) : tProfile("bothApparatus")}
                   </dd>
                 </div>
               )}
