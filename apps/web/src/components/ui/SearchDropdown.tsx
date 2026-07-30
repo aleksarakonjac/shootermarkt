@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 export interface DropdownOption {
   value: string;
@@ -25,6 +26,10 @@ interface Props {
   showSelectedSublabel?: boolean;
   align?: "left" | "right";
   disabled?: boolean;
+  animated?: boolean;
+  pinnedValues?: string[];
+  pinnedLabel?: string;
+  showEmptyOption?: boolean;
 }
 
 const Chevron = ({ open }: { open: boolean }) => (
@@ -53,11 +58,16 @@ export function SearchDropdown({
   showSelectedSublabel = true,
   align = "left",
   disabled = false,
+  animated = false,
+  pinnedValues = [],
+  pinnedLabel,
+  showEmptyOption = true,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     if (!open) return;
@@ -81,6 +91,8 @@ export function SearchDropdown({
           o.value.toLowerCase().includes(search.toLowerCase())
       )
     : options;
+  const pinnedOptions = filtered.filter((option) => pinnedValues.includes(option.value));
+  const regularOptions = filtered.filter((option) => !pinnedValues.includes(option.value));
 
   async function handleCreate() {
     if (!onCreateNew || creating) return;
@@ -106,23 +118,39 @@ export function SearchDropdown({
         className="w-full flex items-center justify-between gap-2 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span className="flex items-center gap-1.5 min-w-0 truncate">
-          {selected ? (
-            <>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={selected?.value ?? "empty"}
+              className="flex min-w-0 items-center gap-1.5"
+              initial={animated && !reducedMotion ? { opacity: 0, x: 6 } : false}
+              animate={{ opacity: 1, x: 0 }}
+              exit={animated && !reducedMotion ? { opacity: 0, x: -6 } : undefined}
+              transition={{ duration: animated && !reducedMotion ? 0.14 : 0 }}
+            >
+              {selected ? (
+                <>
               {selected.prefix && <span className="shrink-0">{selected.prefix}</span>}
               <span className={`truncate ${labelClassName}`}>{selected.label}</span>
               {showSelectedSublabel && selected.sublabel && (
                 <span className="shrink-0 text-[var(--muted)] text-xs">{selected.sublabel}</span>
               )}
-            </>
-          ) : (
-            <span className="text-[var(--subtle)]">{placeholder}</span>
-          )}
+                </>
+              ) : <span className="text-[var(--subtle)]">{placeholder}</span>}
+            </motion.span>
+          </AnimatePresence>
         </span>
         <Chevron open={open} />
       </button>
 
-      {open && (
-        <div className={`absolute top-full mt-1 z-50 min-w-full w-max max-w-xs rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-lg ${align === "right" ? "right-0" : "left-0"}`}>
+      <AnimatePresence initial={false}>
+        {open && (
+        <motion.div
+          className={`absolute top-full mt-1 z-50 min-w-full w-max max-w-xs rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-lg ${align === "right" ? "right-0" : "left-0"}`}
+          initial={animated && !reducedMotion ? { opacity: 0, y: -4, scale: 0.98 } : false}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={animated && !reducedMotion ? { opacity: 0, y: -4, scale: 0.98 } : undefined}
+          transition={{ duration: animated && !reducedMotion ? 0.16 : 0 }}
+        >
           {searchable && (
             <div className="p-1.5 border-b border-[var(--border)]">
               <input
@@ -137,15 +165,37 @@ export function SearchDropdown({
 
           <div className="max-h-52 overflow-y-auto">
             {/* Empty/clear option */}
-            <button
-              type="button"
-              onClick={() => { onChange(""); setOpen(false); setSearch(""); }}
-              className="w-full text-left px-3 py-2 text-xs text-[var(--subtle)] hover:bg-[var(--surface)] transition-colors"
-            >
-              {emptyLabel}
-            </button>
+            {showEmptyOption && (
+              <button
+                type="button"
+                onClick={() => { onChange(""); setOpen(false); setSearch(""); }}
+                className="w-full text-left px-3 py-2 text-xs text-[var(--subtle)] hover:bg-[var(--surface)] transition-colors"
+              >
+                {emptyLabel}
+              </button>
+            )}
 
-            {filtered.map((o) => (
+            {pinnedOptions.length > 0 && (
+              <>
+                {pinnedLabel && <p className="px-3 pt-2 text-[0.625rem] font-semibold uppercase tracking-wider text-[var(--subtle)]">{pinnedLabel}</p>}
+                {pinnedOptions.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => { onChange(o.value); setOpen(false); setSearch(""); }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--surface)] transition-colors flex items-center gap-1.5"
+                    style={{ fontWeight: o.value === value ? 700 : 400, color: o.value === value ? "var(--brand-primary)" : "var(--ink)" }}
+                  >
+                    {o.prefix && <span className="shrink-0">{o.prefix}</span>}
+                    <span className={`truncate ${labelClassName}`}>{o.label}</span>
+                    {o.sublabel && <span className="text-[var(--muted)] shrink-0">{o.sublabel}</span>}
+                  </button>
+                ))}
+                {regularOptions.length > 0 && <div className="mx-2 border-t border-[var(--border)]" />}
+              </>
+            )}
+
+            {regularOptions.map((o) => (
               <button
                 key={o.value}
                 type="button"
@@ -178,8 +228,9 @@ export function SearchDropdown({
               </button>
             )}
           </div>
-        </div>
-      )}
+        </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTickerNextTime, getTickerScheduleState, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectHomepageDisplayPhases, selectTickerUpcoming } from "./homepage-data";
+import { formatTickerNextTime, getTickerScheduleState, getTickerScheduleStatus, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectHomepageDisplayPhases, selectTickerCompletedSlots, selectTickerUpcoming } from "./homepage-data";
 import { getTickerSlotEnd, isTickerSlotLive } from "./ticker-schedule";
 
 describe("selectTickerUpcoming", () => {
@@ -40,6 +40,36 @@ describe("getTickerScheduleState", () => {
     ];
 
     expect(getTickerScheduleState(slots, now)).toMatchObject({ active: { name: "ARW qual" }, lastCompleted: { name: "ARM qual" }, next: { name: "ARM final" } });
+  });
+});
+
+describe("getTickerScheduleStatus", () => {
+  it("uses live only for an active phase and uskoro in the final 20 minutes", () => {
+    const now = new Date("2026-07-21T10:00:00Z");
+    const next = { discCode: "ARM", stage: "final", startTime: new Date("2026-07-21T10:20:00Z"), endTime: null };
+
+    expect(getTickerScheduleStatus({ active: null, next, lastCompleted: null }, now)).toBe("USKORO");
+    expect(getTickerScheduleStatus({ active: null, next: { ...next, startTime: new Date("2026-07-21T10:21:00Z") }, lastCompleted: null }, now)).toBe("NEXT");
+    expect(getTickerScheduleStatus({ active: next, next: null, lastCompleted: null }, now)).toBe("LIVE");
+    expect(getTickerScheduleStatus({ active: null, next: null, lastCompleted: next }, now)).toBe("REVIEW");
+  });
+});
+
+describe("selectTickerCompletedSlots", () => {
+  it("prioritizes finals, then qualifications, and keeps one phase per discipline", () => {
+    const slots = [
+      { id: "team", discipline: "ARMT", stage: "final" },
+      { id: "rifle-qual", discipline: "ARM", stage: "qual" },
+      { id: "rifle-final", discipline: "ARM", stage: "final" },
+      { id: "three-position-elim", discipline: "R3PM", stage: "elimination" },
+      { id: "three-position-qual", discipline: "R3PM", stage: "qual" },
+      { id: "pistol-final", discipline: "APM", stage: "final" },
+    ];
+    expect(selectTickerCompletedSlots(slots, (slot) => slot.id !== "team", (slot) => slot.discipline)).toEqual([
+      { id: "rifle-final", discipline: "ARM", stage: "final" },
+      { id: "pistol-final", discipline: "APM", stage: "final" },
+      { id: "three-position-qual", discipline: "R3PM", stage: "qual" },
+    ]);
   });
 });
 

@@ -6,7 +6,7 @@ import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { useTranslations, useLocale } from "next-intl";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
-export interface TickerDetailItem { label?: string; text: string; href?: string; }
+export interface TickerDetailItem { label?: string; text: string; href?: string; status?: "REVIEW"; }
 
 export interface TickerItem {
   id: number;
@@ -15,7 +15,7 @@ export interface TickerItem {
   endDate?: string;
   location?: string;
   level: string;
-  status: "LIVE" | "USKORO" | "CUSTOM";
+  status: "LIVE" | "USKORO" | "NEXT" | "NEUTRAL" | "REVIEW" | "CUSTOM";
   detailText?: string;
   detailItems?: TickerDetailItem[];
   href?: string;
@@ -71,7 +71,7 @@ export function Ticker({
       className="w-full"
       style={{ borderTop: "2px solid var(--brand-primary)", borderBottom: "1px solid var(--border)" }}
     >
-      {cycleItems.length > 0 && <UpperBar items={cycleItems} live={t("live")} upcoming={t("upcoming")} locale={locale} />}
+      {cycleItems.length > 0 && <UpperBar items={cycleItems} live={t("live")} upcoming={t("upcoming")} nextLabel={t("next")} review={t("results")} locale={locale} />}
       {marqueeItems.length > 0 && <UpcomingBar items={marqueeItems} upcoming={t("upcoming")} locale={locale} />}
     </div>
   );
@@ -92,14 +92,15 @@ function formatDateRange(start: string, locale: string, end?: string): string {
 
 // ── Live detail rotator ───────────────────────────────────────────────────────
 
-function LiveDetail({ item }: { item: TickerItem }) {
+function LiveDetail({ item, onStatusChange }: { item: TickerItem; onStatusChange?: (status?: TickerDetailItem["status"]) => void }) {
   const scopedHref = useScopedHref();
-  const items: TickerDetailItem[] = item.detailItems?.length
+  const items = useMemo<TickerDetailItem[]>(() => item.detailItems?.length
     ? item.detailItems
-    : item.detailText ? [{ text: item.detailText }] : [];
+    : item.detailText ? [{ text: item.detailText }] : [], [item.detailItems, item.detailText]);
 
   const [idx, setIdx]         = useState(0);
   const [visible, setVisible] = useState(true);
+  const current = items.length ? items[idx % items.length] : undefined;
 
   useEffect(() => {
     if (items.length <= 1) return;
@@ -110,8 +111,11 @@ function LiveDetail({ item }: { item: TickerItem }) {
     return () => clearInterval(interval);
   }, [items.length]);
 
-  if (items.length === 0) return null;
-  const current = items[idx];
+  useEffect(() => {
+    onStatusChange?.(current?.status);
+  }, [current, onStatusChange]);
+
+  if (!current) return null;
 
   const detail = (
     <span
@@ -133,11 +137,11 @@ function LiveDetail({ item }: { item: TickerItem }) {
 
 // ── Upper bar (cycles through live + uskoro + custom) ────────────────────────
 
-function UpperBar({ items, live, upcoming, locale }: { items: TickerItem[]; live: string; upcoming: string; locale: string }) {
+function UpperBar({ items, live, upcoming, nextLabel, review, locale }: { items: TickerItem[]; live: string; upcoming: string; nextLabel: string; review: string; locale: string }) {
   return (
     <>
-      <div className="sm:hidden"><MobileUpperBar items={items} live={live} upcoming={upcoming} /></div>
-      <div className="hidden sm:block"><DesktopUpperBar items={items} live={live} upcoming={upcoming} locale={locale} /></div>
+      <div className="sm:hidden"><MobileUpperBar items={items} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} /></div>
+      <div className="hidden sm:block"><DesktopUpperBar items={items} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} locale={locale} /></div>
     </>
   );
 }
@@ -148,17 +152,17 @@ type MobileTickerSegment = {
   href?: string;
 };
 
-function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: string; upcoming: string }) {
+function MobileUpperBar({ items, live, upcoming, nextLabel, review }: { items: TickerItem[]; live: string; upcoming: string; nextLabel: string; review: string }) {
   const scopedHref = useScopedHref();
   const segments = useMemo<MobileTickerSegment[]>(() => items.flatMap((item) => {
-    const details = item.status === "LIVE"
+    const details = item.status !== "USKORO" || item.detailItems?.length
       ? item.detailItems?.length ? item.detailItems : item.detailText ? [{ text: item.detailText }] : []
       : [];
 
     return [
       { item, text: item.name, href: item.href },
       ...details.map((detail) => ({
-        item,
+        item: { ...item, status: detail.status ?? item.status },
         text: detail.label ? `${detail.label} · ${detail.text}` : detail.text,
         href: detail.href,
       })),
@@ -204,6 +208,8 @@ function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: 
 
   const isLive = segment.item.status === "LIVE";
   const isUpcoming = segment.item.status === "USKORO";
+  const isNext = segment.item.status === "NEXT";
+  const isReview = segment.item.status === "REVIEW";
   const scrollStyle = travelPx > 0
     ? {
         "--ticker-mobile-distance": `-${travelPx}px`,
@@ -223,10 +229,12 @@ function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: 
 
   return (
     <div className="h-8 overflow-hidden" style={{ background: "var(--brand-primary)" }} role="status" aria-label={`Ticker: ${segment.text}`}>
-      <div className="mx-auto flex h-full max-w-7xl items-center gap-2 px-4">
+      <div className="mx-auto flex h-full max-w-7xl items-center gap-2 pl-2 pr-4">
         <div className="flex items-center gap-2 shrink-0" style={{ opacity: badgeVisible ? 1 : 0, transition: "opacity 0.22s ease" }}>
           {isLive && <MobileStatusBadge label={live} live />}
           {isUpcoming && <MobileStatusBadge label={upcoming.toUpperCase()} />}
+          {isNext && <MobileStatusBadge label={nextLabel.toUpperCase()} neutral />}
+          {isReview && <MobileStatusBadge label={review.toUpperCase()} review />}
           {segment.item.status === "CUSTOM" && segment.item.label && <MobileStatusBadge label={segment.item.label} />}
         </div>
         <div className="flex min-w-0 flex-1 items-center gap-2" style={{ opacity: visible ? 1 : 0, transition: "opacity 0.22s ease" }}>
@@ -241,16 +249,16 @@ function MobileUpperBar({ items, live, upcoming }: { items: TickerItem[]; live: 
   );
 }
 
-function MobileStatusBadge({ label, live = false }: { label: string; live?: boolean }) {
+function MobileStatusBadge({ label, live = false, neutral = false, review = false }: { label: string; live?: boolean; neutral?: boolean; review?: boolean }) {
   return (
-    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded px-1.5 font-extrabold select-none leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: live ? "var(--brand-primary)" : "#92400e", background: live ? "white" : "#fefce8" }}>
+    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded px-1.5 font-extrabold select-none leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: live ? "var(--brand-primary)" : review ? "var(--brand-accent)" : neutral ? "rgba(255,255,255,0.85)" : "#92400e", background: live || review ? "white" : neutral ? "rgba(255,255,255,0.14)" : "#fefce8" }}>
       {live && <span className="shrink-0 rounded-full" style={{ width: 5, height: 5, background: "var(--brand-primary)", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />}
       {label}
     </span>
   );
 }
 
-function DesktopUpperBar({ items, live, upcoming, locale }: { items: TickerItem[]; live: string; upcoming: string; locale: string }) {
+function DesktopUpperBar({ items, live, upcoming, nextLabel, review, locale }: { items: TickerItem[]; live: string; upcoming: string; nextLabel: string; review: string; locale: string }) {
   const [idx, setIdx]         = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -268,19 +276,23 @@ function DesktopUpperBar({ items, live, upcoming, locale }: { items: TickerItem[
   return (
     <div style={{ height: 32, background: "var(--brand-primary)", overflow: "hidden" }} role="status" aria-label={`Ticker: ${item.name}`}>
       <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.32s ease", height: 32 }}>
-        <LiveBarInner item={item} live={live} upcoming={upcoming} locale={locale} />
+        <LiveBarInner item={item} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} locale={locale} />
       </div>
     </div>
   );
 }
 
-function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live: string; upcoming: string; locale: string }) {
+function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { item: TickerItem; live: string; upcoming: string; nextLabel: string; review: string; locale: string }) {
   const scopedHref = useScopedHref();
-  const isLive   = item.status === "LIVE";
-  const isUskoro = item.status === "USKORO";
+  const [detailStatus, setDetailStatus] = useState<TickerDetailItem["status"]>();
+  const status = detailStatus ?? item.status;
+  const isLive   = status === "LIVE";
+  const isUskoro = status === "USKORO";
+  const isNext = status === "NEXT";
+  const isReview = status === "REVIEW";
 
   const inner = (
-    <div className="mx-auto max-w-7xl px-4 h-full flex items-center gap-3 min-w-0">
+    <div className="mx-auto max-w-7xl pl-2 pr-4 h-full flex items-center gap-3 min-w-0">
 
       {/* Status badge */}
       {isLive && (
@@ -306,6 +318,18 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
             style={{ width: 5, height: 5, background: "#f59e0b", display: "inline-block", animation: "ticker-pulse 2s ease-in-out infinite" }}
           />
           {upcoming.toUpperCase()}
+        </span>
+      )}
+
+      {isReview && (
+        <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--brand-accent)", background: "white", height: 20 }}>
+          {review.toUpperCase()}
+        </span>
+      )}
+
+      {isNext && (
+        <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "rgba(255,255,255,0.85)", background: "rgba(255,255,255,0.14)", height: 20 }}>
+          {nextLabel.toUpperCase()}
         </span>
       )}
 
@@ -350,11 +374,10 @@ function LiveBarInner({ item, live, upcoming, locale }: { item: TickerItem; live
           {item.name}
         </span>
 
-        {/* Show rotating detail only for LIVE */}
-        {isLive && (item.detailItems?.length || item.detailText) && (
+        {(item.detailItems?.length || item.detailText) && (
           <>
             <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
-            <LiveDetail item={item} />
+            <LiveDetail item={item} onStatusChange={setDetailStatus} />
           </>
         )}
       </span>
@@ -398,7 +421,10 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
   const touchStartX = useRef(0);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const singleViewportRef = useRef<HTMLDivElement>(null);
+  const singleItemRef = useRef<HTMLDivElement>(null);
   const [trackWidth, setTrackWidth] = useState(0);
+  const [singleTravelPx, setSingleTravelPx] = useState(0);
   const doubled = [...items, ...items];
 
   useEffect(() => {
@@ -409,8 +435,18 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
     return () => observer.disconnect();
   }, [items]);
 
-  // Constant reading speed (~25px/s) so long text isn't rushed just because there's more of it.
-  const duration = trackWidth > 0 ? Math.max(8, trackWidth / 2 / 25) : doubled.length * 7;
+  useEffect(() => {
+    if (items.length !== 1) return;
+    const measure = () => setSingleTravelPx(Math.max(0, (singleItemRef.current?.scrollWidth ?? 0) - (singleViewportRef.current?.clientWidth ?? 0)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (singleViewportRef.current) observer.observe(singleViewportRef.current);
+    return () => observer.disconnect();
+  }, [items]);
+
+  // Constant reading speed (~15px/s) so long text isn't rushed just because there's more of it.
+  const duration = trackWidth > 0 ? Math.max(8, trackWidth / 2 / 15) : doubled.length * 7;
+  const singleDuration = Math.max(4_000, Math.ceil(singleTravelPx / 0.015) * 2 + 1_200);
 
   function cancelResume() {
     if (resumeTimer.current) clearTimeout(resumeTimer.current);
@@ -451,7 +487,7 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="mx-auto max-w-7xl px-4 h-full flex items-center gap-3">
+      <div className="mx-auto max-w-7xl px-2 sm:px-4 h-full flex items-center gap-3">
 
         {/* Static label */}
         <span
@@ -464,20 +500,44 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
           />
           {upcoming.toUpperCase()}
         </span>
-        <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
+        <span className="hidden shrink-0 sm:block" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
 
-        {/* Marquee track */}
+        {/* One announcement stays still; only its overflow gets a slow return scroll. */}
         <div className="flex-1 overflow-hidden min-w-0">
-          {/* Touch offset wrapper — shifts content during swipe, smoothly returns on resume */}
-          <div style={{
-            transform: `translateX(${touchDx}px)`,
-            transition: smoothReturn ? "transform 250ms ease-out" : "none",
-          }}>
+          {items.length === 1 ? (
             <div
-              ref={trackRef}
-              className="flex items-center"
+              ref={singleViewportRef}
+              className="relative overflow-hidden"
+            >
+              <div
+                ref={singleItemRef}
+                className="w-max"
+                style={singleTravelPx > 0 ? {
+                  "--ticker-mobile-distance": `-${singleTravelPx}px`,
+                  animation: `ticker-mobile-scroll ${singleDuration}ms ease-in-out infinite`,
+                  animationPlayState: paused ? "paused" : "running",
+                } as CSSProperties : undefined}
+              >
+                <UpcomingItem item={items[0]} locale={locale} />
+              </div>
+              {singleTravelPx > 0 && <>
+                <span className="pointer-events-none absolute inset-y-0 left-0 w-4" style={{ background: "linear-gradient(to right, var(--brand-primary), transparent)" }} aria-hidden="true" />
+                <span className="pointer-events-none absolute inset-y-0 right-0 w-5" style={{ background: "linear-gradient(to left, var(--brand-primary), transparent)" }} aria-hidden="true" />
+              </>}
+            </div>
+          ) : (
+            <div style={{
+              transform: `translateX(${touchDx}px)`,
+              transition: smoothReturn ? "transform 250ms ease-out" : "none",
+            }}>
+              <div
+                ref={trackRef}
+                className="flex items-center"
               style={{
-                animation: `ticker-scroll ${duration}s linear infinite`,
+                animationName: "ticker-scroll",
+                animationDuration: `${duration}s`,
+                animationTimingFunction: "linear",
+                animationIterationCount: "infinite",
                 animationPlayState: paused ? "paused" : "running",
                 width: "max-content",
               }}
@@ -488,8 +548,9 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
                   <UpcomingItem item={item} locale={locale} />
                 </div>
               ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
       </div>

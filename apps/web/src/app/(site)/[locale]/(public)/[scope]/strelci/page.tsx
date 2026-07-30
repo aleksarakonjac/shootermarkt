@@ -11,6 +11,7 @@ import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { StrelciFilterBar } from "./StrelciFilterBar";
+import { StrelciTableTransition } from "./StrelciTableTransition";
 import { getLocale, getTranslations } from "next-intl/server";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@shootermarkt/db/pdf-import-types";
 import { buildAlternates } from "@/i18n/alternates";
@@ -157,6 +158,7 @@ type Props = {
     zemlja?: string;
     pol?: string;
     aparat?: string;
+    godiste?: string;
     page?: string;
     sort?: string;
     dir?: string;
@@ -178,9 +180,11 @@ export default async function StrelciPage({ params, searchParams }: Props) {
 
   const sp           = await searchParams;
   const activeQ      = sp.q?.trim() ?? "";
-  const activeZemlja = sp.zemlja === "all" ? "" : (sp.zemlja ?? (scope === "srb" ? "SRB" : ""));
+  const activeZemlja = sp.zemlja === "all" ? "" : (sp.zemlja ?? "");
+  const isAllCountries = sp.zemlja === "all";
   const activePol    = sp.pol ?? "";
   const activeAparat = sp.aparat ?? "";
+  const activeGodiste = /^\d{4}$/.test(sp.godiste ?? "") ? sp.godiste! : "";
   const page         = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
   const offset       = (page - 1) * PAGE_SIZE;
   const thisYear     = String(new Date().getFullYear());
@@ -201,6 +205,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
     activeZemlja ? eq(shooters.nationality, activeZemlja) : undefined,
     activePol    ? eq(shooters.gender, activePol) : undefined,
     activeAparat ? eq(shooters.apparatus, activeAparat) : undefined,
+    activeGodiste ? eq(shooters.birthYear, Number(activeGodiste)) : undefined,
   ].filter((c): c is SQL => c !== undefined);
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -209,6 +214,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
     data,
     [{ totalCount }],
     nocRows,
+    birthYearRows,
     statsActiveRows,
     statsApparatus,
     [{ totalAll }],
@@ -252,6 +258,12 @@ export default async function StrelciPage({ params, searchParams }: Props) {
       .where(isNotNull(shooters.nationality))
       .orderBy(asc(shooters.nationality)),
 
+    db
+      .selectDistinct({ birthYear: shooters.birthYear })
+      .from(shooters)
+      .where(and(inArray(shooters.apparatus, [...MVP_APPARATUS]), isNotNull(shooters.birthYear)))
+      .orderBy(desc(shooters.birthYear)),
+
     // Active this year = at least 1 result in current year
     db
       .selectDistinct({ id: results.shooterId })
@@ -288,8 +300,6 @@ export default async function StrelciPage({ params, searchParams }: Props) {
           .select({
             shooterId:      shooterFormaCache.shooterId,
             disciplineCode: shooterFormaCache.disciplineCode,
-            forma:          shooterFormaCache.forma,
-            trend:          shooterFormaCache.trend,
             sampleSize:     shooterFormaCache.sampleSize,
           })
           .from(shooterFormaCache)
@@ -318,21 +328,14 @@ export default async function StrelciPage({ params, searchParams }: Props) {
   ]);
 
   // Map page shooters to their cached forma (matching by discipline code)
-  const pageCacheMap = new Map<number, { forma: number | null; trend: "up"|"down"|"stable"; sampleSize: number }>();
+  const pageCacheMap = new Map<number, number>();
   for (const r of pageCacheRows) {
     if (shooterDiscMap.get(r.shooterId) === r.disciplineCode) {
-      pageCacheMap.set(r.shooterId, {
-        forma:      r.forma != null ? Number(r.forma) : null,
-        trend:      (r.trend ?? "stable") as "up"|"down"|"stable",
-        sampleSize: r.sampleSize,
-      });
+      pageCacheMap.set(r.shooterId, r.sampleSize);
     }
   }
 
-  const enrichedData = data.map((s) => {
-    const cached = pageCacheMap.get(s.id);
-    return { ...s, forma: cached?.forma ?? null, trend: (cached?.trend ?? "stable") as "up"|"down"|"stable", resultCount: cached?.sampleSize ?? 0 };
-  });
+  const enrichedData = data.map((s) => ({ ...s, resultCount: pageCacheMap.get(s.id) ?? 0 }));
 
   // Forma leaders — cache already ordered by (disc, forma desc), slice top 3 per disc
   const top3ByDisc: Record<string, FormaEntry[]> = { ARM: [], ARW: [], APM: [], APW: [] };
@@ -353,6 +356,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
 
   const totalPages    = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const availableNocs = nocRows.map((r) => r.noc).filter(Boolean) as string[];
+  const availableBirthYears = birthYearRows.map((r) => r.birthYear).filter((year): year is number => year != null);
 
   // Stats bar
   const activeCount    = statsActiveRows.length;
@@ -363,8 +367,10 @@ export default async function StrelciPage({ params, searchParams }: Props) {
     const p = new URLSearchParams();
     if (activeQ)      p.set("q",      activeQ);
     if (activeZemlja) p.set("zemlja", activeZemlja);
+    else if (isAllCountries) p.set("zemlja", "all");
     if (activePol)    p.set("pol",    activePol);
     if (activeAparat) p.set("aparat", activeAparat);
+    if (activeGodiste) p.set("godiste", activeGodiste);
     p.set("sort", col);
     p.set("dir", activeSort === col && activeDir === "asc" ? "desc" : "asc");
     return `/strelci?${p.toString()}`;
@@ -374,8 +380,10 @@ export default async function StrelciPage({ params, searchParams }: Props) {
     const params = new URLSearchParams();
     if (activeQ)      params.set("q",      activeQ);
     if (activeZemlja) params.set("zemlja", activeZemlja);
+    else if (isAllCountries) params.set("zemlja", "all");
     if (activePol)    params.set("pol",    activePol);
     if (activeAparat) params.set("aparat", activeAparat);
+    if (activeGodiste) params.set("godiste", activeGodiste);
     if (activeSort !== "name") params.set("sort", activeSort);
     if (activeDir  !== "asc")  params.set("dir",  activeDir);
     if (p > 1) params.set("page", String(p));
@@ -481,10 +489,15 @@ export default async function StrelciPage({ params, searchParams }: Props) {
       <Suspense fallback={<div className="h-20 rounded-lg bg-[var(--surface)] mb-6 animate-pulse" />}>
         <StrelciFilterBar
           availableNocs={availableNocs}
+          availableBirthYears={availableBirthYears}
           currentQ={activeQ}
           currentZemlja={activeZemlja}
+          currentZemljaParam={isAllCountries ? "all" : activeZemlja}
           currentPol={activePol}
           currentAparat={activeAparat}
+          currentGodiste={activeGodiste}
+          showSrbPrompt={scope === "srb"}
+          prioritizeSrb={scope === "srb"}
           totalCount={totalCount}
           shownCount={data.length}
           page={page}
@@ -493,6 +506,8 @@ export default async function StrelciPage({ params, searchParams }: Props) {
       </Suspense>
 
       {/* ── Table ── */}
+      <Suspense fallback={<div className="h-96 rounded-xl bg-[var(--surface)] animate-pulse" />}>
+      <StrelciTableTransition>
       <div className="rounded-xl border border-[var(--border)] overflow-hidden">
         {enrichedData.length === 0 ? (
           <div className="py-20 text-center">
@@ -501,7 +516,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                 ? t("noResults")
                 : t("noResultsPage")}
             </p>
-            {(activeQ || activeZemlja || activePol || activeAparat) && (
+            {(activeQ || activeZemlja || activePol || activeAparat || activeGodiste) && (
               <ScopedLink
                 href="/strelci"
                 className="mt-3 inline-block text-xs font-semibold text-[var(--brand-primary)] hover:underline"
@@ -520,21 +535,18 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       {tProfile("shooter")}<SortIcon col="name" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden md:table-cell">
+                  <th scope="col" className="w-[18%] px-2 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
                     <ScopedLink href={sortUrl("godiste")} className="inline-flex items-center justify-end hover:text-[var(--ink)] transition-colors">
                       {tProfile("birthYear")}<SortIcon col="godiste" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
                   </th>
-                  <th scope="col" className="w-[18%] px-2 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
+                  <th scope="col" className="w-[18%] px-2 py-3 pr-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
                     <ScopedLink href={sortUrl("disc")} className="inline-flex items-center hover:text-[var(--ink)] transition-colors">
-                      {tProfile("discipline")}<SortIcon col="disc" activeSort={activeSort} activeDir={activeDir} />
+                      Disc.<SortIcon col="disc" activeSort={activeSort} activeDir={activeDir} />
                     </ScopedLink>
                   </th>
                   <th scope="col" className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
                     {locale === "en" ? "Category" : "Kategorija"}
-                  </th>
-                  <th scope="col" className="w-[18%] px-2 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:w-auto sm:px-4">
-                    {tProfile("form")}
                   </th>
                   <th scope="col" className="px-4 py-3 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] hidden sm:table-cell">
                     {tProfile("competitions")}
@@ -623,11 +635,11 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       </td>
 
                       {/* Godište */}
-                      <td className="px-4 py-2.5 text-right hidden md:table-cell">
+                      <td className="px-2 py-2.5 text-right sm:px-4">
                         {s.birthYear ? (
-                          <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--ink)]">
+                          <span className="whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--ink)] sm:text-sm">
                             {s.birthYear}
-                            <span className="text-[var(--muted)] ml-1 text-xs">
+                            <span className="ml-1 text-[0.65rem] text-[var(--muted)] sm:text-xs">
                               ({new Date().getFullYear() - s.birthYear})
                             </span>
                           </span>
@@ -654,37 +666,6 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                           CATEGORY_LABEL[currentCategory]
                         ) : (
                           <span className="text-[var(--subtle)]">—</span>
-                        )}
-                      </td>
-
-                      {/* Forma + trend */}
-                      <td className="px-2 py-2.5 text-right sm:px-4">
-                        {s.forma !== null ? (
-                          <div className="inline-flex items-center justify-end gap-1.5">
-                            <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)] tabular-nums text-sm">
-                              {s.forma.toFixed(1)}
-                            </span>
-                            <span
-                              className="text-xs font-bold leading-none w-3 text-center"
-                              style={{
-                                color:
-                                  s.trend === "up"
-                                    ? "var(--success)"
-                                    : s.trend === "down"
-                                    ? "var(--brand-primary)"
-                                    : "var(--subtle)",
-                              }}
-                              aria-label={
-                                s.trend === "up" ? t("trendUp") : s.trend === "down" ? t("trendDown") : t("trendStable")
-                              }
-                            >
-                              {s.trend === "up" ? "↑" : s.trend === "down" ? "↓" : "→"}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] text-sm">
-                            —
-                          </span>
                         )}
                       </td>
 
@@ -715,6 +696,8 @@ export default async function StrelciPage({ params, searchParams }: Props) {
           </div>
         )}
       </div>
+      </StrelciTableTransition>
+      </Suspense>
 
       {/* Bottom pagination */}
       {totalPages > 1 && (

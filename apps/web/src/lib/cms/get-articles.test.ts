@@ -7,7 +7,7 @@ const { fetchMock } = vi.hoisted(() => {
   return { fetchMock };
 });
 
-import { getPublishedArticles, getPublishedArticleBySlug } from "./get-articles";
+import { getPublishedArticles, getPublishedArticleBySlug, getRelatedCompetitionArticles } from "./get-articles";
 
 describe("getPublishedArticles", () => {
   it("fetches published articles sorted by publication date", async () => {
@@ -42,5 +42,21 @@ describe("getPublishedArticleBySlug", () => {
     })));
     const article = await getPublishedArticleBySlug("naslov");
     expect(article?.slug).toBe("naslov");
+  });
+});
+
+describe("getRelatedCompetitionArticles", () => {
+  it("prioritizes the current competition and returns no more than the sidebar limit", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      docs: [
+        { id: 1, title: "Prethodno", slug: "prethodno", excerpt: "...", tags: [{ type: "competition", label: "Kup", refId: 2 }] },
+        { id: 2, title: "Aktuelno", slug: "aktuelno", excerpt: "...", tags: [{ type: "competition", label: "Finale", refId: 1 }] },
+        { id: 3, title: "Još aktuelno", slug: "jos-aktuelno", excerpt: "...", tags: [{ type: "competition", label: "Finale", refId: 1 }] },
+      ],
+    })));
+
+    const articles = await getRelatedCompetitionArticles([1, 2]);
+
+    expect(articles.map((article) => article.id)).toEqual([2, 3]);
   });
 });

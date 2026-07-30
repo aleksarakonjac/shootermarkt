@@ -6,18 +6,18 @@ interface Props {
 }
 
 const POSITION_LABELS = {
-  kneeling: "Klečeći",
-  prone:    "Ležeći",
-  standing: "Stojeći",
+  sr: { kneeling: "Klečeći", prone: "Ležeći", standing: "Stojeći" },
+  en: { kneeling: "Kneeling", prone: "Prone", standing: "Standing" },
 } as const;
 
-type Position = keyof typeof POSITION_LABELS;
+type Position = keyof typeof POSITION_LABELS.sr;
 
-export function PositionsQualDisplay({ detail, hasDecimals = false }: Props) {
+export function PositionsQualDisplay({ detail, hasDecimals = false, locale = "sr", showGrandTotal = true }: Props & { locale?: string; showGrandTotal?: boolean }) {
   const fmt = (v: number) =>
     hasDecimals ? v.toFixed(1) : Math.round(v).toString();
 
   const positions: Position[] = ["kneeling", "prone", "standing"];
+  const labels = locale === "en" ? POSITION_LABELS.en : POSITION_LABELS.sr;
   const maxSeries = Math.max(...positions.map((p) => detail[p].series.length));
   const grandTotal =
     detail.kneeling.total + detail.prone.total + detail.standing.total;
@@ -69,7 +69,7 @@ export function PositionsQualDisplay({ detail, hasDecimals = false }: Props) {
                 }
               >
                 <td className="px-3 py-2 font-[family-name:var(--font-barlow-condensed)] font-semibold text-xs uppercase tracking-wide text-[var(--ink)]">
-                  {POSITION_LABELS[pos]}
+                  {labels[pos]}
                 </td>
                 {series.map((s, si) => {
                   const st = seriesTotals[si];
@@ -105,18 +105,7 @@ export function PositionsQualDisplay({ detail, hasDecimals = false }: Props) {
             );
           })}
 
-          {/* Grand total */}
-          <tr className="border-t-2 border-[var(--border-strong)] bg-[var(--surface)]">
-            <td className="px-3 py-2 font-[family-name:var(--font-barlow-condensed)] font-bold text-xs uppercase tracking-wide text-[var(--ink)]">
-              Ukupno
-            </td>
-            {Array.from({ length: maxSeries }).map((_, i) => (
-              <td key={i} className="px-3 py-2" />
-            ))}
-            <td className="px-3 py-2 text-center font-[family-name:var(--font-jetbrains-mono)] text-base font-bold tabular-nums text-[var(--ink)]">
-              {fmt(grandTotal)}
-            </td>
-          </tr>
+          {showGrandTotal && <tr className="border-t-2 border-[var(--border-strong)] bg-[var(--surface)]"><td className="px-3 py-2 font-[family-name:var(--font-barlow-condensed)] font-bold text-xs uppercase tracking-wide text-[var(--ink)]">Ukupno</td>{Array.from({ length: maxSeries }).map((_, i) => <td key={i} className="px-3 py-2" />)}<td className="px-3 py-2 text-center font-[family-name:var(--font-jetbrains-mono)] text-base font-bold tabular-nums text-[var(--ink)]">{fmt(grandTotal)}</td></tr>}
         </tbody>
       </table>
     </div>
