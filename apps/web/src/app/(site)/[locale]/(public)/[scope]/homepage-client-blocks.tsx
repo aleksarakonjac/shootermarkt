@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { NewsSection } from "../components/NewsSection";
 import { useParams } from "next/navigation";
 import { Ticker, type TickerItem } from "../ticker";
 import { createClient } from "@/lib/supabase/client";
@@ -17,8 +18,10 @@ type ResultPlace = { firstName: string; lastName: string; clubName: string | nul
 
 function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveToggleSpace = false }: { entries: ResultPlace[]; score: (entry: ResultPlace) => number | null; decimals: number; prefix?: ReactNode; renderAff: (entry: ResultPlace) => ReactNode; reserveToggleSpace?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const allPlacesRef = useRef<HTMLDivElement>(null);
   const firstSecondRef = useRef<HTMLDivElement>(null);
   const secondThirdRef = useRef<HTMLDivElement>(null);
+  const [allPlacesFit, setAllPlacesFit] = useState(false);
   const [pairFirstSecond, setPairFirstSecond] = useState(false);
 
   const place = (entry: ResultPlace, index: number) => {
@@ -37,8 +40,10 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
     const measure = () => {
       const row = containerRef.current?.closest<HTMLElement>("[data-phase-row]");
       const available = (row?.clientWidth ?? containerRef.current?.clientWidth ?? 0) - (reserveToggleSpace ? 44 : 0);
+      const allFit = window.matchMedia("(min-width: 1024px)").matches && (allPlacesRef.current?.offsetWidth ?? 0) <= available;
       const secondThirdFits = (secondThirdRef.current?.offsetWidth ?? 0) <= available;
       const firstSecondFits = (firstSecondRef.current?.offsetWidth ?? 0) <= available;
+      setAllPlacesFit(allFit);
       setPairFirstSecond(!secondThirdFits && firstSecondFits);
     };
     measure();
@@ -48,13 +53,15 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
     return () => observer.disconnect();
   }, [entries, reserveToggleSpace]);
 
-  const useFallback = entries.length === 3 && pairFirstSecond;
-  const firstRow = useFallback ? entries.slice(0, 2) : entries.slice(0, 1);
-  const secondRow = useFallback ? entries.slice(2) : entries.slice(1);
+  const singleRow = entries.length === 3 && allPlacesFit;
+  const useFallback = !singleRow && entries.length === 3 && pairFirstSecond;
+  const firstRow = singleRow ? entries : useFallback ? entries.slice(0, 2) : entries.slice(0, 1);
+  const secondRow = singleRow ? [] : useFallback ? entries.slice(2) : entries.slice(1);
   return <div ref={containerRef} className="relative">
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">{prefix}{firstRow.map(place)}</div>
+    <div className={`flex items-center gap-x-3 gap-y-1 ${singleRow ? "flex-nowrap" : "flex-wrap"}`}>{prefix}{firstRow.map(place)}</div>
     {secondRow.length > 0 && <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">{secondRow.map((entry, index) => place(entry, useFallback ? index + 2 : index + 1))}</div>}
     <div className="pointer-events-none absolute invisible whitespace-nowrap" aria-hidden="true">
+      <div ref={allPlacesRef} className="flex items-center gap-x-3">{prefix}{entries.map(place)}</div>
       <div ref={firstSecondRef} className="flex items-center gap-x-3">{prefix}{place(entries[0], 0)}{entries[1] && place(entries[1], 1)}</div>
       <div ref={secondThirdRef} className="flex items-center gap-x-3">{entries[1] && place(entries[1], 1)}{entries[2] && place(entries[2], 2)}</div>
     </div>
@@ -161,8 +168,16 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
   const locale = useLocale();
   const t = useTranslations("home");
   const tComp = useTranslations("competition");
+  const [isDesktop, setIsDesktop] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [expandedQual, setExpandedQual] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const toggleQual = (key: string) => setExpandedQual((previous) => {
     const next = new Set(previous);
     if (next.has(key)) next.delete(key);
@@ -234,9 +249,10 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                 const hasFinal = shownPhases.some((item) => item.stage === "final");
                 const qualKey = `${competitionId}:${disc.discCode}:${phase.category}:qual`;
                 const qualExpanded = expandedQual.has(qualKey);
-                const shownEntries = phase.stage.startsWith("qual") && hasFinal && !qualExpanded ? phase.qualTop3.slice(0, 1) : phase.qualTop3;
+                const collapseQualification = !isDesktop && phase.stage.startsWith("qual") && hasFinal && !qualExpanded;
+                const shownEntries = collapseQualification ? phase.qualTop3.slice(0, 1) : phase.qualTop3;
                 const extraQualificationResults = phase.qualTop3.length - 1;
-                const qualToggle = phase.stage.startsWith("qual") && hasFinal && phase.qualTop3.length > 1 ? (
+                const qualToggle = !isDesktop && phase.stage.startsWith("qual") && hasFinal && phase.qualTop3.length > 1 ? (
                   <button
                     type="button"
                     onClick={() => toggleQual(qualKey)}
@@ -399,6 +415,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
       )}
     </section>
     <section className="mt-8"><TopFormaClient initialData={data.topForma as never} /></section>
+    <section className="mt-8"><NewsSection /></section>
     <section className="mt-8"><UpcomingEvents competitions={upcoming} /></section>
   </>;
 }

@@ -124,6 +124,21 @@ export async function getRelatedArticles(
     .slice(0, limit);
 }
 
+export async function getRelatedCompetitionArticles(competitionIds: number[], limit = 2): Promise<ArticleSummary[]> {
+  const articles = await getPublishedArticles({ limit: 200 });
+  const seen = new Set<number>();
+  const related: ArticleSummary[] = [];
+  for (const competitionId of competitionIds) {
+    for (const article of articles) {
+      if (seen.has(article.id) || !article.tags.some((tag) => tag.type === "competition" && tag.refId === competitionId)) continue;
+      seen.add(article.id);
+      related.push(article);
+      if (related.length === limit) return related;
+    }
+  }
+  return related;
+}
+
 export async function getAllPublishedTags(): Promise<ArticleTag[]> {
   const articles = await getPublishedArticles({ limit: 200 });
   const seen = new Set<string>();

@@ -100,6 +100,7 @@ function LiveDetail({ item, onStatusChange }: { item: TickerItem; onStatusChange
 
   const [idx, setIdx]         = useState(0);
   const [visible, setVisible] = useState(true);
+  const current = items.length ? items[idx % items.length] : undefined;
 
   useEffect(() => {
     if (items.length <= 1) return;
@@ -111,11 +112,10 @@ function LiveDetail({ item, onStatusChange }: { item: TickerItem; onStatusChange
   }, [items.length]);
 
   useEffect(() => {
-    onStatusChange?.(items[idx]?.status);
-  }, [idx, items, onStatusChange]);
+    onStatusChange?.(current?.status);
+  }, [current, onStatusChange]);
 
-  if (items.length === 0) return null;
-  const current = items[idx];
+  if (!current) return null;
 
   const detail = (
     <span
@@ -421,7 +421,10 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
   const touchStartX = useRef(0);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const singleViewportRef = useRef<HTMLDivElement>(null);
+  const singleItemRef = useRef<HTMLDivElement>(null);
   const [trackWidth, setTrackWidth] = useState(0);
+  const [singleTravelPx, setSingleTravelPx] = useState(0);
   const doubled = [...items, ...items];
 
   useEffect(() => {
@@ -432,8 +435,18 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
     return () => observer.disconnect();
   }, [items]);
 
-  // Constant reading speed (~25px/s) so long text isn't rushed just because there's more of it.
-  const duration = trackWidth > 0 ? Math.max(8, trackWidth / 2 / 25) : doubled.length * 7;
+  useEffect(() => {
+    if (items.length !== 1) return;
+    const measure = () => setSingleTravelPx(Math.max(0, (singleItemRef.current?.scrollWidth ?? 0) - (singleViewportRef.current?.clientWidth ?? 0)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (singleViewportRef.current) observer.observe(singleViewportRef.current);
+    return () => observer.disconnect();
+  }, [items]);
+
+  // Constant reading speed (~15px/s) so long text isn't rushed just because there's more of it.
+  const duration = trackWidth > 0 ? Math.max(8, trackWidth / 2 / 15) : doubled.length * 7;
+  const singleDuration = Math.max(4_000, Math.ceil(singleTravelPx / 0.015) * 2 + 1_200);
 
   function cancelResume() {
     if (resumeTimer.current) clearTimeout(resumeTimer.current);
@@ -474,7 +487,7 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="mx-auto max-w-7xl px-4 h-full flex items-center gap-3">
+      <div className="mx-auto max-w-7xl px-2 sm:px-4 h-full flex items-center gap-3">
 
         {/* Static label */}
         <span
@@ -487,20 +500,44 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
           />
           {upcoming.toUpperCase()}
         </span>
-        <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
+        <span className="hidden shrink-0 sm:block" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
 
-        {/* Marquee track */}
+        {/* One announcement stays still; only its overflow gets a slow return scroll. */}
         <div className="flex-1 overflow-hidden min-w-0">
-          {/* Touch offset wrapper — shifts content during swipe, smoothly returns on resume */}
-          <div style={{
-            transform: `translateX(${touchDx}px)`,
-            transition: smoothReturn ? "transform 250ms ease-out" : "none",
-          }}>
+          {items.length === 1 ? (
             <div
-              ref={trackRef}
-              className="flex items-center"
+              ref={singleViewportRef}
+              className="relative overflow-hidden"
+            >
+              <div
+                ref={singleItemRef}
+                className="w-max"
+                style={singleTravelPx > 0 ? {
+                  "--ticker-mobile-distance": `-${singleTravelPx}px`,
+                  animation: `ticker-mobile-scroll ${singleDuration}ms ease-in-out infinite`,
+                  animationPlayState: paused ? "paused" : "running",
+                } as CSSProperties : undefined}
+              >
+                <UpcomingItem item={items[0]} locale={locale} />
+              </div>
+              {singleTravelPx > 0 && <>
+                <span className="pointer-events-none absolute inset-y-0 left-0 w-4" style={{ background: "linear-gradient(to right, var(--brand-primary), transparent)" }} aria-hidden="true" />
+                <span className="pointer-events-none absolute inset-y-0 right-0 w-5" style={{ background: "linear-gradient(to left, var(--brand-primary), transparent)" }} aria-hidden="true" />
+              </>}
+            </div>
+          ) : (
+            <div style={{
+              transform: `translateX(${touchDx}px)`,
+              transition: smoothReturn ? "transform 250ms ease-out" : "none",
+            }}>
+              <div
+                ref={trackRef}
+                className="flex items-center"
               style={{
-                animation: `ticker-scroll ${duration}s linear infinite`,
+                animationName: "ticker-scroll",
+                animationDuration: `${duration}s`,
+                animationTimingFunction: "linear",
+                animationIterationCount: "infinite",
                 animationPlayState: paused ? "paused" : "running",
                 width: "max-content",
               }}
@@ -511,8 +548,9 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
                   <UpcomingItem item={item} locale={locale} />
                 </div>
               ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
       </div>

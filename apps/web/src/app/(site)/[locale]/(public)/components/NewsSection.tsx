@@ -69,18 +69,16 @@ export function NewsSection() {
   return (
     <section className="flex flex-col gap-4">
       {/* Section header */}
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between gap-3">
         <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-wider text-[var(--ink)]">
           {t("title")}
         </h2>
-        {state === "ready" && articles.length > 0 && (
-          <ScopedLink
-            href="/vesti"
-            className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"
-          >
-            {tHome("allNewsLink")}
-          </ScopedLink>
-        )}
+        <ScopedLink
+          href="/vesti"
+          className="shrink-0 text-xs font-semibold text-[var(--brand-primary)] hover:underline"
+        >
+          {tHome("allNewsLink")}
+        </ScopedLink>
       </div>
 
       {state === "loading" ? (
