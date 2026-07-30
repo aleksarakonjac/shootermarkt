@@ -57,7 +57,7 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
   const useFallback = !singleRow && entries.length === 3 && pairFirstSecond;
   const firstRow = singleRow ? entries : useFallback ? entries.slice(0, 2) : entries.slice(0, 1);
   const secondRow = singleRow ? [] : useFallback ? entries.slice(2) : entries.slice(1);
-  return <div ref={containerRef} className="relative">
+  return <div ref={containerRef} className="relative overflow-x-hidden">
     <div className={`flex items-center gap-x-3 gap-y-1 ${singleRow ? "flex-nowrap" : "flex-wrap"}`}>{prefix}{firstRow.map(place)}</div>
     {secondRow.length > 0 && (
       <div className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
