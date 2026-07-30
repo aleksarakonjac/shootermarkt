@@ -15,7 +15,7 @@ import type { HomepageMainData } from "@/lib/homepage-data";
 
 type ResultPlace = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
 
-function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveToggleSpace = false }: { entries: ResultPlace[]; score: (entry: ResultPlace) => number | null; decimals: number; prefix?: ReactNode; renderAff: (entry: ResultPlace) => ReactNode; reserveToggleSpace?: boolean }) {
+function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveToggleSpace = false, collapsed = false }: { entries: ResultPlace[]; score: (entry: ResultPlace) => number | null; decimals: number; prefix?: ReactNode; renderAff: (entry: ResultPlace) => ReactNode; reserveToggleSpace?: boolean; collapsed?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const firstSecondRef = useRef<HTMLDivElement>(null);
   const secondThirdRef = useRef<HTMLDivElement>(null);
@@ -53,7 +53,15 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
   const secondRow = useFallback ? entries.slice(2) : entries.slice(1);
   return <div ref={containerRef} className="relative">
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">{prefix}{firstRow.map(place)}</div>
-    {secondRow.length > 0 && <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">{secondRow.map((entry, index) => place(entry, useFallback ? index + 2 : index + 1))}</div>}
+    {secondRow.length > 0 && (
+      <div className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
+        <div className="overflow-hidden">
+          <div className={`mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 transition-opacity duration-150 motion-reduce:transition-none ${collapsed ? "opacity-0" : "opacity-100 delay-75"}`}>
+            {secondRow.map((entry, index) => place(entry, useFallback ? index + 2 : index + 1))}
+          </div>
+        </div>
+      </div>
+    )}
     <div className="pointer-events-none absolute invisible whitespace-nowrap" aria-hidden="true">
       <div ref={firstSecondRef} className="flex items-center gap-x-3">{prefix}{place(entries[0], 0)}{entries[1] && place(entries[1], 1)}</div>
       <div ref={secondThirdRef} className="flex items-center gap-x-3">{entries[1] && place(entries[1], 1)}{entries[2] && place(entries[2], 2)}</div>
@@ -226,17 +234,24 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                 const hasFinal = shownPhases.some((item) => item.stage === "final");
                 const qualKey = `${competitionId}:${disc.discCode}:${phase.category}:qual`;
                 const qualExpanded = expandedQual.has(qualKey);
-                const shownEntries = phase.stage.startsWith("qual") && hasFinal && !qualExpanded ? phase.qualTop3.slice(0, 1) : phase.qualTop3;
                 const extraQualificationResults = phase.qualTop3.length - 1;
-                const qualToggle = phase.stage.startsWith("qual") && hasFinal && phase.qualTop3.length > 1 ? (
+                const isCollapsibleQual = phase.stage.startsWith("qual") && hasFinal && phase.qualTop3.length > 1;
+                const qualToggle = isCollapsibleQual ? (
                   <button
                     type="button"
                     onClick={() => toggleQual(qualKey)}
                     aria-expanded={qualExpanded}
                     aria-label={qualExpanded ? t("showLessQualificationResults") : t("showMoreQualificationResults", { count: extraQualificationResults })}
-                    className="absolute left-full top-0 ml-1 flex size-11 -translate-y-0.5 items-start justify-start pt-1 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
+                    className="absolute left-full top-0 ml-1 flex size-11 -translate-y-0.5 items-start justify-start gap-0.5 pt-1 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
                   >
-                    {qualExpanded ? t("showLess") : `+${extraQualificationResults}`}
+                    <span>{qualExpanded ? t("showLess") : `+${extraQualificationResults}`}</span>
+                    <svg
+                      width="8" height="8" viewBox="0 0 12 12"
+                      className={`mt-0.5 shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none ${qualExpanded ? "rotate-180" : ""}`}
+                      aria-hidden="true"
+                    >
+                      <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                    </svg>
                   </button>
                 ) : null;
                 return (
@@ -246,7 +261,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                         href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)}
                         className="block min-w-0 w-fit max-w-full no-underline hover:opacity-80 transition-opacity"
                       >
-                        {shownEntries.length > 0 && <InlinePlaces entries={shownEntries} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} reserveToggleSpace={qualToggle != null} />}
+                        {phase.qualTop3.length > 0 && <InlinePlaces entries={phase.qualTop3} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} reserveToggleSpace={qualToggle != null} collapsed={isCollapsibleQual && !qualExpanded} />}
                       {phase.srbHighlights.length > 0 && (
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           {phase.srbHighlights.map((h, i) => {
