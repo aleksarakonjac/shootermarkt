@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, ilike, inArray, lte, lt, or } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { competitions, countries, disciplines, results } from "@/lib/db/schema";
+import { db } from "@shootermarkt/db";
+import { competitions, countries, disciplines, results } from "@shootermarkt/db/schema";
 import type { ResultRowData } from "@/components/result-display/ResultsHistoryTable";
 
 export const SHOOTER_RESULTS_PAGE_SIZE = 8;
