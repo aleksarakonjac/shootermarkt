@@ -1,6 +1,6 @@
 import { db } from "@shootermarkt/db";
 import { shooters, competitions, results, disciplines } from "@shootermarkt/db/schema";
-import { count, desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -54,13 +54,22 @@ function formatTimestamp(value: string | Date | null | undefined) {
 }
 
 export default async function AdminDashboardPage() {
-  const [[{ total: totalShooters }], [{ total: totalComps }], [{ total: totalResults }], [{ total: totalVerified }], [{ total: totalUnverified }], sourceRows, unverified, recentCompetitions, recentResults] =
+  const [[totals], sourceRows, unverified, recentCompetitions, recentResults] =
     await Promise.all([
-      db.select({ total: count() }).from(shooters),
-      db.select({ total: count() }).from(competitions),
-      db.select({ total: count() }).from(results),
-      db.select({ total: count() }).from(shooters).where(eq(shooters.verified, true)),
-      db.select({ total: count() }).from(shooters).where(eq(shooters.verified, false)),
+      db.execute<{
+        totalShooters: number;
+        totalComps: number;
+        totalResults: number;
+        totalVerified: number;
+        totalUnverified: number;
+      }>(sql`
+        select
+          (select count(*)::int from ${shooters}) as "totalShooters",
+          (select count(*)::int from ${competitions}) as "totalComps",
+          (select count(*)::int from ${results}) as "totalResults",
+          (select count(*)::int from ${shooters} where ${shooters.verified} = true) as "totalVerified",
+          (select count(*)::int from ${shooters} where ${shooters.verified} = false) as "totalUnverified"
+      `),
       db
         .select({
           source: results.source,
@@ -113,6 +122,7 @@ export default async function AdminDashboardPage() {
         .limit(5),
     ]);
 
+  const { totalShooters, totalComps, totalResults, totalVerified, totalUnverified } = totals;
   const verifiedShooters = totalVerified ?? totalShooters - totalUnverified;
   const sourceTotals = Object.fromEntries(sourceRows.map((row) => [row.source, row.total])) as Record<string, number>;
 
