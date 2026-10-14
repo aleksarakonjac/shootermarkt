@@ -39,10 +39,12 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
     if (entries.length !== 3) return;
     const measure = () => {
       const row = containerRef.current?.closest<HTMLElement>("[data-phase-row]");
-      const available = (row?.clientWidth ?? containerRef.current?.clientWidth ?? 0) - (reserveToggleSpace ? 44 : 0);
-      const allFit = window.matchMedia("(min-width: 1024px)").matches && (allPlacesRef.current?.offsetWidth ?? 0) <= available;
-      const secondThirdFits = (secondThirdRef.current?.offsetWidth ?? 0) <= available;
-      const firstSecondFits = (firstSecondRef.current?.offsetWidth ?? 0) <= available;
+      const full = row?.clientWidth ?? containerRef.current?.clientWidth ?? 0;
+      // The toggle sits beside the first row only; later rows may use the full width.
+      const firstRowAvailable = full - (reserveToggleSpace ? 44 : 0);
+      const allFit = window.matchMedia("(min-width: 1024px)").matches && (allPlacesRef.current?.offsetWidth ?? 0) <= firstRowAvailable;
+      const secondThirdFits = (secondThirdRef.current?.offsetWidth ?? 0) <= full;
+      const firstSecondFits = (firstSecondRef.current?.offsetWidth ?? 0) <= firstRowAvailable;
       setAllPlacesFit(allFit);
       setPairFirstSecond(!secondThirdFits && firstSecondFits);
     };
@@ -58,7 +60,7 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
   const firstRow = singleRow ? entries : useFallback ? entries.slice(0, 2) : entries.slice(0, 1);
   const secondRow = singleRow ? [] : useFallback ? entries.slice(2) : entries.slice(1);
   return <div ref={containerRef} className="relative overflow-clip">
-    <div className={`flex items-center gap-x-3 gap-y-1 ${singleRow ? "flex-nowrap" : "flex-wrap"}`}>{prefix}{firstRow.map(place)}</div>
+    <div className={`flex items-center gap-x-3 gap-y-1 ${reserveToggleSpace ? "pr-11" : ""} ${singleRow ? "flex-nowrap" : "flex-wrap"}`}>{prefix}{firstRow.map(place)}</div>
     {secondRow.length > 0 && (
       <div className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
         <div className="overflow-hidden">
@@ -280,21 +282,23 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                     onClick={() => toggleQual(qualKey)}
                     aria-expanded={qualExpanded}
                     aria-label={qualExpanded ? t("showLessQualificationResults") : t("showMoreQualificationResults", { count: extraQualificationResults })}
-                    className="absolute left-full top-0 ml-1 flex size-11 -translate-y-0.5 items-start justify-start gap-0.5 pt-1 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
+                    className="absolute right-0 top-0 flex size-11 -translate-y-0.5 items-start justify-start pt-2 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
                   >
+                    <span className="flex items-center gap-0.5 leading-none">
                     <span>{qualExpanded ? t("showLess") : `+${extraQualificationResults}`}</span>
                     <svg
                       width="8" height="8" viewBox="0 0 12 12"
-                      className={`mt-0.5 shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none ${qualExpanded ? "rotate-180" : ""}`}
+                      className={`shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none ${qualExpanded ? "rotate-180" : ""}`}
                       aria-hidden="true"
                     >
                       <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
                     </svg>
+                    </span>
                   </button>
                 ) : null;
                 return (
                   <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className="w-full" data-phase-row>
-                    <div className={`relative min-w-0 w-fit ${qualToggle ? "max-w-[calc(100%-2.75rem)]" : "max-w-full"}`}>
+                    <div className="relative min-w-0 w-fit max-w-full">
                       <ScopedLink
                         href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)}
                         className="block min-w-0 w-fit max-w-full no-underline hover:opacity-80 transition-opacity"

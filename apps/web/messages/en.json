@@ -305,7 +305,7 @@
     "clickHint": "Click month name to browse by year",
     "legend": {
       "world": "World",
-      "continental": "European",
+      "continental": "Continental",
       "national": "National",
       "other": "Other"
     },

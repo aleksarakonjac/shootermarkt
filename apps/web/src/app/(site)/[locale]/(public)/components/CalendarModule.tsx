@@ -34,6 +34,18 @@ function getLevelColor(level: string): string {
   return LEVEL_DOT_COLOR[level.toLowerCase()] ?? LEVEL_DOT_COLOR["club"];
 }
 
+const MAX_DOTS = 4;
+
+// One dot per competition on the day, most prominent level first.
+function CompetitionDots({ comps, onBrand = false }: { comps: Competition[]; onBrand?: boolean }) {
+  const levels = Object.keys(LEVEL_DOT_COLOR);
+  const rank = (level: string) => { const i = levels.indexOf(level.toLowerCase()); return i === -1 ? levels.length : i; };
+  const dots = comps.toSorted((a, b) => rank(a.level) - rank(b.level)).slice(0, MAX_DOTS);
+  return <span className={`absolute bottom-1.5 flex ${onBrand ? "gap-1" : "gap-0.5"}`} aria-hidden="true">
+    {dots.map((c) => <span key={c.id} className="h-1 w-1 rounded-full" style={{ background: getLevelColor(c.level), boxShadow: onBrand ? "0 0 0 1px #fff" : undefined }} />)}
+  </span>;
+}
+
 export function CalendarModule({ competitions }: CalendarModuleProps) {
   const t = useTranslations("calendar");
   const common = useTranslations("common");
@@ -315,10 +327,13 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
             const row = Math.floor(idx / 7);
             const tooltipH = row === 0 ? "top-full mt-2" : "bottom-full mb-2";
             const tooltipX = col <= 1 ? "left-0" : col >= 5 ? "right-0" : "left-1/2 -translate-x-1/2";
-            const hasStart = comps.some(c => c.date.slice(0, 10) === dateStr);
-            const hasEnd = comps.some(c => (c.endDate ?? c.date).slice(0, 10) === dateStr);
-            const roundLeft  = !hasComp || isToday || hasStart;
-            const roundRight = !hasComp || isToday || hasEnd;
+            // Round only where the highlighted run really ends — a neighbouring
+            // day with any competition (even a different one) keeps it joined.
+            const dayKey = (d: number) => `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+            const joinsPrev = hasComp && col > 0 && day > 1 && compsByDate.has(dayKey(day - 1)) && !isToday && !(day - 1 === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear());
+            const joinsNext = hasComp && col < 6 && day < daysInMonth && compsByDate.has(dayKey(day + 1)) && !isToday && !(day + 1 === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear());
+            const roundLeft  = !joinsPrev;
+            const roundRight = !joinsNext;
             const roundedClass =
               roundLeft && roundRight ? "rounded-md" :
               roundLeft               ? "rounded-l-md rounded-r-none" :
@@ -346,7 +361,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                     ].join(" ")}
                   >
                     {day}
-                    {!isToday && <span className="absolute bottom-1.5 h-1 w-1 rounded-full" style={{ background: getLevelColor(comps[0].level) }} />}
+                    <CompetitionDots comps={comps} onBrand={isToday} />
                   </Link>
                 ) : (
                   <button
@@ -368,7 +383,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                     ].join(" ")}
                   >
                     {day}
-                    {hasComp && !isToday && <span className="absolute bottom-1.5 h-1 w-1 rounded-full" style={{ background: getLevelColor(comps[0].level) }} />}
+                    {hasComp && <CompetitionDots comps={comps} onBrand={isToday} />}
                   </button>
                 )}
 
