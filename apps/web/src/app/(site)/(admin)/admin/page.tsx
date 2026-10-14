@@ -20,6 +20,7 @@ const SOURCE_LABELS: Record<string, string> = {
   pdf_import: "PDF",
   manual: "Ručno",
   issf_import: "ISSF",
+  sius_import: "SIUS",
   esc_import: "ESC",
 };
 

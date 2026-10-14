@@ -155,7 +155,7 @@ async function processCompetition(
             qualified: r.qualified || null,
             qualRemark: r.remark,
             ...(r.series.length > 0 ? { qualDetail: { series: r.series } } : {}),
-            source: "issf_import",
+            source: "sius_import",
           });
         }
       }
@@ -176,7 +176,7 @@ async function processCompetition(
               elimDetail: { series: r.series.map(Math.round), inners: r.inners },
               qualified: r.qualified || null,
               elimRemark: r.remark,
-              source: "issf_import",
+              source: "sius_import",
             });
           }
         }
@@ -195,7 +195,7 @@ async function processCompetition(
             finalRank: r.rank,
             finalRemark: r.remark,
             ...(r.series.length > 0 ? { finalDetail: { format: "bulletin", scoring: "decimal", series: r.series } } : {}),
-            source: "issf_import",
+            source: "sius_import",
           });
         }
       }
@@ -341,7 +341,7 @@ async function processMixedTeamSlots(
           ...(isFinal
             ? { finalRank: r.rank, finalTotal: r.total.toFixed(1), finalRemark: r.remark }
             : { qualRank: r.rank, qualTotal: r.total.toFixed(1), qualInners: r.inners, qualified: r.qualified || null, qualRemark: r.remark }),
-          source: "issf_import",
+          source: "sius_import",
         });
       };
 

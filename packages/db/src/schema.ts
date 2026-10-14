@@ -94,6 +94,7 @@ export const resultSourceEnum = pgEnum("result_source", [
   "manual",
   "issf_import",
   "esc_import",
+  "sius_import",
 ]);
 
 // ── JSONB Type Definitions ────────────────────────────────────────────────────

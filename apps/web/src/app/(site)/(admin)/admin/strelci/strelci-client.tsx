@@ -79,7 +79,7 @@ function ShooterThumbnail({ shooter }: { shooter: ShooterRow }) {
   );
 }
 
-export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRow[]; page: number; total: number; pageSize: number }) {
+export function StrelciClient({ data, page, total, unverifiedTotal, pageSize }: { data: ShooterRow[]; page: number; total: number; unverifiedTotal: number; pageSize: number }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -108,12 +108,12 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
   const allUnverifiedSelected = unverified.length > 0 && unverified.every((s) => selected.has(s.id));
 
   async function verifyAll() {
-    if (!confirm("Verifikuj SVE neverifikovane strelce u bazi? Ova akcija se odnosi na sve stranice.")) return;
+    if (!confirm(`Verifikuj ${unverifiedTotal} neverifikovanih strelaca koji odgovaraju trenutnim filterima i pretrazi (sve stranice)?`)) return;
     startVerifyingAll(async () => {
       const res = await fetch("/api/admin/shooters/bulk-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ all: true }),
+        body: JSON.stringify({ all: true, filter: Object.fromEntries(params.entries()) }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -198,14 +198,14 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
       )}
 
       {/* Verify all */}
-      {unverified.length > 0 && selectedUnverified.length === 0 && (
+      {unverifiedTotal > 0 && selectedUnverified.length === 0 && (
         <div className="mb-4 flex justify-end">
           <button
             onClick={verifyAll}
             disabled={verifyingAll}
             className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors disabled:opacity-50"
           >
-            {verifyingAll ? "Verifikujem sve..." : "Verifikuj sve"}
+            {verifyingAll ? "Verifikujem sve..." : `Verifikuj sve (${unverifiedTotal})`}
           </button>
         </div>
       )}
@@ -216,10 +216,19 @@ export function StrelciClient({ data, page, total, pageSize }: { data: ShooterRo
           <span className="text-sm text-[var(--muted)]">
             <span className="font-semibold text-[var(--ink)]">{selectedUnverified.length}</span> selektovano
           </span>
+          {unverifiedTotal > selectedUnverified.length && (
+            <button
+              onClick={verifyAll}
+              disabled={verifyingAll}
+              className="ml-auto text-xs font-semibold text-[var(--brand-primary)] hover:underline disabled:opacity-50"
+            >
+              {verifyingAll ? "Verifikujem sve..." : `Selektuj svih ${unverifiedTotal} po filterima i verifikuj`}
+            </button>
+          )}
           <button
             onClick={bulkVerify}
             disabled={verifying}
-            className="ml-auto rounded-md px-4 py-1.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
+            className={`${unverifiedTotal > selectedUnverified.length ? "" : "ml-auto "}rounded-md px-4 py-1.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50`}
           >
             {verifying ? "Verifikujem..." : `Verifikuj ${selectedUnverified.length}`}
           </button>

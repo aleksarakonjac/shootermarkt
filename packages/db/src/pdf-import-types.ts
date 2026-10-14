@@ -282,7 +282,7 @@ export function mergeFinalsIntoRows(
 
 export interface CommitPayload {
   /** Excel i ručni unos su administrativni unosi; PDF/ISSF tokovi čuvaju svoj izvor. */
-  source?: "manual" | "pdf_import" | "issf_import" | "esc_import";
+  source?: "manual" | "pdf_import" | "issf_import" | "esc_import" | "sius_import";
   tags?: string[];
   competitionId?: number; // if set, skip upsert and use existing (competition može izostati)
   competition?: {

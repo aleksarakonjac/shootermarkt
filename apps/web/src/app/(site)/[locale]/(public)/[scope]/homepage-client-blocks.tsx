@@ -360,7 +360,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                 <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
                   {leadLevelLabel}
                 </span>
-                <span className="flex-1 min-w-0 truncate text-xs text-[var(--muted)]">
+                <span className="flex-1 min-w-0 truncate text-[13px] font-semibold text-[var(--muted)]">
                   {formatCompetitionDate(lead.date, lead.dateEnd)}{lead.location ? ` · ${lead.location}` : ""}
                 </span>
               </div>

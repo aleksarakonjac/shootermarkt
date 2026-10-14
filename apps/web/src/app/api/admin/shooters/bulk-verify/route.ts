@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
 import { createClient } from "@/lib/supabase/server";
-import { inArray, eq } from "drizzle-orm";
+import { and, inArray, eq } from "drizzle-orm";
+import { buildShootersWhere, type ShooterFilterParams } from "@/lib/admin-shooters-filter";
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -11,13 +12,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json() as { ids?: number[]; all?: boolean };
+  const body = await req.json() as { ids?: number[]; all?: boolean; filter?: ShooterFilterParams };
 
   if (body.all) {
     const result = await db
       .update(shooters)
       .set({ verified: true })
-      .where(eq(shooters.verified, false))
+      .where(and(eq(shooters.verified, false), body.filter ? buildShootersWhere(body.filter) : undefined))
       .returning({ id: shooters.id });
     return NextResponse.json({ verified: result.length });
   }

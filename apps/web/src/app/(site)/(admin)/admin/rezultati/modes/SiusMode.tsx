@@ -265,7 +265,7 @@ export function SiusMode() {
       }
     }
 
-    const payload: CommitPayload = { competitionId: selectedComp.id, rows: mergedRows };
+    const payload: CommitPayload = { source: "sius_import", competitionId: selectedComp.id, rows: mergedRows };
     let inserted = 0, skipped = 0;
     const errors: string[] = [];
     try {

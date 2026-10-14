@@ -1,9 +1,9 @@
 import { db } from "@shootermarkt/db";
 import { shooters, clubs, countries } from "@shootermarkt/db/schema";
-import { eq, ilike, or, and, isNotNull, inArray, sql, asc, desc } from "drizzle-orm";
+import { eq, and, isNotNull, sql, asc, desc } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { MVP_APPARATUS } from "@/lib/mvp-scope";
+import { buildShootersWhere } from "@/lib/admin-shooters-filter";
 import { StrelciClient } from "./strelci-client";
 import { StrelciFilters } from "./strelci-filters";
 
@@ -18,8 +18,6 @@ export default async function AdminStrelciPage({
 }) {
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page ?? "1"));
-  const q = sp.q?.trim() ?? "";
-  const nat = sp.nat?.trim() ?? "";
   const gender = sp.gender?.trim() ?? "";
   const apparatus = sp.apparatus?.trim() ?? "";
   const onlyUnverified = sp.verified === "0";
@@ -27,25 +25,7 @@ export default async function AdminStrelciPage({
   const sortCol = sp.sort ?? "name";
   const sortDir = sp.dir === "desc" ? "desc" : "asc";
 
-  const conditions = [
-    includeNoApparatus ? undefined : inArray(shooters.apparatus, [...MVP_APPARATUS]),
-    q
-      ? and(
-          ...q
-            .split(/\s+/)
-            .filter(Boolean)
-            .map((word) =>
-              or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`))
-            )
-        )
-      : undefined,
-    nat ? eq(shooters.nationality, nat) : undefined,
-    gender ? eq(shooters.gender, gender) : undefined,
-    apparatus ? eq(shooters.apparatus, apparatus) : undefined,
-    onlyUnverified ? eq(shooters.verified, false) : undefined,
-  ].filter(Boolean) as Parameters<typeof and>;
-
-  const where = conditions.length ? and(...conditions) : undefined;
+  const where = buildShootersWhere(sp);
 
   const orderBy = (() => {
     const d = sortDir === "desc";
@@ -58,7 +38,7 @@ export default async function AdminStrelciPage({
     }
   })();
 
-  const [data, [{ total }], nats] = await Promise.all([
+  const [data, [{ total }], [{ unverifiedTotal }], nats] = await Promise.all([
     db
       .select({
         id: shooters.id,
@@ -87,6 +67,10 @@ export default async function AdminStrelciPage({
       .select({ total: sql<number>`count(*)::int` })
       .from(shooters)
       .where(where),
+    db
+      .select({ unverifiedTotal: sql<number>`count(*)::int` })
+      .from(shooters)
+      .where(and(where, eq(shooters.verified, false))),
     db
       .selectDistinct({
         code: shooters.nationality,
@@ -140,6 +124,7 @@ export default async function AdminStrelciPage({
         data={data}
         page={page}
         total={total}
+        unverifiedTotal={unverifiedTotal}
         pageSize={PAGE_SIZE}
       />
     </div>
