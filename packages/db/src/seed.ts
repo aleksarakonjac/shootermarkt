@@ -18,7 +18,7 @@ async function seed() {
     .insert(countries)
     .values([
       { code: "SRB", code2: "RS", name: "Srbija", nocCode: "SRB" },
-      { code: "DEU", code2: "DE", name: "Nemačka", nocCode: "GER" },
+      { code: "DEU", code2: "DE", name: "Nemačka", nocCode: null },
       { code: "CHN", code2: "CN", name: "Kina", nocCode: "CHN" },
       { code: "KOR", code2: "KR", name: "Južna Koreja", nocCode: "KOR" },
       { code: "IND", code2: "IN", name: "Indija", nocCode: "IND" },

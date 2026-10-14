@@ -123,7 +123,7 @@ const PHASE_LABELS: Record<string, Record<string, string>> = {
 };
 
 function eliminationRoundLabel(round: number, locale: string): string {
-  return `${(PHASE_LABELS[locale] ?? PHASE_LABELS.en).elim} — ${locale === "en" ? "round" : "partija"} ${round}`;
+  return `${(PHASE_LABELS[locale] ?? PHASE_LABELS.en).elim} — relay ${round}`;
 }
 
 // ── Root ──────────────────────────────────────────────────────────────────────
@@ -801,7 +801,7 @@ function CompetitionDetail({
                         transition={selectorTransition}
                       />
                     )}
-                    <span className="relative z-10">{locale === "en" ? `Round ${rnd}` : `Partija ${rnd}`}</span>
+                    <span className="relative z-10">Relay {rnd}</span>
                   </button>
                 ))}
               </motion.div>

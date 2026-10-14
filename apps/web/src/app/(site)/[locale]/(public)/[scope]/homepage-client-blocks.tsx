@@ -57,7 +57,7 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
   const useFallback = !singleRow && entries.length === 3 && pairFirstSecond;
   const firstRow = singleRow ? entries : useFallback ? entries.slice(0, 2) : entries.slice(0, 1);
   const secondRow = singleRow ? [] : useFallback ? entries.slice(2) : entries.slice(1);
-  return <div ref={containerRef} className="relative overflow-x-hidden">
+  return <div ref={containerRef} className="relative overflow-clip">
     <div className={`flex items-center gap-x-3 gap-y-1 ${singleRow ? "flex-nowrap" : "flex-wrap"}`}>{prefix}{firstRow.map(place)}</div>
     {secondRow.length > 0 && (
       <div className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
@@ -69,9 +69,9 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
       </div>
     )}
     <div className="pointer-events-none absolute invisible whitespace-nowrap" aria-hidden="true">
-      <div ref={allPlacesRef} className="flex items-center gap-x-3">{prefix}{entries.map(place)}</div>
-      <div ref={firstSecondRef} className="flex items-center gap-x-3">{prefix}{place(entries[0], 0)}{entries[1] && place(entries[1], 1)}</div>
-      <div ref={secondThirdRef} className="flex items-center gap-x-3">{entries[1] && place(entries[1], 1)}{entries[2] && place(entries[2], 2)}</div>
+      <div ref={allPlacesRef} className="flex w-max items-center gap-x-3">{prefix}{entries.map(place)}</div>
+      <div ref={firstSecondRef} className="flex w-max items-center gap-x-3">{prefix}{place(entries[0], 0)}{entries[1] && place(entries[1], 1)}</div>
+      <div ref={secondThirdRef} className="flex w-max items-center gap-x-3">{entries[1] && place(entries[1], 1)}{entries[2] && place(entries[2], 2)}</div>
     </div>
   </div>;
 }
@@ -83,6 +83,21 @@ function phaseHref(competitionId: number, discCode: string, stage: string, categ
   else params.set("category", category);
   return `/takmicenja/${competitionId}?${params.toString()}`;
 }
+
+const DISC_FULL_NAMES: Record<string, { sr: string; en: string }> = {
+  ARM: { sr: "Vazdušna puška muški", en: "Air Rifle Men" },
+  ARW: { sr: "Vazdušna puška ženski", en: "Air Rifle Women" },
+  APM: { sr: "Vazdušni pištolj muški", en: "Air Pistol Men" },
+  APW: { sr: "Vazdušni pištolj ženski", en: "Air Pistol Women" },
+  ARMT: { sr: "Vazdušna puška mešoviti tim", en: "Air Rifle Mixed Team" },
+  APMT: { sr: "Vazdušni pištolj mešoviti tim", en: "Air Pistol Mixed Team" },
+  R3PM: { sr: "Puška trostav muški", en: "Rifle 3 Position Men" },
+  R3PW: { sr: "Puška trostav ženski", en: "Rifle 3 Position Women" },
+  R3JM: { sr: "Puška trostav muški", en: "Rifle 3 Position Men" },
+  R3JW: { sr: "Puška trostav ženski", en: "Rifle 3 Position Women" },
+  SPW: { sr: "Sportski pištolj ženski", en: "Sport Pistol Women" },
+  RFPM: { sr: "Brzometni pištolj muški", en: "Rapid Fire Pistol Men" },
+};
 
 const FALLBACK_LEVEL_STYLE = { background: "var(--level-club-bg)", color: "var(--level-club-fg)" };
 const INTL_LEVELS = new Set(["olympic", "world", "continental", "international"]);
@@ -221,19 +236,19 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
 
   type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
   type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
-  type Phase = { stage: string; category: string; isLive: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
+  type Phase = { stage: string; elimRound?: number | null; category: string; isLive: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
   type DiscResult = { discCode: string; isLive: boolean; isJunior: boolean; phases: Phase[] };
 
   function renderDiscResults(discResults: DiscResult[], level: string, competitionId: number) {
     if (discResults.length === 0) return <p className="mt-4 text-sm italic text-[var(--muted)]">{t("noWinner")}</p>;
     const isIntl = INTL_LEVELS.has(level.toLowerCase());
     const aff = (e: Shooter) => {
-      if (!isIntl && e.clubName) return <span className="shrink-0 hidden sm:block text-[10px] text-[var(--muted)] max-w-[80px] truncate">{e.clubName}</span>;
+      if (!isIntl && e.clubName) return <span className="shrink-0 hidden sm:block text-[11px] text-[var(--muted)] max-w-[80px] truncate">{e.clubName}</span>;
       if (!e.nationality) return null;
       return (
         <span className="shrink-0 flex items-center gap-0.5">
           {e.countryCode2 && <span className={`fi fi-${e.countryCode2.toLowerCase()}`} style={{ fontSize: 11 }} aria-hidden="true" />}
-          <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--muted)]">{e.nationality}</span>
+          <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold text-[var(--muted)]">{e.nationality}</span>
         </span>
       );
     };
@@ -245,15 +260,15 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
             .toSorted((a, b) => Number(b.stage === "final") - Number(a.stage === "final"));
           if (shownPhases.length === 0) return null;
           const isAP = disc.discCode.startsWith("AP");
-          const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{disc.discCode}</span>;
-          const junBadge = disc.isJunior ? <span className="shrink-0 text-[9px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>JUN</span> : null;
-          const liveBadge = disc.isLive ? <span className="shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">LIVE</span> : null;
+          const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-barlow-condensed)] text-[15px] font-bold uppercase tracking-[0.04em] text-[var(--muted)]">{DISC_FULL_NAMES[disc.discCode]?.[locale === "en" ? "en" : "sr"] ?? disc.discCode}</span>;
+          const junBadge = disc.isJunior ? <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>JUN</span> : null;
+          const liveBadge = disc.isLive ? <span className="shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">LIVE</span> : null;
           return (
             <div key={`${disc.discCode}:${disc.isJunior}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
               <div className="flex items-center gap-1">{discBadge}{junBadge}</div>
               {shownPhases.map((phase) => {
-                const decimals = phase.stage === "elimination" || isAP || disc.discCode === "SPW" ? 0 : 1;
-                const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? "E" : phase.stage === "final" ? "F" : "Q"}</span>;
+                const decimals = phase.stage === "elimination" || isAP || disc.discCode === "SPW" || (disc.discCode.startsWith("R3") && phase.stage !== "final") ? 0 : 1;
+                const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? `E${phase.elimRound ?? ""}` : phase.stage === "final" ? "F" : "Q"}</span>;
                 const hasFinal = shownPhases.some((item) => item.stage === "final");
                 const qualKey = `${competitionId}:${disc.discCode}:${phase.category}:qual`;
                 const qualExpanded = expandedQual.has(qualKey);
@@ -278,14 +293,18 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   </button>
                 ) : null;
                 return (
-                  <div key={phase.stage} className="w-full" data-phase-row>
+                  <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className="w-full" data-phase-row>
                     <div className={`relative min-w-0 w-fit ${qualToggle ? "max-w-[calc(100%-2.75rem)]" : "max-w-full"}`}>
                       <ScopedLink
                         href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)}
                         className="block min-w-0 w-fit max-w-full no-underline hover:opacity-80 transition-opacity"
                       >
                         {phase.qualTop3.length > 0 && <InlinePlaces entries={phase.qualTop3} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} reserveToggleSpace={qualToggle != null} collapsed={isCollapsibleQual && !qualExpanded} />}
-                      {phase.srbHighlights.length > 0 && (
+                      </ScopedLink>
+                      {qualToggle}
+                    </div>
+                    {phase.srbHighlights.length > 0 && (
+                      <ScopedLink href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} className="block no-underline hover:opacity-80 transition-opacity">
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           {phase.srbHighlights.map((h, i) => {
                             const isFinalRow = h.finalRank != null && h.finalTotal != null;
@@ -294,7 +313,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                             return (
                               <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-primary)]/[0.08] pl-1.5 pr-2 py-0.5">
                                 <span className="fi fi-rs shrink-0" style={{ fontSize: 10 }} aria-hidden="true" />
-                                <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--brand-primary)] tabular-nums">
+                                <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold text-[var(--brand-primary)] tabular-nums">
                                   {rank != null ? `${rank}.` : "—"}
                                 </span>
                                 <span className="text-xs font-semibold text-[var(--ink)]">{h.firstName ? `${h.lastName} ${h.firstName.charAt(0)}.` : h.lastName}</span>
@@ -303,10 +322,8 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                             );
                           })}
                         </div>
-                      )}
                       </ScopedLink>
-                      {qualToggle}
-                    </div>
+                    )}
                   </div>
                 );
               })}
@@ -393,7 +410,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                         {previewCountryCode2 && <span className={`fi fi-${previewCountryCode2.toLowerCase()} shrink-0`} style={{ fontSize: 10 }} aria-hidden="true" />}
                         {previewNoc && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--muted)]">{previewNoc}</span>}
                         <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--brand-primary)] tabular-nums">
-                          {preview.qualTotal.toFixed(item.discResults[0].discCode.startsWith("AP") ? 0 : 1)}
+                          {preview.qualTotal.toFixed(item.discResults[0].discCode.startsWith("AP") || (item.discResults[0].discCode.startsWith("R3") && previewPhase!.stage !== "final") || previewPhase!.stage === "elimination" ? 0 : 1)}
                         </span>
                       </>
                     ) : (

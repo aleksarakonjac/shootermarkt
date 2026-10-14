@@ -191,7 +191,7 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
     const isFinal = slot.stage === "final" || slot.stage === "elimination";
     const ranked = resultRows.filter((row) => row.competitionId === slot.competitionId && row.disciplineId === slot.disciplineId && row.category === slot.category && (isFinal ? row.finalRank != null && row.finalTotal != null : row.qualRank != null && row.qualTotal != null)).sort((a, b) => Number(isFinal ? a.finalRank : a.qualRank) - Number(isFinal ? b.finalRank : b.qualRank)).slice(0, 3);
     if (!ranked.length) return null;
-    return ranked.map((row, index) => `${index + 1}. ${row.lastName} ${Number(isFinal ? row.finalTotal : row.qualTotal).toFixed(!isFinal && slot.discCode.startsWith("AP") ? 0 : 1)}`).join(" · ");
+    return ranked.map((row, index) => `${index + 1}. ${row.lastName} ${Number(isFinal ? row.finalTotal : row.qualTotal).toFixed(!isFinal && (slot.discCode.startsWith("AP") || slot.discCode.startsWith("R3")) ? 0 : 1)}`).join(" · ");
   };
   const live = liveRows.map((competition) => {
     const competitionSlots = slots.filter((slot) => slot.competitionId === competition.id);
@@ -268,10 +268,10 @@ export async function getHomepageMain(scope: Scope) {
   const recent = await Promise.all(recentComps.map(async (competition) => {
     const [slots, individualRows, mixedRows] = await Promise.all([
       db.select({ discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(eq(competitionSchedule.competitionId, competition.id)),
-      db.select({ shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(eq(results.competitionId, competition.id)),
+      db.select({ shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRound: results.elimRound, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(eq(results.competitionId, competition.id)),
       db.select({ disciplineId: mixedTeamResults.disciplineId, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(eq(mixedTeamResults.competitionId, competition.id)),
     ]);
-    type Entry = { id: string; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; rank: number; total: number };
+    type Entry = { id: string; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; rank: number; total: number; round: number | null };
     // A discipline/category can have multiple "qual" schedule rows at different
     // times (e.g. SPW: precizna + brza paljba are separate time slots but share
     // one combined qual ranking) — collapse to one slot per (discipline,
@@ -287,7 +287,7 @@ export async function getHomepageMain(scope: Scope) {
         const rank = stageKind === "elimination" ? row.elimRank : stageKind === "final" ? row.finalRank : row.qualRank;
         const total = stageKind === "elimination" ? row.elimTotal : stageKind === "final" ? row.finalTotal : row.qualTotal;
         const nationality = displayNoc(row.nationality);
-        return rank != null && total != null ? [{ id: `shooter:${row.shooterId}`, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality, countryCode2: nationality === "AIN" ? "AIN" : row.countryCode2 ?? null, rank, total: Number(total) }] : [];
+        return rank != null && total != null ? [{ id: `shooter:${row.shooterId}`, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality, countryCode2: nationality === "AIN" ? "AIN" : row.countryCode2 ?? null, rank, total: Number(total), round: stageKind === "elimination" ? row.elimRound : null }] : [];
       });
       const mixed = stageKind === "elimination" ? [] : mixedRows.flatMap((row): Entry[] => {
         if (row.disciplineId !== slot.disciplineId) return [];
@@ -300,14 +300,19 @@ export async function getHomepageMain(scope: Scope) {
             return firstName ? `${lastName} ${firstName.charAt(0)}.` : lastName;
           })
           .join(" / ");
-        return rank != null && total != null ? [{ id: `team:${row.nocCode}:${names}`, firstName: "", lastName: names || row.nocCode, clubName: null, nationality: row.nocCode, countryCode2: row.countryCode2 ?? NOC_LIST.find((country) => country.noc === row.nocCode)?.alpha2 ?? null, rank, total: Number(total) }] : [];
+        return rank != null && total != null ? [{ id: `team:${row.nocCode}:${names}`, firstName: "", lastName: names || row.nocCode, clubName: null, nationality: row.nocCode, countryCode2: row.countryCode2 ?? NOC_LIST.find((country) => country.noc === row.nocCode)?.alpha2 ?? null, rank, total: Number(total), round: null }] : [];
       });
-      const entries = [...individual, ...mixed].sort((a, b) => a.rank - b.rank);
+      // Elimination relays are separate rankings (each relay advances its own
+      // shooters), so every relay becomes its own phase instead of one merged list.
+      const rounds = stageKind === "elimination" ? [...new Set(individual.map((e) => e.round))].sort((a, b) => (a ?? 0) - (b ?? 0)) : [null];
+      return rounds.flatMap((round) => {
+      const entries = [...individual.filter((e) => e.round === round), ...mixed].sort((a, b) => a.rank - b.rank);
       if (!entries.length || (!isLive && (getTickerSlotEnd(slot) == null || getTickerSlotEnd(slot)! >= new Date()))) return [];
       const top3 = entries.slice(0, 3);
       const shown = new Set(top3.map((entry) => entry.id));
       const srbHighlights = showSrbHighlight ? entries.filter((entry) => entry.nationality === "SRB" && !shown.has(entry.id)) : [];
-      return [{ ...slot, isLive, hasSrb: entries.some((entry) => entry.nationality === "SRB"), discCode: slot.discCode, stage: slot.stage, isJunior: slot.category !== "senior", top3, srbHighlights }];
+      return [{ ...slot, isLive, hasSrb: entries.some((entry) => entry.nationality === "SRB"), discCode: slot.discCode, stage: slot.stage, elimRound: round, isJunior: slot.category !== "senior", top3, srbHighlights }];
+      });
     });
 
     // One discipline (senior vs junior counted separately) is one homepage
@@ -343,6 +348,7 @@ export async function getHomepageMain(scope: Scope) {
       isLive: group.isLive,
       phases: visiblePhases.map((phase) => ({
         stage: phase.stage,
+        elimRound: phase.elimRound,
         category: phase.category,
         isLive: phase.isLive,
         qualTop3: phase.top3.map(({ firstName, lastName, clubName, nationality, countryCode2, total, rank }) => ({ firstName, lastName, clubName, nationality, countryCode2, qualTotal: total, qualRank: rank, finalTotal: null, finalRank: null })),

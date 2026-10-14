@@ -439,7 +439,7 @@ export function H2HClient({ labels, initialP1, initialP2 }: Props) {
             const s1 = data.p1.stats.find((s) => s.disciplineCode === code) ?? null;
             const s2 = data.p2.stats.find((s) => s.disciplineCode === code) ?? null;
             const meets = commonMeetsByDisc.get(code) ?? [];
-            const isAP = code.startsWith("AP");
+            const isAP = code.startsWith("AP") || code.startsWith("R3");
             return (
               <div key={code} className="border-t border-[var(--border)]">
                 <div className="px-5 pt-4 pb-1 flex items-center gap-2">
