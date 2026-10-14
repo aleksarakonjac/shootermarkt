@@ -60,12 +60,12 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
   const hasActiveFilters = currentNat || gender || apparatus;
 
   return (
-    <div className="flex gap-2 flex-wrap items-center">
+    <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
       <input
         defaultValue={params.get("q") ?? ""}
         onChange={(e) => onSearch(e.target.value)}
         placeholder="Pretraži ime..."
-        className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] w-48"
+        className="rounded-md border border-[var(--border)] px-3 py-2.5 text-base sm:py-1.5 sm:text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] col-span-2 w-full sm:w-48"
       />
 
       <SearchDropdown
@@ -75,7 +75,7 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
         placeholder="Sve nacije"
         emptyLabel="Sve nacije"
         searchPlaceholder="Pretraži naciju..."
-        className="w-52"
+        className="col-span-2 sm:w-52"
       />
 
       <SearchDropdown
@@ -86,7 +86,7 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
           { value: "F", label: "Ženski" },
         ]}
         placeholder="Pol"
-        className="w-40"
+        className="sm:w-40"
       />
 
       <SearchDropdown
@@ -98,7 +98,7 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
           { value: "both", label: "Puška + Pištolj" },
         ]}
         placeholder="Disciplina"
-        className="w-48"
+        className="sm:w-48"
       />
 
       {hasActiveFilters && (
@@ -108,7 +108,7 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
             update("gender", "");
             update("apparatus", "");
           }}
-          className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors px-1"
+          className="col-span-2 min-h-11 text-left text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors px-1 sm:min-h-0"
         >
           × Ukloni filtere
         </button>

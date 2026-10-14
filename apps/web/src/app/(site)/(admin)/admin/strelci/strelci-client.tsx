@@ -247,7 +247,53 @@ export function StrelciClient({ data, page, total, unverifiedTotal, pageSize }: 
             Nema strelaca. <Link href="/admin/strelci/novi" className="text-[var(--brand-primary)] hover:underline">Dodaj prvog →</Link>
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <>
+          {/* Mobile: one card per shooter (the 8-column table doesn't fit a phone) */}
+          <ul className="divide-y divide-[var(--border)] md:hidden">
+            {data.map((s) => {
+              const alpha2 = NOC_LIST.find((n) => n.noc === s.nationality)?.alpha2;
+              const meta = [
+                s.clubName,
+                s.gender === "M" ? "M" : s.gender === "F" ? "Ž" : null,
+                s.apparatus ? (APPARATUS_LABELS[s.apparatus] ?? s.apparatus) : null,
+                s.birthDate ? `${fmtDate(s.birthDate)} (${calcAge(s.birthDate)} g.)` : s.birthYear ? String(s.birthYear) : null,
+              ].filter(Boolean);
+              return (
+                <li key={s.id} className="flex items-start gap-3 px-3 py-3" style={selected.has(s.id) ? { background: "var(--surface)" } : undefined}>
+                  {!s.verified ? (
+                    <label className="-m-2 flex size-11 shrink-0 items-center justify-center" aria-label={`Selektuj ${s.lastName} ${s.firstName}`}>
+                      <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="size-5 accent-[var(--brand-primary)]" />
+                    </label>
+                  ) : null}
+                  <ShooterThumbnail shooter={s} />
+                  <div className="min-w-0 flex-1">
+                    <a href={`/admin/strelci/${s.id}`} className="block py-0.5 text-sm font-semibold leading-snug text-[var(--ink)]">
+                      {s.lastName} {s.firstName}
+                      {s.createdBySelf && (
+                        <span className="ml-2 rounded px-1.5 py-0.5 text-[0.65rem] font-semibold" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}>self</span>
+                      )}
+                    </a>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--muted)]">
+                      {s.nationality && (
+                        <span className="flex items-center gap-1.5">
+                          {alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ borderRadius: "2px" }} />}
+                          <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">{s.nationality}</span>
+                        </span>
+                      )}
+                      {meta.map((item, i) => <span key={i}>{item}</span>)}
+                    </p>
+                    <div className="mt-1 flex items-center gap-1 -ml-2">
+                      {!s.verified && (
+                        <button onClick={() => verifySingle(s.id)} disabled={verifying} className="min-h-11 px-2 text-xs font-semibold text-[var(--brand-primary)] disabled:opacity-50">Verifikuj</button>
+                      )}
+                      <button onClick={() => deleteSingle(s.id, `${s.lastName} ${s.firstName}`)} disabled={verifying} className="min-h-11 px-2 text-xs font-semibold text-red-500 disabled:opacity-50">Obriši</button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <table className="hidden w-full text-sm md:table">
             <thead>
               <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                 <th className="px-4 py-3 w-8">
@@ -382,6 +428,7 @@ export function StrelciClient({ data, page, total, unverifiedTotal, pageSize }: 
               ))}
             </tbody>
           </table>
+          </>
         )}
         <Pagination page={page} total={total} pageSize={pageSize} />
       </div>

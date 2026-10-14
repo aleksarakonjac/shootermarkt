@@ -172,7 +172,7 @@ export default async function AdminTakmicenjaPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 mb-6">
         <div>
           <h1
             className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase tracking-tight text-[var(--ink)]"
@@ -182,7 +182,7 @@ export default async function AdminTakmicenjaPage({
           </h1>
           <p className="text-sm text-[var(--muted)] mt-0.5">prikazano {data.length} od {total}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <BatchTranslateButton />
           <Link
             href="/admin/takmicenja/sync"
@@ -218,9 +218,9 @@ export default async function AdminTakmicenjaPage({
                 key={competition.id}
                 className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3.5"
               >
-                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                <div className="flex min-w-0 basis-full items-center gap-2.5 sm:basis-0 sm:flex-1">
                   <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--live-dot)]" aria-hidden="true" />
-                  <span className="truncate font-semibold text-[var(--ink)]">{competition.name}</span>
+                  <span className="font-semibold text-[var(--ink)] sm:truncate">{competition.name}</span>
                 </div>
                 <span className="whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
                   {formatDateRangeSr(competition.date, competition.dateEnd)}
@@ -280,7 +280,25 @@ export default async function AdminTakmicenjaPage({
           </div>
         ) : (
           <>
-            <table className="w-full text-sm">
+            {/* Mobile: card per competition */}
+            <ul className="divide-y divide-[var(--border)] md:hidden">
+              {data.map((c) => (
+                <li key={c.id}>
+                  <Link href={`/admin/takmicenja/${c.id}/edit`} className="flex min-h-11 flex-col gap-1.5 px-4 py-3.5 no-underline">
+                    <span className="text-sm font-semibold leading-snug text-[var(--ink)]">{c.name}</span>
+                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
+                      <span className="font-[family-name:var(--font-jetbrains-mono)]">{formatDateRangeSr(c.date, c.dateEnd)}</span>
+                      {c.location && <span>{c.location}</span>}
+                      <span className="rounded px-2 py-0.5 text-[0.7rem] font-semibold" style={LEVEL_STYLE[c.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
+                        {LEVEL_LABEL[c.level] ?? c.level}
+                      </span>
+                      <span className="ml-auto font-semibold text-[var(--brand-primary)]">Uredi →</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <table className="hidden w-full text-sm md:table">
               <thead>
                 <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                   {renderSortableHeader("name", "Naziv")}
