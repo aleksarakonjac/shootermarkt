@@ -340,8 +340,8 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
 
   return <>
     <section className="flex flex-col gap-4">
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-[family-name:var(--font-barlow-condensed)] text-xl font-bold uppercase tracking-wider">{t("recentCompetitions")}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-[family-name:var(--font-barlow-condensed)] text-xl font-bold uppercase leading-none tracking-wider">{t("recentCompetitions")}</h2>
         <ScopedLink href="/takmicenja" className="text-sm font-semibold text-[var(--brand-primary)] hover:underline">{t("allCompsLink")}</ScopedLink>
       </div>
 
