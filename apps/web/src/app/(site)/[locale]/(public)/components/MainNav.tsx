@@ -351,7 +351,7 @@ export function MainNav() {
               <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" fill="none"/>
               <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            <span className="flex-1 text-left text-sm">{tSearch("drawerPlaceholder")}</span>
+            <span className="min-w-0 flex-1 truncate whitespace-nowrap text-left text-sm">{tSearch("drawerPlaceholder")}</span>
           </button>
         </div>
 

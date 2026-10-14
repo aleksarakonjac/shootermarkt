@@ -25,7 +25,7 @@
     "desktopPlaceholder": "Search…",
     "mobilePlaceholder": "Search shooters and competitions…",
     "fullPlaceholder": "Search shooters and competitions…",
-    "drawerPlaceholder": "Search shooters and competitions…",
+    "drawerPlaceholder": "Search",
     "shootersSection": "Shooters",
     "competitionsSection": "Competitions",
     "noResults": "No results for \"{query}\"",

@@ -282,7 +282,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                     onClick={() => toggleQual(qualKey)}
                     aria-expanded={qualExpanded}
                     aria-label={qualExpanded ? t("showLessQualificationResults") : t("showMoreQualificationResults", { count: extraQualificationResults })}
-                    className="absolute right-0 top-0 flex size-11 -translate-y-0.5 items-start justify-start pt-2 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
+                    className="absolute right-0 top-0 flex size-11 -translate-y-0.5 items-start justify-start pl-2 pt-2 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
                   >
                     <span className="flex items-center gap-0.5 leading-none">
                     <span>{qualExpanded ? t("showLess") : `+${extraQualificationResults}`}</span>
@@ -341,7 +341,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
   return <>
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-[family-name:var(--font-barlow-condensed)] text-xl font-bold uppercase leading-none tracking-wider">{t("recentCompetitions")}</h2>
+        <h2 className="font-[family-name:var(--font-barlow-condensed)] text-2xl sm:text-3xl font-bold uppercase leading-none tracking-wider">{t("recentCompetitions")}</h2>
         <ScopedLink href="/takmicenja" className="text-sm font-semibold text-[var(--brand-primary)] hover:underline">{t("allCompsLink")}</ScopedLink>
       </div>
 
