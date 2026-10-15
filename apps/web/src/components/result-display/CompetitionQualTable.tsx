@@ -480,7 +480,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                         // Sve grupe u jednom redu; naziv grupe (Klečeći…) iznad svojih serija.
                         <div className="grid gap-x-1.5 gap-y-1 py-2.5" style={{ gridTemplateColumns: `repeat(${detailGroupsTotal}, minmax(0, 1fr))` }}>
                           {detailGroups.map((g, gi) => (
-                            <span key={`l${gi}`} className="truncate border-b border-[var(--border)] pb-0.5 text-center text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]" style={{ gridColumn: `span ${g.values.length}` }}>
+                            <span key={`l${gi}`} className="truncate text-center text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]" style={{ gridColumn: `span ${g.values.length}` }}>
                               {g.label}
                             </span>
                           ))}
