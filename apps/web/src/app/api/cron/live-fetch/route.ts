@@ -6,7 +6,7 @@ import { and, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml, fetchFinalResultsFromHtml, extractMixedTeamEvents, fetchMixedTeamQualFromHtml, fetchMixedTeamFinalFromHtml } from "@shootermarkt/adapters/issf/adapter";
 import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@shootermarkt/adapters/sius/public-adapter";
 import { matchShooter } from "@shootermarkt/db/name-match";
-import { buildIssfFinalDetails } from "@/lib/issf-final-detail";
+import { buildIssfFinalDetails, buildSiusFinalDetails } from "@/lib/final-detail";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 
 export const maxDuration = 30;
@@ -184,7 +184,10 @@ async function processCompetition(
       }
 
       if (slot.stage === "final" && eventData.final.length > 0) {
-        for (const r of eventData.final) {
+        // Format po disciplini (vazdušno / trostav / serije) — vidi lib/final-detail.ts.
+        const finalists = [...eventData.final].sort((a, b) => a.rank - b.rank);
+        const finalDetails = buildSiusFinalDetails(slot.disciplineCode, finalists);
+        for (const [index, r] of finalists.entries()) {
           const shooterId = await resolveOrCreateShooter(r, allShooters);
           if (!shooterId) continue;
           rows.push({
@@ -195,7 +198,7 @@ async function processCompetition(
             finalTotal: r.total.toFixed(1),
             finalRank: r.rank,
             finalRemark: r.remark,
-            ...(r.series.length > 0 ? { finalDetail: { format: "bulletin", scoring: "decimal", series: r.series } } : {}),
+            ...(r.series.length > 0 ? { finalDetail: finalDetails[index] } : {}),
             source: "sius_import",
           });
         }
@@ -625,10 +628,11 @@ async function fetchFromIssf(
       try {
         finalResults = await fetchFinalResultsFromHtml(issfCompId, event.finalPhase.resultKey, true);
       } catch { continue; }
-      // Format po disciplini: vazdušno finale vs. trostav (zbir po fazi) — vidi issf-final-detail.ts.
-      const finalDetails = buildIssfFinalDetails(slot.disciplineCode, finalResults);
+      // Format po disciplini (vazdušno / trostav) — vidi lib/final-detail.ts.
+      const finalists = [...finalResults].sort((a, b) => a.rank - b.rank);
+      const finalDetails = buildIssfFinalDetails(slot.disciplineCode, finalists);
 
-      for (const [index, r] of finalResults.entries()) {
+      for (const [index, r] of finalists.entries()) {
         const shooterId = r.issfId && shooterByIssfId.has(r.issfId)
           ? shooterByIssfId.get(r.issfId)!
           : (() => { const m = matchShooter(r.firstName, r.lastName, r.nationCode, allShooters); return m.kind === "exact" ? m.id : undefined; })();
