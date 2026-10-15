@@ -92,8 +92,8 @@ function formatDateRange(start: string, locale: string, end?: string): string {
 
 // ── Live detail rotator ───────────────────────────────────────────────────────
 
-function LiveDetail({ item, onStatusChange }: { item: TickerItem; onStatusChange?: (status?: TickerDetailItem["status"]) => void }) {
-  const scopedHref = useScopedHref();
+// Link trenutnog detalja rešava roditelj (cela traka je jedan link), pa ovde nema <Link>.
+function LiveDetail({ item, onCurrentChange }: { item: TickerItem; onCurrentChange?: (detail?: TickerDetailItem) => void }) {
   const items = useMemo<TickerDetailItem[]>(() => item.detailItems?.length
     ? item.detailItems
     : item.detailText ? [{ text: item.detailText }] : [], [item.detailItems, item.detailText]);
@@ -112,12 +112,12 @@ function LiveDetail({ item, onStatusChange }: { item: TickerItem; onStatusChange
   }, [items.length]);
 
   useEffect(() => {
-    onStatusChange?.(current?.status);
-  }, [current, onStatusChange]);
+    onCurrentChange?.(current);
+  }, [current, onCurrentChange]);
 
   if (!current) return null;
 
-  const detail = (
+  return (
     <span
       className="shrink-0 flex items-center gap-1.5"
       style={{ opacity: visible ? 1 : 0, transition: "opacity 0.3s ease", minWidth: 80 }}
@@ -132,7 +132,6 @@ function LiveDetail({ item, onStatusChange }: { item: TickerItem; onStatusChange
       </span>
     </span>
   );
-  return current.href ? <Link href={scopedHref(current.href)} className="hover:opacity-75 transition-opacity">{detail}</Link> : detail;
 }
 
 // ── Upper bar (cycles through live + uskoro + custom) ────────────────────────
@@ -164,7 +163,7 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review }: { items: T
       ...details.map((detail) => ({
         item: { ...item, status: detail.status ?? item.status },
         text: detail.label ? `${detail.label} · ${detail.text}` : detail.text,
-        href: detail.href,
+        href: detail.href ?? item.href,
       })),
     ];
   }), [items]);
@@ -229,6 +228,7 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review }: { items: T
 
   return (
     <div className="h-8 overflow-hidden" style={{ background: "var(--brand-primary)" }} role="status" aria-label={`Ticker: ${segment.text}`}>
+      {(() => { const row = (
       <div className="mx-auto flex h-full max-w-7xl items-center gap-2 pl-2 pr-4">
         <div className="flex items-center gap-2 shrink-0" style={{ opacity: badgeVisible ? 1 : 0, transition: "opacity 0.22s ease" }}>
           {isLive && <MobileStatusBadge label={live} live />}
@@ -240,18 +240,21 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review }: { items: T
         <div className="flex min-w-0 flex-1 items-center gap-2" style={{ opacity: visible ? 1 : 0, transition: "opacity 0.22s ease" }}>
           <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
           <div ref={viewportRef} className="min-w-0 flex-1 overflow-hidden flex items-center h-full">
-            {segment.href ? <Link href={scopedHref(segment.href)} className="block hover:opacity-80 leading-none">{text}</Link> : text}
+            {text}
           </div>
           {segment.href && <span className="shrink-0" style={{ fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.45)" }} aria-hidden="true">→</span>}
         </div>
-      </div>
+      </div>);
+      // Ceo red je jedan link (veća površina za dodir nego sam tekst).
+      return segment.href ? <Link href={scopedHref(segment.href)} className="block h-full active:opacity-80">{row}</Link> : row; })()}
     </div>
   );
 }
 
+// pb-[2px] na bedževima: Plus Jakarta Sans sa leading-none spušta velika slova ~1px ispod sredine kutije.
 function MobileStatusBadge({ label, live = false, neutral = false, review = false }: { label: string; live?: boolean; neutral?: boolean; review?: boolean }) {
   return (
-    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded px-1.5 font-extrabold select-none leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: live ? "var(--brand-primary)" : review ? "var(--brand-accent)" : neutral ? "rgba(255,255,255,0.85)" : "#92400e", background: live || review ? "white" : neutral ? "rgba(255,255,255,0.14)" : "#fefce8" }}>
+    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded px-1.5 pb-[2px] font-extrabold select-none leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: live ? "var(--brand-primary)" : review ? "var(--brand-accent)" : neutral ? "rgba(255,255,255,0.85)" : "#92400e", background: live || review ? "white" : neutral ? "rgba(255,255,255,0.14)" : "#fefce8" }}>
       {live && <span className="shrink-0 rounded-full" style={{ width: 5, height: 5, background: "var(--brand-primary)", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />}
       {label}
     </span>
@@ -284,8 +287,8 @@ function DesktopUpperBar({ items, live, upcoming, nextLabel, review, locale }: {
 
 function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { item: TickerItem; live: string; upcoming: string; nextLabel: string; review: string; locale: string }) {
   const scopedHref = useScopedHref();
-  const [detailStatus, setDetailStatus] = useState<TickerDetailItem["status"]>();
-  const status = detailStatus ?? item.status;
+  const [currentDetail, setCurrentDetail] = useState<TickerDetailItem>();
+  const status = currentDetail?.status ?? item.status;
   const isLive   = status === "LIVE";
   const isUskoro = status === "USKORO";
   const isNext = status === "NEXT";
@@ -297,7 +300,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
       {/* Status badge */}
       {isLive && (
         <span
-          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 leading-none"
+          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none"
           style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--brand-primary)", background: "white", height: 20 }}
         >
           <span
@@ -310,7 +313,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
 
       {isUskoro && (
         <span
-          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 leading-none"
+          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none"
           style={{ fontSize: 11, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}
         >
           <span
@@ -322,20 +325,20 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
       )}
 
       {isReview && (
-        <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--brand-accent)", background: "white", height: 20 }}>
+        <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--brand-accent)", background: "white", height: 20 }}>
           {review.toUpperCase()}
         </span>
       )}
 
       {isNext && (
-        <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "rgba(255,255,255,0.85)", background: "rgba(255,255,255,0.14)", height: 20 }}>
+        <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "rgba(255,255,255,0.85)", background: "rgba(255,255,255,0.14)", height: 20 }}>
           {nextLabel.toUpperCase()}
         </span>
       )}
 
       {item.status === "CUSTOM" && item.label && (
         <span
-          className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 leading-none"
+          className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none"
           style={{ fontSize: 11, letterSpacing: "0.06em", color: "var(--brand-primary)", background: "white", height: 20 }}
         >
           {item.label}
@@ -350,7 +353,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
         const s = LEVEL_STYLE[item.level] ?? { background: "var(--surface)", color: "var(--ink)" };
         return (
           <span className="hidden sm:inline-flex items-center gap-1.5 shrink-0 rounded px-1.5 leading-none" style={{ background: "white", height: 20 }}>
-            <span className="inline-flex items-center rounded font-extrabold uppercase px-1 h-full leading-none" style={{ fontSize: 11, letterSpacing: "0.06em", background: s.background, color: s.color }}>
+            <span className="inline-flex items-center rounded font-extrabold uppercase px-1 pb-[2px] h-full leading-none" style={{ fontSize: 11, letterSpacing: "0.06em", background: s.background, color: s.color }}>
               {LEVEL_LABEL[item.level] ?? item.level}
             </span>
             {item.countryCode2 && (
@@ -377,7 +380,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
         {(item.detailItems?.length || item.detailText) && (
           <>
             <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
-            <LiveDetail item={item} onStatusChange={setDetailStatus} />
+            <LiveDetail item={item} onCurrentChange={setCurrentDetail} />
           </>
         )}
       </span>
@@ -406,9 +409,10 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
     </div>
   );
 
-  const hasLinkedDetail = item.detailItems?.some((detail) => detail.href);
-  return item.href && !hasLinkedDetail ? (
-    <Link href={scopedHref(item.href)} className="block h-full hover:opacity-90 transition-opacity">{inner}</Link>
+  // Ceo red je klikabilan i dok se smenjuju rezultati: vodi na link trenutnog detalja, inače na takmičenje.
+  const href = currentDetail?.href ?? item.href;
+  return href ? (
+    <Link href={scopedHref(href)} className="block h-full hover:opacity-90 transition-opacity">{inner}</Link>
   ) : inner;
 }
 
@@ -491,7 +495,7 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
 
         {/* Static label */}
         <span
-          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 leading-none"
+          className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none"
           style={{ fontSize: 11, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}
         >
           <span

@@ -258,7 +258,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
       <div className="mt-3 divide-y divide-[var(--border)]">
         {discResults.map((disc) => {
           const shownPhases = disc.phases
-            .filter((p) => p.qualTop3.length > 0 || p.srbHighlights.length > 0)
+            .filter((p) => p.qualTop3.length > 0 || p.srbHighlights.length > 0 || p.isLive)
             .toSorted((a, b) => Number(b.stage === "final") - Number(a.stage === "final"));
           if (shownPhases.length === 0) return null;
           const isAP = disc.discCode.startsWith("AP");
@@ -296,6 +296,17 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                     </span>
                   </button>
                 ) : null;
+                // Faza u toku bez ijednog rezultata u bazi: samo oznaka da je počela.
+                if (phase.qualTop3.length === 0 && phase.srbHighlights.length === 0) {
+                  return (
+                    <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className="w-full" data-phase-row>
+                      <ScopedLink href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} className="flex w-fit items-center gap-1.5 no-underline hover:opacity-80 transition-opacity">
+                        {stageBadge}{liveBadge}
+                        <span className="text-xs italic text-[var(--muted)]">{t("liveResultsSoon")}</span>
+                      </ScopedLink>
+                    </div>
+                  );
+                }
                 return (
                   <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className="w-full" data-phase-row>
                     <div className="relative min-w-0 w-fit max-w-full">

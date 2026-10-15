@@ -354,10 +354,13 @@ export async function getHomepageMain(scope: Scope) {
       });
       // Elimination relays are separate rankings (each relay advances its own
       // shooters), so every relay becomes its own phase instead of one merged list.
-      const rounds = stageKind === "elimination" ? [...new Set(individual.map((e) => e.round))].sort((a, b) => (a ?? 0) - (b ?? 0)) : [null];
+      const eliminationRounds = [...new Set(individual.map((e) => e.round))].sort((a, b) => (a ?? 0) - (b ?? 0));
+      const rounds = stageKind === "elimination" && eliminationRounds.length ? eliminationRounds : [null];
       return rounds.flatMap((round) => {
       const entries = [...individual.filter((e) => e.round === round), ...mixed].sort((a, b) => a.rank - b.rank);
-      if (!entries.length || (!isLive && (getTickerSlotEnd(slot) == null || getTickerSlotEnd(slot)! >= new Date()))) return [];
+      // Faza u toku se prikazuje i bez rezultata (klijent pokazuje "LIVE · rezultati uskoro");
+      // završena faza samo ako ima rezultate.
+      if (!isLive && (!entries.length || getTickerSlotEnd(slot) == null || getTickerSlotEnd(slot)! >= new Date())) return [];
       const top3 = entries.slice(0, 3);
       const shown = new Set(top3.map((entry) => entry.id));
       const srbHighlights = showSrbHighlight ? entries.filter((entry) => entry.nationality === "SRB" && !shown.has(entry.id)) : [];
