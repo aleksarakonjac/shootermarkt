@@ -48,6 +48,17 @@ function isImminent(dateStr: string): boolean {
   return diffDays >= 0 && diffDays <= IMMINENT_LEAD_DAYS;
 }
 
+/**
+ * Šta gornja traka vrti. Kad je bar jedna disciplina stvarno LIVE, samo LIVE stavke —
+ * bez NEXT/USKORO/rezultata drugih takmičenja i bez nadolazećih. Inače sva tekuća
+ * takmičenja + nadolazeća koja počinju za ≤2 dana.
+ */
+export function selectTickerCycleItems(liveItems: TickerItem[], upcomingItems: TickerItem[]) {
+  const liveNow = liveItems.filter((item) => item.status === "LIVE");
+  if (liveNow.length > 0) return liveNow;
+  return liveItems.length > 0 ? [...liveItems, ...upcomingItems.filter((item) => isImminent(item.date))] : [];
+}
+
 export function Ticker({
   liveItems = [],
   upcomingItems = [],
@@ -58,10 +69,10 @@ export function Ticker({
   const t = useTranslations("common");
   const locale = useLocale();
 
-  // Single strip: while something is live, cycle live + imminent (≤2d) upcoming.
+  // Single strip: while a competition is on, cycle it (see selectTickerCycleItems).
   // Otherwise the whole strip becomes the upcoming marquee.
   const hasLive     = liveItems.length > 0;
-  const cycleItems  = hasLive ? [...liveItems, ...upcomingItems.filter((item) => isImminent(item.date))] : [];
+  const cycleItems  = selectTickerCycleItems(liveItems, upcomingItems);
   const marqueeItems = hasLive ? [] : upcomingItems;
 
   if (cycleItems.length === 0 && marqueeItems.length === 0) return null;

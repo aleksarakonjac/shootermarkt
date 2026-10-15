@@ -1,7 +1,7 @@
 import { act, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { vi, describe, expect, it } from "vitest";
-import { Ticker, type TickerItem } from "./ticker";
+import { Ticker, selectTickerCycleItems, type TickerItem } from "./ticker";
 
 vi.mock("next-intl", () => ({ useLocale: () => "sr", useTranslations: () => () => "" }));
 vi.mock("@/i18n/navigation", () => ({ Link: ({ children }: { children: ReactNode }) => <a>{children}</a> }));
@@ -28,5 +28,26 @@ describe("Ticker", () => {
     act(() => { vi.advanceTimersByTime(4_350); });
     expect(() => view.rerender(<Ticker liveItems={[{ ...item, detailItems: [item.detailItems![0]] }]} />)).not.toThrow();
     vi.useRealTimers();
+  });
+});
+
+describe("selectTickerCycleItems", () => {
+  const today = new Date();
+  const iso = (days: number) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + days).toLocaleDateString("sv-SE");
+  const live = { ...item, id: 1, status: "LIVE" as const };
+  const next = { ...item, id: 2, status: "NEXT" as const };
+  const review = { ...item, id: 3, status: "REVIEW" as const };
+  const soon = { ...item, id: 4, status: "USKORO" as const, date: iso(1) };
+
+  it("shows only live items while a discipline is live", () => {
+    expect(selectTickerCycleItems([next, live, review], [soon]).map((i) => i.id)).toEqual([1]);
+  });
+
+  it("falls back to ongoing competitions plus imminent upcoming when nothing is live", () => {
+    expect(selectTickerCycleItems([next, review], [soon, { ...soon, id: 5, date: iso(10) }]).map((i) => i.id)).toEqual([2, 3, 4]);
+  });
+
+  it("is empty when no competition is on", () => {
+    expect(selectTickerCycleItems([], [soon])).toEqual([]);
   });
 });
