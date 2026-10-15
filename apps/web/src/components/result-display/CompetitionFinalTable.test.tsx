@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildSiusFinalDetails } from "@/lib/final-detail";
 import { CompetitionFinalTable, type FinalResultRow } from "./CompetitionFinalTable";
 
+vi.mock("next-intl", () => ({ useLocale: () => "sr" }));
 vi.mock("@/i18n/navigation", () => ({ Link: ({ children }: { children: ReactNode }) => <a>{children}</a> }));
 
 describe("CompetitionFinalTable — 3P final in progress (SIUS position totals)", () => {

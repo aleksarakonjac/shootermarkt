@@ -7,7 +7,7 @@ import { deriveFinalRankProgression } from "@shootermarkt/db/pdf-import-types";
  * poslednja kolona je zbir do tog hica). Pojedinačni hici se (još) ne prikazuju.
  *
  * Serije finala:
- * - trostav: klečeći 10, ležeći 10, stojeći 5 + 5, pa pojedinačni stojeći hici (H1, H2…);
+ * - trostav: klečeći 10, ležeći 10, stojeći 5 + 5, pa pojedinačni stojeći hici (S1, S2…);
  * - vazdušno: 5 + 5, pa serije od po 2 hica (11–12, 13–14…), posle svake ispada poslednji.
  * SIUS daje zbir po seriji u tom redosledu. Kad su poznati pojedinačni hici (ISSF HTML,
  * ili SIUS ako vrati hice), grupišu se po istom pravilu, pa kolone uvek imaju iste nazive.
@@ -35,7 +35,7 @@ function seriesPlan(disciplineCode: string): SeriesPlan | null {
   return null;
 }
 
-/** Naziv i-te kolone: serija prve faze, pa pojedinačni hitac (H1…) ili par hitaca po rednom broju (11–12…). */
+/** Naziv i-te kolone: serija prve faze, pa pojedinačni hitac (S1…) ili par hitaca po rednom broju (11–12…). */
 function seriesLabels(disciplineCode: string, count: number): string[] | undefined {
   const plan = seriesPlan(disciplineCode);
   if (!plan) return undefined;
@@ -43,7 +43,7 @@ function seriesLabels(disciplineCode: string, count: number): string[] | undefin
   return Array.from({ length: count }, (_, i) => {
     if (plan.phase[i]) return plan.phase[i].label;
     const k = i - plan.phase.length;
-    if (plan.then === 1) return `H${k + 1}`;
+    if (plan.then === 1) return `S${k + 1}`;
     const first = phaseShots + k * plan.then + 1;
     return `${first}–${first + plan.then - 1}`;
   });
@@ -122,6 +122,12 @@ export function buildIssfFinalDetails(
  */
 export function normalizeFinalDetailsForDisplay<T extends FinalDetailLike | null>(disciplineCode: string, detailsByRank: T[]): Array<T | BulletinFinalDetail> {
   if (!seriesPlan(disciplineCode)) return detailsByRank;
+  // Ranije sačuvana finala trostava imaju pojedinačne hice kao H1, H2… → prikaz S1, S2…
+  if (isThreePositionEvent(disciplineCode)) {
+    detailsByRank = detailsByRank.map((d) => (d && d.seriesLabels?.some((l) => /^H\d+$/.test(l))
+      ? { ...d, seriesLabels: d.seriesLabels.map((l) => l.replace(/^H(\d+)$/, "S$1")) }
+      : d));
+  }
   const isLegacySeries = (d: FinalDetailLike | null): d is BulletinFinalDetail =>
     d?.format === "bulletin" && !!d.series?.length && !d.cumulative?.length && !d.shots?.length && d.scoring !== "hit_count";
   const legacy: BulletinFinalDetail[] = [];
@@ -132,4 +138,4 @@ export function normalizeFinalDetailsForDisplay<T extends FinalDetailLike | null
   return detailsByRank.map((d) => (isLegacySeries(d) ? rebuilt[next++] : d));
 }
 
-type FinalDetailLike = { format: string; series?: number[]; cumulative?: number[]; shots?: number[]; scoring?: string };
+type FinalDetailLike = { format: string; series?: number[]; cumulative?: number[]; shots?: number[]; scoring?: string; seriesLabels?: string[] };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { useLocale } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import type { QualDetail, PositionsQualDetail } from "@shootermarkt/db/schema";
@@ -9,6 +10,8 @@ import { displayNoc } from "@shootermarkt/db/noc-list";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, type RemarkLegendItem } from "./RemarkBadge";
 
 const POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"] as const;
+const POSITION_LABELS_EN = ["Kneeling", "Prone", "Standing"] as const;
+type PositionLabels = readonly [string, string, string];
 const POSITION_KEYS = ["kneeling", "prone", "standing"] as const;
 
 // Disciplines whose flat `series` array is really several fixed-size phases
@@ -90,8 +93,10 @@ const NOC_ONLY_LEVELS = new Set(["world", "olympic", "continental"]);
 // Fixed pixel widths for the (now few) non-flexible columns — a CSS Grid
 // track's size is authoritative, unlike a real <table> under table-layout:auto.
 const RANK_W = "32px";
-const NAME_W = "minmax(96px, 200px)";
-const CLUB_W = "minmax(52px, 1fr)";
+// Ime dobija sav slobodan prostor; klub/NOC je uzak, da ne pravi prazan razmak do serija.
+const NAME_W = "minmax(140px, 1fr)";
+const NOC_W = "84px";
+const CLUB_W = "minmax(96px, 180px)";
 const TOTAL_W = "92px";
 const REMARK_W = "44px";
 
@@ -106,17 +111,18 @@ function buildDetailGroups(
   r: CompResultRow,
   isPositionsType: boolean,
   flatGroups: FlatGroup[] | null,
-  posSeriesCounts: Record<(typeof POSITION_KEYS)[number], number> | null
+  posSeriesCounts: Record<(typeof POSITION_KEYS)[number], number> | null,
+  positionLabels: PositionLabels = POSITION_LABELS,
 ): DetailGroup[] {
   if (isPositionsType && posSeriesCounts) {
     const posDetail = r.qualDetail as PositionsQualDetail | null;
-    return POSITION_KEYS.filter((pos) => posSeriesCounts[pos] > 0).map((pos, pi) => {
+    return POSITION_KEYS.filter((pos) => posSeriesCounts[pos] > 0).map((pos) => {
       const series = posDetail?.[pos]?.series ?? [];
       const values = Array.from({ length: posSeriesCounts[pos] }).map((_, si) => {
         const shots = series[si];
         return shots ? shots.reduce((a, b) => a + b, 0) : null;
       });
-      return { label: POSITION_LABELS[pi], values, bestValue: null };
+      return { label: positionLabels[POSITION_KEYS.indexOf(pos)], values, bestValue: null };
     });
   }
 
@@ -182,6 +188,8 @@ function SeriesBox({ text, best }: { text: string; best: boolean }) {
 }
 
 export function CompetitionQualTable({ results, competitionLevel }: Props) {
+  const locale = useLocale();
+  const positionLabels: PositionLabels = locale === "en" ? POSITION_LABELS_EN : POSITION_LABELS;
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
 
@@ -236,7 +244,18 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
 
   const seriesHeaders = hasSeriesDetail ? buildSeriesHeaders(sorted, isPositionsType, flatGroups, posSeriesCounts) : [];
   const SERIES_COL_W = "60px";
-  const gridTemplateColumns = [RANK_W, NAME_W, CLUB_W, ...seriesHeaders.map(() => SERIES_COL_W), TOTAL_W, REMARK_W]
+  const isNocOnly = NOC_ONLY_LEVELS.has(competitionLevel ?? "");
+  // Desktop zaglavlje: trostav i grupisane discipline dobijaju jedan naslov preko svojih kolona
+  // (Klečeći / Ležeći / Stojeći), umesto K1, K2, L1…; obične serije ostaju S1, S2…
+  const headerGroups: Array<{ label: string; span: number }> = !hasSeriesDetail
+    ? []
+    : isPositionsType && posSeriesCounts
+      ? POSITION_KEYS.filter((pos) => posSeriesCounts[pos] > 0).map((pos) => ({ label: positionLabels[POSITION_KEYS.indexOf(pos)], span: posSeriesCounts[pos] }))
+      : flatGroups
+        ? flatGroups.map((g) => ({ label: g.label, span: g.count }))
+        : seriesHeaders.map((label) => ({ label, span: 1 }));
+  const clubColW = isNocOnly ? NOC_W : CLUB_W;
+  const gridTemplateColumns = [RANK_W, NAME_W, clubColW, ...seriesHeaders.map(() => SERIES_COL_W), TOTAL_W, REMARK_W]
     .filter(Boolean)
     .join(" ");
   const mobileGridTemplateColumns = hasSeriesDetail
@@ -281,9 +300,14 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
             <div role="columnheader" className={`${headerCellCls} justify-end`}>#</div>
             <div role="columnheader" className={headerCellCls}>Strelac</div>
             <div role="columnheader" className={headerCellCls}>{clubHeaderLabel}</div>
-            {hasSeriesDetail && seriesHeaders.map((h, i) => (
-              <div key={i} role="columnheader" className={`hidden sm:flex ${headerCellCls} justify-end`}>
-                {h}
+            {headerGroups.map((group, i) => (
+              <div
+                key={i}
+                role="columnheader"
+                className={`hidden sm:flex ${headerCellCls} ${group.span > 1 ? "justify-center" : "justify-end"} whitespace-nowrap`}
+                style={group.span > 1 ? { gridColumn: `span ${group.span}` } : undefined}
+              >
+                {group.label}
               </div>
             ))}
             <div role="columnheader" className={`${headerCellCls} justify-end`}>Σ</div>
@@ -300,7 +324,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
             const rowBg = isOddRow ? "var(--surface)" : "var(--bg)";
             const showBottomBorder = !isLastRow || isExpanded;
             const cellCls = `px-2 py-2.5 text-sm sm:px-3 flex items-center transition-colors ${showBottomBorder ? "border-b border-[var(--border)]" : ""}`;
-            const seriesFlat = hasSeriesDetail ? flattenGroups(buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts)) : [];
+            const seriesFlat = hasSeriesDetail ? flattenGroups(buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts, positionLabels)) : [];
 
             return (
               <div key={r.id} role="rowgroup" style={{ display: "contents" }}>
@@ -366,7 +390,8 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                           </span>
                         );
                       })()}
-                      {r.clubDisplay && (
+                      {/* Međunarodna takmičenja: samo NOC (kolona je uska), bez naziva kluba. */}
+                      {!isNocOnly && r.clubDisplay && (
                         <span className="text-[var(--muted)] text-xs truncate">
                           {r.clubDisplay}
                         </span>
@@ -443,7 +468,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                           Trostav / grupisane discipline zadržavaju naziv grupe (Klečeći, Ležeći…). */}
                       {isPositionsType || flatGroups ? (
                         <div className="flex flex-col gap-2 py-2.5">
-                          {buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts).map((g, gi) => (
+                          {buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts, positionLabels).map((g, gi) => (
                             <div key={gi} className="flex flex-col gap-1">
                               <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
                                 {g.label}

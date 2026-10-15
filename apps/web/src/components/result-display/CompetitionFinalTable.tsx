@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { useLocale } from "next-intl";
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
@@ -114,6 +115,23 @@ function seriesCells(columns: Column[], r: FinalResultRow) {
 const decimalFmt = (v: number) => v.toFixed(1);
 const intFmt = (v: number) => Math.round(v).toString();
 
+// Nazivi serija finala se čuvaju na srpskom; na engleskom se prevode stavovi trostava.
+const POSITION_LABELS_EN: Record<string, string> = { "Klečeći": "Kneeling", "Ležeći": "Prone", "Stojeći": "Standing" };
+const localizeSeriesLabel = (label: string, locale: string) =>
+  locale === "en" ? label.replace(/^(Klečeći|Ležeći|Stojeći)/, (word) => POSITION_LABELS_EN[word] ?? word) : label;
+
+/** Susedne kolone "Stojeći 1", "Stojeći 2" → jedan naslov "Stojeći" preko obe (desktop zaglavlje). */
+function groupColumnHeaders(headers: string[]): Array<{ label: string; span: number }> {
+  const groups: Array<{ label: string; span: number }> = [];
+  for (const header of headers) {
+    const base = header.match(/^(.+) \d+$/)?.[1];
+    const last = groups[groups.length - 1];
+    if (base && last?.label === base) last.span += 1;
+    else groups.push({ label: base ?? header, span: 1 });
+  }
+  return groups;
+}
+
 function buildColumns(rows: FinalResultRow[]): Column[] {
   const withDetail = rows.find((r) => r.finalDetail);
   const format = withDetail?.finalDetail?.format;
@@ -185,8 +203,10 @@ function buildColumns(rows: FinalResultRow[]): Column[] {
 // <table>) is required.
 const RANK_W = "40px";
 const AVATAR_W = "40px";
-const NAME_W = "minmax(140px, 220px)";
-const CLUB_W = "minmax(80px, 1fr)";
+// Ime dobija sav slobodan prostor; klub/NOC je uzak, da ne pravi prazan razmak do serija.
+const NAME_W = "minmax(160px, 1fr)";
+const NOC_W = "84px";
+const CLUB_W = "minmax(96px, 180px)";
 const TOTAL_W = "76px";
 const REMARK_W = "24px";
 
@@ -197,6 +217,7 @@ const narrowHeaderCellCls = "px-1 py-3 text-[0.7rem] font-semibold uppercase tra
 
 export function CompetitionFinalTable({ results, competitionLevel, showMedals = true }: Props) {
   const clubHeaderLabel = NOC_ONLY_LEVELS.has(competitionLevel ?? "") ? "NOC" : "Klub / NOC";
+  const locale = useLocale();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
 
@@ -227,7 +248,10 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
   const hasDetail = columns.length > 0;
 
   const SERIES_COL_W = "56px";
-  const gridTemplateColumns = [RANK_W, AVATAR_W, NAME_W, CLUB_W, ...columns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W]
+  const isNocOnly = NOC_ONLY_LEVELS.has(competitionLevel ?? "");
+  const clubColW = isNocOnly ? NOC_W : CLUB_W;
+  const headerGroups = groupColumnHeaders(columns.map((col) => localizeSeriesLabel(col.header, locale)));
+  const gridTemplateColumns = [RANK_W, AVATAR_W, NAME_W, clubColW, ...columns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W]
     .filter(Boolean)
     .join(" ");
   const mobileGridTemplateColumns = hasDetail
@@ -273,9 +297,14 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
             <div role="columnheader" className={headerCellCls}>Strelac</div>
             <div role="columnheader" className={headerCellCls}>{clubHeaderLabel}</div>
             {hasDetail && <div role="columnheader" className={`${narrowHeaderCellCls} sm:hidden`} aria-hidden="true" />}
-            {hasDetail && columns.map((col, i) => (
-              <div key={i} role="columnheader" className={`hidden sm:flex ${headerCellCls} justify-end`}>
-                {col.header}
+            {hasDetail && headerGroups.map((group, i) => (
+              <div
+                key={i}
+                role="columnheader"
+                className={`hidden sm:flex ${headerCellCls} ${group.span > 1 ? "justify-center" : "justify-end"} whitespace-nowrap`}
+                style={group.span > 1 ? { gridColumn: `span ${group.span}` } : undefined}
+              >
+                {group.label}
               </div>
             ))}
             <div role="columnheader" className={`${headerCellCls} justify-end whitespace-nowrap`}>
@@ -357,7 +386,8 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                           </span>
                         );
                       })()}
-                      {r.clubDisplay && (
+                      {/* Međunarodna takmičenja: samo NOC (kolona je uska), bez naziva kluba. */}
+                      {!isNocOnly && r.clubDisplay && (
                         <span className="text-[var(--muted)] text-xs truncate">
                           {r.clubDisplay}
                         </span>
@@ -415,7 +445,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                       <div className="grid grid-cols-[repeat(auto-fit,minmax(3.75rem,1fr))] gap-2 py-2.5">
                         {seriesCells(columns, r).filter((cell) => cell.main).map((cell, i) => (
                           <div key={i} className="flex min-w-0 flex-col items-center rounded-md bg-[var(--surface)] px-1 py-1.5">
-                            <span className="max-w-full truncate text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{cell.header}</span>
+                            <span className="max-w-full truncate text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{localizeSeriesLabel(cell.header, locale)}</span>
                             <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)]">{cell.main}</span>
                             <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--subtle)]">{cell.sub || "\u00a0"}</span>
                           </div>

@@ -14,12 +14,12 @@ describe("buildSiusFinalDetails", () => {
 
   it("labels standing series and single shots once they arrive", () => {
     const [detail] = buildSiusFinalDetails("R3PW", [{ series: [104.3, 104.9, 51.2, 50.8, 10.5, 10.1] }]);
-    expect(detail).toMatchObject({ cumulative: [104.3, 209.2, 260.4, 311.2, 321.7, 331.8], seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "H1", "H2"] });
+    expect(detail).toMatchObject({ cumulative: [104.3, 209.2, 260.4, 311.2, 321.7, 331.8], seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "S1", "S2"] });
   });
 
   it("groups SIUS per-shot values by the 3P plan when the API returns single shots", () => {
     const [detail] = buildSiusFinalDetails("R3PW", [{ series: [...shots(10, 10.4), ...shots(10, 10.5), ...shots(5, 10.1), ...shots(5, 10.2), 10.7] }]);
-    expect(detail).toMatchObject({ cumulative: [104, 209, 259.5, 310.5, 321.2], seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "H1"] });
+    expect(detail).toMatchObject({ cumulative: [104, 209, 259.5, 310.5, 321.2], seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "S1"] });
   });
 
   it("labels SIUS air finals S1, S2, then 2-shot series by shot numbers", () => {
@@ -43,7 +43,7 @@ describe("buildIssfFinalDetails", () => {
     const [detail] = buildIssfFinalDetails("R3PM", [{ stageCumulatives: [51, 103, 155.5, 207, 257, 306, 316.6, 326.7], shotsByStage: stages, total }]);
     expect(detail).toMatchObject({
       cumulative: [103, 207, 257, 306, 316.6, 326.7],
-      seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "H1", "H2"],
+      seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "S1", "S2"],
     });
   });
 
@@ -70,7 +70,7 @@ describe("normalizeFinalDetailsForDisplay", () => {
       { format: "bulletin" as const, scoring: "decimal" as const, series: [102.5, 104.2, 50.8, 50.6] },
     ];
     const [a, b] = normalizeFinalDetailsForDisplay("R3PW", legacy);
-    expect(a).toMatchObject({ cumulative: [103.1, 207.1, 258.3, 309.2, 319.6], seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "H1"] });
+    expect(a).toMatchObject({ cumulative: [103.1, 207.1, 258.3, 309.2, 319.6], seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "S1"] });
     expect(b).toMatchObject({ cumulative: [102.5, 206.7, 257.5, 308.1] });
   });
 
@@ -79,5 +79,15 @@ describe("normalizeFinalDetailsForDisplay", () => {
     expect(normalizeFinalDetailsForDisplay("R3PM", current)).toEqual(current);
     const spw = [{ format: "bulletin" as const, scoring: "hit_count" as const, series: [5, 4, 5] }];
     expect(normalizeFinalDetailsForDisplay("SPW", spw)).toEqual(spw);
+  });
+});
+
+describe("3P single-shot labels", () => {
+  it("labels single standing shots S1, S2 and renames stored H labels for display", () => {
+    const [fresh] = buildSiusFinalDetails("R3PM", [{ series: [104, 104, 51, 51, 10.2, 10.1] }]);
+    expect(fresh.seriesLabels?.slice(4)).toEqual(["S1", "S2"]);
+    const stored = { ...fresh, seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "H1", "H2"] };
+    const [shown] = normalizeFinalDetailsForDisplay("R3PM", [stored]);
+    expect(shown?.seriesLabels).toEqual(["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "S1", "S2"]);
   });
 });

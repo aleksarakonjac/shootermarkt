@@ -67,7 +67,8 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const seriesHeaders = Array.from({ length: seriesLen }, (_, i) => `S${i + 1}`);
   const SERIES_COL_W = "64px";
   const mobileColumns = ["28px", "0px", "minmax(56px, 72px)", "minmax(0, 1fr)", "44px", "60px", "20px", hasSeries ? "16px" : ""].filter(Boolean).join(" ");
-  const desktopColumns = ["32px", "minmax(90px, 200px)", "80px", "minmax(120px, 180px)", ...seriesHeaders.map(() => SERIES_COL_W), "minmax(56px, 140px)", "minmax(72px, 1fr)", "40px", "28px"].join(" ");
+  // Imena strelaca dobijaju slobodan prostor (ne kolona ukupnog), da serije budu odmah uz NOC/imena.
+  const desktopColumns = ["32px", "minmax(90px, 200px)", "80px", "minmax(140px, 1fr)", ...seriesHeaders.map(() => SERIES_COL_W), "72px", "max-content", "40px", "28px"].join(" ");
   const header = "flex items-center border-b border-[var(--border)] bg-[var(--surface-2)] px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-3";
 
   if (!sorted.length) return <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center"><p className="text-sm text-[var(--muted)]">{isFinal ? "Nema finalnih rezultata." : "Nema rezultata za ovu disciplinu."}</p></div>;
