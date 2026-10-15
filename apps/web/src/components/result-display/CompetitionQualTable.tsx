@@ -175,12 +175,17 @@ function flattenGroups(groups: DetailGroup[]): Array<{ value: number | null; isB
 // Mobilni prikaz serija (auto-fit): jedan red se razvlači preko cele širine, a nepun poslednji
 // red pri prelamanju zadržava istu širinu kartica kao redovi iznad.
 const SERIES_GRID_CLS = "grid grid-cols-[repeat(auto-fit,minmax(3rem,1fr))] gap-1.5";
+/** Grupisane serije (trostav 3×20 = 6) idu u jedan red dok staju; preko toga po grupi u svom redu. */
+const ONE_ROW_MAX = 8;
 
-function SeriesBox({ text, best }: { text: string; best: boolean }) {
+/** `onSurface`: red je sivi (zebra) → kartica dobija svetlu pozadinu da se ne utopi u red. */
+function SeriesBox({ text, best, onSurface }: { text: string; best: boolean; onSurface: boolean }) {
   return (
     <span
-      className={`flex min-w-0 items-center justify-center rounded-md px-1 py-1.5 font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums ${
-        best ? "bg-[var(--surface-2)] font-semibold text-[var(--ink)] ring-1 ring-[var(--border-strong)]" : "bg-[var(--surface)] text-[var(--muted)]"
+      className={`flex min-w-0 items-center justify-center rounded-md px-1 py-1.5 font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums ring-1 ${
+        best
+          ? "bg-[var(--surface-2)] font-semibold text-[var(--ink)] ring-[var(--border-strong)]"
+          : `${onSurface ? "bg-[var(--bg)]" : "bg-[var(--surface)]"} text-[var(--muted)] ring-[var(--border)]`
       }`}
     >
       {text}
@@ -326,7 +331,10 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
             const rowBg = isOddRow ? "var(--surface)" : "var(--bg)";
             const showBottomBorder = !isLastRow || isExpanded;
             const cellCls = `px-2 py-2.5 text-sm sm:px-3 flex items-center transition-colors ${showBottomBorder ? "border-b border-[var(--border)]" : ""}`;
-            const seriesFlat = hasSeriesDetail ? flattenGroups(buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts, positionLabels)) : [];
+            const allGroups = hasSeriesDetail ? buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts, positionLabels) : [];
+            const seriesFlat = flattenGroups(allGroups);
+            const detailGroups = isPositionsType || flatGroups ? allGroups : null;
+            const detailGroupsTotal = seriesFlat.length;
 
             return (
               <div key={r.id} role="rowgroup" style={{ display: "contents" }}>
@@ -468,16 +476,28 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                     >
                       {/* Svaka serija u svojoj kartici; kartice popunjavaju ceo red (auto-fit).
                           Trostav / grupisane discipline zadržavaju naziv grupe (Klečeći, Ležeći…). */}
-                      {isPositionsType || flatGroups ? (
+                      {detailGroups && detailGroupsTotal <= ONE_ROW_MAX ? (
+                        // Sve grupe u jednom redu; naziv grupe (Klečeći…) iznad svojih serija.
+                        <div className="grid gap-x-1.5 gap-y-1 py-2.5" style={{ gridTemplateColumns: `repeat(${detailGroupsTotal}, minmax(0, 1fr))` }}>
+                          {detailGroups.map((g, gi) => (
+                            <span key={`l${gi}`} className="truncate border-b border-[var(--border)] pb-0.5 text-center text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]" style={{ gridColumn: `span ${g.values.length}` }}>
+                              {g.label}
+                            </span>
+                          ))}
+                          {detailGroups.flatMap((g, gi) => g.values.map((v, vi) => (
+                            <SeriesBox key={`${gi}-${vi}`} text={v != null ? fmt(v) : "—"} best={v != null && v === g.bestValue} onSurface={isOddRow} />
+                          )))}
+                        </div>
+                      ) : detailGroups ? (
                         <div className="flex flex-col gap-2 py-2.5">
-                          {buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts, positionLabels).map((g, gi) => (
+                          {detailGroups.map((g, gi) => (
                             <div key={gi} className="flex flex-col gap-1">
                               <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
                                 {g.label}
                               </span>
                               <div className={SERIES_GRID_CLS}>
                                 {g.values.map((v, vi) => (
-                                  <SeriesBox key={vi} text={v != null ? fmt(v) : "—"} best={v != null && v === g.bestValue} />
+                                  <SeriesBox key={vi} text={v != null ? fmt(v) : "—"} best={v != null && v === g.bestValue} onSurface={isOddRow} />
                                 ))}
                               </div>
                             </div>
@@ -486,7 +506,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                       ) : (
                         <div className={`${SERIES_GRID_CLS} py-2.5`}>
                           {seriesFlat.map((item, i) => (
-                            <SeriesBox key={i} text={item.value != null ? fmt(item.value) : "—"} best={item.isBest} />
+                            <SeriesBox key={i} text={item.value != null ? fmt(item.value) : "—"} best={item.isBest} onSurface={isOddRow} />
                           ))}
                         </div>
                       )}
