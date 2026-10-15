@@ -628,9 +628,9 @@ async function fetchFromIssf(
       try {
         finalResults = await fetchFinalResultsFromHtml(issfCompId, event.finalPhase.resultKey, true);
       } catch { continue; }
-      // Kumulativ po fazi, kao na ISSF sajtu — vidi lib/final-detail.ts.
+      // Kumulativ po seriji discipline (trostav 10/10/5/5, vazdušno 5/5, pa hici) — vidi lib/final-detail.ts.
       const finalists = [...finalResults].sort((a, b) => a.rank - b.rank);
-      const finalDetails = buildIssfFinalDetails(finalists);
+      const finalDetails = buildIssfFinalDetails(slot.disciplineCode, finalists);
 
       for (const [index, r] of finalists.entries()) {
         const shooterId = r.issfId && shooterByIssfId.has(r.issfId)
