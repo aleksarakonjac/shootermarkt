@@ -66,11 +66,10 @@ const FOCUS_WINDOW_DAYS = 14;
  * olympic > world > continental > international ≈ national > regional > club,
  * uz bonus za tip događaja (prvenstvo > svetski kup > kup) i penal za juniorske
  * kategorije, tako da senior svetski kup nadjača juniorsko kontinentalno finale,
- * a svetsko prvenstvo nadjača svetski kup. U srb scope-u državna takmičenja
- * dobijaju podizanje na nivo kontinentalnih.
+ * a svetsko prvenstvo nadjača svetski kup. Isto važi za sve scope-ove.
  */
-export function competitionFocusPriority(competition: Pick<FocusCompetition, "level" | "eventType" | "ageCategory">, scope: Scope = "issf") {
-  const base = scope === "srb" && competition.level === "national" ? 65 : (FOCUS_LEVEL_BASE[competition.level] ?? 0);
+export function competitionFocusPriority(competition: Pick<FocusCompetition, "level" | "eventType" | "ageCategory">) {
+  const base = FOCUS_LEVEL_BASE[competition.level] ?? 0;
   const juniorPenalty = FOCUS_JUNIOR_AGES.has(competition.ageCategory) ? 25 : 0;
   return base + (FOCUS_EVENT_BONUS[competition.eventType] ?? 0) - juniorPenalty;
 }
@@ -81,7 +80,7 @@ export function competitionFocusPriority(competition: Pick<FocusCompetition, "le
  * FOCUS_WINDOW_DAYS dana; ako ih ima manje od `limit`, dopunjava se najnovijim
  * starijim da sekcija ne ostane prazna.
  */
-export function selectHomepageFocusCompetitions<T extends FocusCompetition>(candidates: T[], scope: Scope, today: string, limit = 3) {
+export function selectHomepageFocusCompetitions<T extends FocusCompetition>(candidates: T[], today: string, limit = 3) {
   const cutoff = new Date(`${today}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - FOCUS_WINDOW_DAYS);
   const cutoffKey = cutoff.toISOString().slice(0, 10);
@@ -89,7 +88,7 @@ export function selectHomepageFocusCompetitions<T extends FocusCompetition>(cand
   const isLive = (c: T) => isCompetitionLive(c.date, c.dateEnd, today);
   const byFocus = (a: T, b: T) =>
     Number(isLive(b)) - Number(isLive(a))
-    || competitionFocusPriority(b, scope) - competitionFocusPriority(a, scope)
+    || competitionFocusPriority(b) - competitionFocusPriority(a)
     || b.date.localeCompare(a.date);
   const windowed = candidates.filter((c) => c.date <= today && endOf(c) >= cutoffKey).toSorted(byFocus).slice(0, limit);
   if (windowed.length >= limit) return windowed;
@@ -317,7 +316,7 @@ export async function getHomepageMain(scope: Scope) {
     db.select().from(competitions).where(and(sql`${competitions.date} >= ${today} AND ${competitions.date} < ${upcomingDeadline}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
   ]);
   const showSrbHighlight = scope === 'srb';
-  const recentComps = selectHomepageFocusCompetitions(candidateComps, scope, today);
+  const recentComps = selectHomepageFocusCompetitions(candidateComps, today);
   const recent =await Promise.all(recentComps.map(async (competition) => {
     const [slots, individualRows, mixedRows] = await Promise.all([
       db.select({ discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(eq(competitionSchedule.competitionId, competition.id)),

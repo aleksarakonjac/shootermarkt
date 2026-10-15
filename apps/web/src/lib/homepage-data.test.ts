@@ -144,19 +144,12 @@ describe("competition focus priority", () => {
   });
 
   it("orders by priority within the window, not by date", () => {
-    expect(selectHomepageFocusCompetitions([club, youthFinal, worldCup, worldChamp], "issf", "2026-10-15").map((c) => c.id)).toEqual([2, 1, 3]);
+    expect(selectHomepageFocusCompetitions([club, youthFinal, worldCup, worldChamp], "2026-10-15").map((c) => c.id)).toEqual([2, 1, 3]);
   });
 
   it("keeps a live competition first and falls back to older ones when the window is thin", () => {
     const live = comp(5, "regional", "other", "open", "2026-10-14", "2026-10-16");
     const old = comp(6, "national", "cup", "open", "2026-08-01");
-    expect(selectHomepageFocusCompetitions([old, worldChamp, live], "issf", "2026-10-15").map((c) => c.id)).toEqual([5, 2, 6]);
-  });
-
-  it("lifts national competitions in the srb scope", () => {
-    const national = comp(7, "national", "cup", "open", "2026-10-13");
-    const continental = comp(8, "continental", "other", "open", "2026-10-13");
-    expect(competitionFocusPriority(national, "srb")).toBeGreaterThan(competitionFocusPriority(continental, "srb"));
-    expect(competitionFocusPriority(national, "issf")).toBeLessThan(competitionFocusPriority(continental, "issf"));
+    expect(selectHomepageFocusCompetitions([old, worldChamp, live], "2026-10-15").map((c) => c.id)).toEqual([5, 2, 6]);
   });
 });
