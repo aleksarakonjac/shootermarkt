@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { Link } from "@/i18n/navigation";
-import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
+import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import { useTranslations, useLocale } from "next-intl";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
@@ -365,7 +365,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
         return (
           <span className="hidden sm:inline-flex items-center gap-1.5 shrink-0 rounded px-1.5 leading-none" style={{ background: "white", height: 20 }}>
             <span className="inline-flex items-center rounded font-extrabold uppercase px-1 pb-[2px] h-full leading-none" style={{ fontSize: 11, letterSpacing: "0.06em", background: s.background, color: s.color }}>
-              {LEVEL_LABEL[item.level] ?? item.level}
+              {getLevelLabel(item.level, locale)}
             </span>
             {item.countryCode2 && (
               <>

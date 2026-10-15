@@ -256,7 +256,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
               {/* Naziv discipline vodi na prvu prikazanu fazu (finale ako postoji, inače kvalifikacije). */}
               <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="flex w-fit items-center gap-1 no-underline hover:opacity-80 transition-opacity">{discBadge}{junBadge}</ScopedLink>
               {shownPhases.map((phase) => {
-                const decimals = phase.stage === "elimination" || isAP || disc.discCode === "SPW" || (disc.discCode.startsWith("R3") && phase.stage !== "final") ? 0 : 1;
+                const decimals = phase.stage === "elimination" || (isAP && phase.stage !== "final") || disc.discCode === "SPW" || (disc.discCode.startsWith("R3") && phase.stage !== "final") ? 0 : 1;
                 const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? `E${phase.elimRound ?? ""}` : phase.stage === "final" ? "F" : "Q"}</span>;
                 const hasFinal = shownPhases.some((item) => item.stage === "final");
                 const qualKey = `${competitionId}:${disc.discCode}:${phase.category}:qual`;
