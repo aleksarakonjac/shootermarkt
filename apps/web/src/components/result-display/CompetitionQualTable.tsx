@@ -99,7 +99,8 @@ const headerCellCls = "px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-
 
 // One labeled block of series values inside the expanded detail row, e.g.
 // "S1  105 106" or (grouped disciplines) "Klečeći  105 106".
-type DetailGroup = { label: string; values: Array<number | null>; bestIdx: number };
+// bestValue: sve serije jednake ovoj vrednosti se ističu (više jednakih najboljih → sve).
+type DetailGroup = { label: string; values: Array<number | null>; bestValue: number | null };
 
 function buildDetailGroups(
   r: CompResultRow,
@@ -115,26 +116,25 @@ function buildDetailGroups(
         const shots = series[si];
         return shots ? shots.reduce((a, b) => a + b, 0) : null;
       });
-      return { label: POSITION_LABELS[pi], values, bestIdx: -1 };
+      return { label: POSITION_LABELS[pi], values, bestValue: null };
     });
   }
 
   const seriesArr = r.qualDetail && "series" in r.qualDetail ? (r.qualDetail as { series: number[] }).series : [];
-  const bestIdx = seriesArr.length > 0 ? seriesArr.indexOf(Math.max(...seriesArr)) : -1;
+  const bestValue = seriesArr.length > 0 ? Math.max(...seriesArr) : null;
 
   if (flatGroups) {
     let offset = 0;
     return flatGroups.map((g) => {
       const values = seriesArr.slice(offset, offset + g.count);
-      const localBest = bestIdx >= offset && bestIdx < offset + g.count ? bestIdx - offset : -1;
       offset += g.count;
-      return { label: g.label, values: values.length > 0 ? values : Array(g.count).fill(null), bestIdx: localBest };
+      return { label: g.label, values: values.length > 0 ? values : Array(g.count).fill(null), bestValue };
     });
   }
 
   // Ungrouped flat series — one mini-group per series so the visual language
   // (label above values) stays consistent whether or not the discipline groups.
-  return seriesArr.map((v, i) => ({ label: `S${i + 1}`, values: [v], bestIdx: v != null && i === bestIdx ? 0 : -1 }));
+  return seriesArr.map((v, i) => ({ label: `S${i + 1}`, values: [v], bestValue }));
 }
 
 // Short per-column headers for the desktop inline series columns — one column
@@ -162,7 +162,7 @@ function buildSeriesHeaders(
 }
 
 function flattenGroups(groups: DetailGroup[]): Array<{ value: number | null; isBest: boolean }> {
-  return groups.flatMap((g) => g.values.map((v, i) => ({ value: v, isBest: i === g.bestIdx })));
+  return groups.flatMap((g) => g.values.map((v) => ({ value: v, isBest: v != null && v === g.bestValue })));
 }
 
 export function CompetitionQualTable({ results, competitionLevel }: Props) {
@@ -434,7 +434,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                                 {g.values.map((v, vi) => (
                                   <span
                                     key={vi}
-                                    className={vi === g.bestIdx ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}
+                                    className={v != null && v === g.bestValue ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}
                                   >
                                     {v != null ? fmt(v) : "—"}
                                   </span>

@@ -53,11 +53,10 @@ export function PositionsQualDisplay({ detail, hasDecimals = false, locale = "sr
         <tbody>
           {positions.map((pos, pi) => {
             const { series, total } = detail[pos];
-            const seriesTotals = series.map((s) => s.reduce((a, b) => a + b, 0));
-            const bestSeriesIdx =
-              seriesTotals.length > 0
-                ? seriesTotals.indexOf(Math.max(...seriesTotals))
-                : -1;
+            // Zaokruženo na 0.1 da float greška zbira (10.4 + 10.6 …) ne razbije jednakost serija.
+            const seriesTotals = series.map((s) => Math.round(s.reduce((a, b) => a + b, 0) * 10) / 10);
+            // Sve serije jednake najboljoj se ističu (npr. više 100-ki u trostavu).
+            const bestSeriesTotal = seriesTotals.length > 0 ? Math.max(...seriesTotals) : null;
 
             return (
               <tr
@@ -73,7 +72,7 @@ export function PositionsQualDisplay({ detail, hasDecimals = false, locale = "sr
                 </td>
                 {series.map((s, si) => {
                   const st = seriesTotals[si];
-                  const isBest = si === bestSeriesIdx;
+                  const isBest = bestSeriesTotal != null && st === bestSeriesTotal;
                   return (
                     <td
                       key={si}

@@ -16,7 +16,8 @@ export function SeriesQualDisplay({ detail, hasDecimals = false, inners, total: 
 
   const displaySeries = Array.from({ length: Math.max(series.length, columnCount ?? 0) }, (_, index) => series[index] ?? null);
   const total = storedTotal ?? series.reduce((a, b) => a + b, 0);
-  const bestIdx = series.indexOf(Math.max(...series));
+  // Sve serije jednake najboljoj se ističu, ne samo prva.
+  const bestValue = Math.max(...series);
 
   const fmt = (v: number) =>
     hasDecimals ? v.toFixed(1) : Math.round(v).toString();
@@ -42,7 +43,7 @@ export function SeriesQualDisplay({ detail, hasDecimals = false, inners, total: 
               <td
                 key={i}
                 className={`whitespace-nowrap px-1 py-1.5 text-center font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums border-r border-[var(--border)] last:border-r-0 sm:px-2 sm:text-sm ${
-                  v != null && i === bestIdx
+                  v != null && v === bestValue
                     ? "text-[var(--ink)] bg-[var(--surface-2)]"
                     : "text-[var(--muted)]"
                 }`}
