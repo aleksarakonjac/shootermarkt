@@ -446,10 +446,12 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                           prelamaju, nepun poslednji red zadržava istu širinu kartica kao redovi iznad. */}
                       <div className="grid grid-cols-[repeat(auto-fit,minmax(3.75rem,1fr))] gap-2 py-2.5">
                         {seriesCells(columns, r).filter((cell) => cell.main).map((cell, i) => (
-                          <div key={i} className="flex min-w-0 flex-col items-center rounded-md bg-[var(--surface)] px-1 py-1.5 ring-1 ring-[var(--border)]">
-                            <span className="max-w-full truncate text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{localizeSeriesLabel(cell.header, locale)}</span>
-                            <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)]">{cell.main}</span>
-                            <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--subtle)]">{cell.sub || "\u00a0"}</span>
+                          <div key={i} className="flex min-w-0 flex-col gap-1">
+                            <span className="max-w-full truncate text-center text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{localizeSeriesLabel(cell.header, locale)}</span>
+                            <div className="flex min-w-0 flex-col items-center rounded-md bg-[var(--surface)] px-1 py-1.5 ring-1 ring-[var(--border)]">
+                              <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)]">{cell.main}</span>
+                              <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--subtle)]">{cell.sub || "\u00a0"}</span>
+                            </div>
                           </div>
                         ))}
                       </div>
