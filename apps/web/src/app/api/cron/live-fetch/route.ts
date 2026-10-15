@@ -3,9 +3,10 @@ import { db } from "@shootermarkt/db";
 import { competitions, competitionSchedule, disciplines, mixedTeamResults, results, shooters } from "@shootermarkt/db/schema";
 import type { AgeCategory } from "@shootermarkt/db/schema";
 import { and, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
-import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml, extractMixedTeamEvents, fetchMixedTeamQualFromHtml, fetchMixedTeamFinalFromHtml } from "@shootermarkt/adapters/issf/adapter";
+import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml, fetchFinalResultsFromHtml, extractMixedTeamEvents, fetchMixedTeamQualFromHtml, fetchMixedTeamFinalFromHtml } from "@shootermarkt/adapters/issf/adapter";
 import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@shootermarkt/adapters/sius/public-adapter";
 import { matchShooter } from "@shootermarkt/db/name-match";
+import { deriveFinalRankProgression } from "@shootermarkt/db/pdf-import-types";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 
 export const maxDuration = 30;
@@ -239,16 +240,17 @@ async function processCompetition(
       .onConflictDoUpdate({
         target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
         set: {
-          qualTotal: sql`excluded.qual_total`,
-          qualInners: sql`excluded.qual_inners`,
-          qualRank: sql`excluded.qual_rank`,
+          // Coalesce: red samo sa finalom (kvalifikacije van 4h prozora) ne sme da obriše kvalifikacije.
+          qualTotal: sql`coalesce(excluded.qual_total, ${results.qualTotal})`,
+          qualInners: sql`coalesce(excluded.qual_inners, ${results.qualInners})`,
+          qualRank: sql`coalesce(excluded.qual_rank, ${results.qualRank})`,
           // SIUS only tags QualificationRemark/StatusRemark once that shooter's
           // status is officially decided — until then the row has neither, so
           // we push null. Coalesce so an in-progress fetch never clobbers an
           // already-decided flag from an earlier run (or the ISSF path).
           qualified: sql`coalesce(excluded.qualified, ${results.qualified})`,
           qualRemark: sql`coalesce(excluded.qual_remark, ${results.qualRemark})`,
-          qualDetail: sql`excluded.qual_detail`,
+          qualDetail: sql`coalesce(excluded.qual_detail, ${results.qualDetail})`,
           finalTotal: sql`coalesce(excluded.final_total, ${results.finalTotal})`,
           finalRank: sql`coalesce(excluded.final_rank, ${results.finalRank})`,
           finalDetail: sql`coalesce(excluded.final_detail, ${results.finalDetail})`,
@@ -614,6 +616,40 @@ async function fetchFromIssf(
             source: "issf_import",
           });
         }
+      }
+    }
+
+    // Finale uživo: ISSF objavljuje kumulativ posle svake faze dok finale traje.
+    if (slot.stage === "final" && event.finalPhase?.resultKey) {
+      let finalResults;
+      try {
+        finalResults = await fetchFinalResultsFromHtml(issfCompId, event.finalPhase.resultKey, true);
+      } catch { continue; }
+      const allCumulatives = finalResults.map((f) => f.stageCumulatives);
+
+      for (const r of finalResults) {
+        const shooterId = r.issfId && shooterByIssfId.has(r.issfId)
+          ? shooterByIssfId.get(r.issfId)!
+          : (() => { const m = matchShooter(r.firstName, r.lastName, r.nationCode, allShooters); return m.kind === "exact" ? m.id : undefined; })();
+        if (!shooterId) continue;
+
+        rows.push({
+          shooterId,
+          competitionId,
+          disciplineId: slot.disciplineId,
+          category: slot.category,
+          finalTotal: r.total.toFixed(1),
+          finalRank: r.rank,
+          finalDetail: {
+            format: "bulletin",
+            scoring: slot.disciplineCode.startsWith("AP") ? "hit_count" : "decimal",
+            cumulative: r.stageCumulatives,
+            ranks: deriveFinalRankProgression(r.stageCumulatives, allCumulatives) ?? undefined,
+            shots: r.shotsByStage.flat(),
+          },
+          qualified: true,
+          source: "issf_import",
+        });
       }
     }
   }
