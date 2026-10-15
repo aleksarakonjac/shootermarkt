@@ -233,7 +233,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
           href={scopedHref(`/rangiranje?disciplina=${activeTab.toLowerCase()}`)}
           className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"
         >
-          Pogledaj celo rangiranje ({activeTab}) →
+          {locale === "en" ? `View full rankings (${activeTab})` : `Pogledaj celo rangiranje (${activeTab})`} →
         </Link>
       </div>
     </div>

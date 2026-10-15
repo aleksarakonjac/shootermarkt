@@ -79,7 +79,7 @@ export async function CompetitionEmbedBlock({ competitionId }: { competitionId: 
         </div>
 
         <div className="mt-3 flex items-center gap-1 text-[12px] font-semibold text-[var(--brand-primary)] group-hover:gap-2 transition-all">
-          Pogledaj rezultate
+          {locale === "en" ? "View results" : "Pogledaj rezultate"}
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
