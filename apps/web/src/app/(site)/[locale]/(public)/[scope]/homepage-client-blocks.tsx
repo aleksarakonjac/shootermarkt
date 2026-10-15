@@ -384,13 +384,6 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
             const levelKey = `levels.${item.level.toLowerCase()}`;
             const rowLevelLabel = tComp.has(levelKey) ? tComp(levelKey) : item.level;
             const rowLevelStyle = LEVEL_STYLE[item.level.toLowerCase()] ?? FALLBACK_LEVEL_STYLE;
-            const previewPhase = item.discResults[0]?.phases
-              .toSorted((a, b) => (a.stage === "final" ? -1 : a.stage.startsWith("qual") ? 0 : 1) - (b.stage === "final" ? -1 : b.stage.startsWith("qual") ? 0 : 1))
-              .find((phase) => phase.qualTop3[0] || phase.srbHighlights[0]);
-            const preview = previewPhase && (previewPhase.qualTop3[0] ?? previewPhase.srbHighlights[0]);
-            const previewIsSrbHighlight = preview != null && preview === previewPhase?.srbHighlights[0];
-            const previewNoc = previewIsSrbHighlight ? "SRB" : preview?.nationality;
-            const previewCountryCode2 = previewIsSrbHighlight ? "rs" : preview?.countryCode2;
             return (
               <div key={item.id}>
                 <button
@@ -405,22 +398,6 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   <span className="flex-1 min-w-0 text-sm font-semibold text-[var(--ink)] truncate">
                     {name}
                   </span>
-                  <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                    {preview ? (
-                      <>
-                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--muted)]">{previewPhase!.stage === "final" ? "F" : previewPhase!.stage === "elimination" ? "E" : "Q"}</span>
-                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums">{preview.qualRank != null ? `${preview.qualRank}.` : "—"}</span>
-                        <span className="text-xs text-[var(--muted)]">{preview.firstName ? `${preview.lastName} ${preview.firstName.charAt(0)}.` : preview.lastName}</span>
-                        {previewCountryCode2 && <span className={`fi fi-${previewCountryCode2.toLowerCase()} shrink-0`} style={{ fontSize: 10 }} aria-hidden="true" />}
-                        {previewNoc && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--muted)]">{previewNoc}</span>}
-                        <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--brand-primary)] tabular-nums">
-                          {preview.qualTotal.toFixed(item.discResults[0].discCode.startsWith("AP") || (item.discResults[0].discCode.startsWith("R3") && previewPhase!.stage !== "final") || previewPhase!.stage === "elimination" ? 0 : 1)}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-xs italic text-[var(--muted)]">—</span>
-                    )}
-                  </div>
                   <svg
                     width="12" height="12" viewBox="0 0 12 12"
                     className={`shrink-0 text-[var(--muted)] transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
