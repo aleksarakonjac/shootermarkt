@@ -4,6 +4,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTransition, useRef } from "react";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { LEVEL_DOT_COLOR } from "@/lib/competition-utils";
+import { FOCUS_PRIORITY_TIERS } from "@/lib/competition-priority";
 
 const LEVEL_OPTIONS = [
   { value: "olympic",       label: "Olimpijsko" },
@@ -37,13 +38,21 @@ const TAG_OPTIONS = [
   { value: "50/25m", label: "50/25m" },
 ];
 
+const PRIORITY_OPTIONS = [
+  { value: "manual", label: "Ručno postavljen" },
+  { value: "auto",   label: "Automatski" },
+  ...FOCUS_PRIORITY_TIERS.map((t) => ({ value: String(t.value), label: `${t.value} · ${t.label}` })),
+  { value: "11+",    label: "11+ · mlađe kategorije / 300m" },
+];
+
 interface Props {
   years: number[];
   currentLevel?: string;
   currentTag?: string;
+  currentPriority?: string;
 }
 
-export function TakmicenjaFilters({ years, currentLevel, currentTag }: Props) {
+export function TakmicenjaFilters({ years, currentLevel, currentTag, currentPriority }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -106,7 +115,16 @@ export function TakmicenjaFilters({ years, currentLevel, currentTag }: Props) {
         emptyLabel="Svi tagovi"
         searchable={false}
         labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
-        className="col-span-2 sm:col-span-1 sm:w-36"
+        className="sm:w-36"
+      />
+      <SearchDropdown
+        value={currentPriority ?? params.get("priority") ?? ""}
+        onChange={(v) => update("priority", v)}
+        options={PRIORITY_OPTIONS}
+        placeholder="Svi prioriteti"
+        emptyLabel="Svi prioriteti"
+        searchable={false}
+        className="sm:w-64"
       />
     </div>
   );

@@ -9,6 +9,7 @@ import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { formatDateRangeSr } from "@/lib/date-utils";
 import { BatchTranslateButton } from "./batch-translate-button";
 import { defaultFocusPriority } from "@/lib/competition-priority";
+import { effectiveFocusPrioritySql } from "@/lib/competition-priority-sql";
 
 export const metadata: Metadata = { title: "Admin · Takmičenja" };
 
@@ -26,6 +27,18 @@ export default async function AdminTakmicenjaPage({
   const year = sp.year?.trim() ?? currentYear;
   const level = sp.level?.trim() ?? "";
   const tag = sp.tag?.trim() ?? "";
+  const priority = sp.priority?.trim() ?? "";
+
+  // Filter prioriteta: "manual" / "auto" = da li je ručno postavljen; broj = efektivni prioritet (ručni ili auto); "11+" = sve ispod klupskog nivoa.
+  const priorityCondition = priority === "manual"
+    ? sql`${competitions.focusPriority} is not null`
+    : priority === "auto"
+      ? sql`${competitions.focusPriority} is null`
+      : priority === "11+"
+        ? sql`${effectiveFocusPrioritySql()} >= 11`
+        : /^\d+$/.test(priority)
+          ? sql`${effectiveFocusPrioritySql()} = ${parseInt(priority)}`
+          : undefined;
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -34,6 +47,7 @@ export default async function AdminTakmicenjaPage({
     year ? sql`date_part('year', ${competitions.date}::date) = ${parseInt(year)}` : undefined,
     level ? eq(competitions.level, level as "club" | "regional" | "national" | "continental" | "world" | "olympic") : undefined,
     tag ? sql`${competitions.tags} @> ARRAY[${tag}]::varchar[]` : undefined,
+    priorityCondition,
   ].filter(Boolean) as Parameters<typeof and>;
 
   const baseWhere = conditions.length ? and(...conditions) : undefined;
@@ -92,6 +106,7 @@ export default async function AdminTakmicenjaPage({
     if (year) params.set("year", year);
     if (level) params.set("level", level);
     if (tag) params.set("tag", tag);
+    if (priority) params.set("priority", priority);
     params.set("status", status);
 
     params.set("sort", col);
@@ -110,6 +125,7 @@ export default async function AdminTakmicenjaPage({
     if (year) params.set("year", year);
     if (level) params.set("level", level);
     if (tag) params.set("tag", tag);
+    if (priority) params.set("priority", priority);
 
     params.set("status", targetStatus);
     params.set("page", "1");
@@ -279,7 +295,7 @@ export default async function AdminTakmicenjaPage({
       </div>
 
       <div className="mb-4">
-        <TakmicenjaFilters years={years} currentLevel={level} currentTag={tag} />
+        <TakmicenjaFilters years={years} currentLevel={level} currentTag={tag} currentPriority={priority} />
       </div>
 
       <div className="rounded-xl border border-[var(--border)] overflow-hidden">
