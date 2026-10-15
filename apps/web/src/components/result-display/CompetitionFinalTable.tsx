@@ -100,7 +100,8 @@ function buildColumns(rows: FinalResultRow[]): Column[] {
     const cols: Column[] = [0, 1].map((si) => ({
       header: `S${si + 1}`,
       fmt: decimalFmt,
-      getValue: (r) => (r.finalDetail?.format === "ar_ap_10m" ? r.finalDetail.phase1.series[si]?.reduce((a, b) => a + b, 0) ?? null : null),
+      // Serija koja još nije gađana (finale u toku) → "—", ne 0.0.
+      getValue: (r) => (r.finalDetail?.format === "ar_ap_10m" && r.finalDetail.phase1.series[si]?.length ? r.finalDetail.phase1.series[si].reduce((a, b) => a + b, 0) : null),
     }));
     for (let i = 0; i < maxPhase2; i++) {
       cols.push({
@@ -117,7 +118,8 @@ function buildColumns(rows: FinalResultRow[]): Column[] {
     const cols: Column[] = (["kneeling", "prone", "standing"] as const).map((pos, i) => ({
       header: ["Klečeći", "Ležeći", "Stojeći"][i],
       fmt: withDetail?.finalDetail?.format === "3x40_mk" ? decimalFmt : intFmt,
-      getValue: (r) => (r.finalDetail && (r.finalDetail.format === "3x20_mk" || r.finalDetail.format === "3x40_mk") ? r.finalDetail.phase1[pos].total : null),
+      // Stav koji još nije gađan (finale u toku) ima zbir 0 → "—".
+      getValue: (r) => (r.finalDetail && (r.finalDetail.format === "3x20_mk" || r.finalDetail.format === "3x40_mk") ? r.finalDetail.phase1[pos].total || null : null),
     }));
     for (let i = 0; i < maxPhase2; i++) {
       cols.push({

@@ -93,17 +93,60 @@ export function buildIssfFinalDetails(
   return buildFinalDetailsFromShots(disciplineCode, finalists.map((f) => ({ shots: f.shotsByStage.flat(), total: f.total })));
 }
 
+const isShot = (value: number) => value <= MAX_SHOT_VALUE;
+
 /**
- * SIUS API: `series` je u finalu ili niz pojedinačnih hitaca ili niz zbirova serija.
- * Ako su sve vrednosti ≤ 10.9 to su hici → pun format; inače prikaz po serijama.
+ * SIUS trostav: `series` = [klečeći (10), ležeći (10), stojeći 5, stojeći 5, pa pojedinačni hici].
+ * Pojedinačni hici nisu poznati za prvu fazu, pa su nizovi hitaca prazni a ukupno je zbir stava.
+ */
+function threePositionFromSeriesTotals(finalists: Array<{ series: number[]; total: number }>): PositionsFinalDetail[] {
+  const phase2Lengths = finalists.map((f) => Math.max(0, f.series.length - 4));
+  const longest = Math.max(0, ...phase2Lengths);
+  const phase1Eliminations = longest > 0 ? finalists.flatMap((_, i) => (phase2Lengths[i] === 0 ? [i + 1] : [])) : [];
+  return finalists.map((f, i) => {
+    const [kneeling = 0, prone = 0, standing1 = 0, standing2 = 0] = f.series;
+    return {
+      format: "3x40_mk",
+      phase1: {
+        kneeling: { shots: [], total: kneeling },
+        prone: { shots: [], total: prone },
+        standing: { series1: [], series2: [], total: round1(standing1 + standing2) },
+        subtotal: sum(f.series.slice(0, 4)),
+      },
+      phase1Eliminations,
+      phase2: { shots: f.series.slice(4), eliminatedAfterShot: phase2Lengths[i] > 0 && phase2Lengths[i] < longest ? phase2Lengths[i] : null },
+      total: f.total,
+    };
+  });
+}
+
+/**
+ * SIUS API: `series` je u finalu niz vrednosti koje mogu biti pojedinačni hici ili zbirovi.
+ * - sve ≤ 10.9 → hici → pun format (vazdušno / trostav).
+ * - trostav sa zbirovima stavova (provereno na živom SIUS finalu: [104.3, 104.9, …]) → format trostava.
+ * - vazdušno: 2 zbira od po 5, pa pojedinačni hici → format vazdušnog finala.
+ * - sve ostalo → prikaz po serijama.
  */
 export function buildSiusFinalDetails(
   disciplineCode: string,
   finalists: Array<{ series: number[]; total: number }>,
 ): AnyFinalDetail[] {
   const values = finalists.flatMap((f) => f.series);
-  const areShots = values.length > 0 && values.every((value) => value <= MAX_SHOT_VALUE);
-  return areShots
-    ? buildFinalDetailsFromShots(disciplineCode, finalists.map((f) => ({ shots: f.series, total: f.total })))
-    : seriesDetails(finalists.map((f) => f.series));
+  if (values.length > 0 && values.every(isShot)) {
+    return buildFinalDetailsFromShots(disciplineCode, finalists.map((f) => ({ shots: f.series, total: f.total })));
+  }
+  if (isThreePositionEvent(disciplineCode) && finalists.every((f) => f.series.slice(4).every(isShot))) {
+    return threePositionFromSeriesTotals(finalists);
+  }
+  if (isAirEvent(disciplineCode) && finalists.every((f) => f.series.slice(2).every(isShot))) {
+    const eliminated = phase2Eliminations(finalists.map((f) => ({ shots: f.series, total: f.total })), 2);
+    return finalists.map((f, i): ArApFinalDetail => ({
+      format: "ar_ap_10m",
+      // Zbir serije kao jedini "hitac" — tabela prikazuje zbir serije, pa je rezultat isti.
+      phase1: { series: [f.series.slice(0, 1), f.series.slice(1, 2)], subtotal: sum(f.series.slice(0, 2)) },
+      phase2: { shots: f.series.slice(2), eliminatedAfterShot: eliminated[i] },
+      total: f.total,
+    }));
+  }
+  return seriesDetails(finalists.map((f) => f.series));
 }
