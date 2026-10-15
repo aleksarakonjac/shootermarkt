@@ -6,7 +6,7 @@ import { and, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml, fetchFinalResultsFromHtml, extractMixedTeamEvents, fetchMixedTeamQualFromHtml, fetchMixedTeamFinalFromHtml } from "@shootermarkt/adapters/issf/adapter";
 import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@shootermarkt/adapters/sius/public-adapter";
 import { matchShooter } from "@shootermarkt/db/name-match";
-import { deriveFinalRankProgression } from "@shootermarkt/db/pdf-import-types";
+import { buildIssfFinalDetails } from "@/lib/issf-final-detail";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 
 export const maxDuration = 30;
@@ -625,9 +625,10 @@ async function fetchFromIssf(
       try {
         finalResults = await fetchFinalResultsFromHtml(issfCompId, event.finalPhase.resultKey, true);
       } catch { continue; }
-      const allCumulatives = finalResults.map((f) => f.stageCumulatives);
+      // Format po disciplini: vazdušno finale vs. trostav (zbir po fazi) — vidi issf-final-detail.ts.
+      const finalDetails = buildIssfFinalDetails(slot.disciplineCode, finalResults);
 
-      for (const r of finalResults) {
+      for (const [index, r] of finalResults.entries()) {
         const shooterId = r.issfId && shooterByIssfId.has(r.issfId)
           ? shooterByIssfId.get(r.issfId)!
           : (() => { const m = matchShooter(r.firstName, r.lastName, r.nationCode, allShooters); return m.kind === "exact" ? m.id : undefined; })();
@@ -640,13 +641,7 @@ async function fetchFromIssf(
           category: slot.category,
           finalTotal: r.total.toFixed(1),
           finalRank: r.rank,
-          finalDetail: {
-            format: "bulletin",
-            scoring: slot.disciplineCode.startsWith("AP") ? "hit_count" : "decimal",
-            cumulative: r.stageCumulatives,
-            ranks: deriveFinalRankProgression(r.stageCumulatives, allCumulatives) ?? undefined,
-            shots: r.shotsByStage.flat(),
-          },
+          finalDetail: finalDetails[index],
           qualified: true,
           source: "issf_import",
         });

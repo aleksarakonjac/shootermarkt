@@ -313,7 +313,8 @@ export const processIssfDirectImport = inngest.createFunction(
             row.finalRanks = deriveFinalRankProgression(finalist.stageCumulatives, allCumulatives);
             row.finalShotsByStage = finalist.shotsByStage;
             row.finalShootOff = finalist.shootOff || null;
-            row.finalScoring = disciplineCode.startsWith("AP") ? "hit_count" : "decimal";
+            // AR/AP/R3P finala se boduju decimalno (hit_count je samo 25m pištolj).
+            row.finalScoring = "decimal";
             row.qualified = true;
           }
         } catch {
