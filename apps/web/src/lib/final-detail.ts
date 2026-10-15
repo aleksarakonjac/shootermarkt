@@ -113,3 +113,23 @@ export function buildIssfFinalDetails(
   }
   return cumulativeDetails(finalists.map((f) => f.stageCumulatives));
 }
+
+/**
+ * Za prikaz: finala sačuvana u starom obliku (samo `series`, bez kumulativa — stari cron
+ * zapisi i admin SIUS uvoz) prevode se u isti kumulativni prikaz sa nazivima serija.
+ * Samo za AR/AP/R3P; ostalo (npr. 25m pištolj, broj pogodaka) ostaje kako je.
+ * `detailsByRank`: finalDetail finalista u redosledu plasmana.
+ */
+export function normalizeFinalDetailsForDisplay<T extends FinalDetailLike | null>(disciplineCode: string, detailsByRank: T[]): Array<T | BulletinFinalDetail> {
+  if (!seriesPlan(disciplineCode)) return detailsByRank;
+  const isLegacySeries = (d: FinalDetailLike | null): d is BulletinFinalDetail =>
+    d?.format === "bulletin" && !!d.series?.length && !d.cumulative?.length && !d.shots?.length && d.scoring !== "hit_count";
+  const legacy: BulletinFinalDetail[] = [];
+  for (const d of detailsByRank) if (isLegacySeries(d)) legacy.push(d);
+  if (legacy.length === 0) return detailsByRank;
+  const rebuilt = buildSiusFinalDetails(disciplineCode, legacy.map((d) => ({ series: d.series ?? [] })));
+  let next = 0;
+  return detailsByRank.map((d) => (isLegacySeries(d) ? rebuilt[next++] : d));
+}
+
+type FinalDetailLike = { format: string; series?: number[]; cumulative?: number[]; shots?: number[]; scoring?: string };

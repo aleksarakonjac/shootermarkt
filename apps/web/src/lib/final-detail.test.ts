@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildIssfFinalDetails, buildSiusFinalDetails } from "./final-detail";
+import { buildIssfFinalDetails, buildSiusFinalDetails, normalizeFinalDetailsForDisplay } from "./final-detail";
 
 // Pravi SIUS odgovor (finale trostava M, 15.10.2026, posle klečećeg i ležećeg): zbir po stavu.
 const live3p = [[104.3, 104.9], [102.0, 105.4], [103.0, 103.7], [102.7, 103.8], [102.0, 104.5], [102.2, 103.8], [102.6, 102.8], [100.1, 103.0]]
@@ -60,5 +60,24 @@ describe("buildIssfFinalDetails", () => {
     const [a, b] = buildIssfFinalDetails("ARW", [{ stageCumulatives: [52.5, 104.5], shotsByStage: [], total: 104.5 }, { stageCumulatives: [53.0, 103.9], shotsByStage: [], total: 103.9 }]);
     expect(a).toEqual({ format: "bulletin", scoring: "decimal", cumulative: [52.5, 104.5], ranks: [2, 1] });
     expect(b).toMatchObject({ ranks: [1, 2] });
+  });
+});
+
+describe("normalizeFinalDetailsForDisplay", () => {
+  it("shows legacy series-only 3P finals (old cron rows, admin SIUS import) with position labels", () => {
+    const legacy = [
+      { format: "bulletin" as const, scoring: "decimal" as const, series: [103.1, 104.0, 51.2, 50.9, 10.4] },
+      { format: "bulletin" as const, scoring: "decimal" as const, series: [102.5, 104.2, 50.8, 50.6] },
+    ];
+    const [a, b] = normalizeFinalDetailsForDisplay("R3PW", legacy);
+    expect(a).toMatchObject({ cumulative: [103.1, 207.1, 258.3, 309.2, 319.6], seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "H1"] });
+    expect(b).toMatchObject({ cumulative: [102.5, 206.7, 257.5, 308.1] });
+  });
+
+  it("leaves new cumulative details and non-AR/AP/R3P finals untouched", () => {
+    const current = buildSiusFinalDetails("R3PM", [{ series: [104.3, 104.9] }]);
+    expect(normalizeFinalDetailsForDisplay("R3PM", current)).toEqual(current);
+    const spw = [{ format: "bulletin" as const, scoring: "hit_count" as const, series: [5, 4, 5] }];
+    expect(normalizeFinalDetailsForDisplay("SPW", spw)).toEqual(spw);
   });
 });

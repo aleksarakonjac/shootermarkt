@@ -21,6 +21,7 @@ import {
 } from "@/components/result-display/MixedTeamQualTable";
 import { startNavigationProgress } from "@/components/NavigationProgress";
 import { shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
+import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
 
 export type DisciplineGroup = {
   code: string;
@@ -685,7 +686,7 @@ function CompetitionDetail({
         apparatus: group?.apparatus ?? null,
       })) ?? [];
 
-  const finalRows: FinalResultRow[] =
+  const rawFinalRows: FinalResultRow[] =
     catGroup?.results
       .filter((r) => r.finalRank != null || r.finalTotal != null)
       .map((r) => ({
@@ -702,6 +703,10 @@ function CompetitionDetail({
         finalDetail: r.finalDetail,
         remark: r.finalRemark,
       })) ?? [];
+  // Stara finala (samo zbirovi serija) → isti prikaz kao live: Klečeći/Ležeći… ili S1, S2, 11–12…
+  const finalRowsByRank = [...rawFinalRows].sort((a, b) => (a.finalRank ?? Infinity) - (b.finalRank ?? Infinity));
+  const displayDetails = normalizeFinalDetailsForDisplay(group?.code ?? "", finalRowsByRank.map((r) => r.finalDetail));
+  const finalRows: FinalResultRow[] = finalRowsByRank.map((r, i) => ({ ...r, finalDetail: displayDetails[i] as FinalResultRow["finalDetail"] }));
   const finalSlot = selection.kind === "individual"
     ? finalSlots.find((slot) => slot.disciplineCode === selection.disciplineCode && slot.category === selection.category)
     : undefined;
