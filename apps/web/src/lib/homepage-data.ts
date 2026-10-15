@@ -247,7 +247,8 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
     const detailItems = state.active
       ? [{ label: locale === "en" ? "NOW" : "U TOKU", text: activePhase! }, ...(activeTopThree ? [{ label: "TOP 3", text: activeTopThree }] : [])]
       : [
-          ...(nextPhase ? [{ label: locale === "en" ? "NEXT" : "SLEDEĆE", text: nextPhase }] : []),
+          // NEXT/USKORO badge već kaže da je sledeće, pa labela u tekstu ne ponavlja isto (ostaje kad je badge LIVE).
+          ...(nextPhase ? [{ ...(tickerStatus === "NEXT" || tickerStatus === "USKORO" ? {} : { label: locale === "en" ? "NEXT" : "SLEDEĆE" }), text: nextPhase }] : []),
           ...completedSlots.map((slot) => ({ text: `${slot.discCode} · ${tickerStageLabel(slot.stage, locale)} · ${topThree(slot)!}`, status: "REVIEW" as const })),
         ];
     const linkedItems = activeOverrides
