@@ -5,6 +5,7 @@ const nav = vi.hoisted(() => ({ pathname: "/sr/srb", search: "" }));
 vi.mock("next/navigation", () => ({
   usePathname: () => nav.pathname,
   useSearchParams: () => new URLSearchParams(nav.search),
+  useParams: () => ({ locale: "sr" }),
 }));
 
 import { NavigationProgress, startNavigationProgress } from "./NavigationProgress";

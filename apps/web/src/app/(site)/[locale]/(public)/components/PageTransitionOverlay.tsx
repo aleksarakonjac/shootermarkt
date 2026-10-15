@@ -2,6 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useSyncExternalStore } from "react";
+import { useUiLocale } from "@/hooks/use-ui-locale";
 
 const MIN_SPLASH_DURATION = 3_000;
 let splashUntil = 0;
@@ -29,6 +30,7 @@ export function startPageTransitionSplash() {
 }
 
 export function PageTransitionOverlay({ visible }: { visible: boolean }) {
+  const en = useUiLocale() === "en";
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const heldUntil = useSyncExternalStore(subscribeSplash, getSplashUntil, () => 0);
 
@@ -54,7 +56,7 @@ export function PageTransitionOverlay({ visible }: { visible: boolean }) {
         className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-8 bg-[var(--bg)]"
         style={{ animation: "_splash-in 90ms ease-out both" }}
         aria-live="polite"
-        aria-label="Učitavanje"
+        aria-label={en ? "Loading" : "Učitavanje"}
         role="status"
       >
         {/* Wordmark */}

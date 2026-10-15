@@ -104,7 +104,7 @@ export function PositionsQualDisplay({ detail, hasDecimals = false, locale = "sr
             );
           })}
 
-          {showGrandTotal && <tr className="border-t-2 border-[var(--border-strong)] bg-[var(--surface)]"><td className="px-3 py-2 font-[family-name:var(--font-barlow-condensed)] font-bold text-xs uppercase tracking-wide text-[var(--ink)]">Ukupno</td>{Array.from({ length: maxSeries }).map((_, i) => <td key={i} className="px-3 py-2" />)}<td className="px-3 py-2 text-center font-[family-name:var(--font-jetbrains-mono)] text-base font-bold tabular-nums text-[var(--ink)]">{fmt(grandTotal)}</td></tr>}
+          {showGrandTotal && <tr className="border-t-2 border-[var(--border-strong)] bg-[var(--surface)]"><td className="px-3 py-2 font-[family-name:var(--font-barlow-condensed)] font-bold text-xs uppercase tracking-wide text-[var(--ink)]">{locale === "en" ? "Total" : "Ukupno"}</td>{Array.from({ length: maxSeries }).map((_, i) => <td key={i} className="px-3 py-2" />)}<td className="px-3 py-2 text-center font-[family-name:var(--font-jetbrains-mono)] text-base font-bold tabular-nums text-[var(--ink)]">{fmt(grandTotal)}</td></tr>}
         </tbody>
       </table>
     </div>

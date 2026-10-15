@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useSyncExternalStore } from "react";
+import { useUiLocale } from "@/hooks/use-ui-locale";
 
 // Module-level store so all ThemeToggle instances (if any) stay in sync
 // and the storage event propagates cross-tab.
@@ -16,6 +17,7 @@ function getIsDark() { return localStorage.getItem("theme") === "dark"; }
 export default function ThemeToggle() {
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const isDark   = useSyncExternalStore(subscribeTheme, getIsDark, () => false);
+  const en = useUiLocale() === "en";
 
   // Sync class on initial mount and whenever isDark changes
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      aria-label={isDark ? "Prebaci na svetli mod" : "Prebaci na tamni mod"}
+      aria-label={en ? (isDark ? "Switch to light mode" : "Switch to dark mode") : (isDark ? "Prebaci na svetli mod" : "Prebaci na tamni mod")}
       className="flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] lg:h-8 lg:w-8"
     >
       {mounted && isDark ? (

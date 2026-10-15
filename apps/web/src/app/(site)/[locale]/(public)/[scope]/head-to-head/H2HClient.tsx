@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
+import { useLocale } from "next-intl";
 import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
 import { trendLabel, type Trend } from "@/lib/forma";
 import { type ShooterOption } from "@/components/ui/ShooterSearchSelect";
@@ -28,6 +29,7 @@ function ShooterInlineSearch({
   placeholder: string;
   label: string;
 }) {
+  const en = useLocale() === "en";
   const listboxId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -108,7 +110,7 @@ function ShooterInlineSearch({
             type="button"
             onClick={(e) => { e.stopPropagation(); onChange({ ...value, id: -1 } as never); setQuery(""); }}
             className="shrink-0 text-[var(--subtle)] hover:text-[var(--ink)] transition-colors ml-auto"
-            aria-label="Obriši izbor"
+            aria-label={en ? "Clear selection" : "Obriši izbor"}
             onClickCapture={(e) => { e.stopPropagation(); select({ id: -1 } as never); setResults([]); }}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -139,10 +141,10 @@ function ShooterInlineSearch({
               className="absolute left-0 right-0 top-full z-[var(--z-dropdown)] mt-1 max-h-[min(280px,calc(100vh-12rem))] overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_4px_8px_oklch(0_0_0/0.12)]"
             >
               {loading ? (
-                <li className="px-3 py-3 text-center text-sm text-[var(--muted)]">Tražim…</li>
+                <li className="px-3 py-3 text-center text-sm text-[var(--muted)]">{en ? "Searching…" : "Tražim…"}</li>
               ) : results.length === 0 ? (
                 <li className="px-3 py-3 text-center text-sm text-[var(--muted)]">
-                  {query.trim().length < 2 ? "Ukucaj bar 2 slova…" : "Nema poklapanja"}
+                  {query.trim().length < 2 ? (en ? "Type at least 2 letters…" : "Ukucaj bar 2 slova…") : (en ? "No matches" : "Nema poklapanja")}
                 </li>
               ) : results.map((s, i) => {
                 const sa2 = nocAlpha2(s.nationality);
@@ -288,6 +290,7 @@ interface Props {
 
 export function H2HClient({ labels, initialP1, initialP2 }: Props) {
   const scopedHref = useScopedHref();
+  const en = useLocale() === "en";
 
   const [p1, setP1] = useState<ShooterOption | null>(null);
   const [p2, setP2] = useState<ShooterOption | null>(null);
@@ -378,7 +381,7 @@ export function H2HClient({ labels, initialP1, initialP2 }: Props) {
           onChange={handleP1Change}
           excludeId={p2Id}
           placeholder={labels.h2hPickPrompt}
-          label="Strelac A"
+          label={en ? "Shooter A" : "Strelac A"}
         />
         <button
           type="button"
@@ -396,7 +399,7 @@ export function H2HClient({ labels, initialP1, initialP2 }: Props) {
           onChange={handleP2Change}
           excludeId={p1Id}
           placeholder={labels.h2hPickPrompt}
-          label="Strelac B"
+          label={en ? "Shooter B" : "Strelac B"}
         />
       </div>
 
@@ -407,7 +410,7 @@ export function H2HClient({ labels, initialP1, initialP2 }: Props) {
         </div>
       ) : error ? (
         <div className="py-16 text-center px-5">
-          <p className="text-sm text-[var(--muted)]">Greška pri učitavanju. Pokušaj ponovo.</p>
+          <p className="text-sm text-[var(--muted)]">{en ? "Failed to load. Please try again." : "Greška pri učitavanju. Pokušaj ponovo."}</p>
         </div>
       ) : !data ? (
         <div className="py-16 text-center px-5">
@@ -433,7 +436,7 @@ export function H2HClient({ labels, initialP1, initialP2 }: Props) {
           {/* Per-discipline stats */}
           {sharedDiscs.length === 0 ? (
             <div className="px-5 py-6 text-center border-t border-[var(--border)]">
-              <p className="text-sm text-[var(--muted)]">Nema zajedničkih nastupa u istim disciplinama.</p>
+              <p className="text-sm text-[var(--muted)]">{en ? "No shared appearances in the same events." : "Nema zajedničkih nastupa u istim disciplinama."}</p>
             </div>
           ) : sharedDiscs.map((code) => {
             const s1 = data.p1.stats.find((s) => s.disciplineCode === code) ?? null;

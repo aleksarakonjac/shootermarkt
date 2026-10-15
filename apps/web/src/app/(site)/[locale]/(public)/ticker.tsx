@@ -495,7 +495,7 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
       className="w-full overflow-hidden"
       style={{ height: 32, background: "var(--brand-primary)" }}
       role="region"
-      aria-label="Najava takmičenja"
+      aria-label={locale === "en" ? "Upcoming competitions" : "Najava takmičenja"}
       onMouseEnter={() => { cancelResume(); setPaused(true); }}
       onMouseLeave={() => { cancelResume(); setPaused(false); }}
       onTouchStart={handleTouchStart}

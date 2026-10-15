@@ -7,6 +7,8 @@ vi.mock("@/i18n/navigation", () => ({
   ),
 }));
 
+vi.mock("next-intl/server", () => ({ getLocale: async () => "sr" }));
+
 vi.mock("@/lib/cms/resolve-competition", () => ({
   resolveCompetition: vi.fn(async (id: number) =>
     id === 1 ? { id: 1, name: "Prvenstvo Srbije 2026", date: "2026-05-01", dateEnd: null, location: "Beograd", level: "national" } : null
@@ -43,6 +45,6 @@ describe("ArticleContent", () => {
 
   it("renders a fallback message for a shooter-embed block whose shooter no longer exists", async () => {
     render(await ArticleContent({ content: lexicalContent }));
-    expect(screen.getByText("Podaci o strelacu nisu dostupni.")).toBeInTheDocument();
+    expect(screen.getByText("Podaci o strelcu nisu dostupni.")).toBeInTheDocument();
   });
 });

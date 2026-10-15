@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useUiLocale } from "@/hooks/use-ui-locale";
 
 /**
  * Povuci nadole na vrhu stranice → osveži stranicu i podatke.
@@ -34,6 +35,7 @@ function insideScrolledElement(target: EventTarget | null) {
 const reloadPage = () => window.location.reload();
 
 export function PullToRefresh({ onRefresh = reloadPage }: { onRefresh?: () => void }) {
+  const en = useUiLocale() === "en";
   const [pull, setPull] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -98,7 +100,9 @@ export function PullToRefresh({ onRefresh = reloadPage }: { onRefresh?: () => vo
   return (
     <div
       role="status"
-      aria-label={refreshing ? "Osvežavanje" : ready ? "Pusti za osvežavanje" : "Povuci za osvežavanje"}
+      aria-label={en
+        ? (refreshing ? "Refreshing" : ready ? "Release to refresh" : "Pull to refresh")
+        : (refreshing ? "Osvežavanje" : ready ? "Pusti za osvežavanje" : "Povuci za osvežavanje")}
       className="pointer-events-none fixed left-1/2 z-[var(--z-tooltip)] flex size-9 -translate-x-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg)] shadow-md"
       style={{ top: `calc(var(--site-header-h, 3.5rem) + ${pull - 28}px)`, opacity: Math.min(1, pull / PULL_THRESHOLD), transition: dragging ? "none" : "top 200ms ease, opacity 200ms ease" }}
     >

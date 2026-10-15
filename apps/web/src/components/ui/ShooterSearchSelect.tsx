@@ -1,5 +1,6 @@
 "use client";
 
+import { useUiLocale } from "@/hooks/use-ui-locale";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
 
@@ -51,9 +52,11 @@ export function ShooterSearchSelect({
   options,
   excludeId = null,
   resolvedOption = null,
-  placeholder = "Pretraži strelca…",
+  placeholder: placeholderProp,
   className = "",
 }: Props) {
+  const en = useUiLocale() === "en";
+  const placeholder = placeholderProp ?? (en ? "Search shooter…" : "Pretraži strelca…");
   const isLocal = options !== undefined;
 
   const [remoteResults, setRemoteResults] = useState<ShooterOption[]>([]);
@@ -160,12 +163,12 @@ export function ShooterSearchSelect({
   };
 
   const emptyMessage = isLocal
-    ? (options!.length === 0 ? "Nema dostupnih strelaca" : "Nema poklapanja")
+    ? (options!.length === 0 ? (en ? "No shooters available" : "Nema dostupnih strelaca") : (en ? "No matches" : "Nema poklapanja"))
     : query.trim().length < 2
     ? "Ukucaj bar 2 slova…"
     : loading
-    ? "Tražim…"
-    : "Nema poklapanja";
+    ? (en ? "Searching…" : "Tražim…")
+    : (en ? "No matches" : "Nema poklapanja");
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -213,7 +216,7 @@ export function ShooterSearchSelect({
                 setFocusedIndex(0);
               }}
               onKeyDown={handleSearchKeyDown}
-              placeholder="Pretraži po imenu ili prezimenu…"
+              placeholder={en ? "Search by first or last name…" : "Pretraži po imenu ili prezimenu…"}
               className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-[var(--ink)] placeholder:text-[var(--subtle)] focus:border-[var(--brand-primary)] focus:outline-none"
             />
           </div>

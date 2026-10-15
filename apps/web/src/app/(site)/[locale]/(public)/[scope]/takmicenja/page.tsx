@@ -536,7 +536,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
 
           {/* ── HERO (live or first upcoming group) + rest ───────────── */}
           {activeWhen === "upcoming" && (heroItems.length > 0 || upcomingMonths.length > 0) && (
-            <section aria-label="Nadolazeća takmičenja">
+            <section aria-label={locale === "en" ? "Upcoming competitions" : "Nadolazeća takmičenja"}>
               {heroItems.length > 0 && <div className="space-y-2 mb-2">
                 {heroItems.map((hero) => (
                   <ScopedLink
@@ -675,7 +675,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
           )}
 
           {activeWhen === "past" && pastAll.length > 0 && (
-            <section aria-label="Prošla takmičenja">
+            <section aria-label={locale === "en" ? "Past competitions" : "Prošla takmičenja"}>
               <div className="space-y-5">
                 {visiblePastMonths.map((mk, monthIdx) => {
                   const comps = pastByMonth.get(mk)!;

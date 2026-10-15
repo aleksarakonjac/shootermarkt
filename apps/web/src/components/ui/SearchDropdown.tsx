@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useUiLocale } from "@/hooks/use-ui-locale";
 
 export interface DropdownOption {
   value: string;
@@ -47,9 +48,9 @@ export function SearchDropdown({
   value,
   onChange,
   options,
-  placeholder = "Izaberi...",
-  emptyLabel = "— bez izbora —",
-  searchPlaceholder = "Pretraži...",
+  placeholder: placeholderProp,
+  emptyLabel: emptyLabelProp,
+  searchPlaceholder: searchPlaceholderProp,
   searchable = true,
   onCreateNew,
   createNewLabel = (q) => `+ Kreiraj "${q}"`,
@@ -63,6 +64,11 @@ export function SearchDropdown({
   pinnedLabel,
   showEmptyOption = true,
 }: Props) {
+  // Podrazumevani tekstovi po jeziku stranice (komponenta se koristi i u adminu, van next-intl).
+  const en = useUiLocale() === "en";
+  const placeholder = placeholderProp ?? (en ? "Select..." : "Izaberi...");
+  const emptyLabel = emptyLabelProp ?? (en ? "— none —" : "— bez izbora —");
+  const searchPlaceholder = searchPlaceholderProp ?? (en ? "Search..." : "Pretraži...");
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -213,7 +219,7 @@ export function SearchDropdown({
             ))}
 
             {filtered.length === 0 && !showCreate && (
-              <p className="px-3 py-2 text-xs text-[var(--subtle)]">Nema rezultata</p>
+              <p className="px-3 py-2 text-xs text-[var(--subtle)]">{en ? "No results" : "Nema rezultata"}</p>
             )}
 
             {showCreate && (

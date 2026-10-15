@@ -69,7 +69,7 @@ describe("ResultsHistoryTable", () => {
     render(<ResultsHistoryTable locale="en" results={[{ ...result, disciplineCode: "R3PM", qualTotal: "590", qualRank: 5, qualDetail: { series: [96, 97, 98, 99, 100, 100] }, elimTotal: 590, elimRank: 4, elimRound: 2, elimDetail: { series: [96, 97, 98, 99, 100, 100] } }]} />);
     fireEvent.click(screen.getByText("R3PM"));
 
-    expect(screen.getByText("Eliminacije · #4")).toBeInTheDocument();
+    expect(screen.getByText("Eliminations · #4")).toBeInTheDocument();
     expect(screen.getByLabelText("Open elimination results")).toHaveAttribute("href", "/sr/srb/takmicenja/1?result=individual&disc=R3PM&category=senior&stage=elim&round=2");
     expect(screen.getAllByText("Kneeling")).toHaveLength(2);
     expect([...document.querySelectorAll("colgroup")].map((group) => group.children.length)).toEqual([6, 6]);

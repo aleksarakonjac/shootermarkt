@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useUiLocale } from "@/hooks/use-ui-locale";
 
 // Boja po značenju kazne/napomene — bez box-a, samo obojeno slovo/oznaka.
 // DSQ i A-kaznene oznake (A1, A2...) su diskvalifikacije → crveno (--danger).
@@ -35,6 +36,7 @@ function RemarkModal({ remark, label, onClose }: { remark: string; label?: strin
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const en = useUiLocale() === "en";
   return createPortal(
     <div
       className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center px-4"
@@ -45,8 +47,8 @@ function RemarkModal({ remark, label, onClose }: { remark: string; label?: strin
     >
       <div className="w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4 shadow-lg">
         <div className="flex items-start justify-between gap-3 mb-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{label || "Napomena"}</p>
-          <button type="button" onClick={onClose} aria-label="Zatvori" className="text-[var(--subtle)] hover:text-[var(--ink)] text-sm leading-none">✕</button>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{label || (en ? "Remark" : "Napomena")}</p>
+          <button type="button" onClick={onClose} aria-label={en ? "Close" : "Zatvori"} className="text-[var(--subtle)] hover:text-[var(--ink)] text-sm leading-none">✕</button>
         </div>
         <p className="text-sm text-[var(--ink)] whitespace-pre-wrap">{remark}</p>
       </div>
@@ -59,6 +61,7 @@ function RemarkModal({ remark, label, onClose }: { remark: string; label?: strin
  *  kolonu — tad se prikazuje kao dugme koje na klik otvara modal sa punim tekstom. */
 export function RemarkBadge({ remark, code, label, className = "ml-1.5" }: { remark: string; code?: string | null; label?: string; className?: string }) {
   const [open, setOpen] = useState(false);
+  const en = useUiLocale() === "en";
 
   if (code) {
     return (
@@ -68,7 +71,7 @@ export function RemarkBadge({ remark, code, label, className = "ml-1.5" }: { rem
           onClick={(e) => { e.stopPropagation(); setOpen(true); }}
           className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none underline decoration-dotted underline-offset-2 ${className}`}
           style={{ color: "var(--danger)" }}
-          title="Prikaži napomenu"
+          title={en ? "Show remark" : "Prikaži napomenu"}
         >
           {code}
         </button>

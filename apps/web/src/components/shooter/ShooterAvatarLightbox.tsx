@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useUiLocale } from "@/hooks/use-ui-locale";
 
 type Props = {
   src: string;
@@ -14,6 +15,7 @@ type Props = {
 export function ShooterAvatarLightbox({ src, alt }: Props) {
   const [open, setOpen] = useState(false);
   const reducedMotion = useReducedMotion();
+  const en = useUiLocale() === "en";
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
   useEffect(() => {
@@ -65,7 +67,7 @@ export function ShooterAvatarLightbox({ src, alt }: Props) {
                   type="button"
                   onClick={() => setOpen(false)}
                   className="pointer-events-auto absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-black/65 text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                  aria-label="Zatvori fotografiju"
+                  aria-label={en ? "Close photo" : "Zatvori fotografiju"}
                 >
                   <X size={20} aria-hidden="true" />
                 </button>

@@ -154,7 +154,7 @@ export function KalendarClient({ competitions }: Props) {
   const listKey = listTitle + "|" + levelFilter;
 
   const filterPills = (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter po nivou takmičenja">
+    <div className="flex flex-wrap gap-1.5" role="group" aria-label={locale === "en" ? "Filter by competition level" : "Filter po nivou takmičenja"}>
       {FILTER_TABS.map((tab) => (
         <button
           key={tab.key}
@@ -249,7 +249,7 @@ export function KalendarClient({ competitions }: Props) {
                   setActiveStartDate(d);
                   setSelectedDate(null);
                 }}
-                aria-label="Prethodni mesec"
+                aria-label={locale === "en" ? "Previous month" : "Prethodni mesec"}
                 className="w-6 h-6 flex items-center justify-center rounded text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
@@ -263,7 +263,7 @@ export function KalendarClient({ competitions }: Props) {
                   setActiveStartDate(d);
                   setSelectedDate(null);
                 }}
-                aria-label="Sledeći mesec"
+                aria-label={locale === "en" ? "Next month" : "Sledeći mesec"}
                 className="w-6 h-6 flex items-center justify-center rounded text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
@@ -276,7 +276,7 @@ export function KalendarClient({ competitions }: Props) {
                     setActiveStartDate(new Date(today.getFullYear(), today.getMonth(), 1));
                     setSelectedDate(null);
                   }}
-                  aria-label="Trenutni mesec"
+                  aria-label={locale === "en" ? "Current month" : "Trenutni mesec"}
                   className="ml-1 px-2 h-6 flex items-center rounded text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
                 >
                   Danas
@@ -346,7 +346,7 @@ export function KalendarClient({ competitions }: Props) {
                     !isLast ? "border-b border-[var(--border)]" : ""
                   } ${isPast ? "opacity-60" : ""}`}
                   style={{ "--idx": Math.min(idx, 8) } as React.CSSProperties}
-                  aria-label={`${comp.name}, ${formatDisplayDate(comp.date, comp.dateEnd)}${comp.location ? `, ${comp.location}` : ""}${isPast ? ", završeno" : ""}`}
+                  aria-label={`${comp.name}, ${formatDisplayDate(comp.date, comp.dateEnd)}${comp.location ? `, ${comp.location}` : ""}${isPast ? (locale === "en" ? ", finished" : ", završeno") : ""}`}
                 >
                   {/* Date block */}
                   <div

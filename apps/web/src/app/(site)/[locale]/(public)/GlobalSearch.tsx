@@ -257,10 +257,12 @@ function detectShortcuts(q: string, locale: string, scopedHref: (path: string) =
   if (country) {
     const [noc, display] = country;
     const code2 = NOC_TO_CODE2[noc];
+    // Lokacija ostaje srpski naziv (tako su upisana mesta takmičenja); prikaz se prevodi.
+    const shown = isEn && code2 ? new Intl.DisplayNames(["en"], { type: "region" }).of(code2.toUpperCase()) ?? display : display;
     const ps = new URLSearchParams(); ps.set("zemlja", noc);
-    shortcuts.push({ icon:"flag", label:`${shootersLabel} · ${display} (${noc})`, href: scopedHref(`/strelci?${ps}`), countryCode2: code2 });
+    shortcuts.push({ icon:"flag", label:`${shootersLabel} · ${shown} (${noc})`, href: scopedHref(`/strelci?${ps}`), countryCode2: code2 });
     const pc = new URLSearchParams(); pc.set("location", display);
-    shortcuts.push({ icon:"location", label:`${compsLabel} · ${display} (${isEn ? "location" : "lokacija"})`, href: scopedHref(`/takmicenja?${pc}`), countryCode2: code2 });
+    shortcuts.push({ icon:"location", label:`${compsLabel} · ${shown} (${isEn ? "location" : "lokacija"})`, href: scopedHref(`/takmicenja?${pc}`), countryCode2: code2 });
   }
 
   return shortcuts.slice(0, 7);
@@ -646,7 +648,7 @@ export function GlobalSearch() {
             </div>
           ) : isSearching ? (
             <div className="px-4 py-10 text-center">
-              <p className="text-sm text-[var(--muted)]">Pretraživanje…</p>
+              <p className="text-sm text-[var(--muted)]">{locale === "en" ? "Searching…" : "Pretraživanje…"}</p>
             </div>
           ) : searchError ? (
             <div className="px-4 py-10 text-center">

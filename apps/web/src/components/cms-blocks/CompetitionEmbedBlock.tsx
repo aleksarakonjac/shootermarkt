@@ -1,24 +1,29 @@
 import { Link } from "@/i18n/navigation";
+import { getLocale } from "next-intl/server";
 import { resolveCompetition } from "@/lib/cms/resolve-competition";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 
-function formatCompDate(date: string, dateEnd: string | null): string {
+function formatCompDate(date: string, dateEnd: string | null, locale: string): string {
+  const dateLocale = locale === "en" ? "en-GB" : "sr-Latn-RS";
   const start = new Date(date);
   const fmt = (d: Date) =>
-    d.toLocaleDateString("sr-Latn-RS", { day: "numeric", month: "short", year: "numeric" });
+    d.toLocaleDateString(dateLocale, { day: "numeric", month: "short", year: "numeric" });
   if (!dateEnd || dateEnd === date) return fmt(start);
   const end = new Date(dateEnd);
   if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
-    return `${start.getDate()}–${end.getDate()}. ${start.toLocaleString("sr-Latn-RS", { month: "short" })} ${start.getFullYear()}.`;
+    const month = start.toLocaleString(dateLocale, { month: "short" });
+    return locale === "en"
+      ? `${start.getDate()}–${end.getDate()} ${month} ${start.getFullYear()}`
+      : `${start.getDate()}–${end.getDate()}. ${month} ${start.getFullYear()}.`;
   }
   return `${fmt(start)} – ${fmt(end)}`;
 }
 
 export async function CompetitionEmbedBlock({ competitionId }: { competitionId: number }) {
-  const competition = await resolveCompetition(competitionId);
+  const [competition, locale] = await Promise.all([resolveCompetition(competitionId), getLocale()]);
   if (!competition) {
     return (
-      <p className="my-4 text-sm text-[var(--muted)] italic">Podaci o takmičenju nisu dostupni.</p>
+      <p className="my-4 text-sm text-[var(--muted)] italic">{locale === "en" ? "Competition data is not available." : "Podaci o takmičenju nisu dostupni."}</p>
     );
   }
 
@@ -38,13 +43,13 @@ export async function CompetitionEmbedBlock({ competitionId }: { competitionId: 
           className="text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full"
           style={levelStyle}
         >
-          {getLevelLabel(competition.level, "sr")}
+          {getLevelLabel(competition.level, locale)}
         </span>
         <time
           className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] text-[var(--subtle)] tabular-nums"
           dateTime={competition.date}
         >
-          {formatCompDate(competition.date, competition.dateEnd)}
+          {formatCompDate(competition.date, competition.dateEnd, locale)}
         </time>
       </div>
 

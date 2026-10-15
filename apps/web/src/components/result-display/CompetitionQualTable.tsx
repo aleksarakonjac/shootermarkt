@@ -55,11 +55,12 @@ export type CompResultRow = {
 };
 
 function QualifiedBadge() {
+  const en = useLocale() === "en";
   return (
     <span
       className="font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none"
       style={{ color: "var(--success)" }}
-      title="Kvalifikovan za finale"
+      title={en ? "Qualified for the final" : "Kvalifikovan za finale"}
     >
       Q
     </span>
@@ -189,6 +190,7 @@ function SeriesBox({ text, best }: { text: string; best: boolean }) {
 
 export function CompetitionQualTable({ results, competitionLevel }: Props) {
   const locale = useLocale();
+  const en = locale === "en";
   const positionLabels: PositionLabels = locale === "en" ? POSITION_LABELS_EN : POSITION_LABELS;
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
@@ -196,7 +198,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
   if (results.length === 0) {
     return (
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center">
-        <p className="text-sm text-[var(--muted)]">Nema rezultata za ovu disciplinu.</p>
+        <p className="text-sm text-[var(--muted)]">{en ? "No results for this event." : "Nema rezultata za ovu disciplinu."}</p>
       </div>
     );
   }
@@ -225,7 +227,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
   // Inner tens don't apply to air rifle; for other disciplines the column
   // sits to the right of the total, not the left.
   const showInners = !isAirRifle && results.some((r) => r.qualInners != null);
-  const clubHeaderLabel = NOC_ONLY_LEVELS.has(competitionLevel ?? "") ? "NOC" : "Klub / NOC";
+  const clubHeaderLabel = NOC_ONLY_LEVELS.has(competitionLevel ?? "") ? "NOC" : en ? "Club / NOC" : "Klub / NOC";
 
   const fmt = (v: number) =>
     hasDecimals ? v.toFixed(1) : Math.round(v).toString();
@@ -284,7 +286,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
             onClick={toggleAll}
             className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
           >
-            {allExpanded ? "Sakrij serije" : "Prikaži sve serije"}
+            {allExpanded ? (en ? "Hide series" : "Sakrij serije") : (en ? "Show all series" : "Prikaži sve serije")}
             <ChevronIcon open={allExpanded} />
           </button>
         </div>
@@ -298,7 +300,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
           {/* Column header row */}
           <div role="row" style={{ display: "contents" }}>
             <div role="columnheader" className={`${headerCellCls} justify-end`}>#</div>
-            <div role="columnheader" className={headerCellCls}>Strelac</div>
+            <div role="columnheader" className={headerCellCls}>{en ? "Shooter" : "Strelac"}</div>
             <div role="columnheader" className={headerCellCls}>{clubHeaderLabel}</div>
             {headerGroups.map((group, i) => (
               <div

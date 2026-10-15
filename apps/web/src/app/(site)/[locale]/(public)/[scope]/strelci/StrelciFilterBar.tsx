@@ -153,7 +153,7 @@ export function StrelciFilterBar({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t("search")}
-            aria-label="Pretraži strelce"
+            aria-label={locale === "en" ? "Search shooters" : "Pretraži strelce"}
             className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--bg)] pl-9 pr-3 py-0 text-xs text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
           />
         </div>
@@ -169,17 +169,17 @@ export function StrelciFilterBar({
                 exit={reducedMotion ? undefined : { opacity: 0, y: 4 }}
                 transition={{ duration: reducedMotion ? 0 : 0.16 }}
               >
-                <button type="button" onClick={() => setSrbPromptOpen(false)} className="absolute right-2 top-0.5 flex h-7 w-7 items-center justify-center text-lg leading-none text-[var(--subtle)] hover:text-[var(--ink)]" aria-label="Zatvori">×</button>
+                <button type="button" onClick={() => setSrbPromptOpen(false)} className="absolute right-2 top-0.5 flex h-7 w-7 items-center justify-center text-lg leading-none text-[var(--subtle)] hover:text-[var(--ink)]" aria-label={locale === "en" ? "Close" : "Zatvori"}>×</button>
                 <p className="flex items-center gap-1.5 pr-4 text-xs font-medium text-[var(--ink)]">
                   <span className="fi fi-rs shrink-0" style={{ width: "16px", height: "12px", borderRadius: "2px" }} aria-hidden="true" />
-                  Prikaži samo strelce Srbije?
+                  {locale === "en" ? "Show only Serbian shooters?" : "Prikaži samo strelce Srbije?"}
                 </p>
                 <button
                   type="button"
                   onClick={() => { setSrbPromptOpen(false); push({ zemlja: "SRB", page: 1 }); }}
                   className="mt-2 text-xs font-semibold text-[var(--brand-primary)] hover:underline"
                 >
-                  Prikaži Srbiju
+                  {locale === "en" ? "Show Serbia" : "Prikaži Srbiju"}
                 </button>
               </motion.div>
             )}
@@ -218,7 +218,7 @@ export function StrelciFilterBar({
       {/* Filters */}
       <div className="grid grid-cols-6 gap-1 sm:flex sm:items-center sm:flex-wrap sm:gap-1.5">
         {/* Apparatus */}
-        <div role="group" aria-label="Filter po disciplini" className="contents">
+        <div role="group" aria-label={locale === "en" ? "Filter by event" : "Filter po disciplini"} className="contents">
           {APARAT_OPTIONS.map((a, index) => (
             <motion.button
               key={a.value}
@@ -236,7 +236,7 @@ export function StrelciFilterBar({
         <span className="hidden h-4 w-px shrink-0 bg-[var(--border)] sm:block sm:mx-1" aria-hidden="true" />
 
         {/* Gender */}
-        <div role="group" aria-label="Filter po polu" className="contents">
+        <div role="group" aria-label={locale === "en" ? "Filter by gender" : "Filter po polu"} className="contents">
           {GENDER_OPTIONS.map(([val, label]) => (
             <motion.button
               key={val}

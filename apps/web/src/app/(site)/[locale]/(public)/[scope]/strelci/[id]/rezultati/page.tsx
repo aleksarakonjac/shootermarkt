@@ -20,8 +20,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     getLocale(),
   ]);
   const alternates = buildAlternates(locale, scope, `/strelci/${id}/rezultati`);
-  if (!shooter) return { title: "Rezultati", alternates };
-  return { title: `${shooter.lastName} ${shooter.firstName} — Rezultati | Shootermarkt`, alternates };
+  const resultsTitle = locale === "en" ? "Results" : "Rezultati";
+  if (!shooter) return { title: resultsTitle, alternates };
+  return { title: `${shooter.lastName} ${shooter.firstName} — ${resultsTitle} | Shootermarkt`, alternates };
 }
 
 export default async function ShooterResultsPage({ params }: Props) {

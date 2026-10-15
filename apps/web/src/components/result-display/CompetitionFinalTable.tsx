@@ -59,13 +59,14 @@ const MEDAL_COLOR: Record<number, string> = {
 };
 
 function MedalIcon({ rank }: { rank: number }) {
+  const en = useLocale() === "en";
   const color = MEDAL_COLOR[rank];
   if (!color) return null;
   return (
     <span
       className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[0.65rem] font-bold text-white shrink-0"
       style={{ background: color }}
-      aria-label={`Mesto ${rank}`}
+      aria-label={`${en ? "Place" : "Mesto"} ${rank}`}
     >
       {rank}
     </span>
@@ -216,8 +217,9 @@ const headerCellCls = "px-3 py-3 text-[0.7rem] font-semibold uppercase tracking-
 const narrowHeaderCellCls = "px-1 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center bg-[var(--surface)] border-b border-[var(--border)]";
 
 export function CompetitionFinalTable({ results, competitionLevel, showMedals = true }: Props) {
-  const clubHeaderLabel = NOC_ONLY_LEVELS.has(competitionLevel ?? "") ? "NOC" : "Klub / NOC";
   const locale = useLocale();
+  const en = locale === "en";
+  const clubHeaderLabel = NOC_ONLY_LEVELS.has(competitionLevel ?? "") ? "NOC" : en ? "Club / NOC" : "Klub / NOC";
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
 
@@ -238,7 +240,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
   if (sorted.length === 0) {
     return (
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center">
-        <p className="text-sm text-[var(--muted)]">Nema finalnih rezultata.</p>
+        <p className="text-sm text-[var(--muted)]">{en ? "No final results." : "Nema finalnih rezultata."}</p>
       </div>
     );
   }
@@ -280,7 +282,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
             onClick={toggleAll}
             className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
           >
-            {allExpanded ? "Sakrij serije" : "Prikaži sve serije"}
+            {allExpanded ? (en ? "Hide series" : "Sakrij serije") : (en ? "Show all series" : "Prikaži sve serije")}
             <ChevronIcon open={allExpanded} />
           </button>
         </div>
@@ -294,7 +296,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
           <div role="row" style={{ display: "contents" }}>
             <div role="columnheader" className={`${headerCellCls} justify-center`}>#</div>
             <div role="columnheader" className={headerCellCls} aria-hidden="true" />
-            <div role="columnheader" className={headerCellCls}>Strelac</div>
+            <div role="columnheader" className={headerCellCls}>{en ? "Shooter" : "Strelac"}</div>
             <div role="columnheader" className={headerCellCls}>{clubHeaderLabel}</div>
             {hasDetail && <div role="columnheader" className={`${narrowHeaderCellCls} sm:hidden`} aria-hidden="true" />}
             {hasDetail && headerGroups.map((group, i) => (
@@ -308,7 +310,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
               </div>
             ))}
             <div role="columnheader" className={`${headerCellCls} justify-end whitespace-nowrap`}>
-              {isHitCountFinal ? "Pogoci" : "Σ"}
+              {isHitCountFinal ? (en ? "Hits" : "Pogoci") : "Σ"}
             </div>
             <div role="columnheader" className={narrowHeaderCellCls} aria-hidden="true" />
           </div>

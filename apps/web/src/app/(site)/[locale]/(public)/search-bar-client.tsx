@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { useLocale } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { startNavigationProgress } from "@/components/NavigationProgress";
 
@@ -16,6 +17,7 @@ interface SearchBarClientProps {
 }
 
 export function SearchBarClient({ shootersList }: SearchBarClientProps) {
+  const locale = useLocale();
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -62,7 +64,7 @@ export function SearchBarClient({ shootersList }: SearchBarClientProps) {
         </div>
         <input
           type="text"
-          placeholder="Pretraži strelce..."
+          placeholder={locale === "en" ? "Search shooters..." : "Pretraži strelce..."}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -70,7 +72,7 @@ export function SearchBarClient({ shootersList }: SearchBarClientProps) {
           }}
           onFocus={() => setIsOpen(true)}
           className="w-full text-sm pl-8 pr-3 py-1.5 bg-transparent text-[var(--ink)] placeholder-[var(--subtle)] outline-none rounded-lg"
-          aria-label="Pretraga strelaca"
+          aria-label={locale === "en" ? "Shooter search" : "Pretraga strelaca"}
         />
       </div>
 

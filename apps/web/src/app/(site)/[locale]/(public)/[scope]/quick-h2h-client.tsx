@@ -38,7 +38,7 @@ function ShooterSearch({ label, excludedId, onSelect }: { label: string; exclude
         <input
           value={query}
           onChange={(event) => { setQuery(event.target.value); setResults([]); }}
-          placeholder="Pretraži..."
+          placeholder={locale === "en" ? "Search..." : "Pretraži..."}
           className="w-full text-xs rounded border border-[var(--border-strong)] p-1.5 bg-[var(--bg)] text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)]"
           autoComplete="off"
         />
@@ -62,6 +62,7 @@ function ShooterSearch({ label, excludedId, onSelect }: { label: string; exclude
 }
 
 export function QuickH2HClient() {
+  const locale = useLocale();
   const [shooterA, setShooterA] = useState<Shooter | null>(null);
   const [shooterB, setShooterB] = useState<Shooter | null>(null);
   const [result, setResult] = useState<ComparisonResult | null>(null);
@@ -79,19 +80,19 @@ export function QuickH2HClient() {
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]">
       <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
-        <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-[var(--ink)] uppercase tracking-wider">Direktni duel</h3>
+        <h3 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-lg text-[var(--ink)] uppercase tracking-wider">{locale === "en" ? "Head to head" : "Direktni duel"}</h3>
       </div>
       <div className="p-4 flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-2">
-          <ShooterSearch label="Strelac A" excludedId={String(shooterB?.id ?? "")} onSelect={(shooter) => { setShooterA(shooter); compare(shooter, shooterB); }} />
-          <ShooterSearch label="Strelac B" excludedId={String(shooterA?.id ?? "")} onSelect={(shooter) => { setShooterB(shooter); compare(shooterA, shooter); }} />
+          <ShooterSearch label={locale === "en" ? "Shooter A" : "Strelac A"} excludedId={String(shooterB?.id ?? "")} onSelect={(shooter) => { setShooterA(shooter); compare(shooter, shooterB); }} />
+          <ShooterSearch label={locale === "en" ? "Shooter B" : "Strelac B"} excludedId={String(shooterA?.id ?? "")} onSelect={(shooter) => { setShooterB(shooter); compare(shooterA, shooter); }} />
         </div>
-        {isPending && <p className="py-10 text-center text-xs text-[var(--muted)]">Računam statistiku...</p>}
-        {!isPending && !result && <p className="py-10 text-center text-xs text-[var(--muted)]">Izaberi dva strelca za poređenje.</p>}
+        {isPending && <p className="py-10 text-center text-xs text-[var(--muted)]">{locale === "en" ? "Calculating stats..." : "Računam statistiku..."}</p>}
+        {!isPending && !result && <p className="py-10 text-center text-xs text-[var(--muted)]">{locale === "en" ? "Pick two shooters to compare." : "Izaberi dva strelca za poređenje."}</p>}
         {!isPending && result?.shooterA && result.shooterB && (
           <div className="flex flex-col gap-3">
             <div className="flex h-6 overflow-hidden rounded text-center text-xs font-bold text-white">
-              {result.h2hRecord.total === 0 ? <span className="w-full bg-[var(--surface)] py-1 text-[var(--muted)]">Nema zajedničkih mečeva</span> : <>
+              {result.h2hRecord.total === 0 ? <span className="w-full bg-[var(--surface)] py-1 text-[var(--muted)]">{locale === "en" ? "No head-to-head meetings" : "Nema zajedničkih mečeva"}</span> : <>
                 <span className="bg-[var(--brand-primary)]" style={{ width: `${(result.h2hRecord.winsA / result.h2hRecord.total) * 100}%` }}>{result.h2hRecord.winsA}</span>
                 <span className="bg-[var(--subtle)]" style={{ width: `${(result.h2hRecord.draws / result.h2hRecord.total) * 100}%` }}>{result.h2hRecord.draws}</span>
                 <span className="bg-[var(--brand-accent)]" style={{ width: `${(result.h2hRecord.winsB / result.h2hRecord.total) * 100}%` }}>{result.h2hRecord.winsB}</span>

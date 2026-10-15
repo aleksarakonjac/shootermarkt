@@ -3,6 +3,7 @@
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 import { routing } from "@/i18n/routing";
+import { useUiLocale } from "@/hooks/use-ui-locale";
 
 /**
  * Tanka traka napretka na vrhu ekrana dok se učitava sledeća stranica.
@@ -108,6 +109,7 @@ export function NavigationProgress() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { phase, progress } = useSyncExternalStore(subscribe, getState, getServerState);
+  const en = useUiLocale() === "en";
 
   // Start: klikovi na interne linkove i back/forward.
   useEffect(() => {
@@ -128,7 +130,7 @@ export function NavigationProgress() {
   return (
     <div
       role="progressbar"
-      aria-label="Učitavanje stranice"
+      aria-label={en ? "Loading page" : "Učitavanje stranice"}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(progress * 100)}

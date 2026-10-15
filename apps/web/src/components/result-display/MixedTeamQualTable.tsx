@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { useLocale } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
@@ -25,9 +26,10 @@ const MEDAL_COLOR: Record<number, string> = {
 };
 
 function MedalIcon({ rank }: { rank: number }) {
+  const en = useLocale() === "en";
   const color = MEDAL_COLOR[rank];
   if (!color) return null;
-  return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[0.65rem] font-bold text-white shrink-0" style={{ background: color }} aria-label={`Mesto ${rank}`}>{rank}</span>;
+  return <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[0.65rem] font-bold text-white shrink-0" style={{ background: color }} aria-label={`${en ? "Place" : "Mesto"} ${rank}`}>{rank}</span>;
 }
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -44,6 +46,7 @@ function sumOrNull(series: number[] | undefined): number | null {
 }
 
 export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedals = true }: Props) {
+  const en = useLocale() === "en";
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
   const isFinal = stage === "final";
@@ -71,7 +74,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const desktopColumns = ["32px", "minmax(90px, 200px)", "80px", "minmax(140px, 1fr)", ...seriesHeaders.map(() => SERIES_COL_W), "72px", "max-content", "40px", "28px"].join(" ");
   const header = "flex items-center border-b border-[var(--border)] bg-[var(--surface-2)] px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-3";
 
-  if (!sorted.length) return <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center"><p className="text-sm text-[var(--muted)]">{isFinal ? "Nema finalnih rezultata." : "Nema rezultata za ovu disciplinu."}</p></div>;
+  if (!sorted.length) return <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center"><p className="text-sm text-[var(--muted)]">{isFinal ? (en ? "No final results." : "Nema finalnih rezultata.") : (en ? "No results for this event." : "Nema rezultata za ovu disciplinu.")}</p></div>;
   const toggle = (id: number) => setExpanded((previous) => {
     const next = new Set(previous);
     if (next.has(id)) next.delete(id);
@@ -80,13 +83,13 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   });
 
   return <div className="overflow-hidden rounded-xl border border-[var(--border)]">
-    {hasSeries && <div className="flex items-center justify-end border-b border-[var(--border)] bg-[var(--surface)] px-3 py-2 sm:hidden"><button type="button" onClick={() => setExpanded(allExpanded ? new Set() : new Set(sorted.map((team) => team.id)))} className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--muted)] transition-colors hover:text-[var(--ink)]">{allExpanded ? "Sakrij serije" : "Prikaži sve serije"}<ChevronIcon open={allExpanded} /></button></div>}
+    {hasSeries && <div className="flex items-center justify-end border-b border-[var(--border)] bg-[var(--surface)] px-3 py-2 sm:hidden"><button type="button" onClick={() => setExpanded(allExpanded ? new Set() : new Set(sorted.map((team) => team.id)))} className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--muted)] transition-colors hover:text-[var(--ink)]">{allExpanded ? (en ? "Hide series" : "Sakrij serije") : (en ? "Show all series" : "Prikaži sve serije")}<ChevronIcon open={allExpanded} /></button></div>}
     <div><div role="table" className="grid text-sm [grid-template-columns:var(--mobile-grid)] sm:[grid-template-columns:var(--desktop-grid)]" style={{ "--mobile-grid": mobileColumns, "--desktop-grid": desktopColumns } as CSSProperties}>
       <div role="row" style={{ display: "contents" }}>
         <div role="columnheader" className={`${header} justify-end`}>#</div>
-        <div role="columnheader" className={header}>Tim</div>
+        <div role="columnheader" className={header}>{en ? "Team" : "Tim"}</div>
         <div role="columnheader" className={header}>NOC</div>
-        <div role="columnheader" className={header}>Strelci</div>
+        <div role="columnheader" className={header}>{en ? "Shooters" : "Strelci"}</div>
         {hasSeries && seriesHeaders.map((h, i) => <div key={i} role="columnheader" className={`hidden sm:flex ${header} justify-end`}>{h}</div>)}
         <div role="columnheader" className={`${header} justify-end`} aria-hidden="true" />
         <div role="columnheader" className={`${header} justify-end`}>Σ</div>

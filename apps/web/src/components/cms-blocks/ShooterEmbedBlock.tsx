@@ -1,12 +1,13 @@
 import { Link } from "@/i18n/navigation";
 import Image from "next/image";
+import { getLocale } from "next-intl/server";
 import { resolveShooter } from "@/lib/cms/resolve-shooter";
 
-const DISC_LABEL: Record<string, string> = {
-  ARM: "10m Vazdušna puška M",
-  ARW: "10m Vazdušna puška Ž",
-  APM: "10m Vazdušni pištolj M",
-  APW: "10m Vazdušni pištolj Ž",
+const DISC_LABEL: Record<string, { sr: string; en: string }> = {
+  ARM: { sr: "10m Vazdušna puška M", en: "10m Air Rifle Men" },
+  ARW: { sr: "10m Vazdušna puška Ž", en: "10m Air Rifle Women" },
+  APM: { sr: "10m Vazdušni pištolj M", en: "10m Air Pistol Men" },
+  APW: { sr: "10m Vazdušni pištolj Ž", en: "10m Air Pistol Women" },
 };
 
 const TREND_ICON: Record<string, string> = {
@@ -22,10 +23,11 @@ const TREND_COLOR: Record<string, string> = {
 };
 
 export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {
-  const shooter = await resolveShooter(shooterId);
+  const [shooter, locale] = await Promise.all([resolveShooter(shooterId), getLocale()]);
+  const en = locale === "en";
   if (!shooter) {
     return (
-      <p className="my-4 text-sm text-[var(--muted)] italic">Podaci o strelacu nisu dostupni.</p>
+      <p className="my-4 text-sm text-[var(--muted)] italic">{en ? "Shooter data is not available." : "Podaci o strelcu nisu dostupni."}</p>
     );
   }
 
@@ -67,11 +69,11 @@ export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {
             {shooter.firstName} {shooter.lastName}
           </h3>
           <p className="text-sm text-[var(--muted)] truncate mt-0.5">
-            {shooter.clubName ?? "Bez kluba"}
+            {shooter.clubName ?? (en ? "No club" : "Bez kluba")}
             {shooter.disciplineCode && (
               <span className="text-[var(--subtle)]">
                 {" · "}
-                {DISC_LABEL[shooter.disciplineCode] ?? shooter.disciplineCode}
+                {DISC_LABEL[shooter.disciplineCode]?.[en ? "en" : "sr"] ?? shooter.disciplineCode}
               </span>
             )}
           </p>
@@ -105,7 +107,7 @@ export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {
               {forma.peak != null ? forma.peak.toFixed(1) : "—"}
             </span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--subtle)] mt-1">
-              Vrhunac
+              {en ? "Peak" : "Vrhunac"}
             </span>
           </div>
 
@@ -115,19 +117,19 @@ export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {
               {forma.sampleSize}
             </span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--subtle)] mt-1">
-              Nastupa
+              {en ? "Appearances" : "Nastupa"}
             </span>
           </div>
         </div>
       ) : (
         <div className="px-4 py-3">
-          <p className="text-sm text-[var(--muted)] italic">Nema dovoljno podataka za FORMAScore.</p>
+          <p className="text-sm text-[var(--muted)] italic">{en ? "Not enough data for FORMAScore." : "Nema dovoljno podataka za FORMAScore."}</p>
         </div>
       )}
 
       {/* Footer CTA */}
       <div className="px-4 py-2.5 border-t border-[var(--border)] flex items-center gap-1 text-[12px] font-semibold text-[var(--brand-primary)] group-hover:gap-2 transition-all">
-        Profil strelca
+        {en ? "Shooter profile" : "Profil strelca"}
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

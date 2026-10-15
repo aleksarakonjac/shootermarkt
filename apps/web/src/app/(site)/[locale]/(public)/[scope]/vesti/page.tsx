@@ -201,6 +201,7 @@ export default async function VestiPage({ searchParams }: Props) {
             topShooters={topShooters}
             title={<><span>Top </span><FormaScoreMark size="md" /></>}
             rankingLabel={locale === "en" ? "Ranking" : "Rangiranje"}
+            locale={locale}
           />
           {tags.length > 0 && <TagsWidget tags={tags} title={t("popularTags")} />}
         </aside>
@@ -496,11 +497,11 @@ function UpcomingWidget({
 
 // ── Sidebar: top shooters ─────────────────────────────────────────────────────
 
-const DISC_LABEL_SR: Record<string, string> = {
-  ARM: "10m AR Muški",
-  ARW: "10m AR Žene",
-  APM: "10m AP Muški",
-  APW: "10m AP Žene",
+const DISC_LABEL: Record<string, { sr: string; en: string }> = {
+  ARM: { sr: "10m AR Muški", en: "10m AR Men" },
+  ARW: { sr: "10m AR Žene", en: "10m AR Women" },
+  APM: { sr: "10m AP Muški", en: "10m AP Men" },
+  APW: { sr: "10m AP Žene", en: "10m AP Women" },
 };
 
 
@@ -508,10 +509,12 @@ function TopShootersWidget({
   topShooters,
   title,
   rankingLabel,
+  locale,
 }: {
   topShooters: Awaited<ReturnType<typeof getTopShootersByDiscipline>>;
   title: React.ReactNode;
   rankingLabel: string;
+  locale: string;
 }) {
   const hasAny = DISC_ORDER.some((code) => (topShooters[code]?.length ?? 0) > 0);
   if (!hasAny) return null;
@@ -526,7 +529,7 @@ function TopShootersWidget({
           return (
             <div key={code} className="px-4 py-2">
               <div className="text-[11px] font-bold uppercase tracking-wide text-[var(--muted)] mb-2">
-                {DISC_LABEL_SR[code] ?? code}
+                {DISC_LABEL[code]?.[locale === "en" ? "en" : "sr"] ?? code}
               </div>
               {!rows?.length ? (
                 <p className="text-[12px] text-[var(--subtle)]">—</p>
