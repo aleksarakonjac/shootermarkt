@@ -6,6 +6,9 @@ import { RegionSelector } from "./components/RegionSelector";
 import { LocaleSwitcher } from "./components/LocaleSwitcher";
 import { ScopedLink } from "./components/ScopedLink";
 import Link from "next/link";
+import { SiteHeader } from "./components/SiteHeader";
+import { HeaderLiveTicker } from "./components/HeaderLiveTicker";
+import { TickerDataProvider } from "./components/live-ticker-data";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 export const revalidate = 300;
@@ -24,10 +27,11 @@ export default async function PublicLayout({ children, params }: Props) {
   const [t, tCommon] = await Promise.all([getTranslations("footer"), getTranslations("common")]);
 
   return (
-    <>
-      <header className="sticky top-0 z-[var(--z-sticky)] bg-[var(--bg)] border-b border-[var(--border)]">
+    <TickerDataProvider>
+      <SiteHeader>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-14 items-center gap-2 lg:gap-4">
+          {/* Na mobilnom se red sužava pri skrolovanju (SiteHeader postavlja data-compact). */}
+          <div className="flex h-14 items-center gap-2 transition-[height] duration-200 group-data-[compact=true]:h-11 lg:gap-4 lg:group-data-[compact=true]:h-14 motion-reduce:transition-none">
 
             {/* Logo */}
             <ScopedLink href="/" className="flex items-baseline gap-0 shrink-0 no-underline">
@@ -57,7 +61,8 @@ export default async function PublicLayout({ children, params }: Props) {
 
           </div>
         </div>
-      </header>
+        <HeaderLiveTicker />
+      </SiteHeader>
 
       <main className="flex-1">{children}</main>
 
@@ -172,6 +177,6 @@ export default async function PublicLayout({ children, params }: Props) {
 
         </div>
       </footer>
-    </>
+    </TickerDataProvider>
   );
 }

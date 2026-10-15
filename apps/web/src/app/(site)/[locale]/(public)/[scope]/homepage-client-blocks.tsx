@@ -4,7 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 import { useLocale, useTranslations } from "next-intl";
 import { NewsSection } from "../components/NewsSection";
 import { useParams } from "next/navigation";
-import { Ticker, type TickerItem } from "../ticker";
+import { Ticker } from "../ticker";
+import { useTickerData } from "../components/live-ticker-data";
 import { createClient } from "@/lib/supabase/client";
 import { UpcomingEvents } from "../components/UpcomingEvents";
 import { ScopedLink } from "../components/ScopedLink";
@@ -166,27 +167,12 @@ function HomepageError({ retry, compact = false }: { retry: () => void; compact?
 }
 
 export function HomepageTickerClient() {
-  const t = useTranslations("home");
-  const common = useTranslations("common");
-  const { data, state, retry } = useHomepageData<{ live: Array<{ id: number; name: string; date: string; dateEnd: string | null; level: string; detailItems: TickerItem["detailItems"]; nocCode: string | null; countryCode2: string | null; forceStatus: "LIVE" | "USKORO" | null; tickerStatus: "LIVE" | "USKORO" | "NEXT" | "NEUTRAL" | "REVIEW" }>; upcoming: Array<{ id: number; name: string; date: string; level: string; location: string | null; href: string | null }> }>("/api/homepage/ticker", 60_000);
-
-  // Realtime: re-fetch immediately when admin changes ticker overrides
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel("ticker-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_live_overrides" }, retry)
-      .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, retry)
-      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_custom_upcoming" }, retry)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [retry]);
+  // Dok je nešto LIVE, traka je u sticky header-u (HeaderLiveTicker); ovde ostaje samo marquee nadolazećih.
+  const { state, liveItems, upcomingItems, retry } = useTickerData();
   if (state === "loading") return <div aria-busy="true" className="h-10 animate-pulse bg-[var(--surface)]" />;
-  if (state === "error" || !data) return <HomepageError retry={retry} compact />;
-
-  const liveItems: TickerItem[] = data.live.map((item) => ({ id: item.id, name: item.name, date: item.date, endDate: item.dateEnd ?? undefined, level: item.level, status: item.forceStatus ?? item.tickerStatus, detailItems: item.detailItems?.length ? item.detailItems : item.forceStatus === "LIVE" ? [{ text: t("inProgress") }] : undefined, href: `/takmicenja/${item.id}`, nocCode: item.nocCode ?? undefined, countryCode2: item.countryCode2 ?? undefined }));
-  const upcomingItems: TickerItem[] = data.upcoming.map((item) => ({ id: item.id, name: item.name, date: item.date, level: item.level, status: "USKORO", detailText: item.location || common("serbia"), href: item.href ?? undefined }));
-  return <Ticker liveItems={liveItems} upcomingItems={upcomingItems} />;
+  if (state === "error") return <HomepageError retry={retry} compact />;
+  if (liveItems.length > 0) return null;
+  return <Ticker upcomingItems={upcomingItems} />;
 }
 
 export function HomepageMainClient({ initialData }: { initialData?: HomepageMainData }) {

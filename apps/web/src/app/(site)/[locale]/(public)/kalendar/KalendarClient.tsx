@@ -180,7 +180,7 @@ export function KalendarClient({ competitions }: Props) {
       <div className="w-full lg:hidden">{filterPills}</div>
 
       {/* ── Calendar ──────────────────────────────────────────── */}
-      <div className="w-full lg:w-auto lg:shrink-0 lg:sticky lg:top-[88px]">
+      <div className="w-full lg:w-auto lg:shrink-0 lg:sticky lg:top-[calc(var(--site-header-h,3.5rem)+2rem)]">
         <Calendar
           value={selectedDate}
           onChange={(val) => {

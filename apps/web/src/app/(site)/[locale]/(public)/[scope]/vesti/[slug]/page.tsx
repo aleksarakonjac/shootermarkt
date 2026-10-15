@@ -205,7 +205,7 @@ export default async function VestPage({ params }: Props) {
         </article>
 
         {/* ── Right: sidebar ── */}
-        <aside className="flex flex-col gap-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden">
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-[calc(var(--site-header-h,3.5rem)+1.5rem)] lg:max-h-[calc(100vh-var(--site-header-h,3.5rem)-2rem)] lg:overflow-y-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden">
           {related.length > 0 && (
             <RelatedWidget articles={related} title={t("relatedArticles")} locale={locale} />
           )}

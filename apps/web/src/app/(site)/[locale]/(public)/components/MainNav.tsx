@@ -320,7 +320,7 @@ export function MainNav() {
 
       {/* ── Mobile backdrop ───────────────────────────────────────────── */}
       <div
-        className={`fixed inset-0 top-14 z-[var(--z-modal-bd)] bg-black/30 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden ${
+        className={`fixed inset-0 top-[var(--site-header-h,3.5rem)] z-[var(--z-modal-bd)] bg-black/30 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden ${
           mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setMobileOpen(false)}
@@ -331,7 +331,7 @@ export function MainNav() {
       <div
         ref={drawerRef}
         id="mobile-navigation"
-        className={`fixed top-14 right-0 bottom-0 w-[17.5rem] max-w-[90vw] z-[var(--z-modal)] bg-[var(--bg)] border-l border-[var(--border)] flex flex-col
+        className={`fixed top-[var(--site-header-h,3.5rem)] right-0 bottom-0 w-[17.5rem] max-w-[90vw] z-[var(--z-modal)] bg-[var(--bg)] border-l border-[var(--border)] flex flex-col
           transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden ${
           mobileOpen ? "translate-x-0" : "translate-x-full"
         }`}
