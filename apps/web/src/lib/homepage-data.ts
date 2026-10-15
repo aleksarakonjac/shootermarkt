@@ -1,6 +1,7 @@
 import { db } from "@shootermarkt/db";
 import { clubs, competitionSchedule, competitions, countries, disciplines, mixedTeamResults, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@shootermarkt/db/schema";
 import { displayNoc, NOC_LIST } from "@shootermarkt/db/noc-list";
+import { effectiveFocusPriority } from "@/lib/competition-priority";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
 import { getTickerSlotEnd, isTickerSlotLive } from "@/lib/ticker-schedule";
@@ -48,47 +49,34 @@ export function selectHomepageCurrentPhases<T extends HomepagePhaseCandidate>(ph
 
 type FocusCompetition = {
   id: number;
+  name: string;
   date: string;
   dateEnd: string | null;
   level: string;
   eventType: string;
   ageCategory: string;
+  focusPriority: number | null;
 };
 
-const FOCUS_LEVEL_BASE: Record<string, number> = { olympic: 100, world: 80, continental: 60, international: 45, national: 40, regional: 20, club: 10 };
-// Prvenstvo je vrhunac svog nivoa; svetski kup je serijal pa ide ispod prvenstva.
-const FOCUS_EVENT_BONUS: Record<string, number> = { championship: 15, world_cup: 8, grand_prix: 5, champions_league: 5, cup: 3 };
-const FOCUS_JUNIOR_AGES = new Set(["pionir", "kadet", "mladji_junior", "junior"]);
 const FOCUS_WINDOW_DAYS = 14;
 
 /**
- * Prioritet takmičenja za "Aktuelno / In focus" sekciju (veći = važnije).
- * olympic > world > continental > international ≈ national > regional > club,
- * uz bonus za tip događaja (prvenstvo > svetski kup > kup) i penal za juniorske
- * kategorije, tako da senior svetski kup nadjača juniorsko kontinentalno finale,
- * a svetsko prvenstvo nadjača svetski kup. Isto važi za sve scope-ove.
- */
-export function competitionFocusPriority(competition: Pick<FocusCompetition, "level" | "eventType" | "ageCategory">) {
-  const base = FOCUS_LEVEL_BASE[competition.level] ?? 0;
-  const juniorPenalty = FOCUS_JUNIOR_AGES.has(competition.ageCategory) ? 25 : 0;
-  return base + (FOCUS_EVENT_BONUS[competition.eventType] ?? 0) - juniorPenalty;
-}
-
-/**
  * Bira `limit` takmičenja za fokus sekciju: tekuća (live) uvek prva, zatim po
- * prioritetu, pa po novijem datumu. Kandidati su tekuća + završena u poslednjih
- * FOCUS_WINDOW_DAYS dana; ako ih ima manje od `limit`, dopunjava se najnovijim
- * starijim da sekcija ne ostane prazna.
+ * prioritetu (manji broj = važnije, vidi competition-priority.ts), pa po novijem
+ * datumu. Kandidati su tekuća + završena u poslednjih FOCUS_WINDOW_DAYS dana; ako
+ * ih ima manje od `limit`, dopunjava se najnovijim starijim da sekcija ne ostane prazna.
+ * `categoriesById` = starosne kategorije koje se na takmičenju takmiče (raspored/rezultati).
  */
-export function selectHomepageFocusCompetitions<T extends FocusCompetition>(candidates: T[], today: string, limit = 3) {
+export function selectHomepageFocusCompetitions<T extends FocusCompetition>(candidates: T[], today: string, categoriesById: Map<number, Iterable<string>> = new Map(), limit = 3) {
   const cutoff = new Date(`${today}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - FOCUS_WINDOW_DAYS);
   const cutoffKey = cutoff.toISOString().slice(0, 10);
   const endOf = (c: T) => c.dateEnd ?? c.date;
   const isLive = (c: T) => isCompetitionLive(c.date, c.dateEnd, today);
+  const priority = (c: T) => effectiveFocusPriority(c, categoriesById.get(c.id) ?? []);
   const byFocus = (a: T, b: T) =>
     Number(isLive(b)) - Number(isLive(a))
-    || competitionFocusPriority(b) - competitionFocusPriority(a)
+    || priority(a) - priority(b)
     || b.date.localeCompare(a.date);
   const windowed = candidates.filter((c) => c.date <= today && endOf(c) >= cutoffKey).toSorted(byFocus).slice(0, limit);
   if (windowed.length >= limit) return windowed;
@@ -316,7 +304,16 @@ export async function getHomepageMain(scope: Scope) {
     db.select().from(competitions).where(and(sql`${competitions.date} >= ${today} AND ${competitions.date} < ${upcomingDeadline}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
   ]);
   const showSrbHighlight = scope === 'srb';
-  const recentComps = selectHomepageFocusCompetitions(candidateComps, today);
+  const candidateIds = candidateComps.map((competition) => competition.id);
+  const [scheduleCategories, resultCategories] = candidateIds.length
+    ? await Promise.all([
+        db.selectDistinct({ competitionId: competitionSchedule.competitionId, category: competitionSchedule.category }).from(competitionSchedule).where(inArray(competitionSchedule.competitionId, candidateIds)),
+        db.selectDistinct({ competitionId: results.competitionId, category: results.category }).from(results).where(inArray(results.competitionId, candidateIds)),
+      ])
+    : [[], []];
+  const categoriesById = new Map<number, Set<string>>();
+  for (const row of [...scheduleCategories, ...resultCategories]) categoriesById.set(row.competitionId, (categoriesById.get(row.competitionId) ?? new Set()).add(row.category));
+  const recentComps = selectHomepageFocusCompetitions(candidateComps, today, categoriesById);
   const recent =await Promise.all(recentComps.map(async (competition) => {
     const [slots, individualRows, mixedRows] = await Promise.all([
       db.select({ discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(eq(competitionSchedule.competitionId, competition.id)),

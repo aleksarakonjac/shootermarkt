@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { competitionFocusPriority, formatTickerNextTime, selectHomepageFocusCompetitions, getTickerScheduleState, getTickerScheduleStatus, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectHomepageDisplayPhases, selectTickerCompletedSlots, selectTickerUpcoming } from "./homepage-data";
+import { effectiveFocusPriority } from "./competition-priority";
+import { formatTickerNextTime, selectHomepageFocusCompetitions, getTickerScheduleState, getTickerScheduleStatus, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectHomepageDisplayPhases, selectTickerCompletedSlots, selectTickerUpcoming } from "./homepage-data";
 import { getTickerSlotEnd, isTickerSlotLive } from "./ticker-schedule";
 
 describe("selectTickerUpcoming", () => {
@@ -131,25 +132,41 @@ describe("ticker slot defaults", () => {
 });
 
 describe("competition focus priority", () => {
-  const comp = (id: number, level: string, eventType: string, ageCategory: string, date: string, dateEnd: string | null = null) => ({ id, level, eventType, ageCategory, date, dateEnd });
-  const worldCup = comp(1, "world", "world_cup", "open", "2026-10-10", "2026-10-12");
-  const worldChamp = comp(2, "world", "championship", "open", "2026-10-02", "2026-10-08");
-  const youthFinal = comp(3, "continental", "championship", "junior", "2026-10-13", "2026-10-14");
-  const club = comp(4, "club", "other", "open", "2026-10-14");
+  const comp = (id: number, name: string, level: string, eventType: string, date: string, dateEnd: string | null = null, focusPriority: number | null = null) => ({ id, name, level, eventType, ageCategory: "open", date, dateEnd, focusPriority });
+  const worldCup = comp(1, "ISSF World Cup", "world", "world_cup", "2026-10-10", "2026-10-12");
+  const worldChamp = comp(2, "ISSF World Championship", "world", "championship", "2026-10-02", "2026-10-08");
+  const youthFinal = comp(3, "European Youth League Final", "continental", "other", "2026-10-13", "2026-10-14");
+  const club = comp(4, "Klupski turnir", "club", "other", "2026-10-14");
+  const none = new Map<number, string[]>();
+  const youthCats = new Map([[3, ["mladji_junior"]]]);
+  const prio = (c: ReturnType<typeof comp>, cats: string[] = []) => effectiveFocusPriority(c, cats);
 
-  it("ranks world championship > world cup > junior continental final", () => {
-    expect(competitionFocusPriority(worldChamp)).toBeGreaterThan(competitionFocusPriority(worldCup));
-    expect(competitionFocusPriority(worldCup)).toBeGreaterThan(competitionFocusPriority(youthFinal));
-    expect(competitionFocusPriority(youthFinal)).toBeGreaterThan(competitionFocusPriority(club));
+  it("defaults: olympic 0 > world championship 1 > world cup 2 > junior continental > club", () => {
+    expect(prio(comp(9, "Olimpijske igre", "olympic", "other", "2028-07-01"))).toBe(0);
+    expect(prio(worldChamp)).toBe(1);
+    expect(prio(worldCup)).toBe(2);
+    expect(prio(youthFinal, ["mladji_junior"])).toBe(8);
+    expect(prio(club)).toBe(10);
+  });
+
+  it("derives age from the most senior category present and applies the 300m offset", () => {
+    expect(prio(youthFinal, ["mladji_junior", "senior"])).toBe(5);
+    expect(prio(comp(5, "Evropsko prvenstvo", "continental", "championship", "2026-10-01"), ["junior"])).toBe(5);
+    expect(prio(comp(6, "ISSF World Championship 300m", "world", "championship", "2026-10-01"))).toBe(5);
+  });
+
+  it("manual priority overrides the default", () => {
+    expect(prio(comp(7, "Mediteranske igre", "continental", "other", "2026-10-01", null, 4))).toBe(4);
+    expect(prio(comp(8, "Klupski turnir", "club", "other", "2026-10-01", null, 0))).toBe(0);
   });
 
   it("orders by priority within the window, not by date", () => {
-    expect(selectHomepageFocusCompetitions([club, youthFinal, worldCup, worldChamp], "2026-10-15").map((c) => c.id)).toEqual([2, 1, 3]);
+    expect(selectHomepageFocusCompetitions([club, youthFinal, worldCup, worldChamp], "2026-10-15", youthCats).map((c) => c.id)).toEqual([2, 1, 3]);
   });
 
   it("keeps a live competition first and falls back to older ones when the window is thin", () => {
-    const live = comp(5, "regional", "other", "open", "2026-10-14", "2026-10-16");
-    const old = comp(6, "national", "cup", "open", "2026-08-01");
-    expect(selectHomepageFocusCompetitions([old, worldChamp, live], "2026-10-15").map((c) => c.id)).toEqual([5, 2, 6]);
+    const live = comp(5, "Regionalni miting", "regional", "other", "2026-10-14", "2026-10-16");
+    const old = comp(6, "Kup Srbije", "national", "cup", "2026-08-01");
+    expect(selectHomepageFocusCompetitions([old, worldChamp, live], "2026-10-15", none).map((c) => c.id)).toEqual([5, 2, 6]);
   });
 });

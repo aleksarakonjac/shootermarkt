@@ -7,6 +7,8 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { LevelDropdown } from "@/components/ui/LevelDropdown";
 import { TranslatedNameInput } from "@/components/ui/TranslatedNameInput";
 import { CountryDropdown } from "@/components/ui/CountryDropdown";
+import { FocusPriorityField } from "@/components/ui/FocusPriorityField";
+import { defaultFocusPriority } from "@/lib/competition-priority";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 
 interface Competition {
@@ -24,6 +26,9 @@ interface Competition {
   issfId?: string | null;
   siusId?: string | null;
   tags: string[];
+  eventType: string;
+  ageCategory: string;
+  focusPriority: number | null;
   resultCount: number;
 }
 
@@ -57,6 +62,7 @@ export function CompetitionEditClient({ competition, countries }: { competition:
     level: competition.level,
     issfId: competition.issfId ?? "",
     siusId: competition.siusId ?? "",
+    focusPriority: competition.focusPriority == null ? "" : String(competition.focusPriority),
   });
   const [tags, setTags] = useState<string[]>(competition.tags);
   const [tagInput, setTagInput] = useState("");
@@ -191,6 +197,12 @@ export function CompetitionEditClient({ competition, countries }: { competition:
             <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo *</label>
             <LevelDropdown value={form.level} onChange={(v) => set("level", v)} />
           </div>
+
+          <FocusPriorityField
+            value={form.focusPriority}
+            onChange={(v) => set("focusPriority", v)}
+            autoValue={defaultFocusPriority({ name: form.name, level: form.level, eventType: competition.eventType, ageCategory: competition.ageCategory })}
+          />
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija</label>

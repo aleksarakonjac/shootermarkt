@@ -4,6 +4,7 @@ import { db } from "@shootermarkt/db";
 import { competitions } from "@shootermarkt/db/schema";
 import { desc } from "drizzle-orm";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
+import { parseFocusPriorityInput } from "@/lib/competition-priority";
 
 function isAdmin(email: string | undefined) {
   return !!email && email === process.env.ADMIN_EMAIL;
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
   if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, countryId, level, issfId } = body;
+  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, countryId, level, issfId, focusPriority } = body;
 
   if (!name?.trim() || !date || !level) {
     return NextResponse.json({ error: "Naziv, datum i nivo su obavezni" }, { status: 400 });
@@ -36,6 +37,11 @@ export async function POST(req: NextRequest) {
   const parsedCountryId = countryId == null || countryId === "" ? null : Number(countryId);
   if (parsedCountryId !== null && !Number.isInteger(parsedCountryId)) {
     return NextResponse.json({ error: "Neispravna država" }, { status: 400 });
+  }
+
+  const parsedPriority = parseFocusPriorityInput(focusPriority);
+  if (!parsedPriority.ok) {
+    return NextResponse.json({ error: "Prioritet mora biti ceo broj od 0 do 20 ili prazno (auto)" }, { status: 400 });
   }
 
   const [comp] = await db
@@ -52,6 +58,7 @@ export async function POST(req: NextRequest) {
       countryId: parsedCountryId,
       level: level as CompetitionLevel,
       issfId: issfId ? String(issfId) : null,
+      focusPriority: parsedPriority.value,
     })
     .onConflictDoNothing()
     .returning({ id: competitions.id, name: competitions.name });

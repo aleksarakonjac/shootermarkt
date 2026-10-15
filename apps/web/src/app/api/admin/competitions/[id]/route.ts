@@ -4,6 +4,7 @@ import { db } from "@shootermarkt/db";
 import { competitions, results } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
+import { parseFocusPriorityInput } from "@/lib/competition-priority";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 
 function isAdmin(email: string | undefined) {
@@ -23,7 +24,7 @@ export async function PATCH(
   if (isNaN(compId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const body = await req.json();
-  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, countryId, level, tags, issfId, siusId } = body;
+  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, countryId, level, tags, issfId, siusId, focusPriority } = body;
 
   if (!name?.trim() || !date || !level) {
     return NextResponse.json({ error: "Naziv, datum i nivo su obavezni" }, { status: 400 });
@@ -31,6 +32,11 @@ export async function PATCH(
   const parsedCountryId = countryId == null || countryId === "" ? null : Number(countryId);
   if (parsedCountryId !== null && !Number.isInteger(parsedCountryId)) {
     return NextResponse.json({ error: "Neispravna država" }, { status: 400 });
+  }
+
+  const parsedPriority = parseFocusPriorityInput(focusPriority);
+  if (!parsedPriority.ok) {
+    return NextResponse.json({ error: "Prioritet mora biti ceo broj od 0 do 20 ili prazno (auto)" }, { status: 400 });
   }
 
   const [updated] = await db
@@ -48,6 +54,7 @@ export async function PATCH(
       level: level as CompetitionLevel,
       issfId: issfId?.trim() || null,
       siusId: siusId?.trim() || null,
+      focusPriority: parsedPriority.value,
       ...(Array.isArray(tags) ? { tags: tags.map(String) } : {}),
     })
     .where(eq(competitions.id, compId))

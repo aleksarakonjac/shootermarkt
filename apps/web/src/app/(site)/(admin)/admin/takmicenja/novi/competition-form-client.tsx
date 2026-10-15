@@ -7,6 +7,8 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { LevelDropdown } from "@/components/ui/LevelDropdown";
 import { TranslatedNameInput } from "@/components/ui/TranslatedNameInput";
 import { CountryDropdown } from "@/components/ui/CountryDropdown";
+import { FocusPriorityField } from "@/components/ui/FocusPriorityField";
+import { defaultFocusPriority } from "@/lib/competition-priority";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 
 type Country = { id: number; name: string; code2: string | null };
@@ -31,6 +33,7 @@ export function CompetitionFormClient({ countries }: { countries: Country[] }) {
     countryId: "",
     level: "national" as CompetitionLevel,
     issfId: "",
+    focusPriority: "",
   });
 
   function set(field: string, value: string) {
@@ -125,6 +128,12 @@ export function CompetitionFormClient({ countries }: { countries: Country[] }) {
             <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Nivo *</label>
             <LevelDropdown value={form.level} onChange={(v) => set("level", v)} />
           </div>
+
+          <FocusPriorityField
+            value={form.focusPriority}
+            onChange={(v) => set("focusPriority", v)}
+            autoValue={defaultFocusPriority({ name: form.name, level: form.level, eventType: "other", ageCategory: "open" })}
+          />
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Lokacija</label>

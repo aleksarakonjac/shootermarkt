@@ -428,6 +428,9 @@ export const competitions = pgTable(
     level: competitionLevelEnum("level").notNull(),
     eventType: eventTypeEnum("event_type").notNull().default("other"),
     ageCategory: ageCategoryEnum("age_category").notNull().default("open"),
+    // Prioritet u "In focus" sekciji: manji broj = važnije (0 = olimpijske igre).
+    // NULL = automatski (vidi apps/web/src/lib/competition-priority.ts), broj = ručni override.
+    focusPriority: smallint("focus_priority"),
     organizer: varchar("organizer", { length: 50 }), // 'ISSF' | 'ESC' | 'SSS' | 'DSB' ...
     // League linkage
     leagueSeasonId: integer("league_season_id").references(() => leagueSeasons.id),
