@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
@@ -19,7 +19,7 @@ import {
   MixedTeamQualTable,
   type MixedTeamRow,
 } from "@/components/result-display/MixedTeamQualTable";
-import { startNavigationProgress } from "@/components/NavigationProgress";
+import { startNavigationProgress, finishNavigationProgress } from "@/components/NavigationProgress";
 import { shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
 import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
 
@@ -181,12 +181,25 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId, l
     }
 
     const href = params.size > 0 ? `${pathname}?${params}` : pathname;
-    startNavigationProgress(href);
-    if (replace) router.replace(href, { scroll: false });
-    else router.push(href, { scroll: false });
-  }, [pathname, router, search]);
+    // Samo URL: Next 16 sinhronizuje native history sa useSearchParams, a server se ne zove
+    // (stranica je ISR i ne čita searchParams), pa nema čekanja ni pomeranja stranice.
+    if (replace) window.history.replaceState(null, "", href);
+    else window.history.pushState(null, "", href);
+  }, [pathname, search]);
 
-  const retry = useCallback(() => router.refresh(), [router]);
+  // Live osvežavanje podataka radi u pozadini (transition ne blokira UI); samo gornja traka pokazuje da traje.
+  const [refreshing, startRefresh] = useTransition();
+  useEffect(() => {
+    if (refreshing) startNavigationProgress();
+    else finishNavigationProgress();
+  }, [refreshing]);
+  const refreshTimer = useRef<number | null>(null);
+  const retry = useCallback(() => {
+    // Import upisuje mnogo redova odjednom — spoji događaje u jedno osvežavanje.
+    if (refreshTimer.current != null) window.clearTimeout(refreshTimer.current);
+    refreshTimer.current = window.setTimeout(() => startRefresh(() => router.refresh()), 800);
+  }, [router]);
+  useEffect(() => () => { if (refreshTimer.current != null) window.clearTimeout(refreshTimer.current); }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -201,10 +214,6 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId, l
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [competitionId, retry]);
-
-  useEffect(() => {
-    if (selection) detailRef.current?.scrollIntoView({ block: "start" });
-  }, [selection]);
 
   if (groups.length === 0 && mixedGroups.length === 0) {
     return (

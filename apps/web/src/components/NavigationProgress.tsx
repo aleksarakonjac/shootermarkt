@@ -95,6 +95,9 @@ export function startNavigationProgress(href?: string) {
   begin();
 }
 
+/** Za pozadinska osvežavanja koja ne menjaju URL (npr. router.refresh u transition-u). */
+export const finishNavigationProgress = finish;
+
 function isTrackedClick(event: MouseEvent) {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
   const anchor = (event.target as Element | null)?.closest?.("a");
