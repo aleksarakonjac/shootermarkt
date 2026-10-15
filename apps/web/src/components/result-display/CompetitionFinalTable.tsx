@@ -91,9 +91,8 @@ function ChevronIcon({ open }: { open: boolean }) {
 type Column = { header: string; getValue: (r: FinalResultRow) => number | null; fmt: (v: number) => string; cumulative?: boolean };
 
 /**
- * Po koloni: glavna vrednost + pomoćna.
- * - serije/hici: glavna = rezultat serije, pomoćna = zbir do tada.
- * - kumulativ: glavna = zbir do tada, pomoćna = rezultat te serije (razlika).
+ * Po koloni: glavna vrednost = rezultat serije (ili hica), pomoćna = kumulativni zbir do tada.
+ * Za kumulativne kolone rezultat serije je razlika prema prethodnoj koloni.
  */
 function seriesCells(columns: Column[], r: FinalResultRow) {
   let running = 0;
@@ -104,7 +103,7 @@ function seriesCells(columns: Column[], r: FinalResultRow) {
     if (col.cumulative) {
       const sub = val != null && previous != null ? Math.round((val - previous) * 10) / 10 : null;
       previous = val;
-      return { header: col.header, main: val != null ? col.fmt(val) : "", sub: sub != null ? col.fmt(sub) : "" };
+      return { header: col.header, main: sub != null ? col.fmt(sub) : "", sub: val != null ? col.fmt(val) : "" };
     }
     if (val == null) sawNull = true;
     else running += val;
@@ -411,11 +410,11 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                       style={{ gridColumn: "1 / -1" }}
                       className={`min-h-0 px-3 overflow-hidden sm:hidden ${isLastRow ? "" : "border-b border-[var(--border)]"}`}
                     >
-                      {/* Mreža sa minimalnom širinom ćelije: vrednosti se prelamaju u više redova
-                          umesto da se sve (i do 16 hitaca) zbiju u jedan red; svaka ima svoj naziv. */}
-                      <div className="grid grid-cols-[repeat(auto-fill,minmax(3.75rem,1fr))] gap-x-2 gap-y-2 py-2.5">
+                      {/* Kartice minimalne širine koje se prelamaju u više redova i razvlače da svaki red
+                          (i poslednji) popune celom širinom; svaka kartica ima naziv serije. */}
+                      <div className="flex flex-wrap gap-2 py-2.5">
                         {seriesCells(columns, r).filter((cell) => cell.main).map((cell, i) => (
-                          <div key={i} className="flex min-w-0 flex-col items-center rounded-md bg-[var(--surface)] px-1 py-1.5">
+                          <div key={i} className="flex min-w-0 grow basis-[3.75rem] flex-col items-center rounded-md bg-[var(--surface)] px-1 py-1.5">
                             <span className="max-w-full truncate text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{cell.header}</span>
                             <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)]">{cell.main}</span>
                             <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--subtle)]">{cell.sub || "\u00a0"}</span>

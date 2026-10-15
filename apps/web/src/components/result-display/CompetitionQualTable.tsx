@@ -165,6 +165,21 @@ function flattenGroups(groups: DetailGroup[]): Array<{ value: number | null; isB
   return groups.flatMap((g) => g.values.map((v) => ({ value: v, isBest: v != null && v === g.bestValue })));
 }
 
+// Mobilni prikaz serija: kartice minimalne širine koje se razvlače da popune ceo red.
+const SERIES_GRID_CLS = "flex flex-wrap gap-1.5";
+
+function SeriesBox({ text, best }: { text: string; best: boolean }) {
+  return (
+    <span
+      className={`flex min-w-0 grow basis-[3rem] items-center justify-center rounded-md px-1 py-1.5 font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums ${
+        best ? "bg-[var(--surface-2)] font-semibold text-[var(--ink)] ring-1 ring-[var(--border-strong)]" : "bg-[var(--surface)] text-[var(--muted)]"
+      }`}
+    >
+      {text}
+    </span>
+  );
+}
+
 export function CompetitionQualTable({ results, competitionLevel }: Props) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
@@ -423,35 +438,27 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                       style={{ gridColumn: "1 / -1", background: rowBg }}
                       className={`min-h-0 px-3 overflow-hidden sm:hidden ${isLastRow ? "" : "border-b border-[var(--border)]"}`}
                     >
+                      {/* Svaka serija u svojoj kartici; kartice popunjavaju ceo red (auto-fit).
+                          Trostav / grupisane discipline zadržavaju naziv grupe (Klečeći, Ležeći…). */}
                       {isPositionsType || flatGroups ? (
-                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 py-2">
+                        <div className="flex flex-col gap-2 py-2.5">
                           {buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts).map((g, gi) => (
-                            <div key={gi} className="flex flex-col gap-0.5">
+                            <div key={gi} className="flex flex-col gap-1">
                               <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
                                 {g.label}
                               </span>
-                              <div className="flex gap-2 font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums">
+                              <div className={SERIES_GRID_CLS}>
                                 {g.values.map((v, vi) => (
-                                  <span
-                                    key={vi}
-                                    className={v != null && v === g.bestValue ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}
-                                  >
-                                    {v != null ? fmt(v) : "—"}
-                                  </span>
+                                  <SeriesBox key={vi} text={v != null ? fmt(v) : "—"} best={v != null && v === g.bestValue} />
                                 ))}
                               </div>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="flex flex-wrap gap-2 py-2 font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums">
+                        <div className={`${SERIES_GRID_CLS} py-2.5`}>
                           {seriesFlat.map((item, i) => (
-                            <span
-                              key={i}
-                              className={item.isBest ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}
-                            >
-                              {item.value != null ? fmt(item.value) : "—"}
-                            </span>
+                            <SeriesBox key={i} text={item.value != null ? fmt(item.value) : "—"} best={item.isBest} />
                           ))}
                         </div>
                       )}
