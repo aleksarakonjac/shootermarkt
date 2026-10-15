@@ -87,7 +87,30 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
-type Column = { header: string; getValue: (r: FinalResultRow) => number | null; fmt: (v: number) => string };
+// cumulative: vrednost kolone je već zbir do te serije (SIUS/ISSF finale), ne rezultat same serije.
+type Column = { header: string; getValue: (r: FinalResultRow) => number | null; fmt: (v: number) => string; cumulative?: boolean };
+
+/**
+ * Po koloni: glavna vrednost + pomoćna.
+ * - serije/hici: glavna = rezultat serije, pomoćna = zbir do tada.
+ * - kumulativ: glavna = zbir do tada, pomoćna = rezultat te serije (razlika).
+ */
+function seriesCells(columns: Column[], r: FinalResultRow) {
+  let running = 0;
+  let sawNull = false;
+  let previous: number | null = 0;
+  return columns.map((col) => {
+    const val = col.getValue(r);
+    if (col.cumulative) {
+      const sub = val != null && previous != null ? Math.round((val - previous) * 10) / 10 : null;
+      previous = val;
+      return { header: col.header, main: val != null ? col.fmt(val) : "", sub: sub != null ? col.fmt(sub) : "" };
+    }
+    if (val == null) sawNull = true;
+    else running += val;
+    return { header: col.header, main: val != null ? col.fmt(val) : "", sub: sawNull ? "" : col.fmt(running) };
+  });
+}
 
 const decimalFmt = (v: number) => v.toFixed(1);
 const intFmt = (v: number) => Math.round(v).toString();
@@ -153,6 +176,7 @@ function buildColumns(rows: FinalResultRow[]): Column[] {
       header: (withDetail?.finalDetail?.format === "bulletin" ? withDetail.finalDetail.seriesLabels?.[i] : undefined) ?? `${labelPrefix}${i + 1}`,
       fmt,
       getValue: (r) => (r.finalDetail?.format === "bulletin" ? r.finalDetail[kind]?.[i] ?? null : null),
+      cumulative: kind === "cumulative",
     });
   }
   return cols;
@@ -344,28 +368,15 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
 
                   {/* Series values — desktop only; row fits every series in-line so no expand is needed.
                       Cumulative running total stacked above each series value, widening the row. */}
-                  {hasDetail && (() => {
-                    let running = 0;
-                    let sawNull = false;
-                    return columns.map((col, i) => {
-                      const val = col.getValue(r);
-                      if (val == null) sawNull = true;
-                      else running += val;
-                      return (
-                        <div
-                          key={i}
-                          className={`hidden sm:flex ${cellCls} flex-col items-end justify-center gap-0.5 group-hover:bg-[var(--surface-2)]`}
-                        >
-                          <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">
-                            {sawNull ? "" : col.fmt(running)}
-                          </span>
-                          <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]">
-                            {val != null ? col.fmt(val) : ""}
-                          </span>
-                        </div>
-                      );
-                    });
-                  })()}
+                  {hasDetail && seriesCells(columns, r).map((cell, i) => (
+                    <div
+                      key={i}
+                      className={`hidden sm:flex ${cellCls} flex-col items-end justify-center gap-0.5 group-hover:bg-[var(--surface-2)]`}
+                    >
+                      <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">{cell.sub}</span>
+                      <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]">{cell.main}</span>
+                    </div>
+                  ))}
 
                   {/* Final total */}
                   <div className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`}>
@@ -400,37 +411,16 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                       style={{ gridColumn: "1 / -1" }}
                       className={`min-h-0 px-3 overflow-hidden sm:hidden ${isLastRow ? "" : "border-b border-[var(--border)]"}`}
                     >
-                      <div className="grid grid-flow-col auto-cols-fr gap-x-1 pt-2">
-                        {(() => {
-                          let running = 0;
-                          let sawNull = false;
-                          return columns.map((col, i) => {
-                            const val = col.getValue(r);
-                            if (val == null) sawNull = true;
-                            else running += val;
-                            return (
-                              <span
-                                key={i}
-                                className="min-w-0 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]"
-                              >
-                                {sawNull ? "" : col.fmt(running)}
-                              </span>
-                            );
-                          });
-                        })()}
-                      </div>
-                      <div className="grid grid-flow-col auto-cols-fr gap-x-1 pb-2">
-                        {columns.map((col, i) => {
-                          const val = col.getValue(r);
-                          return (
-                            <span
-                              key={i}
-                              className="min-w-0 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]"
-                            >
-                              {val != null ? col.fmt(val) : ""}
-                            </span>
-                          );
-                        })}
+                      {/* Mreža sa minimalnom širinom ćelije: vrednosti se prelamaju u više redova
+                          umesto da se sve (i do 16 hitaca) zbiju u jedan red; svaka ima svoj naziv. */}
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(3.75rem,1fr))] gap-x-2 gap-y-2 py-2.5">
+                        {seriesCells(columns, r).filter((cell) => cell.main).map((cell, i) => (
+                          <div key={i} className="flex min-w-0 flex-col items-center rounded-md bg-[var(--surface)] px-1 py-1.5">
+                            <span className="max-w-full truncate text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{cell.header}</span>
+                            <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)]">{cell.main}</span>
+                            <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--subtle)]">{cell.sub || "\u00a0"}</span>
+                          </div>
+                        ))}
                       </div>
                     </motion.div>
                   )}
