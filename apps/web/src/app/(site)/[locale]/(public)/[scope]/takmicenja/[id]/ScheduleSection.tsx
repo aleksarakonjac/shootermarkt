@@ -171,8 +171,6 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
     return () => clearInterval(id);
   }, []);
 
-  if (slots.length === 0) return null;
-
   // Group by venue date
   const dateKeys: string[] = [];
   const byDate = new Map<string, ScheduleSlot[]>();
@@ -190,17 +188,9 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
 
   const usePills = dateKeys.length >= 3;
 
-  const hasLive = slots.some((s) => {
-    const st = slotStatus(s, now);
-    return st === "active" || st === "imminent" || st === "upcoming";
-  });
-
-  const [open, setOpen] = useState(hasLive);
+  // Raspored je uvek zatvoren dok ga korisnik ne otvori (i kad je faza u toku).
+  const [open, setOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(() => pickDefaultDay(dateKeys, byDate, now));
-
-  useEffect(() => {
-    if (hasLive) setOpen(true);
-  }, [hasLive]);
 
   // Measure whichever panel (preview or full schedule) is currently visible
   // so the wrapper animates height to it directly, instead of two competing
@@ -217,6 +207,9 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
     ro.observe(el);
     return () => ro.disconnect();
   }, [open]);
+
+  // Rani izlaz tek posle svih hook-ova (rules-of-hooks: isti redosled u svakom renderu).
+  if (slots.length === 0) return null;
 
   const lang = STAGE_LABELS[locale] ?? STAGE_LABELS.en;
   const catShort = CATEGORY_SHORT[locale] ?? CATEGORY_SHORT.en;
