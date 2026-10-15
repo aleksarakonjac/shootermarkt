@@ -253,7 +253,8 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
           const liveBadge = disc.isLive ? <span className="shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">LIVE</span> : null;
           return (
             <div key={`${disc.discCode}:${disc.isJunior}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
-              <div className="flex items-center gap-1">{discBadge}{junBadge}</div>
+              {/* Naziv discipline vodi na prvu prikazanu fazu (finale ako postoji, inače kvalifikacije). */}
+              <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="flex w-fit items-center gap-1 no-underline hover:opacity-80 transition-opacity">{discBadge}{junBadge}</ScopedLink>
               {shownPhases.map((phase) => {
                 const decimals = phase.stage === "elimination" || isAP || disc.discCode === "SPW" || (disc.discCode.startsWith("R3") && phase.stage !== "final") ? 0 : 1;
                 const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? `E${phase.elimRound ?? ""}` : phase.stage === "final" ? "F" : "Q"}</span>;
