@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { ReviewRow, CommitPayload } from "@shootermarkt/db/pdf-import-types";
 import type { SiusFinalEntry } from "@/app/api/admin/sius/public-import/route";
+import { buildSiusFinalDetails } from "@/lib/final-detail";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
 import { MixedTeamQualTable, MixedTeamFinalsTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
@@ -219,6 +220,18 @@ export function SiusMode() {
 
     // Merge active final entries into qual rows before committing
     const activeFinals = finalEntries.filter((f) => !f.skip);
+
+    // Isti oblik kao live cron: kumulativ po seriji discipline + nazivi kolona + plasman posle
+    // svake serije (lib/final-detail.ts), umesto čistih zbirova serija.
+    const finalFields = new Map<SiusFinalEntry, Pick<ReviewRow, "finalCumulative" | "finalSeriesLabels" | "finalRanks">>();
+    for (const code of new Set(activeFinals.map((f) => f.disciplineCode))) {
+      const finalists = activeFinals.filter((f) => f.disciplineCode === code && f.series.length > 0).sort((a, b) => a.rank - b.rank);
+      buildSiusFinalDetails(code, finalists).forEach((detail, i) => finalFields.set(finalists[i], {
+        finalCumulative: detail.cumulative ?? null,
+        finalSeriesLabels: detail.seriesLabels ?? null,
+        finalRanks: detail.ranks ?? null,
+      }));
+    }
     const mergedRows = rows.map((r) => {
       const f = activeFinals.find(
         (fe) => fe.disciplineCode === r.disciplineCode && (
@@ -233,7 +246,7 @@ export function SiusMode() {
         qualified: true,
         finalTotal: f.total,
         finalRank: f.rank,
-        finalSeries: f.series.length > 0 ? f.series : null,
+        ...finalFields.get(f),
       };
     });
 
@@ -260,7 +273,7 @@ export function SiusMode() {
           qualified: true,
           finalTotal: f.total,
           finalRank: f.rank,
-          finalSeries: f.series.length > 0 ? f.series : null,
+          ...finalFields.get(f),
         });
       }
     }
