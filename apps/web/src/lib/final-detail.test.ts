@@ -22,9 +22,14 @@ describe("buildSiusFinalDetails", () => {
     expect(detail).toMatchObject({ cumulative: [104, 209, 259.5, 310.5, 321.2], seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "H1"] });
   });
 
-  it("labels air finals S1, S2 then single shots", () => {
-    const [detail] = buildSiusFinalDetails("ARW", [{ series: [52.4, 51.9, 10.6] }]);
-    expect(detail).toMatchObject({ cumulative: [52.4, 104.3, 114.9], seriesLabels: ["S1", "S2", "H1"] });
+  it("labels SIUS air finals S1, S2, then 2-shot series by shot numbers", () => {
+    const [detail] = buildSiusFinalDetails("ARW", [{ series: [52.4, 51.9, 20.9, 21.1] }]);
+    expect(detail).toMatchObject({ cumulative: [52.4, 104.3, 125.2, 146.3], seriesLabels: ["S1", "S2", "11–12", "13–14"] });
+  });
+
+  it("groups SIUS air per-shot values into 5+5 then pairs", () => {
+    const [detail] = buildSiusFinalDetails("APM", [{ series: [...shots(10, 10), 10.5, 10.1, 9.9] }]);
+    expect(detail).toMatchObject({ cumulative: [50, 100, 120.6, 130.5], seriesLabels: ["S1", "S2", "11–12", "13–14"] });
   });
 });
 
@@ -42,12 +47,12 @@ describe("buildIssfFinalDetails", () => {
     });
   });
 
-  it("regroups ISSF air shots into 5+5 then single shots, with a partial series while live", () => {
+  it("regroups ISSF air shots into 5+5 then 2-shot series, with a partial series while live", () => {
     const [done, live] = buildIssfFinalDetails("APW", [
-      { stageCumulatives: [], shotsByStage: [shots(5, 10), shots(5, 9.8), [10.4]], total: 109.4 },
+      { stageCumulatives: [], shotsByStage: [shots(5, 10), shots(5, 9.8), [10.4, 10.2], [10.0, 9.6]], total: 139.2 },
       { stageCumulatives: [], shotsByStage: [shots(3, 10)], total: 30 },
     ]);
-    expect(done).toMatchObject({ cumulative: [50, 99, 109.4], seriesLabels: ["S1", "S2", "H1"] });
+    expect(done).toMatchObject({ cumulative: [50, 99, 119.6, 139.2], seriesLabels: ["S1", "S2", "11–12", "13–14"] });
     expect(live).toMatchObject({ cumulative: [30] });
   });
 

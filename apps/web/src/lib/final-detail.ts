@@ -7,8 +7,8 @@ import { deriveFinalRankProgression } from "@shootermarkt/db/pdf-import-types";
  * poslednja kolona je zbir do tog hica). Pojedinačni hici se (još) ne prikazuju.
  *
  * Serije finala:
- * - trostav: klečeći 10, ležeći 10, stojeći 5 + 5, pa pojedinačni stojeći hici;
- * - vazdušno: 5 + 5, pa pojedinačni hici.
+ * - trostav: klečeći 10, ležeći 10, stojeći 5 + 5, pa pojedinačni stojeći hici (H1, H2…);
+ * - vazdušno: 5 + 5, pa serije od po 2 hica (11–12, 13–14…), posle svake ispada poslednji.
  * SIUS daje zbir po seriji u tom redosledu. Kad su poznati pojedinačni hici (ISSF HTML,
  * ili SIUS ako vrati hice), grupišu se po istom pravilu, pa kolone uvek imaju iste nazive.
  * Sva finala koja uvozimo (AR/AP/R3P) boduju se decimalno.
@@ -20,28 +20,42 @@ const isThreePositionEvent = (code: string) => /^R3[PJ][MW]$/.test(code);
 
 const MAX_SHOT_VALUE = 10.9;
 
-/** Serije prve faze (broj hitaca + naziv); posle njih svaki hitac je svoja kolona H1, H2… */
-function seriesPlan(disciplineCode: string): Array<{ shots: number; label: string }> | null {
+type SeriesPlan = {
+  /** Serije prve faze: broj hitaca + naziv kolone. */
+  phase: Array<{ shots: number; label: string }>;
+  /** Broj hitaca u svakoj sledećoj (eliminacionoj) seriji. */
+  then: number;
+};
+
+function seriesPlan(disciplineCode: string): SeriesPlan | null {
   if (isThreePositionEvent(disciplineCode)) {
-    return [{ shots: 10, label: "Klečeći" }, { shots: 10, label: "Ležeći" }, { shots: 5, label: "Stojeći 1" }, { shots: 5, label: "Stojeći 2" }];
+    return { phase: [{ shots: 10, label: "Klečeći" }, { shots: 10, label: "Ležeći" }, { shots: 5, label: "Stojeći 1" }, { shots: 5, label: "Stojeći 2" }], then: 1 };
   }
-  if (isAirEvent(disciplineCode)) return [{ shots: 5, label: "S1" }, { shots: 5, label: "S2" }];
+  if (isAirEvent(disciplineCode)) return { phase: [{ shots: 5, label: "S1" }, { shots: 5, label: "S2" }], then: 2 };
   return null;
 }
 
+/** Naziv i-te kolone: serija prve faze, pa pojedinačni hitac (H1…) ili par hitaca po rednom broju (11–12…). */
 function seriesLabels(disciplineCode: string, count: number): string[] | undefined {
   const plan = seriesPlan(disciplineCode);
   if (!plan) return undefined;
-  return Array.from({ length: count }, (_, i) => plan[i]?.label ?? `H${i - plan.length + 1}`);
+  const phaseShots = plan.phase.reduce((sum, series) => sum + series.shots, 0);
+  return Array.from({ length: count }, (_, i) => {
+    if (plan.phase[i]) return plan.phase[i].label;
+    const k = i - plan.phase.length;
+    if (plan.then === 1) return `H${k + 1}`;
+    const first = phaseShots + k * plan.then + 1;
+    return `${first}–${first + plan.then - 1}`;
+  });
 }
 
 /** Hronološki hici → kumulativ na kraju svake serije po planu (poslednja može biti nedovršena). */
-function cumulativeFromShots(plan: Array<{ shots: number }>, shots: number[]): number[] {
+function cumulativeFromShots(plan: SeriesPlan, shots: number[]): number[] {
   const out: number[] = [];
   let index = 0;
   let running = 0;
   for (let group = 0; index < shots.length; group++) {
-    const size = plan[group]?.shots ?? 1;
+    const size = plan.phase[group]?.shots ?? plan.then;
     for (const shot of shots.slice(index, index + size)) running += shot;
     index += size;
     out.push(round1(running));
@@ -65,7 +79,8 @@ function labelled(disciplineCode: string, cumulatives: number[][]) {
 }
 
 /**
- * SIUS: `series` su zbirovi serija po planu (provereno: trostav [104.3, 104.9, …]).
+ * SIUS: `series` su zbirovi serija po planu (provereno: trostav [104.3, 104.9, …];
+ * vazdušno: S1, S2, pa zbir svake serije od 2 hica).
  * Ako su sve vrednosti ≤ 10.9, to su pojedinačni hici → grupišu se po planu.
  */
 export function buildSiusFinalDetails(disciplineCode: string, finalists: Array<{ series: number[] }>): BulletinFinalDetail[] {
