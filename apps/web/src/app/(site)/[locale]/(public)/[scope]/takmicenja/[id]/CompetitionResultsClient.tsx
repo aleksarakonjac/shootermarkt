@@ -237,7 +237,7 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId, l
           />
         </motion.div>
       ) : (
-        <motion.div ref={detailRef} key="detail" variants={fadeVariants} initial="hidden" animate="visible" exit="exit" className="scroll-mt-24">
+        <motion.div ref={detailRef} key="detail" variants={fadeVariants} initial="hidden" animate="visible" exit="exit" className="scroll-mt-24" onAnimationStart={(def) => { if (def === "visible") detailRef.current?.scrollIntoView({ block: "start" }); }}>
           <CompetitionDetail
             groups={groups}
             mixedGroups={mixedGroups}

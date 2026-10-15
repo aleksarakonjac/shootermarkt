@@ -300,7 +300,7 @@ export async function getHomepageMain(scope: Scope) {
   const nationalityFilter = scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined;
   const [candidateComps, cacheRows, upcoming] = await Promise.all([
     // Šira lista kandidata; konačni izbor 3 po prioritetu radi selectHomepageFocusCompetitions.
-    db.select().from(competitions).where(and(sql`${competitions.date} <= ${today}`, competitionScope)).orderBy(desc(competitions.date)).limit(40),
+    db.select().from(competitions).where(and(sql`${competitions.date} <= ${today}`, sql`(EXISTS (SELECT 1 FROM ${results} WHERE ${results.competitionId} = ${competitions.id}) OR EXISTS (SELECT 1 FROM ${mixedTeamResults} WHERE ${mixedTeamResults.competitionId} = ${competitions.id}))`, competitionScope)).orderBy(desc(competitions.date)).limit(40),
     db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, rankedFormaCacheFilter())),
     db.select().from(competitions).where(and(sql`${competitions.date} >= ${today} AND ${competitions.date} < ${upcomingDeadline}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
   ]);
