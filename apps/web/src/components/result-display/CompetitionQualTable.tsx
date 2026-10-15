@@ -165,13 +165,14 @@ function flattenGroups(groups: DetailGroup[]): Array<{ value: number | null; isB
   return groups.flatMap((g) => g.values.map((v) => ({ value: v, isBest: v != null && v === g.bestValue })));
 }
 
-// Mobilni prikaz serija: kartice minimalne širine koje se razvlače da popune ceo red.
-const SERIES_GRID_CLS = "flex flex-wrap gap-1.5";
+// Mobilni prikaz serija (auto-fit): jedan red se razvlači preko cele širine, a nepun poslednji
+// red pri prelamanju zadržava istu širinu kartica kao redovi iznad.
+const SERIES_GRID_CLS = "grid grid-cols-[repeat(auto-fit,minmax(3rem,1fr))] gap-1.5";
 
 function SeriesBox({ text, best }: { text: string; best: boolean }) {
   return (
     <span
-      className={`flex min-w-0 grow basis-[3rem] items-center justify-center rounded-md px-1 py-1.5 font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums ${
+      className={`flex min-w-0 items-center justify-center rounded-md px-1 py-1.5 font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums ${
         best ? "bg-[var(--surface-2)] font-semibold text-[var(--ink)] ring-1 ring-[var(--border-strong)]" : "bg-[var(--surface)] text-[var(--muted)]"
       }`}
     >
