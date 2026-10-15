@@ -8,6 +8,7 @@ import { TakmicenjaFilters } from "./takmicenja-filters";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { formatDateRangeSr } from "@/lib/date-utils";
 import { BatchTranslateButton } from "./batch-translate-button";
+import { defaultFocusPriority } from "@/lib/competition-priority";
 
 export const metadata: Metadata = { title: "Admin · Takmičenja" };
 
@@ -78,9 +79,12 @@ export default async function AdminTakmicenjaPage({
   };
 
   const sortColumn = sortColumnMap[sort as keyof typeof sortColumnMap] ?? competitions.date;
-  const orderByExpr = order === "asc"
-    ? [asc(sortColumn), desc(competitions.id)]
-    : [desc(sortColumn), desc(competitions.id)];
+  // Prioritet: ručno postavljeni idu prvi (0 = najvažnije), auto (NULL) uvek na kraju.
+  const orderByExpr = sort === "priority"
+    ? [order === "desc" ? sql`${competitions.focusPriority} desc nulls last` : sql`${competitions.focusPriority} asc nulls last`, desc(competitions.date), desc(competitions.id)]
+    : order === "asc"
+      ? [asc(sortColumn), desc(competitions.id)]
+      : [desc(sortColumn), desc(competitions.id)];
 
   const getSortHref = (col: string) => {
     const params = new URLSearchParams();
@@ -143,6 +147,9 @@ export default async function AdminTakmicenjaPage({
         level: competitions.level,
         issfId: competitions.issfId,
         organizer: competitions.organizer,
+        eventType: competitions.eventType,
+        ageCategory: competitions.ageCategory,
+        focusPriority: competitions.focusPriority,
       })
       .from(competitions)
       .where(activeWhere)
@@ -167,6 +174,11 @@ export default async function AdminTakmicenjaPage({
       .where(currentCondition)
       .orderBy(asc(competitions.date), asc(competitions.dateEnd), desc(competitions.id)),
   ]);
+
+  // Ručni prioritet je običan broj; auto je približan (bez kategorija iz rasporeda) pa je prigušen i sa "auto".
+  const renderPriority = (c: (typeof data)[number]) => c.focusPriority != null
+    ? <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums">{c.focusPriority}</span>
+    : <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--subtle)] tabular-nums" title="Automatski prioritet (bez kategorija iz rasporeda)">auto {defaultFocusPriority(c)}</span>;
 
   const years = yearRows.map((r) => r.year).filter(Boolean);
 
@@ -292,6 +304,7 @@ export default async function AdminTakmicenjaPage({
                       <span className="rounded px-2 py-0.5 text-[0.7rem] font-semibold" style={LEVEL_STYLE[c.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
                         {LEVEL_LABEL[c.level] ?? c.level}
                       </span>
+                      {renderPriority(c)}
                       <span className="ml-auto font-semibold text-[var(--brand-primary)]">Uredi →</span>
                     </span>
                   </Link>
@@ -305,6 +318,7 @@ export default async function AdminTakmicenjaPage({
                   {renderSortableHeader("date", "Datum")}
                   {renderSortableHeader("location", "Lokacija")}
                   {renderSortableHeader("level", "Nivo")}
+                  {renderSortableHeader("priority", "Prioritet")}
                   <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Izvor</th>
                   <th className="px-4 py-3"></th>
                 </tr>
@@ -324,6 +338,7 @@ export default async function AdminTakmicenjaPage({
                         {LEVEL_LABEL[c.level] ?? c.level}
                       </span>
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap">{renderPriority(c)}</td>
                     <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)]">
                       {c.organizer ?? c.issfId ?? "—"}
                     </td>
