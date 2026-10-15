@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { ISSF_LEVELS } from "@/lib/scope";
 import { useScopedHref } from "@/hooks/use-scoped-href";
+import { startNavigationProgress } from "@/components/NavigationProgress";
 
 const ALL_LEVEL_VALUES: Array<CompetitionLevel | "all"> = [
   "all", "olympic", "world", "continental", "international", "national", "regional", "club",
@@ -61,6 +62,7 @@ export function CompetitionsFilterBar({
       } else {
         params.set(key, value);
       }
+      startNavigationProgress(scopedHref(`/takmicenja?${params.toString()}`));
       router.push(scopedHref(`/takmicenja?${params.toString()}`), { scroll: false });
     },
     [router, searchParams]
@@ -131,7 +133,7 @@ export function CompetitionsFilterBar({
         </span>
         {hasFilters && (
           <button
-            onClick={() => router.push(scopedHref("/takmicenja"), { scroll: false })}
+            onClick={() => { startNavigationProgress(scopedHref("/takmicenja")); router.push(scopedHref("/takmicenja"), { scroll: false }); }}
             className="shrink-0 text-xs text-[var(--muted)] hover:text-[var(--brand-primary)] transition-colors"
           >
             {t("list.reset")}

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Barlow_Condensed, JetBrains_Mono } from "next/font/google";
 import { routing } from "@/i18n/routing";
 import "../globals.css";
+import { Suspense } from "react";
+import { NavigationProgress } from "@/components/NavigationProgress";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
@@ -50,6 +52,8 @@ export default function RootLayout({
       className={`${plusJakarta.variable} ${barlowCondensed.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-dvh flex flex-col bg-[var(--bg)] text-[var(--ink)]">
+        {/* useSearchParams u traci zahteva Suspense da ne bi forsirao dinamički render */}
+        <Suspense fallback={null}><NavigationProgress /></Suspense>
         {children}
       </body>
     </html>

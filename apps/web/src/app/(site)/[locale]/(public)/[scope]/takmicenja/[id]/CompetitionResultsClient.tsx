@@ -19,6 +19,7 @@ import {
   MixedTeamQualTable,
   type MixedTeamRow,
 } from "@/components/result-display/MixedTeamQualTable";
+import { startNavigationProgress } from "@/components/NavigationProgress";
 
 export type DisciplineGroup = {
   code: string;
@@ -176,6 +177,7 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId, l
     }
 
     const href = params.size > 0 ? `${pathname}?${params}` : pathname;
+    startNavigationProgress(href);
     if (replace) router.replace(href, { scroll: false });
     else router.push(href, { scroll: false });
   }, [pathname, router, search]);

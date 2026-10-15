@@ -6,6 +6,7 @@ import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { useTranslations, useLocale } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { startNavigationProgress } from "@/components/NavigationProgress";
 
 interface Props {
   availableNocs: string[];
@@ -90,6 +91,7 @@ export function StrelciFilterBar({
   }
 
   function push(overrides: Parameters<typeof buildUrl>[0]) {
+    startNavigationProgress(buildUrl(overrides));
     router.replace(buildUrl(overrides));
   }
 

@@ -10,6 +10,7 @@ import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { useScopedHref } from "@/hooks/use-scoped-href";
+import { startNavigationProgress } from "@/components/NavigationProgress";
 
 // ── Shortcut detection ────────────────────────────────────────────────────────
 
@@ -544,16 +545,16 @@ export function GlobalSearch() {
       e.preventDefault();
       if (total === 0) return;
       if (activeIndex < shortcuts.length) {
-        router.push(shortcuts[activeIndex].href);
+        startNavigationProgress(shortcuts[activeIndex].href); router.push(shortcuts[activeIndex].href);
         closeModal(); return;
       }
       const si = activeIndex - shortcuts.length;
       const shooter = filteredShooters[si];
       if (shooter) {
-        router.push(scopedHref(`/strelci/${shooter.id}`));
+        startNavigationProgress(scopedHref(`/strelci/${shooter.id}`)); router.push(scopedHref(`/strelci/${shooter.id}`));
       } else {
         const c = filteredComps[si - filteredShooters.length];
-        if (c) router.push(scopedHref(`/takmicenja/${c.id}`));
+        if (c) { startNavigationProgress(scopedHref(`/takmicenja/${c.id}`)); router.push(scopedHref(`/takmicenja/${c.id}`)); }
       }
       closeModal();
     }

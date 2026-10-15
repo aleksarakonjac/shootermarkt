@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "@/i18n/navigation";
 import { DEFAULT_SCOPE, VALID_SCOPES, type Scope } from "@/lib/scope";
 import { withScope } from "@/hooks/use-scoped-href";
 import { setPrefCookie } from "@/lib/client-prefs";
+import { startNavigationProgress } from "@/components/NavigationProgress";
 
 // ── Data ───────────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
   function select(nextScope: Scope) {
     setOpen(false);
     setPrefCookie("pref_scope", nextScope);
+    if (nextScope !== scope) startNavigationProgress();
     router.push(scopeUrl(nextScope), locale ? { locale } : undefined);
   }
 

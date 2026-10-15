@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "@/i18n/navigation";
+import { startNavigationProgress } from "@/components/NavigationProgress";
 
 interface SearchShooterItem {
   id: number;
@@ -41,7 +42,7 @@ export function SearchBarClient({ shootersList }: SearchBarClientProps) {
   const handleSelect = (id: number) => {
     setQuery("");
     setIsOpen(false);
-    router.push(`/strelci/${id}`);
+    startNavigationProgress(`/strelci/${id}`); router.push(`/strelci/${id}`);
   };
 
   return (
