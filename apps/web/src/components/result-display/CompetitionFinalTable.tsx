@@ -47,6 +47,8 @@ interface Props {
   results: FinalResultRow[];
   /** world/olympic/continental (ISSF-level) fields — no clubs, only national teams. */
   competitionLevel?: string;
+  /** false dok finale traje — prva tri mesta bez zlatnog/srebrnog/bronzanog kruga. */
+  showMedals?: boolean;
 }
 
 const MEDAL_COLOR: Record<number, string> = {
@@ -170,7 +172,7 @@ const NOC_ONLY_LEVELS = new Set(["world", "olympic", "continental"]);
 const headerCellCls = "px-3 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center bg-[var(--surface)] border-b border-[var(--border)]";
 const narrowHeaderCellCls = "px-1 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] flex items-center bg-[var(--surface)] border-b border-[var(--border)]";
 
-export function CompetitionFinalTable({ results, competitionLevel }: Props) {
+export function CompetitionFinalTable({ results, competitionLevel, showMedals = true }: Props) {
   const clubHeaderLabel = NOC_ONLY_LEVELS.has(competitionLevel ?? "") ? "NOC" : "Klub / NOC";
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
@@ -276,7 +278,7 @@ export function CompetitionFinalTable({ results, competitionLevel }: Props) {
                   {/* Rank */}
                   <div className={`${cellCls} justify-center font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`}>
                     {r.finalRank != null ? (
-                      MEDAL_COLOR[r.finalRank] ? (
+                      showMedals && MEDAL_COLOR[r.finalRank] ? (
                         <MedalIcon rank={r.finalRank} />
                       ) : (
                         <span className="text-[var(--muted)]">{r.finalRank}</span>

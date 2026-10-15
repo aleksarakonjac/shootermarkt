@@ -15,7 +15,8 @@ export type MixedTeamRow = {
   qualRank: number | null; qualTotal: string | null; qualInners: number | null; qualRemark: string | null; qualified: boolean | null; finalRank: number | null; finalTotal: string | null; finalRemark: string | null;
 };
 
-interface Props { teams: MixedTeamRow[]; apparatus: string | null; stage?: "qual" | "final"; }
+// showMedals: false dok finale traje — prva tri mesta bez medalja.
+interface Props { teams: MixedTeamRow[]; apparatus: string | null; stage?: "qual" | "final"; showMedals?: boolean; }
 
 const MEDAL_COLOR: Record<number, string> = {
   1: "oklch(0.75 0.14 85)",
@@ -42,7 +43,7 @@ function sumOrNull(series: number[] | undefined): number | null {
   return series && series.length ? series.reduce((a, b) => a + b, 0) : null;
 }
 
-export function MixedTeamQualTable({ teams, apparatus, stage = "qual" }: Props) {
+export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedals = true }: Props) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
   const isFinal = stage === "final";
@@ -103,7 +104,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual" }: Props) 
         const subtotalCell = `flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`;
         return <div key={team.id} role="rowgroup" style={{ display: "contents" }}>
           <div role="row" className={`group ${hasSeries ? "cursor-pointer sm:cursor-default" : ""}`} style={{ display: "contents" }} onClick={hasSeries ? () => toggle(team.id) : undefined}>
-            <div className={`${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{teamRank == null ? <span className="text-[var(--subtle)]">—</span> : isFinal && teamRank <= 3 ? <span className="flex w-full justify-center"><MedalIcon rank={teamRank} /></span> : <span className={teamRank <= 3 && !isFinal ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>{teamRank}</span>}</div>
+            <div className={`${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{teamRank == null ? <span className="text-[var(--subtle)]">—</span> : isFinal && showMedals && teamRank <= 3 ? <span className="flex w-full justify-center"><MedalIcon rank={teamRank} /></span> : <span className={teamRank <= 3 && !isFinal ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>{teamRank}</span>}</div>
             <div className={`${cell} min-w-0 group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
               <span className="hidden sm:inline min-w-0 truncate text-sm text-[var(--ink)]">{nocEntry?.name && noc !== "AIN" ? nocEntry.name : noc} {team.teamNumber}</span>
             </div>

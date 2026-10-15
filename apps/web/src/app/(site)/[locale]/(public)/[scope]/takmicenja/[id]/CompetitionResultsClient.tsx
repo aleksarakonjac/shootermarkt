@@ -20,6 +20,7 @@ import {
   type MixedTeamRow,
 } from "@/components/result-display/MixedTeamQualTable";
 import { startNavigationProgress } from "@/components/NavigationProgress";
+import { shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
 
 export type DisciplineGroup = {
   code: string;
@@ -75,6 +76,8 @@ interface Props {
   competitionId: number;
   locale: string;
   competitionLevel?: string;
+  /** Satnica finala (disciplina + kategorija) — medalje se prikazuju tek kad je finale gotovo. */
+  finalSlots?: Array<FinalSlot & { disciplineCode: string; category: string }>;
 }
 
 // ── Fade variants ─────────────────────────────────────────────────────────────
@@ -129,7 +132,7 @@ function eliminationRoundLabel(round: number, locale: string): string {
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
-export function CompetitionResultsClient({ groups, mixedGroups, competitionId, locale, competitionLevel }: Props) {
+export function CompetitionResultsClient({ groups, mixedGroups, competitionId, locale, competitionLevel, finalSlots = [] }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -240,6 +243,7 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId, l
             selection={selection}
             locale={locale}
             competitionLevel={competitionLevel}
+            finalSlots={finalSlots}
             onBack={() => {
               setSelection(null);
               setSelectionUrl(null, true);
@@ -533,6 +537,7 @@ function CompetitionDetail({
   selection,
   locale,
   competitionLevel,
+  finalSlots,
   onBack,
   onStageChange,
 }: {
@@ -541,10 +546,17 @@ function CompetitionDetail({
   selection: Selection;
   locale: string;
   competitionLevel?: string;
+  finalSlots: NonNullable<Props["finalSlots"]>;
   onBack: () => void;
   onStageChange: (stage: string, elimRound?: number) => void;
 }) {
   const reducedMotion = useReducedMotion();
+  // Sat za odluku o medaljama u finalu (finale se završava dok je stranica otvorena).
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
   const selectorTransition = reducedMotion
     ? { duration: 0 }
     : { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const };
@@ -552,6 +564,7 @@ function CompetitionDetail({
   if (selection.kind === "mixed") {
     const mixedGroup = mixedGroups.find((g) => g.code === selection.disciplineCode);
     const hasFinal = mixedGroup?.teams.some((t) => t.finalRank != null || t.finalTotal != null) ?? false;
+    const showMixedMedals = shouldShowFinalMedals(finalSlots.find((slot) => slot.disciplineCode === selection.disciplineCode), [], now);
 
     return (
       <div>
@@ -602,7 +615,7 @@ function CompetitionDetail({
 
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={selection.stage} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.22 } }} exit={{ opacity: 0, transition: { duration: 0.16 } }}>
-            <MixedTeamQualTable teams={mixedGroup?.teams ?? []} apparatus={mixedGroup?.apparatus ?? null} stage={selection.stage === "final" ? "final" : "qual"} />
+            <MixedTeamQualTable teams={mixedGroup?.teams ?? []} apparatus={mixedGroup?.apparatus ?? null} stage={selection.stage === "final" ? "final" : "qual"} showMedals={showMixedMedals} />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -689,6 +702,14 @@ function CompetitionDetail({
         finalDetail: r.finalDetail,
         remark: r.finalRemark,
       })) ?? [];
+  const finalSlot = selection.kind === "individual"
+    ? finalSlots.find((slot) => slot.disciplineCode === selection.disciplineCode && slot.category === selection.category)
+    : undefined;
+  const showFinalMedals = shouldShowFinalMedals(
+    finalSlot,
+    [...finalRows].sort((a, b) => (a.finalRank ?? Infinity) - (b.finalRank ?? Infinity)).map((r) => r.finalDetail),
+    now,
+  );
 
   // Build stage toggle options in correct order: Elim → Qual → Final
   type StageOption = { key: Stage; label: string; shortLabel: string; badge: React.ReactNode };
@@ -839,7 +860,7 @@ function CompetitionDetail({
             animate={{ opacity: 1, transition: { duration: 0.22 } }}
             exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
-            <CompetitionFinalTable results={finalRows} competitionLevel={competitionLevel} />
+            <CompetitionFinalTable results={finalRows} competitionLevel={competitionLevel} showMedals={showFinalMedals} />
           </motion.div>
         )}
       </AnimatePresence>
