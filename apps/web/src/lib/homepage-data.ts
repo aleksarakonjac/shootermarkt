@@ -46,6 +46,58 @@ export function selectHomepageCurrentPhases<T extends HomepagePhaseCandidate>(ph
   return selected.toSorted(comparePhaseRecency);
 }
 
+type FocusCompetition = {
+  id: number;
+  date: string;
+  dateEnd: string | null;
+  level: string;
+  eventType: string;
+  ageCategory: string;
+};
+
+const FOCUS_LEVEL_BASE: Record<string, number> = { olympic: 100, world: 80, continental: 60, international: 45, national: 40, regional: 20, club: 10 };
+// Prvenstvo je vrhunac svog nivoa; svetski kup je serijal pa ide ispod prvenstva.
+const FOCUS_EVENT_BONUS: Record<string, number> = { championship: 15, world_cup: 8, grand_prix: 5, champions_league: 5, cup: 3 };
+const FOCUS_JUNIOR_AGES = new Set(["pionir", "kadet", "mladji_junior", "junior"]);
+const FOCUS_WINDOW_DAYS = 14;
+
+/**
+ * Prioritet takmičenja za "Aktuelno / In focus" sekciju (veći = važnije).
+ * olympic > world > continental > international ≈ national > regional > club,
+ * uz bonus za tip događaja (prvenstvo > svetski kup > kup) i penal za juniorske
+ * kategorije, tako da senior svetski kup nadjača juniorsko kontinentalno finale,
+ * a svetsko prvenstvo nadjača svetski kup. U srb scope-u državna takmičenja
+ * dobijaju podizanje na nivo kontinentalnih.
+ */
+export function competitionFocusPriority(competition: Pick<FocusCompetition, "level" | "eventType" | "ageCategory">, scope: Scope = "issf") {
+  const base = scope === "srb" && competition.level === "national" ? 65 : (FOCUS_LEVEL_BASE[competition.level] ?? 0);
+  const juniorPenalty = FOCUS_JUNIOR_AGES.has(competition.ageCategory) ? 25 : 0;
+  return base + (FOCUS_EVENT_BONUS[competition.eventType] ?? 0) - juniorPenalty;
+}
+
+/**
+ * Bira `limit` takmičenja za fokus sekciju: tekuća (live) uvek prva, zatim po
+ * prioritetu, pa po novijem datumu. Kandidati su tekuća + završena u poslednjih
+ * FOCUS_WINDOW_DAYS dana; ako ih ima manje od `limit`, dopunjava se najnovijim
+ * starijim da sekcija ne ostane prazna.
+ */
+export function selectHomepageFocusCompetitions<T extends FocusCompetition>(candidates: T[], scope: Scope, today: string, limit = 3) {
+  const cutoff = new Date(`${today}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - FOCUS_WINDOW_DAYS);
+  const cutoffKey = cutoff.toISOString().slice(0, 10);
+  const endOf = (c: T) => c.dateEnd ?? c.date;
+  const isLive = (c: T) => isCompetitionLive(c.date, c.dateEnd, today);
+  const byFocus = (a: T, b: T) =>
+    Number(isLive(b)) - Number(isLive(a))
+    || competitionFocusPriority(b, scope) - competitionFocusPriority(a, scope)
+    || b.date.localeCompare(a.date);
+  const windowed = candidates.filter((c) => c.date <= today && endOf(c) >= cutoffKey).toSorted(byFocus).slice(0, limit);
+  if (windowed.length >= limit) return windowed;
+  const taken = new Set(windowed.map((c) => c.id));
+  const filler = candidates.filter((c) => c.date <= today && !taken.has(c.id)).toSorted((a, b) => b.date.localeCompare(a.date)).slice(0, limit - windowed.length);
+  return [...windowed, ...filler];
+}
+
 export function selectTickerUpcoming<T extends { date: string }>(competitions: T[], today: string) {
   const deadline = new Date(`${today}T00:00:00Z`);
   deadline.setUTCDate(deadline.getUTCDate() + 14);
@@ -258,14 +310,15 @@ export async function getHomepageMain(scope: Scope) {
   const upcomingDeadline = twoMonthsOut.toISOString().slice(0, 10);
   const competitionScope = buildCompetitionScopeFilter(scope);
   const nationalityFilter = scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined;
-  const activeFirst = sql`CASE WHEN ${competitions.date} <= ${today} AND COALESCE(${competitions.dateEnd}, ${competitions.date}) >= ${today} THEN 1 ELSE 0 END`;
-  const [recentComps, cacheRows, upcoming] = await Promise.all([
-    db.select().from(competitions).where(and(sql`${competitions.date} <= ${today}`, competitionScope)).orderBy(desc(activeFirst), desc(competitions.date)).limit(3),
+  const [candidateComps, cacheRows, upcoming] = await Promise.all([
+    // Šira lista kandidata; konačni izbor 3 po prioritetu radi selectHomepageFocusCompetitions.
+    db.select().from(competitions).where(and(sql`${competitions.date} <= ${today}`, competitionScope)).orderBy(desc(competitions.date)).limit(40),
     db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, rankedFormaCacheFilter())),
     db.select().from(competitions).where(and(sql`${competitions.date} >= ${today} AND ${competitions.date} < ${upcomingDeadline}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
   ]);
   const showSrbHighlight = scope === 'srb';
-  const recent = await Promise.all(recentComps.map(async (competition) => {
+  const recentComps = selectHomepageFocusCompetitions(candidateComps, scope, today);
+  const recent =await Promise.all(recentComps.map(async (competition) => {
     const [slots, individualRows, mixedRows] = await Promise.all([
       db.select({ discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(eq(competitionSchedule.competitionId, competition.id)),
       db.select({ shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRound: results.elimRound, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(eq(results.competitionId, competition.id)),
