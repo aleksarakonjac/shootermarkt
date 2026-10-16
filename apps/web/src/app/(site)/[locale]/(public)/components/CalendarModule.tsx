@@ -35,6 +35,24 @@ function getLevelColor(level: string): string {
 }
 
 const MAX_DOTS = 4;
+const SETTLE_MS = 220;
+const SWIPE_DISTANCE_RATIO = 0.25;
+const SWIPE_VELOCITY = 0.5; // px/ms
+
+function buildCompsByDate(list: Competition[]) {
+  const map = new Map<string, Competition[]>();
+  for (const c of list) {
+    const cur = new Date(`${c.date.slice(0, 10)}T00:00:00Z`);
+    const end = new Date(`${(c.endDate ?? c.date).slice(0, 10)}T00:00:00Z`);
+    while (cur <= end) {
+      const ds = cur.toISOString().slice(0, 10);
+      if (!map.has(ds)) map.set(ds, []);
+      map.get(ds)!.push(c);
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+  }
+  return map;
+}
 
 // One dot per competition on the day, most prominent level first.
 function CompetitionDots({ comps, onBrand = false }: { comps: Competition[]; onBrand?: boolean }) {
@@ -137,25 +155,11 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
     setPickerOpen(false);
   };
 
-  const compsByDate = useMemo(() => {
-    const map = new Map<string, Competition[]>();
-    for (const c of monthCache[`${viewYear}-${viewMonth}`] ?? []) {
-      const startDate = c.date.slice(0, 10);
-      const endDate = (c.endDate ?? c.date).slice(0, 10);
-      const cur = new Date(`${startDate}T00:00:00Z`);
-      const end = new Date(`${endDate}T00:00:00Z`);
-      while (cur <= end) {
-        const ds = cur.toISOString().slice(0, 10);
-        if (!map.has(ds)) map.set(ds, []);
-        map.get(ds)!.push(c);
-        cur.setUTCDate(cur.getUTCDate() + 1);
-      }
-    }
-    return map;
-  }, [monthCache, viewMonth, viewYear]);
-
-  const daysInMonth = getDaysInMonth(viewYear, viewMonth);
-  const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
+  const mapFor = (key: string) => buildCompsByDate(monthCache[key] ?? []);
+  const compsByDate = useMemo(
+    () => buildCompsByDate(monthCache[`${viewYear}-${viewMonth}`] ?? []),
+    [monthCache, viewMonth, viewYear],
+  );
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
@@ -166,13 +170,6 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
     else setViewMonth(m => m + 1);
   };
 
-  const cells: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const selectedComps = selectedDate ? (compsByDate.get(selectedDate) ?? []) : [];
   const currentMonthKey = `${viewYear}-${viewMonth}`;
   const currentState = monthState[currentMonthKey] ?? "loading";
 
@@ -185,7 +182,206 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
     return () => window.clearTimeout(timeout);
   }, [currentMonthKey, currentState, loadMonth, reportFailure, viewMonth, viewYear]);
 
+
   const DAYS_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+  const renderMonth = (year: number, month: number, active: boolean) => {
+    const monthComps = active ? compsByDate : mapFor(`${year}-${month}`);
+    const monthDays = getDaysInMonth(year, month);
+    const monthCells: (number | null)[] = [
+      ...Array(getFirstDayOfMonth(year, month)).fill(null),
+      ...Array.from({ length: monthDays }, (_, i) => i + 1),
+    ];
+    while (monthCells.length % 7 !== 0) monthCells.push(null);
+    const selected = active ? selectedDate : null;
+    const selectedHere = selected ? (monthComps.get(selected) ?? []) : [];
+    const loaded = monthState[`${year}-${month}`] === "ready";
+    return (
+      <>
+        {/* Day labels */}
+        <div className="grid grid-cols-7 mb-1">
+          {DAYS_ORDER.map((d) => (
+            <div
+              key={d}
+              className="py-1 text-center text-xs font-bold uppercase tracking-wider text-[var(--muted)]"
+            >
+              {t(`weekdays.${d}`)}
+            </div>
+          ))}
+        </div>
+
+        {/* Day cells */}
+        <div className="grid grid-cols-7 gap-y-0.5">
+          {monthCells.map((day, idx) => {
+            if (!day) return <div key={`empty-${idx}`} />;
+
+            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const comps = monthComps.get(dateStr) ?? [];
+            const isToday =
+              day === today.getDate() &&
+              month === today.getMonth() &&
+              year === today.getFullYear();
+            const hasComp = comps.length > 0;
+            const hasOneComp = comps.length === 1;
+
+            // Span position + tooltip placement
+            const col = idx % 7;
+            const row = Math.floor(idx / 7);
+            const tooltipH = row === 0 ? "top-full mt-2" : "bottom-full mb-2";
+            const tooltipX = col <= 1 ? "left-0" : col >= 5 ? "right-0" : "left-1/2 -translate-x-1/2";
+            // Round only where the highlighted run really ends — a neighbouring
+            // day with any competition (even a different one) keeps it joined.
+            const dayKey = (d: number) => `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+            const joinsPrev = hasComp && col > 0 && day > 1 && monthComps.has(dayKey(day - 1)) && !isToday && !(day - 1 === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+            const joinsNext = hasComp && col < 6 && day < monthDays && monthComps.has(dayKey(day + 1)) && !isToday && !(day + 1 === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+            const roundLeft  = !joinsPrev;
+            const roundRight = !joinsNext;
+            const roundedClass =
+              roundLeft && roundRight ? "rounded-md" :
+              roundLeft               ? "rounded-l-md rounded-r-none" :
+              roundRight              ? "rounded-r-md rounded-l-none" :
+                                        "rounded-none";
+
+            return (
+              <div
+                key={dateStr}
+                className="relative"
+                onMouseLeave={() => setSelectedDate((value) => value === dateStr ? null : value)}
+              >
+                {hasOneComp ? (
+                  <Link
+                    href={scopedHref(`/takmicenja/${comps[0].id}`)}
+                    onFocus={() => setSelectedDate(dateStr)}
+                    onMouseEnter={() => setSelectedDate(dateStr)}
+                    aria-describedby={selected === dateStr ? `calendar-events-${dateStr}` : undefined}
+                    aria-label={`${dateStr}: ${comps[0].name}`}
+                    className={[
+                      `relative flex min-h-11 w-full items-center justify-center py-1.5 text-sm font-semibold transition-colors select-none ${roundedClass}`,
+                      isToday
+                        ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
+                        : "bg-[var(--brand-primary)]/10 text-[var(--ink)] hover:bg-[var(--brand-primary)]/20 cursor-pointer",
+                    ].join(" ")}
+                  >
+                    {day}
+                    <CompetitionDots comps={comps} onBrand={isToday} />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => hasComp && setSelectedDate((value) => value === dateStr ? null : dateStr)}
+                    onFocus={() => hasComp && setSelectedDate(dateStr)}
+                    onMouseEnter={() => hasComp && setSelectedDate(dateStr)}
+                    aria-expanded={hasComp ? selected === dateStr : undefined}
+                    aria-describedby={hasComp && selected === dateStr ? `calendar-events-${dateStr}` : undefined}
+                    aria-label={hasComp ? `${dateStr}: ${t("competitionPlural", { count: comps.length })}` : dateStr}
+                    disabled={!hasComp}
+                    className={[
+                      `relative flex min-h-11 w-full items-center justify-center py-1.5 text-sm font-semibold transition-colors select-none ${roundedClass}`,
+                      isToday
+                        ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
+                        : hasComp
+                          ? "bg-[var(--brand-primary)]/10 text-[var(--ink)] hover:bg-[var(--brand-primary)]/20 cursor-pointer"
+                          : "cursor-default text-[var(--ink)]",
+                    ].join(" ")}
+                  >
+                    {day}
+                    {hasComp && <CompetitionDots comps={comps} onBrand={isToday} />}
+                  </button>
+                )}
+
+                {/* Tooltip */}
+                {selected === dateStr && selectedHere.length > 0 && (
+                  <div
+                    id={`calendar-events-${dateStr}`}
+                    className={`absolute z-50 w-52 rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white ${tooltipH} ${tooltipX}`}
+                  >
+                    {selectedHere.map((c) => {
+                      const levelStyle = LEVEL_STYLE[c.level.toLowerCase()] ?? LEVEL_STYLE.club;
+                      return <Link key={c.id} href={scopedHref(`/takmicenja/${c.id}`)} className="flex flex-col gap-1 py-1 border-b border-white/10 last:border-0 hover:text-white/80">
+                        <span className="self-start rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider" style={levelStyle}>
+                          {getLevelLabel(c.level.toLowerCase(), locale)}
+                        </span>
+                        <span className="font-semibold leading-tight">{c.name}</span>
+                        {c.location && (
+                          <span className="text-white/80">{c.location}</span>
+                        )}
+                      </Link>;
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {active && loaded && monthComps.size === 0 && <p className="py-2 text-center text-sm text-[var(--muted)]">{t("noEvents")}</p>}
+      </>
+    );
+  };
+
+  // Interactive swipe (touch only): the three-month track follows the finger; on release it
+  // either settles on the neighbouring month or springs back.
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const gesture = useRef<{ id: number; x: number; y: number; lastX: number; lastT: number; vx: number; axis: "x" | "y" | null } | null>(null);
+  const settleTimer = useRef<number | undefined>(undefined);
+  const [dragX, setDragX] = useState(0);
+  const [settling, setSettling] = useState(false);
+  useEffect(() => () => window.clearTimeout(settleTimer.current), []);
+
+  const finishSwipe = (cancelled: boolean) => {
+    const g = gesture.current;
+    gesture.current = null;
+    if (!g || g.axis !== "x") return;
+    const width = viewportRef.current?.offsetWidth ?? 0;
+    const passed = !cancelled && width > 0 && (Math.abs(dragX) > width * SWIPE_DISTANCE_RATIO || Math.abs(g.vx) > SWIPE_VELOCITY) && dragX !== 0;
+    const dir = passed ? (dragX < 0 ? 1 : -1) : 0; // swipe left → next month
+    setSettling(true);
+    setDragX(dir === 0 ? 0 : -dir * width);
+    settleTimer.current = window.setTimeout(() => {
+      if (dir === 1) nextMonth();
+      else if (dir === -1) prevMonth();
+      setSettling(false);
+      setDragX(0);
+    }, SETTLE_MS);
+  };
+
+  const swipeHandlers = {
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType !== "touch" || settling || pickerOpen) return;
+      gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastT: e.timeStamp, vx: 0, axis: null };
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+      const g = gesture.current;
+      if (!g || g.id !== e.pointerId) return;
+      const dx = e.clientX - g.x;
+      const dy = e.clientY - g.y;
+      if (!g.axis) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+        if (g.axis === "x") {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setSelectedDate(null);
+        }
+      }
+      if (g.axis !== "x") return;
+      const dt = e.timeStamp - g.lastT;
+      if (dt > 0) g.vx = (e.clientX - g.lastX) / dt;
+      g.lastX = e.clientX;
+      g.lastT = e.timeStamp;
+      setDragX(dx);
+    },
+    onPointerUp: () => finishSwipe(false),
+    onPointerCancel: () => finishSwipe(true),
+  };
+
+  const prevOf = new Date(viewYear, viewMonth - 1, 1);
+  const nextOf = new Date(viewYear, viewMonth + 1, 1);
+  const panels = [
+    { offset: -1, year: prevOf.getFullYear(), month: prevOf.getMonth() },
+    { offset: 0, year: viewYear, month: viewMonth },
+    { offset: 1, year: nextOf.getFullYear(), month: nextOf.getMonth() },
+  ];
+
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)]">
@@ -296,123 +492,21 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
           <button type="button" onClick={() => void loadMonth(viewYear, viewMonth)} className="font-semibold text-[var(--brand-primary)] hover:underline">{common("retry")}</button>
         </div>
       ) : <div className="p-3 flex flex-col gap-2">
-        {/* Day labels */}
-        <div className="grid grid-cols-7 mb-1">
-          {DAYS_ORDER.map((d) => (
-            <div
-              key={d}
-              className="py-1 text-center text-xs font-bold uppercase tracking-wider text-[var(--muted)]"
-            >
-              {t(`weekdays.${d}`)}
-            </div>
-          ))}
-        </div>
-
-        {/* Day cells */}
-        <div className="grid grid-cols-7 gap-y-0.5">
-          {cells.map((day, idx) => {
-            if (!day) return <div key={`empty-${idx}`} />;
-
-            const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-            const comps = compsByDate.get(dateStr) ?? [];
-            const isToday =
-              day === today.getDate() &&
-              viewMonth === today.getMonth() &&
-              viewYear === today.getFullYear();
-            const hasComp = comps.length > 0;
-            const hasOneComp = comps.length === 1;
-
-            // Span position + tooltip placement
-            const col = idx % 7;
-            const row = Math.floor(idx / 7);
-            const tooltipH = row === 0 ? "top-full mt-2" : "bottom-full mb-2";
-            const tooltipX = col <= 1 ? "left-0" : col >= 5 ? "right-0" : "left-1/2 -translate-x-1/2";
-            // Round only where the highlighted run really ends — a neighbouring
-            // day with any competition (even a different one) keeps it joined.
-            const dayKey = (d: number) => `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-            const joinsPrev = hasComp && col > 0 && day > 1 && compsByDate.has(dayKey(day - 1)) && !isToday && !(day - 1 === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear());
-            const joinsNext = hasComp && col < 6 && day < daysInMonth && compsByDate.has(dayKey(day + 1)) && !isToday && !(day + 1 === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear());
-            const roundLeft  = !joinsPrev;
-            const roundRight = !joinsNext;
-            const roundedClass =
-              roundLeft && roundRight ? "rounded-md" :
-              roundLeft               ? "rounded-l-md rounded-r-none" :
-              roundRight              ? "rounded-r-md rounded-l-none" :
-                                        "rounded-none";
-
-            return (
-              <div
-                key={dateStr}
-                className="relative"
-                onMouseLeave={() => setSelectedDate((value) => value === dateStr ? null : value)}
-              >
-                {hasOneComp ? (
-                  <Link
-                    href={scopedHref(`/takmicenja/${comps[0].id}`)}
-                    onFocus={() => setSelectedDate(dateStr)}
-                    onMouseEnter={() => setSelectedDate(dateStr)}
-                    aria-describedby={selectedDate === dateStr ? `calendar-events-${dateStr}` : undefined}
-                    aria-label={`${dateStr}: ${comps[0].name}`}
-                    className={[
-                      `relative flex min-h-11 w-full items-center justify-center py-1.5 text-sm font-semibold transition-colors select-none ${roundedClass}`,
-                      isToday
-                        ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
-                        : "bg-[var(--brand-primary)]/10 text-[var(--ink)] hover:bg-[var(--brand-primary)]/20 cursor-pointer",
-                    ].join(" ")}
-                  >
-                    {day}
-                    <CompetitionDots comps={comps} onBrand={isToday} />
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => hasComp && setSelectedDate((value) => value === dateStr ? null : dateStr)}
-                    onFocus={() => hasComp && setSelectedDate(dateStr)}
-                    onMouseEnter={() => hasComp && setSelectedDate(dateStr)}
-                    aria-expanded={hasComp ? selectedDate === dateStr : undefined}
-                    aria-describedby={hasComp && selectedDate === dateStr ? `calendar-events-${dateStr}` : undefined}
-                    aria-label={hasComp ? `${dateStr}: ${t("competitionPlural", { count: comps.length })}` : dateStr}
-                    disabled={!hasComp}
-                    className={[
-                      `relative flex min-h-11 w-full items-center justify-center py-1.5 text-sm font-semibold transition-colors select-none ${roundedClass}`,
-                      isToday
-                        ? "bg-[var(--brand-primary)] text-white font-bold ring-2 ring-[var(--brand-primary)] ring-offset-1"
-                        : hasComp
-                          ? "bg-[var(--brand-primary)]/10 text-[var(--ink)] hover:bg-[var(--brand-primary)]/20 cursor-pointer"
-                          : "cursor-default text-[var(--ink)]",
-                    ].join(" ")}
-                  >
-                    {day}
-                    {hasComp && <CompetitionDots comps={comps} onBrand={isToday} />}
-                  </button>
-                )}
-
-                {/* Tooltip */}
-                {selectedDate === dateStr && selectedComps.length > 0 && (
-                  <div
-                    id={`calendar-events-${dateStr}`}
-                    className={`absolute z-50 w-52 rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white ${tooltipH} ${tooltipX}`}
-                  >
-                    {selectedComps.map((c) => {
-                      const levelStyle = LEVEL_STYLE[c.level.toLowerCase()] ?? LEVEL_STYLE.club;
-                      return <Link key={c.id} href={scopedHref(`/takmicenja/${c.id}`)} className="flex flex-col gap-1 py-1 border-b border-white/10 last:border-0 hover:text-white/80">
-                        <span className="self-start rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider" style={levelStyle}>
-                          {getLevelLabel(c.level.toLowerCase(), locale)}
-                        </span>
-                        <span className="font-semibold leading-tight">{c.name}</span>
-                        {c.location && (
-                          <span className="text-white/80">{c.location}</span>
-                        )}
-                      </Link>;
-                    })}
-                  </div>
-                )}
+        <div ref={viewportRef} className="overflow-hidden touch-pan-y" {...swipeHandlers}>
+          <div
+            className="flex"
+            style={{
+              transform: `translateX(calc(-100% + ${dragX}px))`,
+              transition: settling ? `transform ${SETTLE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` : "none",
+            }}
+          >
+            {panels.map(({ offset, year, month }) => (
+              <div key={offset} className="flex w-full shrink-0 flex-col gap-2" inert={offset !== 0} aria-hidden={offset !== 0 ? true : undefined}>
+                {renderMonth(year, month, offset === 0)}
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
-
-        {compsByDate.size === 0 && <p className="py-2 text-center text-sm text-[var(--muted)]">{t("noEvents")}</p>}
 
         {/* Legend */}
         <div className="flex items-center justify-between gap-1 pt-2 border-t border-[var(--border)]">
