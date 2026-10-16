@@ -630,21 +630,20 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
                               </span>
                             )}
                           </div>
+                          {sortDiscs(hero.disciplineCodes ?? []).length > 0 && (
+                            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                              {sortDiscs(hero.disciplineCodes ?? []).map((code) => (
+                                <span
+                                  key={code}
+                                  className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.65rem] uppercase tracking-wide px-2 py-1 rounded bg-[var(--surface-2)] text-[var(--muted)]"
+                                >
+                                  {code}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
-                        {/* Discipline badges */}
-                        {sortDiscs(hero.disciplineCodes ?? []).length > 0 && (
-                          <div className="flex items-center gap-1.5 flex-wrap shrink-0 justify-end pt-0.5">
-                            {sortDiscs(hero.disciplineCodes ?? []).map((code) => (
-                              <span
-                                key={code}
-                                className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.65rem] uppercase tracking-wide px-2 py-1 rounded bg-[var(--surface-2)] text-[var(--muted)]"
-                              >
-                                {code}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </ScopedLink>

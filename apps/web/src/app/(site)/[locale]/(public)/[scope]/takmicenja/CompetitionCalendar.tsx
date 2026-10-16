@@ -216,25 +216,30 @@ export function CompetitionCalendar({ competitions }: Props) {
 
   const shift = (dir: 1 | -1) => setActiveStartDate((current) => shiftPeriod(current, view, dir));
   const monthLabel = `${t(`months.${activeStartDate.getMonth()}`)} ${activeStartDate.getFullYear()}`;
+  const monthPrefix = toKey(activeStartDate).slice(0, 7);
+  const monthCount = competitions.filter((c) => c.date.slice(0, 7) === monthPrefix).length;
 
   return (
     <div className="w-full lg:sticky lg:top-[calc(var(--site-header-h,3.5rem)+1.5rem)]">
-      {/* Telefon: traka mesec + strelice */}
+      {/* Telefon: traka s mesecom i brojem takmičenja; strelice se pojavljuju tek kad je mreža otvorena */}
       <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--bg)] px-1 lg:hidden">
-        <button type="button" className="cal-strip-btn" onClick={() => shift(-1)} aria-label={t("prevMonth")}><Arrow dir="prev" /></button>
+        {open && <button type="button" className="cal-strip-btn" onClick={() => shift(-1)} aria-label={t("prevMonth")}><Arrow dir="prev" /></button>}
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls="competition-calendar-grid"
-          className="flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg text-sm font-bold text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
+          className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-2 text-sm font-bold text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
         >
           <span className="truncate">{monthLabel}</span>
+          {monthCount > 0 && (
+            <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold tabular-nums text-[var(--muted)]">{monthCount}</span>
+          )}
           <svg className="cal-strip-chevron shrink-0 text-[var(--muted)]" data-open={open} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
             <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
           </svg>
         </button>
-        <button type="button" className="cal-strip-btn" onClick={() => shift(1)} aria-label={t("nextMonth")}><Arrow dir="next" /></button>
+        {open && <button type="button" className="cal-strip-btn" onClick={() => shift(1)} aria-label={t("nextMonth")}><Arrow dir="next" /></button>}
       </div>
 
       <div id="competition-calendar-grid" className="cal-collapse mt-2 lg:mt-0" data-open={open}>
