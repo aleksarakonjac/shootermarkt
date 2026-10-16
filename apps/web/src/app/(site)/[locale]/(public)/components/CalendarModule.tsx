@@ -389,15 +389,16 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)]">
       {/* Header */}
       <div className="relative flex items-center justify-between rounded-t-xl bg-[var(--brand-primary)] px-4 py-1.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <h3 className="font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-white">
-            {t("title")}
-          </h3>
+        <h3 className="font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider text-white">
+          {t("title")}
+        </h3>
+        {/* Today: centered in the space between the title and the month nav */}
+        <div className="flex min-w-0 flex-1 justify-center">
           {!isCurrentMonthView && (
             <button
               type="button"
               onClick={goToCurrent}
-              className="min-h-8 rounded border border-white/60 px-2 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-white/15"
+              className="rounded border border-white/60 px-2 py-px text-[11px] font-semibold uppercase leading-4 tracking-wide text-white transition-colors hover:bg-white/15"
             >
               {locale === "en" ? "Today" : "Danas"}
             </button>
