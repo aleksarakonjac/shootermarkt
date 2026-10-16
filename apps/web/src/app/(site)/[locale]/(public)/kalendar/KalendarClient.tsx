@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Calendar from "react-calendar";
 import { Link } from "@/i18n/navigation";
 import "./kalendar.css";
@@ -10,6 +10,20 @@ import { useTranslations, useLocale } from "next-intl";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
 const MAX_DOTS = 4;
+const SWIPE_DISTANCE_RATIO = 0.25;
+const SWIPE_VELOCITY = 0.5; // px/ms
+const SETTLE_MS = 220;
+
+type CalendarView = "month" | "year" | "decade" | "century";
+type SwipeGesture = { id: number; x: number; y: number; lastX: number; lastT: number; vx: number; axis: "x" | "y" | null };
+
+// Pomeranje aktivnog perioda za jedan korak u trenutnom prikazu (mesec / godina / decenija / vek).
+function shiftPeriod(date: Date, view: CalendarView, dir: 1 | -1) {
+  const y = date.getFullYear();
+  if (view === "month") return new Date(y, date.getMonth() + dir, 1);
+  if (view === "year") return new Date(y + dir, 0, 1);
+  return new Date(y + dir * (view === "decade" ? 10 : 100), 0, 1);
+}
 const LEVEL_ORDER = ["olympic", "world", "continental", "international", "national", "regional", "club"];
 const levelRank = (level: string) => { const i = LEVEL_ORDER.indexOf(level); return i === -1 ? LEVEL_ORDER.length : i; };
 
@@ -96,6 +110,7 @@ export function KalendarClient({ competitions }: Props) {
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [levelFilter, setLevelFilter] = useState<LevelFilter>("all");
+  const [view, setView] = useState<CalendarView>("month");
   const [activeStartDate, setActiveStartDate] = useState<Date>(() => {
     const upcoming = competitions.find((c) => new Date(c.date + "T00:00:00") >= today);
     if (upcoming) {
@@ -122,6 +137,67 @@ export function KalendarClient({ competitions }: Props) {
     }
     return map;
   }, [competitions]);
+
+  // Swipe (samo dodir): mreža prati prst; na otpuštanju klizi na susedni period ili se vraća.
+  const swipeRef = useRef<HTMLDivElement>(null);
+  const gesture = useRef<SwipeGesture | null>(null);
+  const swipeTimer = useRef<number | undefined>(undefined);
+  const [dragX, setDragX] = useState(0);
+  const [swipeMode, setSwipeMode] = useState<"idle" | "drag" | "settle">("idle");
+  useEffect(() => () => window.clearTimeout(swipeTimer.current), []);
+
+  const finishSwipe = (cancelled: boolean) => {
+    const g = gesture.current;
+    gesture.current = null;
+    if (!g || g.axis !== "x") return;
+    const width = swipeRef.current?.offsetWidth ?? 0;
+    const passed = !cancelled && width > 0 && dragX !== 0 && (Math.abs(dragX) > width * SWIPE_DISTANCE_RATIO || Math.abs(g.vx) > SWIPE_VELOCITY);
+    const dir: 1 | -1 | 0 = passed ? (dragX < 0 ? 1 : -1) : 0; // swipe levo → sledeći period
+    setSwipeMode("settle");
+    setDragX(dir === 0 ? 0 : -dir * width);
+    swipeTimer.current = window.setTimeout(() => {
+      if (dir === 0) { setSwipeMode("idle"); return; }
+      setActiveStartDate((current) => shiftPeriod(current, view, dir));
+      setSelectedDate(null);
+      // Novi period ulazi s suprotne strane.
+      setSwipeMode("drag");
+      setDragX(dir * width);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        setSwipeMode("settle");
+        setDragX(0);
+        swipeTimer.current = window.setTimeout(() => setSwipeMode("idle"), SETTLE_MS);
+      }));
+    }, SETTLE_MS);
+  };
+
+  const swipeHandlers = {
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType !== "touch" || swipeMode !== "idle") return;
+      gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastT: e.timeStamp, vx: 0, axis: null };
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+      const g = gesture.current;
+      if (!g || g.id !== e.pointerId) return;
+      const dx = e.clientX - g.x;
+      const dy = e.clientY - g.y;
+      if (!g.axis) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+        if (g.axis === "x") {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setSwipeMode("drag");
+        }
+      }
+      if (g.axis !== "x") return;
+      const dt = e.timeStamp - g.lastT;
+      if (dt > 0) g.vx = (e.clientX - g.lastX) / dt;
+      g.lastX = e.clientX;
+      g.lastT = e.timeStamp;
+      setDragX(dx);
+    },
+    onPointerUp: () => finishSwipe(false),
+    onPointerCancel: () => finishSwipe(true),
+  };
 
   const filteredComps = useMemo(
     () => competitions.filter((c) => levelMatchesFilter(c.level, levelFilter)),
@@ -185,6 +261,13 @@ export function KalendarClient({ competitions }: Props) {
 
       {/* ── Calendar ──────────────────────────────────────────── */}
       <div className="w-full lg:w-auto lg:shrink-0 lg:sticky lg:top-[calc(var(--site-header-h,3.5rem)+2rem)]">
+        <div
+          ref={swipeRef}
+          className="kalendar-swipe touch-pan-y"
+          data-swipe={swipeMode}
+          style={{ "--drag-x": `${dragX}px` } as React.CSSProperties}
+          {...swipeHandlers}
+        >
         <Calendar
           value={selectedDate}
           onChange={(val) => {
@@ -196,6 +279,7 @@ export function KalendarClient({ competitions }: Props) {
             }
           }}
           activeStartDate={activeStartDate}
+          onViewChange={({ view: next }) => { if (next) setView(next as CalendarView); }}
           onActiveStartDateChange={({ activeStartDate: d }) => {
             if (d) {
               setActiveStartDate(d);
@@ -225,6 +309,7 @@ export function KalendarClient({ competitions }: Props) {
           minDetail="year"
           className="shadow-sm"
         />
+        </div>
         <p className="mt-2 text-center text-[0.65rem] text-[var(--subtle)]">
           {t("clickHint")}
         </p>

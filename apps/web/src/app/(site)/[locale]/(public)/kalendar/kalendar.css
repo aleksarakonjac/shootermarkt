@@ -32,6 +32,19 @@
   min-width: 32px;
 }
 
+/* Veće strelice za mesec i godinu: 44px ciljna površina, jasniji glif */
+.react-calendar__navigation__arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px !important;
+  height: 44px;
+  padding: 0 !important;
+  font-size: 1.75rem !important;
+  line-height: 1;
+}
+.react-calendar__navigation__label { min-height: 44px; }
+
 .react-calendar__navigation button:hover:not(:disabled) {
   background: var(--surface-2);
 }
@@ -213,4 +226,17 @@ html.dark .countdown-chip {
   .kalendar-item.opacity-60 {
     opacity: 0.6;
   }
+}
+
+/* ── Swipe: mreža prati prst (samo dodir) ─────────────────── */
+.kalendar-swipe .react-calendar__viewContainer {
+  transform: translateX(var(--drag-x, 0px));
+  will-change: transform;
+}
+.kalendar-swipe[data-swipe="settle"] .react-calendar__viewContainer {
+  transition: transform 220ms var(--ease-out);
+}
+.kalendar-swipe[data-swipe="idle"] .react-calendar__viewContainer { will-change: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .kalendar-swipe[data-swipe="settle"] .react-calendar__viewContainer { transition: none; }
 }
