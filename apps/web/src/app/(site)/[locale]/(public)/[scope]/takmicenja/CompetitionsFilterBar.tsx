@@ -33,7 +33,6 @@ interface Props {
   currentLevel: string;
   currentQ: string;
   currentTag: string;
-  currentDay?: string;
   totalCount: number;
   scope: string;
 }
@@ -44,7 +43,6 @@ export function CompetitionsFilterBar({
   currentLevel,
   currentQ,
   currentTag,
-  currentDay,
   totalCount,
   scope,
 }: Props) {
@@ -64,8 +62,7 @@ export function CompetitionsFilterBar({
       } else {
         params.set(key, value);
       }
-      // Godina i izabran dan se međusobno isključuju.
-      if (key === "year") params.delete("day");
+
       startNavigationProgress(scopedHref(`/takmicenja?${params.toString()}`));
       router.push(scopedHref(`/takmicenja?${params.toString()}`), { scroll: false });
     },
@@ -100,7 +97,7 @@ export function CompetitionsFilterBar({
   const levelValues = isIssf ? ISSF_LEVEL_VALUES : ALL_LEVEL_VALUES;
   const tags = isIssf ? ALL_TAGS.filter((tag) => tag.value !== "sss") : ALL_TAGS;
 
-  const hasFilters = currentQ || currentLevel !== "all" || currentTag || currentDay;
+  const hasFilters = currentQ || currentLevel !== "all" || currentTag;
 
   const pill =
     "px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer";

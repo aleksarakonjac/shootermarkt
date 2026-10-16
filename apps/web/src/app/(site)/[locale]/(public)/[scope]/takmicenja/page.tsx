@@ -167,6 +167,9 @@ function CompRow({
   return (
     <ScopedLink
       href={`/takmicenja/${comp.id}`}
+      id={`comp-${comp.id}`}
+      data-comp-start={comp.date}
+      data-comp-end={comp.dateEnd ?? comp.date}
       className={`group flex items-center gap-3 sm:gap-4 px-4 py-3.5 transition-colors hover:bg-[var(--surface)] ${animClass ?? ""} ${
         !isLast ? "border-b border-[var(--border)]" : ""
       }`}
@@ -284,17 +287,17 @@ function CompRow({
 
 interface Props {
   params: Promise<{ scope: Scope }>;
-  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; day?: string; archiveAll?: string; when?: string; location?: string }>;
+  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; focus?: string; archiveAll?: string; when?: string; location?: string }>;
 }
 
 export default async function TakmicenjaPage({ params, searchParams }: Props) {
   const { scope } = await params;
-  const { year, level, q, tag, view, day, archiveAll, when, location } = await searchParams;
+  const { year, level, q, tag, view, archiveAll, when, location } = await searchParams;
 
   // Stari link ?view=cal: kalendar je sada deo istog ekrana.
   if (view) {
     const rest = new URLSearchParams();
-    for (const [k, v] of Object.entries({ year, level, q, tag, day, archiveAll, when, location })) if (v) rest.set(k, v);
+    for (const [k, v] of Object.entries({ year, level, q, tag, archiveAll, when, location })) if (v) rest.set(k, v);
     redirect(`/${scope}/takmicenja${rest.size ? `?${rest.toString()}` : ""}`);
   }
   const [locale, t] = await Promise.all([getLocale(), getTranslations("competition")]);
@@ -304,7 +307,6 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
   const activeLevel  = level && level !== "all"     ? level : "all";
   const activeQ      = q?.trim() ?? "";
   const activeTag    = tag?.trim() ?? "";
-  const activeDay      = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
   const activeWhen     = when === "past" ? "past" : "upcoming";
   const activeLocation = location?.trim() ?? "";
 
@@ -321,8 +323,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
   const sqlFilters = [
     scopeFilter,
     activeQ        ? ilike(competitions.name, `%${activeQ}%`)                          : undefined,
-    activeYear  !== "all" && !activeDay ? ilike(competitions.date, `${activeYear}%`)  : undefined,
-    activeDay      ? sql`${competitions.date} <= ${activeDay} AND coalesce(${competitions.dateEnd}, ${competitions.date}) >= ${activeDay}` : undefined,
+    activeYear  !== "all" ? ilike(competitions.date, `${activeYear}%`)               : undefined,
     activeLevel !== "all" ? eq(competitions.level, activeLevel as CompetitionLevel)  : undefined,
     activeTag      ? sql`${competitions.tags} @> ARRAY[${activeTag}]::varchar[]`     : undefined,
     activeLocation ? ilike(competitions.location, `%${activeLocation}%`)             : undefined,
@@ -415,7 +416,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
     .filter((c) => c.date < recentCutoffStr)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const isFiltered = activeQ || activeDay || activeYear !== defaultYear || activeLevel !== "all" || activeTag || activeLocation;
+  const isFiltered = activeQ || activeYear !== defaultYear || activeLevel !== "all" || activeTag || activeLocation;
 
   // Hero: live comps OR first-date upcoming group, sorted by level
   const heroItems: (CompItem & { isLive: boolean })[] = !isFiltered
@@ -484,7 +485,6 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
           currentLevel={activeLevel}
           currentQ={activeQ}
           currentTag={activeTag}
-          currentDay={activeDay}
           totalCount={translatedFiltered.length}
           scope={scope}
         />
@@ -494,30 +494,13 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
       <div className="lg:grid lg:grid-cols-[19.5rem_minmax(0,1fr)] lg:items-start lg:gap-8">
       <div className="mb-6 lg:mb-0">
         <Suspense fallback={<div className="h-11 rounded-xl bg-[var(--surface-2)] lg:h-80" />}>
-          <CompetitionCalendar competitions={calComps} selectedDay={activeDay || null} />
+          <CompetitionCalendar competitions={calComps} />
         </Suspense>
       </div>
       <div className="min-w-0">
 
-      {/* Izabran dan: zamenjuje Nadolazeća/Prošla */}
-      {activeDay && (
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="font-[family-name:var(--font-barlow-condensed)] text-xl font-extrabold uppercase text-[var(--ink)]">
-            {formatDate(activeDay, null, locale)} {activeDay.slice(0, 4)}
-          </h2>
-          <ScopedLink
-            href={filterParams()}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-[var(--muted)] hover:text-[var(--brand-primary)] transition-colors"
-          >
-            {locale === "en" ? "Clear day" : "Poništi dan"}
-            <svg width="10" height="10" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" /></svg>
-          </ScopedLink>
-        </div>
-      )}
-
       {/* When toggle */}
-      {!activeDay && (
-        <WhenTabs
+      <WhenTabs
           activeWhen={activeWhen}
           upcomingHref={whenHref("upcoming")}
           pastHref={whenHref("past")}
@@ -525,13 +508,12 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
           pastCount={recent.length + archive.length}
           locale={locale}
         />
-      )}
 
       {/* Empty state (no SQL results) */}
       {translatedFiltered.length === 0 && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 flex flex-col items-center gap-3">
           <p className="text-sm text-[var(--muted)] text-center max-w-none">
-            {activeDay ? (locale === "en" ? "No competitions on this day." : "Nema takmičenja za izabrani dan.") : isFiltered ? t("list.noResults") : (locale === "en" ? "No competitions added yet." : "Još nema unetih takmičenja.")}
+            {isFiltered ? t("list.noResults") : (locale === "en" ? "No competitions added yet." : "Još nema unetih takmičenja.")}
           </p>
           {isFiltered && (
             <ScopedLink
@@ -544,17 +526,8 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
         </div>
       )}
 
-      {/* Izabran dan: ravna lista */}
-      {activeDay && translatedFiltered.length > 0 && (
-        <div className="rounded-xl border border-[var(--border)] overflow-hidden">
-          {translatedFiltered.map((c, i) => (
-            <CompRow key={c.id} comp={c} isLast={i === translatedFiltered.length - 1} showCountdown={c.date > todayStr} locale={locale} levelLabel={getLevelLabel(c.level, locale)} />
-          ))}
-        </div>
-      )}
-
       {/* Filtered results */}
-      {!activeDay && translatedFiltered.length > 0 && (
+      {translatedFiltered.length > 0 && (
         <div className="space-y-10">
 
           {/* ── UPCOMING TAB ──────────────────────────────────────────── */}
@@ -577,6 +550,9 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
                   <ScopedLink
                     key={hero.id}
                     href={`/takmicenja/${hero.id}`}
+                    id={`comp-${hero.id}`}
+                    data-comp-start={hero.date}
+                    data-comp-end={hero.dateEnd ?? hero.date}
                     className="comp-hero group block rounded-xl border overflow-hidden hover:shadow-sm transition-all"
                     style={hero.isLive
                       ? { borderColor: "var(--live-border)", background: "var(--live-bg)" }

@@ -233,3 +233,14 @@ html.dark .countdown-chip {
 @media (prefers-reduced-motion: reduce) {
   .cal-collapse, .cal-strip-chevron { transition: none; }
 }
+
+/* Dan izabran u mreži: red u listi se kratko istakne */
+[data-comp-start] { scroll-margin-top: calc(var(--site-header-h, 3.5rem) + 1rem); }
+@keyframes comp-focus {
+  from { background-color: color-mix(in srgb, var(--brand-primary) 14%, transparent); }
+  to   { background-color: transparent; }
+}
+.comp-focus { animation: comp-focus 1400ms var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  .comp-focus { animation-duration: 800ms; }
+}

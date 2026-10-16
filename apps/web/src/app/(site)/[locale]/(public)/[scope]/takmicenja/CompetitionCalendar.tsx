@@ -118,14 +118,32 @@ function Arrow({ dir }: { dir: "prev" | "next" }) {
 
 interface Props {
   competitions: CalendarComp[];
-  selectedDay: string | null;
+}
+
+const FOCUS_MS = 1400;
+
+// Pronalazi redove u listi čiji period obuhvata dan, skroluje do prvog i kratko ih istakne.
+function focusDayInList(key: string): boolean {
+  const matches = [...document.querySelectorAll<HTMLElement>("[data-comp-start]")]
+    .filter((el) => el.dataset.compStart! <= key && (el.dataset.compEnd ?? el.dataset.compStart!) >= key);
+  if (matches.length === 0) return false;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  matches[0].scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+  for (const el of matches) {
+    el.classList.remove("comp-focus");
+    void el.offsetWidth; // restart animacije
+    el.classList.add("comp-focus");
+    window.setTimeout(() => el.classList.remove("comp-focus"), FOCUS_MS);
+  }
+  return true;
 }
 
 /**
- * Mesečna mreža kao filter liste: klik na dan postavlja ?day=, ponovni klik ga skida.
+ * Mesečna mreža kao vodič kroz listu: klik na dan skroluje do tog dana u listi i ističe ga,
+ * bez filtriranja. Ako dan nije u prikazanoj listi (druga godina / Prošla), prvo prebaci listu.
  * Desktop: stalno vidljiva. Telefon: traka mesec + strelice koja otvara punu mrežu.
  */
-export function CompetitionCalendar({ competitions, selectedDay }: Props) {
+export function CompetitionCalendar({ competitions }: Props) {
   const t = useTranslations("calendar");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -133,19 +151,16 @@ export function CompetitionCalendar({ competitions, selectedDay }: Props) {
 
   const [view, setView] = useState<CalendarView>("month");
   const [open, setOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [emptyNote, setEmptyNote] = useState(false);
   const [activeStartDate, setActiveStartDate] = useState<Date>(() => {
-    if (selectedDay) {
-      const d = new Date(selectedDay + "T00:00:00");
-      return new Date(d.getFullYear(), d.getMonth(), 1);
-    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const next = competitions.find((c) => new Date(c.date + "T00:00:00") >= today);
     const base = next ? new Date(next.date + "T00:00:00") : today;
     return new Date(base.getFullYear(), base.getMonth(), 1);
   });
-  const selectedDate = selectedDay ? new Date(selectedDay + "T00:00:00") : null;
-
+  
   const eventMap = useMemo(() => {
     const map = new Map<string, CalendarComp[]>();
     for (const comp of competitions) {
@@ -163,17 +178,40 @@ export function CompetitionCalendar({ competitions, selectedDay }: Props) {
     return map;
   }, [competitions]);
 
+  // Dolazak sa ?focus=YYYY-MM-DD (posle prebacivanja liste): istakni dan i skloni parametar iz URL-a.
+  const focusParam = searchParams.get("focus");
+  useEffect(() => {
+    if (!focusParam) return;
+    const frame = requestAnimationFrame(() => {
+      setSelectedDay(focusParam);
+      focusDayInList(focusParam);
+      const params = new URLSearchParams(window.location.search);
+      params.delete("focus");
+      const query = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusParam]);
+
   function pickDay(day: Date | null) {
+    if (!day) return;
+    const key = toKey(day);
+    setOpen(false);
+    setEmptyNote(false);
+    if (key === selectedDay) { setSelectedDay(null); return; }
+    setSelectedDay(key);
+    if (focusDayInList(key)) return;
+    if (!eventMap.has(key)) { setEmptyNote(true); return; }
+    // Dan postoji, ali nije u trenutnoj listi: prebaci godinu i Nadolazeća/Prošla pa istakni.
     const params = new URLSearchParams(searchParams.toString());
-    const key = day ? toKey(day) : null;
-    if (!key || key === selectedDay) params.delete("day");
-    else params.set("day", key);
-    params.delete("when");
-    params.delete("archiveAll");
-    const href = scopedHref(`/takmicenja${params.size ? `?${params.toString()}` : ""}`);
+    const today = toKey(new Date());
+    params.set("year", key.slice(0, 4));
+    if (key < today) { params.set("when", "past"); params.set("archiveAll", "1"); }
+    else { params.delete("when"); params.delete("archiveAll"); }
+    params.set("focus", key);
+    const href = scopedHref(`/takmicenja?${params.toString()}`);
     startNavigationProgress(href);
     router.push(href, { scroll: false });
-    setOpen(false);
   }
 
   const shift = (dir: 1 | -1) => setActiveStartDate((current) => shiftPeriod(current, view, dir));
@@ -203,7 +241,7 @@ export function CompetitionCalendar({ competitions, selectedDay }: Props) {
         <div>
           <SwipeArea onShift={shift} className="kalendar-swipe touch-pan-y">
             <Calendar
-              value={selectedDate}
+              value={selectedDay ? new Date(selectedDay + "T00:00:00") : null}
               onChange={(val) => pickDay(val as Date | null)}
               activeStartDate={activeStartDate}
               onViewChange={({ view: next }) => { if (next) setView(next as CalendarView); }}
@@ -232,6 +270,9 @@ export function CompetitionCalendar({ competitions, selectedDay }: Props) {
           </SwipeArea>
         </div>
       </div>
+      {emptyNote && (
+        <p role="status" className="mt-2 text-center text-xs text-[var(--muted)]">{t("noEventsDay")}</p>
+      )}
     </div>
   );
 }
