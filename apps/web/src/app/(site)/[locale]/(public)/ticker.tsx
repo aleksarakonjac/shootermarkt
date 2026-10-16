@@ -253,7 +253,6 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review }: { items: T
           <div ref={viewportRef} className="min-w-0 flex-1 overflow-hidden flex items-center h-full">
             {text}
           </div>
-          {segment.href && <span className="shrink-0" style={{ fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.45)" }} aria-hidden="true">→</span>}
         </div>
       </div>);
       // Ceo red je jedan link (veća površina za dodir nego sam tekst).
@@ -396,9 +395,6 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
         )}
       </span>
 
-      {item.href && (
-        <span className="shrink-0" style={{ fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.45)" }} aria-hidden="true">→</span>
-      )}
 
       {/* Date + location */}
       {(item.location || item.endDate) && (
