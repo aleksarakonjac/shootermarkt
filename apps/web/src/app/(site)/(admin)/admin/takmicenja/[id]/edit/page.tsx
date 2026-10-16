@@ -42,6 +42,7 @@ export default async function CompetitionEditPage({
         issfId: comp.issfId,
         siusId: comp.siusId,
         tags: comp.tags ?? [],
+        disciplineGroups: comp.disciplineGroups ?? [],
         eventType: comp.eventType,
         ageCategory: comp.ageCategory,
         focusPriority: comp.focusPriority,

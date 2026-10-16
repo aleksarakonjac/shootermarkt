@@ -24,7 +24,7 @@ export async function PATCH(
   if (isNaN(compId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const body = await req.json();
-  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, countryId, level, tags, issfId, siusId, focusPriority } = body;
+  const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, countryId, level, tags, disciplineGroups, issfId, siusId, focusPriority } = body;
 
   if (!name?.trim() || !date || !level) {
     return NextResponse.json({ error: "Naziv, datum i nivo su obavezni" }, { status: 400 });
@@ -56,6 +56,7 @@ export async function PATCH(
       siusId: siusId?.trim() || null,
       focusPriority: parsedPriority.value,
       ...(Array.isArray(tags) ? { tags: tags.map(String) } : {}),
+      ...(Array.isArray(disciplineGroups) ? { disciplineGroups: disciplineGroups.filter((g: unknown): g is string => g === "air" || g === "smallbore") } : {}),
     })
     .where(eq(competitions.id, compId))
     .returning({ id: competitions.id });

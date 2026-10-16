@@ -26,6 +26,7 @@ interface Competition {
   issfId?: string | null;
   siusId?: string | null;
   tags: string[];
+  disciplineGroups?: string[];
   eventType: string;
   ageCategory: string;
   focusPriority: number | null;
@@ -34,7 +35,8 @@ interface Competition {
 
 type Country = { id: number; name: string; code2: string | null };
 
-const TAG_SUGGESTIONS = ["SSS", "ISSF", "ESC", "10m", "25m", "50m"];
+// Oznake izvora (mala slova, kao u sync/import kodu); disciplina se bira ispod, ne tagom.
+const TAG_SUGGESTIONS = ["sss", "issf", "esc"];
 
 const inputCls = "w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)]";
 
@@ -65,6 +67,7 @@ export function CompetitionEditClient({ competition, countries }: { competition:
     focusPriority: competition.focusPriority == null ? "" : String(competition.focusPriority),
   });
   const [tags, setTags] = useState<string[]>(competition.tags);
+  const [disciplineGroups, setDisciplineGroups] = useState<string[]>(competition.disciplineGroups ?? []);
   const [tagInput, setTagInput] = useState("");
   const tagInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,7 +100,7 @@ export function CompetitionEditClient({ competition, countries }: { competition:
       const res = await fetch(`/api/admin/competitions/${competition.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, tags }),
+        body: JSON.stringify({ ...form, tags, disciplineGroups }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Greška");
@@ -260,6 +263,23 @@ export function CompetitionEditClient({ competition, countries }: { competition:
               className={inputCls}
             />
             <p className="mt-1 text-[11px] text-[var(--muted)]">RunningId sa shootingsportscloud.com:8594 — primarni live izvor (real-time iz SIUS hardware).</p>
+          </div>
+
+          <div>
+            <span className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Disciplina (filter na /takmicenja)</span>
+            <div className="flex flex-wrap gap-4">
+              {[{ key: "air", label: "Vazdušno (10m)" }, { key: "smallbore", label: "Malokalibarsko (25m / 50m)" }].map((group) => (
+                <label key={group.key} className="flex min-h-11 items-center gap-2 text-sm text-[var(--ink)]">
+                  <input
+                    type="checkbox"
+                    checked={disciplineGroups.includes(group.key)}
+                    onChange={(e) => setDisciplineGroups((current) => e.target.checked ? [...current, group.key] : current.filter((x) => x !== group.key))}
+                  />
+                  {group.label}
+                </label>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-[var(--muted)]">Posle importa rezultata automatski se preračunava iz stvarnih disciplina.</p>
           </div>
 
           <div>

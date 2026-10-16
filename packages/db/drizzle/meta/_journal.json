@@ -218,6 +218,13 @@
       "when": 1792037982777,
       "tag": "0030_competition_focus_priority",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792182007666,
+      "tag": "0031_discipline_groups",
+      "breakpoints": true
     }
   ]
 }

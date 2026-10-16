@@ -63,7 +63,23 @@
       "search": "Search…",
       "reset": "Reset ×",
       "viewList": "List",
-      "viewCalendar": "Calendar"
+      "viewCalendar": "Calendar",
+      "filterYear": "Year",
+      "filterLevel": "Level",
+      "filterDiscipline": "Discipline",
+      "clearGroup": "Clear",
+      "levelGroups": {
+        "world": "World / Olympic",
+        "continental": "Continental",
+        "international": "International",
+        "national": "National",
+        "regional": "Regional / club"
+      },
+      "disciplineGroups": {
+        "air": "Air",
+        "smallbore": "Small-bore"
+      },
+      "removeFilter": "Remove filter"
     },
     "detail": {
       "results": "Results",

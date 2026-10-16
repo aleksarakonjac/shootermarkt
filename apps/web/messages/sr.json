@@ -63,7 +63,23 @@
       "search": "Pretraži…",
       "reset": "Resetuj ×",
       "viewList": "Lista",
-      "viewCalendar": "Kalendar"
+      "viewCalendar": "Kalendar",
+      "filterYear": "Godina",
+      "filterLevel": "Nivo",
+      "filterDiscipline": "Disciplina",
+      "clearGroup": "Poništi",
+      "levelGroups": {
+        "world": "Svetsko / olimpijsko",
+        "continental": "Kontinentalno",
+        "international": "Međunarodno",
+        "national": "Državno",
+        "regional": "Regionalno / klupsko"
+      },
+      "disciplineGroups": {
+        "air": "Vazdušno",
+        "smallbore": "Malokalibarsko"
+      },
+      "removeFilter": "Ukloni filter"
     },
     "detail": {
       "results": "Rezultati",

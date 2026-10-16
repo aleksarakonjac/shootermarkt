@@ -1,3 +1,4 @@
+import { groupsFromName } from "@/lib/competition-filters";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllCalendarEvents, normalizeEventName } from "@/lib/calendar/adapters";
@@ -202,6 +203,7 @@ export async function POST(req: NextRequest) {
     organizer: e.source.toUpperCase(),
     externalId: e.key,
     tags: [e.source] as string[],
+    disciplineGroups: groupsFromName(e.name),
     ...(e.issfId ? { issfId: e.issfId } : {}),
   });
 

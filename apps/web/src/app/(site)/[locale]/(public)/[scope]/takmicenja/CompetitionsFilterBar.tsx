@@ -2,47 +2,105 @@
 
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
-import { ISSF_LEVELS } from "@/lib/scope";
+import {
+  DISCIPLINE_GROUPS,
+  ISSF_LEVEL_GROUP_KEYS,
+  LEVEL_GROUPS,
+  type DisciplineGroup,
+  type LevelGroupKey,
+} from "@/lib/competition-filters";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 import { startNavigationProgress } from "@/components/NavigationProgress";
-
-const ALL_LEVEL_VALUES: Array<CompetitionLevel | "all"> = [
-  "all", "olympic", "world", "continental", "international", "national", "regional", "club",
-];
-const ISSF_LEVEL_VALUES: Array<CompetitionLevel | "all"> = [
-  "all", ...ISSF_LEVELS,
-];
-
-const ALL_TAGS: { value: string; label: string; activeBg: string; activeColor: string }[] = [
-  { value: "sss",  label: "SSS",  activeBg: "var(--tag-sss-bg)",  activeColor: "var(--tag-sss-fg)" },
-  { value: "issf", label: "ISSF", activeBg: "var(--tag-issf-bg)", activeColor: "var(--tag-issf-fg)" },
-  { value: "esc",  label: "ESC",  activeBg: "var(--tag-esc-bg)",  activeColor: "var(--tag-esc-fg)" },
-  { value: "10m", label: "10m", activeBg: "#dbeafe", activeColor: "#1d4ed8" },
-  { value: "MK", label: "MK", activeBg: "var(--surface-2)", activeColor: "var(--ink)" },
-  { value: "50m", label: "50m", activeBg: "var(--surface-2)", activeColor: "var(--ink)" },
-  { value: "25m", label: "25m", activeBg: "var(--surface-2)", activeColor: "var(--ink)" },
-  { value: "50/25m", label: "50/25m", activeBg: "var(--surface-2)", activeColor: "var(--ink)" },
-];
 
 interface Props {
   availableYears: string[];
   currentYear: string;
-  currentLevel: string;
-  currentQ: string;
-  currentTag: string;
+  currentLevels: LevelGroupKey[];
+  currentDisc: DisciplineGroup[];
   totalCount: number;
   scope: string;
 }
 
+const menuButton =
+  "inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors sm:min-h-9 cursor-pointer";
+
+function Check({ on }: { on: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex size-4 shrink-0 items-center justify-center rounded border ${on ? "border-[var(--ink)] bg-[var(--ink)]" : "border-[var(--border-strong)]"}`}
+    >
+      {on && (
+        <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2L4.2 7.4L8 3" stroke="var(--bg)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
+      )}
+    </span>
+  );
+}
+
+/** Padajući meni sa zatvaranjem na klik van i Escape. `count` > 0 znači da je filter aktivan. */
+function FilterMenu({ label, value, count, children }: { label: string; value?: string; count: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const id = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const active = count > 0;
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-controls={id}
+        className={`${menuButton} ${active ? "border-[var(--border-strong)] bg-[var(--surface-2)] text-[var(--ink)]" : "border-[var(--border)] bg-[var(--bg)] text-[var(--muted)] hover:border-[var(--border-strong)] hover:text-[var(--ink)]"}`}
+      >
+        <span>{label}</span>
+        {value && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[var(--ink)] tabular-nums">{value}</span>}
+        {active && !value && (
+          <span className="rounded-full bg-[var(--brand-primary)] px-1.5 py-px font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] leading-4 text-white tabular-nums">{count}</span>
+        )}
+        <svg width="10" height="10" viewBox="0 0 10 10" className={`shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`} aria-hidden="true">
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          id={id}
+          className="absolute left-0 top-[calc(100%+4px)] z-[var(--z-dropdown)] w-max min-w-[13rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_4px_16px_oklch(0_0_0/0.12)]"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const optionRow =
+  "flex min-h-11 w-full items-center gap-3 px-3 text-left text-sm transition-colors hover:bg-[var(--surface-2)] sm:min-h-9 sm:text-xs";
+
 export function CompetitionsFilterBar({
   availableYears,
   currentYear,
-  currentLevel,
-  currentQ,
-  currentTag,
+  currentLevels,
+  currentDisc,
   totalCount,
   scope,
 }: Props) {
@@ -51,71 +109,67 @@ export function CompetitionsFilterBar({
   const t = useTranslations("competition");
   const scopedHref = useScopedHref();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [yearOpen, setYearOpen] = useState(false);
-  const yearRef = useRef<HTMLDivElement>(null);
+
+  const navigate = useCallback(
+    (params: URLSearchParams) => {
+      // Promena filtera vraća listu na početak: arhiva i fokus iz kalendara više ne važe.
+      params.delete("archiveAll");
+      params.delete("focus");
+      const qs = params.toString();
+      const href = scopedHref(`/takmicenja${qs ? `?${qs}` : ""}`);
+      startNavigationProgress(href);
+      router.push(href, { scroll: false });
+    },
+    [router, scopedHref],
+  );
 
   const setParam = useCallback(
     (key: string, value: string) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (value === "all" || value === "") {
-        params.delete(key);
-      } else {
-        params.set(key, value);
-      }
-
-      startNavigationProgress(scopedHref(`/takmicenja?${params.toString()}`));
-      router.push(scopedHref(`/takmicenja?${params.toString()}`), { scroll: false });
+      if (value === "") params.delete(key);
+      else params.set(key, value);
+      navigate(params);
     },
-    [router, searchParams]
+    [navigate, searchParams],
   );
 
   const onSearch = useCallback(
     (v: string) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => setParam("q", v), 280);
+      debounceRef.current = setTimeout(() => setParam("q", v.trim()), 280);
     },
-    [setParam]
+    [setParam],
   );
 
-  useEffect(() => {
-    if (!yearOpen) return;
-    function onDown(e: MouseEvent) {
-      if (yearRef.current && !yearRef.current.contains(e.target as Node)) setYearOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setYearOpen(false);
-    }
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [yearOpen]);
+  const toggle = <T extends string>(key: "level" | "disc", current: readonly T[], value: T) => {
+    const next = current.includes(value) ? current.filter((x) => x !== value) : [...current, value];
+    // Stari parametri (`tag`, pojedinačni nivoi) se zamenjuju čistim vrednostima.
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("tag");
+    if (next.length) params.set(key, next.join(","));
+    else params.delete(key);
+    navigate(params);
+  };
 
-  const isIssf = scope === "issf";
-  const levelValues = isIssf ? ISSF_LEVEL_VALUES : ALL_LEVEL_VALUES;
-  const tags = isIssf ? ALL_TAGS.filter((tag) => tag.value !== "sss") : ALL_TAGS;
+  const levelKeys = (scope === "issf" ? ISSF_LEVEL_GROUP_KEYS : LEVEL_GROUPS.map((g) => g.key)) as readonly LevelGroupKey[];
+  const hasFilters = currentLevels.length > 0 || currentDisc.length > 0 || Boolean(searchParams.get("q")) || currentYear !== String(new Date().getFullYear());
 
-  const hasFilters = currentQ || currentLevel !== "all" || currentTag;
+  const levelLabel = (key: LevelGroupKey) => t(`list.levelGroups.${key}`);
+  const discLabel = (key: DisciplineGroup) => t(`list.disciplineGroups.${key}`);
 
-  const pill =
-    "px-2.5 py-2 rounded-md text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer";
-  const pillOn  = "bg-[var(--brand-primary)] text-white";
-  const pillOff = "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]";
-
-  const levelLabel = (value: CompetitionLevel | "all") =>
-    value === "all" ? t("list.levelAll") : t(`levels.${value}`);
+  const chips = [
+    ...currentLevels.map((key) => ({ id: `level:${key}`, label: levelLabel(key), remove: () => toggle("level", currentLevels, key) })),
+    ...currentDisc.map((key) => ({ id: `disc:${key}`, label: discLabel(key), remove: () => toggle("disc", currentDisc, key) })),
+  ];
 
   return (
-    <div className="mb-8 space-y-2">
-
-      {/* Row 1: search + count + reset */}
+    <div className="mb-8 space-y-3">
+      {/* Pretraga + broj rezultata + reset */}
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+        <div className="relative max-w-xs flex-1">
           <svg
             width="14" height="14" viewBox="0 0 14 14"
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"
             aria-hidden="true"
           >
             <circle cx="6" cy="6" r="4.25" stroke="currentColor" strokeWidth="1.5" fill="none" />
@@ -123,107 +177,86 @@ export function CompetitionsFilterBar({
           </svg>
           <input
             type="search"
-            defaultValue={currentQ}
+            defaultValue={searchParams.get("q") ?? ""}
             onChange={(e) => onSearch(e.target.value)}
             placeholder={t("list.search")}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] pl-8 pr-3 py-1.5 text-base sm:text-sm text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] py-1.5 pl-8 pr-3 text-base text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none sm:text-sm"
           />
         </div>
-        <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] tabular-nums ml-auto shrink-0">
+        <span className="ml-auto shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">
           {totalCount}
         </span>
         {hasFilters && (
           <button
+            type="button"
             onClick={() => { startNavigationProgress(scopedHref("/takmicenja")); router.push(scopedHref("/takmicenja"), { scroll: false }); }}
-            className="shrink-0 text-xs text-[var(--muted)] hover:text-[var(--brand-primary)] transition-colors"
+            className="min-h-11 shrink-0 px-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--brand-primary)] sm:min-h-0"
           >
             {t("list.reset")}
           </button>
         )}
       </div>
 
-      {/* Row 2: year dropdown + divider + level pills + divider + source tags */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-
-        {/* Year — custom dropdown */}
-        <div ref={yearRef} className="relative shrink-0">
-          <button
-            onClick={() => setYearOpen((v) => !v)}
-            aria-haspopup="listbox"
-            aria-expanded={yearOpen}
-            className={`${pill} bg-[var(--ink)] text-[var(--bg)] font-[family-name:var(--font-jetbrains-mono)] flex items-center gap-1.5`}
-          >
-            {currentYear}
-            <svg
-              width="10" height="10" viewBox="0 0 10 10"
-              className={`shrink-0 transition-transform duration-150 ${yearOpen ? "rotate-180" : ""}`}
-              aria-hidden="true"
-            >
-              <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-            </svg>
-          </button>
-
-          {yearOpen && (
-            <div
-              role="listbox"
-              className="absolute top-[calc(100%+4px)] left-0 z-[var(--z-dropdown)] min-w-[80px] rounded-lg border border-[var(--border)] bg-[var(--bg)] shadow-[0_4px_16px_oklch(0_0_0/0.12)] py-1 overflow-hidden"
-            >
-              {availableYears.map((y) => (
-                <button
-                  key={y}
-                  role="option"
-                  aria-selected={y === currentYear}
-                  onClick={() => { setParam("year", y); setYearOpen(false); }}
-                  className={`w-full text-left px-3 py-2 text-xs font-semibold font-[family-name:var(--font-jetbrains-mono)] transition-colors ${
-                    y === currentYear
-                      ? "bg-[var(--surface-2)] text-[var(--ink)]"
-                      : "text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)]"
-                  }`}
-                >
-                  {y}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
-
-        <div role="group" className="contents">
-          {levelValues.map((value) => (
+      {/* Tri jasne ose: godina (jedan izbor), nivo i disciplina (višestruki izbor) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterMenu label={t("list.filterYear")} value={currentYear === "all" ? t("list.allYears") : currentYear} count={currentYear !== String(new Date().getFullYear()) ? 1 : 0}>
+          {[{ y: "all", label: t("list.allYears") }, ...availableYears.map((y) => ({ y, label: y }))].map(({ y, label }) => (
             <button
-              key={value}
-              onClick={() => setParam("level", value)}
-              className={`${pill} ${currentLevel === value || (value === "all" && currentLevel === "all") ? pillOn : pillOff}`}
+              key={y}
+              type="button"
+              role="option"
+              aria-selected={y === currentYear}
+              onClick={() => setParam("year", y === String(new Date().getFullYear()) ? "" : y)}
+              className={`${optionRow} ${y === currentYear ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"} font-[family-name:var(--font-jetbrains-mono)]`}
             >
-              {levelLabel(value)}
+              {label}
             </button>
           ))}
-        </div>
+        </FilterMenu>
 
-        <span className="h-4 w-px bg-[var(--border)] mx-1 shrink-0" aria-hidden="true" />
-
-        <div role="group" className="contents">
-          {tags.map((tag) => {
-            const active = currentTag === tag.value;
+        <FilterMenu label={t("list.filterLevel")} count={currentLevels.length}>
+          {levelKeys.map((key) => {
+            const on = currentLevels.includes(key);
             return (
-              <button
-                key={tag.value}
-                onClick={() => setParam("tag", active ? "" : tag.value)}
-                className={`${pill} font-[family-name:var(--font-jetbrains-mono)]`}
-                style={
-                  active
-                    ? { background: tag.activeBg, color: tag.activeColor }
-                    : { background: "var(--surface-2)", color: "var(--muted)" }
-                }
-              >
-                {tag.label}
+              <button key={key} type="button" role="checkbox" aria-checked={on} onClick={() => toggle("level", currentLevels, key)} className={`${optionRow} ${on ? "text-[var(--ink)]" : "text-[var(--muted)]"}`}>
+                <Check on={on} />
+                {levelLabel(key)}
               </button>
             );
           })}
-        </div>
+        </FilterMenu>
+
+        <FilterMenu label={t("list.filterDiscipline")} count={currentDisc.length}>
+          {DISCIPLINE_GROUPS.map((key) => {
+            const on = currentDisc.includes(key);
+            return (
+              <button key={key} type="button" role="checkbox" aria-checked={on} onClick={() => toggle("disc", currentDisc, key)} className={`${optionRow} ${on ? "text-[var(--ink)]" : "text-[var(--muted)]"}`}>
+                <Check on={on} />
+                {discLabel(key)}
+              </button>
+            );
+          })}
+        </FilterMenu>
       </div>
 
+      {/* Aktivni filteri kao uklonjivi čipovi */}
+      {chips.length > 0 && (
+        <ul className="flex flex-wrap items-center gap-1.5" aria-label={t("list.filterLevel") + " / " + t("list.filterDiscipline")}>
+          {chips.map((chip) => (
+            <li key={chip.id}>
+              <button
+                type="button"
+                onClick={chip.remove}
+                aria-label={`${t("list.removeFilter")}: ${chip.label}`}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[var(--surface-2)] px-3 text-xs font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--border)] sm:min-h-8"
+              >
+                {chip.label}
+                <svg width="9" height="9" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

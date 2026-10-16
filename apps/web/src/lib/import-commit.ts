@@ -2,14 +2,10 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { clubs, competitions, disciplines, results, shooters } from "@shootermarkt/db/schema";
 import { recomputeFormaCache } from "@/lib/forma-cache";
+import { groupsFromName } from "@/lib/competition-filters";
+import { refreshDisciplineGroups } from "@/lib/discipline-groups";
 import { matchShooter } from "@shootermarkt/db/name-match";
 import { DISCIPLINE_META, type CommitPayload } from "@shootermarkt/db/pdf-import-types";
-
-const DISTANCE_TAGS: Record<string, string[]> = {
-  ARM: ["10m"], ARW: ["10m"], APM: ["10m"], APW: ["10m"],
-  R3PM: ["25m", "50m"], R3PW: ["25m", "50m"], R3JM: ["25m", "50m"], R3JW: ["25m", "50m"],
-  SPW: ["25m"], RFPM: ["25m"], FPM: ["50m"],
-};
 
 export class CommitValidationError extends Error {}
 
@@ -19,10 +15,6 @@ export type CommitResult = {
   errors: string[];
   competitionId: number;
 };
-
-function distanceTags(codes: string[]) {
-  return [...new Set(codes.flatMap((code) => DISTANCE_TAGS[code] ?? []))];
-}
 
 async function addCompetitionTags(competitionId: number, tags: string[]) {
   if (!tags.length) return;
@@ -56,6 +48,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
         name: comp.name, date: comp.date, dateEnd: comp.dateEnd ?? null,
         location: comp.location, level: comp.level, eventType: comp.eventType ?? "other",
         organizer: comp.organizer ?? null, tags: competitionTags,
+        disciplineGroups: groupsFromName(comp.name),
       }).returning({ id: competitions.id });
       competitionId = created.id;
     }
@@ -166,7 +159,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
     }
   }
 
-  await addCompetitionTags(competitionId, distanceTags(rows.filter((row) => !row.skip).map((row) => row.disciplineCode)));
+  await refreshDisciplineGroups(competitionId);
   const affectedIds = [...affectedShooterIds];
   if (affectedIds.length) {
     try {

@@ -2,7 +2,7 @@ export const revalidate = 300;
 
 import { db } from "@shootermarkt/db";
 import { competitions, results, disciplines, countries } from "@shootermarkt/db/schema";
-import { eq, desc, ilike, and, sql } from "drizzle-orm";
+import { eq, desc, ilike, inArray, and, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { ScopedLink } from "../../components/ScopedLink";
@@ -12,6 +12,7 @@ import { CompetitionsFilterBar } from "./CompetitionsFilterBar";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import { CompetitionCalendar, type CalendarComp } from "./CompetitionCalendar";
+import { levelsForGroups, parseDisciplineParam, parseLevelParam, ISSF_LEVEL_GROUP_KEYS } from "@/lib/competition-filters";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
@@ -35,15 +36,10 @@ const LEVEL_PRIORITY: Record<string, number> = {
   olympic: 0, world: 1, continental: 2, international: 3, national: 4, regional: 5, club: 6,
 };
 
-const TAG_STYLE: Record<string, { background: string; color: string }> = {
-  sss:  { background: "var(--tag-sss-bg)",  color: "var(--tag-sss-fg)" },
-  issf: { background: "var(--tag-issf-bg)", color: "var(--tag-issf-fg)" },
-  esc:  { background: "var(--tag-esc-bg)",  color: "var(--tag-esc-fg)" },
-  "10m": { background: "#dbeafe", color: "#1d4ed8" },
-  MK: { background: "#fef3c7", color: "#a16207" },
-  "50m": { background: "#fff3cd", color: "#b45309" },
-  "25m": { background: "#dcfce7", color: "#15803d" },
-  "50/25m": { background: "#fef3c7", color: "#a16207" },
+// Grupa discipline na kartici: kratka oznaka, puno ime u title (filter koristi puna imena).
+const DISCIPLINE_BADGE: Record<string, { short: string; sr: string; en: string; style: { background: string; color: string } }> = {
+  air:       { short: "10m", sr: "Vazdušno",       en: "Air",        style: { background: "#dbeafe", color: "#1d4ed8" } },
+  smallbore: { short: "MK",  sr: "Malokalibarsko", en: "Small-bore", style: { background: "#fef3c7", color: "#a16207" } },
 };
 
 const FALLBACK_BADGE = { background: "var(--surface-2)", color: "var(--muted)" };
@@ -132,7 +128,7 @@ interface CompItem {
   locationSr: string | null;
   locationEn: string | null;
   level: string;
-  tags: string[] | null;
+  disciplineGroups: string[] | null;
   countryCode2: string | null;
   countryName: string | null;
   disciplineCodes: string[];
@@ -161,7 +157,7 @@ function CompRow({
   const levelStyle = LEVEL_STYLE[comp.level] ?? FALLBACK_BADGE;
   const discCodes = sortDiscs(comp.disciplineCodes ?? []);
   const hasResults = comp.resultCount > 0;
-  const tags = comp.tags ?? [];
+  const groups = comp.disciplineGroups ?? [];
   const countdown = showCountdown ? formatCountdown(daysUntil(comp.date), locale) : null;
 
   return (
@@ -229,18 +225,20 @@ function CompRow({
         )}
       </div>
 
-      {/* Tags */}
-      {tags.length > 0 && (
+      {/* Discipline group */}
+      {groups.length > 0 && (
         <div className="hidden sm:flex items-center gap-1 shrink-0">
-          {tags.map((t) => {
-            const ts = TAG_STYLE[t] ?? FALLBACK_BADGE;
+          {groups.map((g) => {
+            const badge = DISCIPLINE_BADGE[g];
+            if (!badge) return null;
             return (
               <span
-                key={t}
+                key={g}
+                title={locale === "en" ? badge.en : badge.sr}
                 className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.6rem] uppercase px-1.5 py-0.5 rounded"
-                style={ts}
+                style={badge.style}
               >
-                {t}
+                {badge.short}
               </span>
             );
           })}
@@ -287,26 +285,26 @@ function CompRow({
 
 interface Props {
   params: Promise<{ scope: Scope }>;
-  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; focus?: string; archiveAll?: string; when?: string; location?: string }>;
+  searchParams: Promise<{ year?: string; level?: string; disc?: string; q?: string; tag?: string; view?: string; focus?: string; archiveAll?: string; when?: string; location?: string }>;
 }
 
 export default async function TakmicenjaPage({ params, searchParams }: Props) {
   const { scope } = await params;
-  const { year, level, q, tag, view, archiveAll, when, location } = await searchParams;
+  const { year, level, disc, q, tag, view, archiveAll, when, location } = await searchParams;
 
   // Stari link ?view=cal: kalendar je sada deo istog ekrana.
   if (view) {
     const rest = new URLSearchParams();
-    for (const [k, v] of Object.entries({ year, level, q, tag, archiveAll, when, location })) if (v) rest.set(k, v);
+    for (const [k, v] of Object.entries({ year, level, disc, q, tag, archiveAll, when, location })) if (v) rest.set(k, v);
     redirect(`/${scope}/takmicenja${rest.size ? `?${rest.toString()}` : ""}`);
   }
   const [locale, t] = await Promise.all([getLocale(), getTranslations("competition")]);
 
   const defaultYear  = new Date().getFullYear().toString();
-  const activeYear   = year && /^\d{4}$/.test(year) ? year : defaultYear;
-  const activeLevel  = level && level !== "all"     ? level : "all";
+  const activeYear   = year === "all" ? "all" : year && /^\d{4}$/.test(year) ? year : defaultYear;
+  const activeLevels = parseLevelParam(level).filter((key) => scope !== "issf" || ISSF_LEVEL_GROUP_KEYS.includes(key));
+  const activeDisc   = parseDisciplineParam(disc, tag);
   const activeQ      = q?.trim() ?? "";
-  const activeTag    = tag?.trim() ?? "";
   const activeWhen     = when === "past" ? "past" : "upcoming";
   const activeLocation = location?.trim() ?? "";
 
@@ -324,8 +322,8 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
     scopeFilter,
     activeQ        ? ilike(competitions.name, `%${activeQ}%`)                          : undefined,
     activeYear  !== "all" ? ilike(competitions.date, `${activeYear}%`)               : undefined,
-    activeLevel !== "all" ? eq(competitions.level, activeLevel as CompetitionLevel)  : undefined,
-    activeTag      ? sql`${competitions.tags} @> ARRAY[${activeTag}]::varchar[]`     : undefined,
+    activeLevels.length ? inArray(competitions.level, levelsForGroups(activeLevels) as CompetitionLevel[]) : undefined,
+    activeDisc.length   ? sql`${competitions.disciplineGroups} && ARRAY[${sql.join(activeDisc.map((d) => sql`${d}`), sql`, `)}]::varchar[]` : undefined,
     activeLocation ? ilike(competitions.location, `%${activeLocation}%`)             : undefined,
   ].filter(Boolean) as Parameters<typeof and>;
 
@@ -342,7 +340,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
         locationSr:      competitions.locationSr,
         locationEn:      competitions.locationEn,
         level:           competitions.level,
-        tags:            competitions.tags,
+        disciplineGroups: competitions.disciplineGroups,
         countryCode2:    countries.code2,
         countryName:     countries.name,
         disciplineCodes: sql<string[]>`
@@ -375,7 +373,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
         dateEnd: competitions.dateEnd,
         location: competitions.location,
         level:   competitions.level,
-        tags:    competitions.tags,
+        disciplineGroups: competitions.disciplineGroups,
       })
       .from(competitions)
       .where(scopeFilter)
@@ -392,8 +390,8 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
   const calComps: CalendarComp[] = calRows
     .filter((r) =>
       (!qLower || r.name.toLowerCase().includes(qLower)) &&
-      (activeLevel === "all" || r.level === activeLevel) &&
-      (!activeTag || (r.tags ?? []).includes(activeTag)) &&
+      (!activeLevels.length || levelsForGroups(activeLevels).includes(r.level)) &&
+      (!activeDisc.length || (r.disciplineGroups ?? []).some((g) => (activeDisc as string[]).includes(g))) &&
       (!locLower || (r.location ?? "").toLowerCase().includes(locLower)))
     .map((r) => ({ id: r.id, date: r.date, dateEnd: r.dateEnd ?? null, level: r.level }));
 
@@ -416,7 +414,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
     .filter((c) => c.date < recentCutoffStr)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const isFiltered = activeQ || activeYear !== defaultYear || activeLevel !== "all" || activeTag || activeLocation;
+  const isFiltered = activeQ || activeYear !== defaultYear || activeLevels.length > 0 || activeDisc.length > 0 || activeLocation;
 
   // Hero: live comps OR first-date upcoming group, sorted by level
   const heroItems: (CompItem & { isLive: boolean })[] = !isFiltered
@@ -453,16 +451,16 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
     const p = new URLSearchParams();
     if (activeQ) p.set("q", activeQ);
     p.set("year", activeYear);
-    if (activeLevel !== "all") p.set("level", activeLevel);
-    if (activeTag) p.set("tag", activeTag);
+    if (activeLevels.length) p.set("level", activeLevels.join(","));
+    if (activeDisc.length) p.set("disc", activeDisc.join(","));
     for (const [k, v] of Object.entries(extra)) if (v) p.set(k, v);
     return `/takmicenja?${p.toString()}`;
   }
 
   // Susedne godine koje imaju takmičenja; ostaje se na istom tabu (Nadolazeća / Prošla).
   const yearNum = Number(activeYear);
-  const prevYear = availableYears.includes(String(yearNum - 1)) ? String(yearNum - 1) : null;
-  const nextYear = availableYears.includes(String(yearNum + 1)) ? String(yearNum + 1) : null;
+  const prevYear = activeYear !== "all" && availableYears.includes(String(yearNum - 1)) ? String(yearNum - 1) : null;
+  const nextYear = activeYear !== "all" && availableYears.includes(String(yearNum + 1)) ? String(yearNum + 1) : null;
   const yearHref = (y: string) => filterParams({ year: y, ...(activeWhen === "past" ? { when: "past" } : {}) });
 
   const whenHref = (w: string) => filterParams(w === "past" ? { when: "past" } : {});
@@ -488,9 +486,8 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
         <CompetitionsFilterBar
           availableYears={availableYears}
           currentYear={activeYear}
-          currentLevel={activeLevel}
-          currentQ={activeQ}
-          currentTag={activeTag}
+          currentLevels={activeLevels}
+          currentDisc={activeDisc}
           totalCount={translatedFiltered.length}
           scope={scope}
         />
@@ -593,15 +590,17 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
                                 {formatCountdown(daysUntil(hero.date), locale)}
                               </span>
                             )}
-                            {(hero.tags ?? []).map((tag) => {
-                              const ts = TAG_STYLE[tag] ?? FALLBACK_BADGE;
+                            {(hero.disciplineGroups ?? []).map((g) => {
+                              const badge = DISCIPLINE_BADGE[g];
+                              if (!badge) return null;
                               return (
                                 <span
-                                  key={tag}
+                                  key={g}
+                                  title={locale === "en" ? badge.en : badge.sr}
                                   className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.6rem] uppercase px-1.5 py-0.5 rounded"
-                                  style={ts}
+                                  style={badge.style}
                                 >
-                                  {tag}
+                                  {badge.short}
                                 </span>
                               );
                             })}

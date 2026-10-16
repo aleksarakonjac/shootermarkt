@@ -442,6 +442,9 @@ export const competitions = pgTable(
     siusId: varchar("scius_id", { length: 50 }).unique(),
     externalId: varchar("external_id", { length: 300 }),
     tags: varchar("tags", { length: 20 }).array().notNull().default([]),
+    // Grupe disciplina za filter na /takmicenja: 'air' (10m vazdušno) i/ili 'smallbore' (MK: 25m / 50m).
+    // Izvor istine su rezultati (disciplines.distance); za buduća takmičenja se izvodi iz naziva ili postavlja ručno.
+    disciplineGroups: varchar("discipline_groups", { length: 12 }).array().notNull().default([]),
     timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
