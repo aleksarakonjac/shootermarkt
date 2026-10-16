@@ -257,8 +257,9 @@ export default async function ShooterPage({ params }: Props) {
         <div className="flex-1 min-w-0 pt-1 flex items-start gap-4">
           <div className="flex-1 min-w-0">
             <h1
+              data-vt="shooter-name"
               className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] leading-none mb-3 break-words"
-              style={{ fontSize: "clamp(1.75rem, 5vw, 2.75rem)", letterSpacing: "-0.02em" }}
+              style={{ fontSize: "clamp(1.75rem, 5vw, 2.75rem)", letterSpacing: "-0.02em", viewTransitionName: "shooter-name" }}
             >
               {shooter.lastName}{" "}
               <span className="font-medium">{shooter.firstName}</span>

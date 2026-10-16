@@ -412,3 +412,23 @@ p {
   @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(0); } }
   @keyframes ticker-mobile-scroll { from { transform: translateX(0); } to { transform: translateX(0); } }
 }
+
+/* ── Motion tokens ────────────────────────────────────────────────────────── */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-instant: 120ms;
+  --dur-fast: 200ms;
+  --dur-base: 320ms;
+  --dur-focal: 900ms;
+}
+
+/* Shared-element prelaz strelac: lista → profil (vidi TransitionLink). */
+::view-transition-group(shooter-name) {
+  animation-duration: 360ms;
+  animation-timing-function: var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+  }
+}

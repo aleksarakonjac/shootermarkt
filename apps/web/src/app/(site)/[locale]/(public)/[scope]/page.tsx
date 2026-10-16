@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import { QuickH2HClient } from "./quick-h2h-client";
 import { HomepageMainClient, HomepageTickerClient } from "./homepage-client-blocks";
 import { HomepageDataStatusProvider, HomepageRetryNotice } from "./homepage-data-status";
+import { MainSkeleton } from "./homepage-skeleton";
 import "./homepage.css";
 
 export const revalidate = 300;
@@ -28,7 +29,7 @@ async function HomepageSidebarNews({ data }: { data: Promise<HomepageMainData> }
 }
 
 function HomepageMainLoading() {
-  return <div aria-busy="true" className="h-48 animate-pulse rounded-xl bg-[var(--surface)]" />;
+  return <MainSkeleton />;
 }
 
 export default async function HomePage({ params }: { params: Promise<{ scope: Scope }> }) {

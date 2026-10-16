@@ -12,6 +12,7 @@ import { ScopedLink } from "../components/ScopedLink";
 import { TopFormaClient } from "./top-forma-client";
 import { useHomepageDataStatus } from "./homepage-data-status";
 import { LEVEL_STYLE } from "@/lib/competition-utils";
+import { ClubsSkeleton, MainSkeleton, TickerSkeleton } from "./homepage-skeleton";
 import { MIXED_TEAM_CODES } from "@shootermarkt/db/pdf-import-types";
 import type { HomepageMainData } from "@/lib/homepage-data";
 
@@ -66,7 +67,7 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
       {toggle}
     </div>
     {secondRow.length > 0 && (
-      <div className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
+      <div className={`grid transition-[grid-template-rows] duration-200 ease-[var(--ease-out)] motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
         <div className={`overflow-hidden ${collapsed ? "[contain:inline-size]" : ""}`}>
           <ScopedLink href={href} tabIndex={collapsed ? -1 : undefined} className={`mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 no-underline hover:opacity-80 transition-opacity duration-150 motion-reduce:transition-none ${collapsed ? "opacity-0" : "opacity-100 delay-75"}`}>
             {secondRow.map((entry, index) => place(entry, useFallback ? index + 2 : index + 1))}
@@ -115,12 +116,15 @@ function useHomepageData<T>(path: string, refreshMs?: number, initialData?: T) {
   const [state, setState] = useState<"loading" | "ready" | "error">(initialData ? "ready" : "loading");
   const [attempt, setAttempt] = useState(0);
   const hasInitialData = useRef(initialData != null);
+  const hasData = useRef(initialData != null);
   const autoRetried = useRef<string | null>(null);
   const { clearFailure, reportFailure } = useHomepageDataStatus();
   const retry = useCallback(() => {
     setState("loading");
     setAttempt((value) => value + 1);
   }, []);
+  // Osvežavanje u pozadini: sadržaj ostaje na ekranu, pa novi rezultat može da se istakne.
+  const refresh = useCallback(() => setAttempt((value) => value + 1), []);
 
   useEffect(() => {
     if (hasInitialData.current) {
@@ -131,10 +135,10 @@ function useHomepageData<T>(path: string, refreshMs?: number, initialData?: T) {
     clearFailure(path);
     fetch(`${path}?scope=${scope ?? "srb"}&locale=${locale}`, { signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Homepage request failed")))
-      .then((result) => { setData(result); setState("ready"); clearFailure(path); })
+      .then((result) => { hasData.current = true; setData(result); setState("ready"); clearFailure(path); })
       .catch((error) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setState("error");
+        if (!hasData.current) setState("error");
         reportFailure(path, retry);
       });
     return () => controller.abort();
@@ -154,7 +158,7 @@ function useHomepageData<T>(path: string, refreshMs?: number, initialData?: T) {
     return () => window.clearInterval(interval);
   }, [refreshMs]);
 
-  return { data, state, retry };
+  return { data, state, retry, refresh };
 }
 
 function HomepageError({ retry, compact = false }: { retry: () => void; compact?: boolean }) {
@@ -172,10 +176,19 @@ function HomepageError({ retry, compact = false }: { retry: () => void; compact?
 export function HomepageTickerClient() {
   // Dok je takmičenje u toku, traka je u layout-u (sticky header ako je LIVE, inače na vrhu stranice); ovde ostaje samo marquee nadolazećih.
   const { state, liveItems, upcomingItems, retry } = useTickerData();
-  if (state === "loading") return <div aria-busy="true" className="h-10 animate-pulse bg-[var(--surface)]" />;
+  if (state === "loading") return <TickerSkeleton />;
   if (state === "error") return <HomepageError retry={retry} compact />;
   if (liveItems.length > 0) return null;
   return <Ticker upcomingItems={upcomingItems} />;
+}
+
+type PhaseKeyInput = { stage: string; elimRound?: number | null; category: string };
+function phaseRowKey(competitionId: number, discCode: string, isJunior: boolean, phase: PhaseKeyInput) {
+  return `${competitionId}:${discCode}:${isJunior}:${phase.stage}:${phase.elimRound ?? ""}:${phase.category}`;
+}
+
+function LiveBadge({ children, className }: { children: ReactNode; className: string }) {
+  return <span className={`${className} items-center gap-1`}><span className="live-dot" aria-hidden="true" />{children}</span>;
 }
 
 export function HomepageMainClient({ initialData }: { initialData?: HomepageMainData }) {
@@ -198,20 +211,45 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
     else next.add(key);
     return next;
   });
-  const { data, state, retry } = useHomepageData<HomepageMainData>("/api/homepage/main", undefined, initialData);
+  const { data, state, retry, refresh } = useHomepageData<HomepageMainData>("/api/homepage/main", undefined, initialData);
+
+  // Fokalni trenutak: kad osvežavanje donese nov ili izmenjen rezultat, taj red se kratko istakne.
+  const previousSignatures = useRef<Map<string, string> | null>(null);
+  const [flashKeys, setFlashKeys] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    if (!data) return;
+    const next = new Map<string, string>();
+    for (const competition of [...data.recent]) {
+      for (const disc of competition.discResults) {
+        for (const phase of disc.phases) {
+          const signature = [...phase.qualTop3.map((e) => `${e.lastName}:${e.qualTotal}:${e.finalTotal ?? ""}`), ...phase.srbHighlights.map((e) => `${e.lastName}:${e.qualTotal}:${e.finalTotal ?? ""}`)].join("|");
+          next.set(phaseRowKey(competition.id, disc.discCode, disc.isJunior, phase), signature);
+        }
+      }
+    }
+    const previous = previousSignatures.current;
+    previousSignatures.current = next;
+    if (!previous) return;
+    const changed = new Set<string>();
+    next.forEach((signature, key) => { if (signature && previous.get(key) !== signature) changed.add(key); });
+    if (changed.size === 0) return;
+    setFlashKeys(changed);
+    const timeout = window.setTimeout(() => setFlashKeys(new Set()), 1_000);
+    return () => window.clearTimeout(timeout);
+  }, [data]);
 
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
       .channel("live-results-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "results" }, retry)
-      .on("postgres_changes", { event: "*", schema: "public", table: "mixed_team_results" }, retry)
-      .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, retry)
+      .on("postgres_changes", { event: "*", schema: "public", table: "results" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "mixed_team_results" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, refresh)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [retry]);
+  }, [refresh]);
 
-  if (state === "loading") return <div aria-busy="true" className="h-48 animate-pulse rounded-xl bg-[var(--surface)]" />;
+  if (state === "loading") return <MainSkeleton />;
   if (state === "error" || !data) return <HomepageError retry={retry} />;
 
   const upcoming = data.upcoming.map((item) => ({ ...item, name: locale === "en" ? (item.nameEn ?? item.name) : (item.nameSr ?? item.name) }));
@@ -253,7 +291,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
           const isAP = disc.discCode.startsWith("AP");
           const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-barlow-condensed)] text-[15px] font-bold uppercase tracking-[0.04em] text-[var(--muted)]">{DISC_FULL_NAMES[disc.discCode]?.[locale === "en" ? "en" : "sr"] ?? disc.discCode}</span>;
           const junBadge = disc.isJunior ? <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>JUN</span> : null;
-          const liveBadge = disc.isLive ? <span className="shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">LIVE</span> : null;
+          const liveBadge = disc.isLive ? <LiveBadge className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">LIVE</LiveBadge> : null;
           return (
             <div key={`${disc.discCode}:${disc.isJunior}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
               {/* Naziv discipline vodi na prvu prikazanu fazu (finale ako postoji, inače kvalifikacije). */}
@@ -289,7 +327,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                 // Faza u toku bez ijednog rezultata u bazi: samo oznaka da je počela.
                 if (phase.qualTop3.length === 0 && phase.srbHighlights.length === 0) {
                   return (
-                    <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className="w-full" data-phase-row>
+                    <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className={flashKeys.has(phaseRowKey(competitionId, disc.discCode, disc.isJunior, phase)) ? "w-full live-flash" : "w-full"} data-phase-row>
                       <ScopedLink href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} className="flex w-fit items-center gap-1.5 no-underline hover:opacity-80 transition-opacity">
                         {stageBadge}{liveBadge}
                         <span className="text-xs italic text-[var(--muted)]">{t("liveResultsSoon")}</span>
@@ -298,7 +336,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   );
                 }
                 return (
-                  <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className="w-full" data-phase-row>
+                  <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className={flashKeys.has(phaseRowKey(competitionId, disc.discCode, disc.isJunior, phase)) ? "w-full live-flash" : "w-full"} data-phase-row>
                     <div className="min-w-0 w-fit max-w-full">
                       {phase.qualTop3.length > 0 && <InlinePlaces href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} toggle={qualToggle} entries={phase.qualTop3} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} reserveToggleSpace={qualToggle != null} collapsed={isCollapsibleQual && !qualExpanded} />}
                     </div>
@@ -351,7 +389,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
           <div className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-4 hover:border-[var(--brand-primary)] transition-colors">
             <ScopedLink href={`/takmicenja/${lead.id}`} className="block no-underline">
               <div className="flex items-center gap-2 flex-nowrap">
-                {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
+                {lead.isLive && <LiveBadge className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</LiveBadge>}
                 <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
                   {leadLevelLabel}
                 </span>
@@ -384,9 +422,9 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                 <button
                   onClick={() => setExpandedId(isExpanded ? null : item.id)}
                   aria-expanded={isExpanded}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--surface-2)] transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--surface-2)] active:bg-[var(--surface-2)] active:scale-[0.995] motion-reduce:active:scale-100 transition-[background-color,transform] duration-150 ease-[var(--ease-out)]"
                 >
-                  {item.isLive && <span className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
+                  {item.isLive && <LiveBadge className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</LiveBadge>}
                   <span className="hidden sm:block shrink-0 text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={rowLevelStyle}>
                     {rowLevelLabel}
                   </span>
@@ -395,14 +433,14 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   </span>
                   <svg
                     width="12" height="12" viewBox="0 0 12 12"
-                    className={`shrink-0 text-[var(--muted)] transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                    className={`shrink-0 text-[var(--muted)] transition-transform duration-200 ease-[var(--ease-out)] motion-reduce:transition-none ${isExpanded ? "rotate-180" : ""}`}
                     aria-hidden="true"
                   >
                     <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
                   </svg>
                 </button>
 
-                <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                <div className={`grid transition-[grid-template-rows] duration-200 ease-[var(--ease-out)] motion-reduce:transition-none ${isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                   <div className="overflow-hidden">
                     <div className="px-4 pb-4">
                       {renderDiscResults(item.discResults, item.level, item.id)}
@@ -431,7 +469,7 @@ export function HomepageClubsClient() {
   const t = useTranslations("home");
   const common = useTranslations("common");
   const { data, state, retry } = useHomepageData<Array<{ clubId: number; name: string; city: string | null; avgPercentile: number; activeShooters: number }>>("/api/homepage/clubs");
-  if (state === "loading") return <div aria-busy="true" className="h-48 animate-pulse rounded-xl bg-[var(--surface)]" />;
+  if (state === "loading") return <ClubsSkeleton />;
   if (state === "error" || !data) return <HomepageError retry={retry} />;
   return <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]"><div className="flex items-baseline justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2"><h3 className="font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase text-[var(--ink)]">{t("clubLeaderboard")}</h3><span className="text-xs text-[var(--muted)]">{t("clubLeaderboardMetric")}</span></div><div className="p-4">{data.length === 0 ? <p className="py-4 text-center text-sm text-[var(--muted)]">{t("noClubData")}</p> : data.map((club, index) => <div key={club.clubId} className="flex items-center justify-between py-2 text-sm"><span><b className="mr-3 text-[var(--subtle)]">{index + 1}</b><b>{club.name}</b> <span className="text-[var(--muted)]">{club.city || common("serbia")}</span></span><span className="font-mono font-bold tabular-nums text-[var(--ink)]">{club.avgPercentile.toFixed(1)}%</span></div>)}</div></section>;
 }

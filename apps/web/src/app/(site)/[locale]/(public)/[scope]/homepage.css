@@ -18,3 +18,70 @@
   break-inside: avoid;
   margin-bottom: 1rem;
 }
+
+/* ── Top forma ─────────────────────────────────────────────────────────────── */
+@keyframes tf-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes tf-progress {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.tf-row {
+  animation: tf-enter 220ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 35ms);
+}
+.tf-progress {
+  transform-origin: left;
+  animation: tf-progress var(--tf-interval, 9000ms) linear 1 forwards;
+}
+.tf-pill { transition: transform 250ms var(--ease-out); }
+
+/* Sparkline se crta sleva udesno; tačka sa najnovijom vrednošću se pojavi na kraju. */
+@keyframes sp-draw {
+  0%   { stroke-dashoffset: 1; opacity: 0; }
+  8%   { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+@keyframes sp-dot {
+  0%, 70% { opacity: 0; }
+  100%    { opacity: 1; }
+}
+.sp-draw-line { stroke-dasharray: 1 1; animation: sp-draw 500ms var(--ease-out) both; }
+.sp-draw-dot  { animation: sp-dot 500ms var(--ease-out) both; }
+
+/* ── Uživo: rezultat je upravo stigao ─────────────────────────────────────── */
+@keyframes live-flash {
+  from { background-color: color-mix(in srgb, var(--brand-primary) 14%, transparent); }
+  to   { background-color: transparent; }
+}
+.live-flash {
+  animation: live-flash var(--dur-focal) var(--ease-out) both;
+  border-radius: 0.375rem;
+}
+@keyframes live-dot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+.live-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: live-dot 1.6s ease-in-out infinite;
+}
+
+/* ── Skeleton: statični oblici sadržaja, bez pulsiranja ───────────────────── */
+.sk { background: var(--surface-2); border-radius: 0.375rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tf-row { animation: none; }
+  .tf-progress { animation: none; display: none; }
+  .tf-pill { transition: none; }
+  .sp-draw-line, .sp-draw-dot { animation: none; }
+  /* Obaveštenje o novom rezultatu ostaje, ali bez trajanja koje se oseća kao kretanje: kratak, miran fade. */
+  .live-flash { animation-duration: 600ms; }
+  .live-dot { animation: none; }
+}

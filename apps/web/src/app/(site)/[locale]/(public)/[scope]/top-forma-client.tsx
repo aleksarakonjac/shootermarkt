@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
+import { TransitionLink } from "@/components/shooter/TransitionLink";
 import { Sparkline } from "@/components/sparkline";
 import { FormaScoreInfo } from "@/components/shooter/FormaScoreHeading";
 import { FormaScoreMark } from "@/components/shooter/FormaScoreMark";
@@ -41,49 +42,77 @@ const TABS = [
   { code: "APW", name: "Pistol Women" },
 ] as const;
 
+const ROLL_DURATION = 450;
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return reduced;
+}
+
+/** Forma broj "ruloira" ka vrednosti kad se tab promeni; bez animacije pri prvom prikazu i uz reduced motion. */
+function RollingNumber({ value, animate }: { value: number; animate: boolean }) {
+  const [shown, setShown] = useState(value);
+  useLayoutEffect(() => {
+    if (!animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setShown(value);
+      return;
+    }
+    const from = value - value * 0.01;
+    const startedAt = performance.now();
+    let frame = requestAnimationFrame(function tick(now) {
+      const progress = Math.min(1, (now - startedAt) / ROLL_DURATION);
+      setShown(from + (value - from) * (1 - Math.pow(1 - progress, 4)));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    });
+    setShown(from);
+    return () => cancelAnimationFrame(frame);
+  }, [value, animate]);
+  return <span className="tabular-nums">{shown.toFixed(1)}</span>;
+}
+
 export function TopFormaClient({ initialData }: TopFormaClientProps) {
   const [activeTab, setActiveTab] = useState<keyof typeof initialData>("ARM");
   const [userSelected, setUserSelected] = useState(false);
-  const rotateTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [switched, setSwitched] = useState(false);
   const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const t = useTranslations("home");
   const locale = useLocale();
   const scopedHref = useScopedHref();
+  const reducedMotion = usePrefersReducedMotion();
 
-  const stopRotation = useCallback(() => {
-    if (rotateTimer.current) clearInterval(rotateTimer.current);
-    rotateTimer.current = null;
-  }, []);
-
-  const clearResume = useCallback(() => {
-    if (resumeTimer.current) clearTimeout(resumeTimer.current);
-    resumeTimer.current = null;
-  }, []);
-
-  const startRotation = useCallback(() => {
-    stopRotation();
-    rotateTimer.current = setInterval(() => {
-      setActiveTab((cur) => {
-        const idx = TABS.findIndex((t) => t.code === cur);
-        return TABS[(idx + 1) % TABS.length].code;
-      });
-    }, ROTATE_INTERVAL);
-  }, [stopRotation]);
+  // Rotacija stoji dok korisnik čita (hover, fokus, dodir, klik na tab) i nikad ne radi uz reduced motion.
+  const rotating = !reducedMotion && !hovered && !focused && !userSelected;
 
   useEffect(() => {
-    startRotation();
-    return () => { stopRotation(); clearResume(); };
-  }, [startRotation, stopRotation, clearResume]);
+    if (!rotating) return;
+    const interval = setInterval(() => {
+      setActiveTab((cur) => TABS[(TABS.findIndex((tab) => tab.code === cur) + 1) % TABS.length].code);
+      setSwitched(true);
+    }, ROTATE_INTERVAL);
+    return () => clearInterval(interval);
+  }, [rotating]);
+
+  const holdRotation = useCallback(() => {
+    setUserSelected(true);
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(() => setUserSelected(false), RESUME_DELAY);
+  }, []);
+
+  useEffect(() => () => { if (resumeTimer.current) clearTimeout(resumeTimer.current); }, []);
 
   function handleTabClick(code: keyof typeof initialData) {
     setActiveTab(code);
-    setUserSelected(true);
-    stopRotation();
-    clearResume();
-    resumeTimer.current = setTimeout(() => {
-      setUserSelected(false);
-      startRotation();
-    }, RESUME_DELAY);
+    setSwitched(true);
+    holdRotation();
   }
 
   const rows = initialData[activeTab];
@@ -91,20 +120,14 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
   const activeIndex = TABS.findIndex((t) => t.code === activeTab);
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
-      <style>{`
-        @keyframes _tf-enter {
-          from { opacity: 0; transform: translateY(5px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes _tf-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-        ._tf-pill { transition: transform 250ms cubic-bezier(0.22, 1, 0.36, 1); }
-        @media (prefers-reduced-motion: reduce) {
-          @keyframes _tf-enter    { from { opacity: 1; transform: none; } }
-          @keyframes _tf-progress { from { transform: scaleX(1); } }
-          ._tf-pill { transition: none; }
-        }
-      `}</style>
+    <div
+      className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden"
+      onPointerEnter={(event) => { if (event.pointerType === "mouse") setHovered(true); }}
+      onPointerLeave={() => setHovered(false)}
+      onFocusCapture={() => setFocused(true)}
+      onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }}
+      onTouchStart={holdRotation}
+    >
       {/* Widget Header with Tabs */}
       <div className="relative flex flex-nowrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--brand-primary)] px-4 py-1.5">
         <h3 className="flex min-h-8 shrink-0 items-center gap-1.5 leading-none font-[family-name:var(--font-barlow-condensed)] text-base font-bold uppercase tracking-wider text-white sm:text-lg">
@@ -119,7 +142,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
           {/* Sliding pill indicator */}
           <span
             aria-hidden="true"
-            className="_tf-pill pointer-events-none absolute top-0 bottom-0 left-0 rounded"
+            className="tf-pill pointer-events-none absolute top-0 bottom-0 left-0 rounded"
             style={{
               width: `${100 / TABS.length}%`,
               background: "var(--bg)",
@@ -142,12 +165,12 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
           })}
         </div>
 
-        {!userSelected && (
+        {rotating && (
           <span
             key={activeTab}
             aria-hidden="true"
-            className="absolute bottom-0 left-0 h-[2px] w-full origin-left bg-white/30"
-            style={{ animation: `_tf-progress ${ROTATE_INTERVAL}ms linear 1 forwards` }}
+            className="tf-progress absolute bottom-0 left-0 h-[2px] w-full bg-white/30"
+            style={{ "--tf-interval": `${ROTATE_INTERVAL}ms` } as React.CSSProperties}
           />
         )}
       </div>
@@ -161,16 +184,16 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
         {rows.map((r, i) => (
           <li
             key={r.shooterId}
-            className="flex min-h-14 items-center gap-2 px-3 py-2"
-            style={{ animation: `_tf-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both`, animationDelay: `${i * 35}ms` }}
+            className="tf-row flex min-h-14 items-center gap-2 px-3 py-2"
+            style={{ "--i": i } as React.CSSProperties}
           >
             <span className="w-5 text-right font-[family-name:var(--font-barlow-condensed)] text-lg font-bold text-[var(--subtle)]">{i + 1}</span>
-            <Link href={scopedHref(`/strelci/${r.shooterId}`)} className="min-w-0 flex-1 truncate font-semibold text-[var(--ink)] hover:underline">
+            <TransitionLink transitionName="shooter-name" href={scopedHref(`/strelci/${r.shooterId}`)} className="min-w-0 flex-1 truncate font-semibold text-[var(--ink)] hover:underline">
               {r.lastName} {r.firstName}
-            </Link>
-            <Sparkline scores={r.recentScores.slice(0, 5)} width={44} height={18} strokeWidth={1.5} />
+            </TransitionLink>
+            <Sparkline scores={r.recentScores.slice(0, 5)} width={44} height={18} strokeWidth={1.5} draw={switched && i < 3} />
             <span className="flex items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] text-base font-semibold text-[var(--ink)]">
-              {r.formaScore.toFixed(1)}
+              <RollingNumber value={r.formaScore} animate={switched && i < 3} />
               <span className="text-base font-bold leading-none" style={{ color: trendColor(r.trend) }} aria-label={r.trend}>{trendLabel(r.trend)}</span>
             </span>
           </li>
@@ -192,28 +215,29 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
               {rows.map((r, i) => (
                 <tr
                   key={r.shooterId}
-                  className="hover:bg-[var(--surface)] transition-colors"
-                  style={{ animation: `_tf-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both`, animationDelay: `${i * 35}ms` }}
+                  className="tf-row hover:bg-[var(--surface)] transition-colors"
+                  style={{ "--i": i } as React.CSSProperties}
                 >
                   <td className="w-10 px-3 py-2.5 text-right font-[family-name:var(--font-barlow-condensed)] font-bold text-base text-[var(--subtle)]">
                     {i + 1}
                   </td>
                   <td className="px-3 py-2.5">
-                    <Link
+                    <TransitionLink
+                      transitionName="shooter-name"
                       href={scopedHref(`/strelci/${r.shooterId}`)}
                       className="font-semibold text-[var(--ink)] hover:underline block truncate max-w-[150px] sm:max-w-none"
                     >
                       {r.lastName} {r.firstName}
-                    </Link>
+                    </TransitionLink>
                   </td>
                   <td className="px-3 py-2.5 text-[var(--muted)] text-xs truncate max-w-[120px] sm:max-w-none">
                     {r.clubName ?? "—"}
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-end gap-2">
-                      <Sparkline scores={r.recentScores.slice(0, 5)} width={56} height={20} strokeWidth={1.5} />
+                      <Sparkline scores={r.recentScores.slice(0, 5)} width={56} height={20} strokeWidth={1.5} draw={switched && i < 3} />
                       <span className="flex items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
-                        {r.formaScore.toFixed(1)}
+                        <RollingNumber value={r.formaScore} animate={switched && i < 3} />
                         <span className="text-sm font-bold leading-none" style={{ color: trendColor(r.trend) }} aria-label={r.trend}>{trendLabel(r.trend)}</span>
                       </span>
                     </div>

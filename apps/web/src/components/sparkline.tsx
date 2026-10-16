@@ -6,6 +6,8 @@ interface SparklineProps {
   height?: number;
   strokeColor?: string;
   strokeWidth?: number;
+  /** Crta liniju sleva udesno (klase u homepage.css). */
+  draw?: boolean;
 }
 
 export function Sparkline({
@@ -14,6 +16,7 @@ export function Sparkline({
   height = 24,
   strokeColor,
   strokeWidth = 2,
+  draw = false,
 }: SparklineProps) {
   if (!scores || scores.length < 2) {
     return <span className="text-[var(--subtle)] text-xs">—</span>;
@@ -56,6 +59,8 @@ export function Sparkline({
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
+        pathLength={draw ? 1 : undefined}
+        className={draw ? "sp-draw-line" : undefined}
         points={points.join(" ")}
       />
       {/* Dynamic pulse dot for the latest value */}
@@ -64,6 +69,7 @@ export function Sparkline({
         cy={points[points.length - 1].split(",")[1]}
         r="2"
         fill={finalStrokeColor}
+        className={draw ? "sp-draw-dot" : undefined}
       />
     </svg>
   );
