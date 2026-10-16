@@ -225,29 +225,40 @@ export function CompetitionCalendar({ competitions }: Props) {
 
   return (
     <div className="w-full lg:sticky lg:top-[calc(var(--site-header-h,3.5rem)+1.5rem)]">
-      {/* Telefon: levo oznaka (zatvoreno: "Kalendar", otvoreno: mesec), desno strelice samo kad je otvoreno */}
-      <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--bg)] pl-1 pr-1 lg:hidden">
+      {/* Telefon: traka u stilu kalendara sa početne. Zatvorena: klik bilo gde je otvara. Otvorena: mesec, Danas, strelice */}
+      <div
+        onClick={() => { if (!open) setOpen(true); }}
+        className={`flex items-center gap-2 rounded-xl bg-[var(--brand-primary)] pl-3 pr-1 lg:hidden ${open ? "" : "cursor-pointer"}`}
+      >
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
           aria-expanded={open}
           aria-controls="competition-calendar-grid"
-          className="flex h-11 min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm font-bold text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
+          className="flex min-h-11 min-w-0 items-center gap-1.5 text-white"
         >
-          <span className="truncate">{open ? monthLabel : t("title")}</span>
-          <svg className="cal-strip-chevron shrink-0 text-[var(--muted)]" data-open={open} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          {open
+            ? <span className="truncate text-sm font-semibold">{monthLabel}</span>
+            : <span className="font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase tracking-wider leading-none">{t("title")}</span>}
+          <svg className="cal-strip-chevron shrink-0 text-white/80" data-open={open} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
             <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
           </svg>
         </button>
-        {open && !showingCurrentMonth && (
-          <button type="button" onClick={goToday} className="h-8 shrink-0 rounded-md bg-[var(--surface-2)] px-2.5 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--border)] transition-colors">
-            {t("goToday")}
-          </button>
-        )}
+        <div className="flex min-w-0 flex-1 justify-center">
+          {open && !showingCurrentMonth && (
+            <button
+              type="button"
+              onClick={goToday}
+              className="rounded border border-white/60 px-2 py-px text-[11px] font-semibold uppercase leading-4 tracking-wide text-white transition-colors hover:bg-white/15"
+            >
+              {t("goToday")}
+            </button>
+          )}
+        </div>
         {open && (
-          <div className="ml-auto flex items-center">
-            <button type="button" className="cal-strip-btn" onClick={() => shift(-1)} aria-label={t("prevMonth")}><Arrow dir="prev" /></button>
-            <button type="button" className="cal-strip-btn" onClick={() => shift(1)} aria-label={t("nextMonth")}><Arrow dir="next" /></button>
+          <div className="flex items-center">
+            <button type="button" className="cal-strip-btn !text-white hover:!bg-white/15" onClick={() => shift(-1)} aria-label={t("prevMonth")}><Arrow dir="prev" /></button>
+            <button type="button" className="cal-strip-btn !text-white hover:!bg-white/15" onClick={() => shift(1)} aria-label={t("nextMonth")}><Arrow dir="next" /></button>
           </div>
         )}
       </div>
@@ -289,7 +300,7 @@ export function CompetitionCalendar({ competitions }: Props) {
       {/* Desktop: povratak na tekući mesec ispod mreže (ne pomera ništa iznad) */}
       {!showingCurrentMonth && (
         <div className="mt-2 hidden justify-center lg:flex">
-          <button type="button" onClick={goToday} className="h-8 rounded-md bg-[var(--surface-2)] px-3 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--border)] transition-colors">
+          <button type="button" onClick={goToday} className="rounded border border-[var(--brand-primary)] px-2 py-px text-[11px] font-semibold uppercase leading-4 tracking-wide text-[var(--brand-primary)] transition-colors hover:bg-[var(--brand-primary)]/10">
             {t("goToday")}
           </button>
         </div>
