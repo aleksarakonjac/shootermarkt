@@ -216,30 +216,40 @@ export function CompetitionCalendar({ competitions }: Props) {
 
   const shift = (dir: 1 | -1) => setActiveStartDate((current) => shiftPeriod(current, view, dir));
   const monthLabel = `${t(`months.${activeStartDate.getMonth()}`)} ${activeStartDate.getFullYear()}`;
-  const monthPrefix = toKey(activeStartDate).slice(0, 7);
-  const monthCount = competitions.filter((c) => c.date.slice(0, 7) === monthPrefix).length;
+  const now = new Date();
+  const showingCurrentMonth = view === "month" && activeStartDate.getFullYear() === now.getFullYear() && activeStartDate.getMonth() === now.getMonth();
+  const goToday = () => {
+    setView("month");
+    setActiveStartDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  };
 
   return (
     <div className="w-full lg:sticky lg:top-[calc(var(--site-header-h,3.5rem)+1.5rem)]">
-      {/* Telefon: traka s mesecom i brojem takmičenja; strelice se pojavljuju tek kad je mreža otvorena */}
-      <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--bg)] px-1 lg:hidden">
-        {open && <button type="button" className="cal-strip-btn" onClick={() => shift(-1)} aria-label={t("prevMonth")}><Arrow dir="prev" /></button>}
+      {/* Telefon: levo oznaka (zatvoreno: "Kalendar", otvoreno: mesec), desno strelice samo kad je otvoreno */}
+      <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--bg)] pl-1 pr-1 lg:hidden">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls="competition-calendar-grid"
-          className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg px-2 text-sm font-bold text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
+          className="flex h-11 min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm font-bold text-[var(--ink)] hover:bg-[var(--surface-2)] transition-colors"
         >
-          <span className="truncate">{monthLabel}</span>
-          {monthCount > 0 && (
-            <span className="shrink-0 rounded-full bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold tabular-nums text-[var(--muted)]">{monthCount}</span>
-          )}
+          <span className="truncate">{open ? monthLabel : t("title")}</span>
           <svg className="cal-strip-chevron shrink-0 text-[var(--muted)]" data-open={open} width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
             <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
           </svg>
         </button>
-        {open && <button type="button" className="cal-strip-btn" onClick={() => shift(1)} aria-label={t("nextMonth")}><Arrow dir="next" /></button>}
+        {open && !showingCurrentMonth && (
+          <button type="button" onClick={goToday} className="h-8 shrink-0 rounded-md bg-[var(--surface-2)] px-2.5 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--border)] transition-colors">
+            {t("goToday")}
+          </button>
+        )}
+        {open && (
+          <div className="ml-auto flex items-center">
+            <button type="button" className="cal-strip-btn" onClick={() => shift(-1)} aria-label={t("prevMonth")}><Arrow dir="prev" /></button>
+            <button type="button" className="cal-strip-btn" onClick={() => shift(1)} aria-label={t("nextMonth")}><Arrow dir="next" /></button>
+          </div>
+        )}
       </div>
 
       <div id="competition-calendar-grid" className="cal-collapse mt-2 lg:mt-0" data-open={open}>
@@ -249,6 +259,7 @@ export function CompetitionCalendar({ competitions }: Props) {
               value={selectedDay ? new Date(selectedDay + "T00:00:00") : null}
               onChange={(val) => pickDay(val as Date | null)}
               activeStartDate={activeStartDate}
+              view={view}
               onViewChange={({ view: next }) => { if (next) setView(next as CalendarView); }}
               onActiveStartDateChange={({ activeStartDate: d }) => { if (d) setActiveStartDate(d); }}
               formatDay={(_, date) => String(date.getDate())}
@@ -275,6 +286,14 @@ export function CompetitionCalendar({ competitions }: Props) {
           </SwipeArea>
         </div>
       </div>
+      {/* Desktop: povratak na tekući mesec ispod mreže (ne pomera ništa iznad) */}
+      {!showingCurrentMonth && (
+        <div className="mt-2 hidden justify-center lg:flex">
+          <button type="button" onClick={goToday} className="h-8 rounded-md bg-[var(--surface-2)] px-3 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--border)] transition-colors">
+            {t("goToday")}
+          </button>
+        </div>
+      )}
       {emptyNote && (
         <p role="status" className="mt-2 text-center text-xs text-[var(--muted)]">{t("noEventsDay")}</p>
       )}
