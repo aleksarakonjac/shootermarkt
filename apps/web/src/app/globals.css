@@ -168,6 +168,11 @@ p {
   outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
+/* Polja za pretragu nemaju okvir u fokusu (nelejerovano pravilo iznad nadjačava Tailwind utility). */
+input[type="search"]:focus-visible,
+input.no-focus-ring:focus-visible {
+  outline: none;
+}
 
 /* ── Scrollbar ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

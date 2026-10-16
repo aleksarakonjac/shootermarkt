@@ -71,7 +71,7 @@ export function SearchBarClient({ shootersList }: SearchBarClientProps) {
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          className="w-full text-base sm:text-sm pl-8 pr-3 py-1.5 bg-transparent text-[var(--ink)] placeholder-[var(--subtle)] outline-none rounded-lg"
+          className="no-focus-ring w-full text-base sm:text-sm pl-8 pr-3 py-1.5 bg-transparent text-[var(--ink)] placeholder-[var(--subtle)] outline-none rounded-lg"
           aria-label={locale === "en" ? "Shooter search" : "Pretraga strelaca"}
         />
       </div>
