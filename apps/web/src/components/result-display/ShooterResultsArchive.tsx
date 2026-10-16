@@ -75,7 +75,7 @@ export function ShooterResultsArchive({ shooterId, initialResults, initialCursor
   }
 
   const toolbar = <form className="ml-auto flex min-w-0 shrink items-center gap-1 sm:gap-1.5" onSubmit={(event) => { event.preventDefault(); void applyFilters(); }}>
-    <label className="relative min-w-0"><span className="sr-only">{searchPlaceholder}</span><Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder={searchPlaceholder} className="h-8 w-28 rounded bg-[var(--surface-2)] py-1 pl-8 pr-2 text-xs text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--muted)] focus:ring-1 focus:ring-[var(--brand-primary)] sm:w-40" /></label>
+    <label className="relative min-w-0"><span className="sr-only">{searchPlaceholder}</span><Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)]" aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder={searchPlaceholder} className="h-8 w-28 rounded bg-[var(--surface-2)] py-1 pl-8 pr-2 text-base sm:text-xs text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--muted)] sm:w-40" /></label>
     <ResultsDateRangePicker value={{ from, to }} onApply={(range) => { setFrom(range.from); setTo(range.to); void applyFilters(query, range.from, range.to); }} locale={locale} labels={{ date: dateLabel, days: dateDaysLabel, months: dateMonthsLabel, years: dateYearsLabel, clear: clearDateLabel, apply: applyDateLabel }} />
   </form>;
 

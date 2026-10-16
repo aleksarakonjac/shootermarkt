@@ -50,7 +50,7 @@ export function SearchBarClient({ shootersList }: SearchBarClientProps) {
   return (
     <div className="relative w-full" ref={dropdownRef}>
       {/* Search Input Container */}
-      <div className="relative rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] focus-within:border-[var(--brand-primary)] focus-within:ring-1 focus-within:ring-[var(--brand-primary)] transition-all">
+      <div className="relative rounded-lg border border-[var(--border-strong)] bg-[var(--surface)]">
         <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-[var(--subtle)]">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path
@@ -71,7 +71,7 @@ export function SearchBarClient({ shootersList }: SearchBarClientProps) {
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          className="w-full text-sm pl-8 pr-3 py-1.5 bg-transparent text-[var(--ink)] placeholder-[var(--subtle)] outline-none rounded-lg"
+          className="w-full text-base sm:text-sm pl-8 pr-3 py-1.5 bg-transparent text-[var(--ink)] placeholder-[var(--subtle)] outline-none rounded-lg"
           aria-label={locale === "en" ? "Shooter search" : "Pretraga strelaca"}
         />
       </div>

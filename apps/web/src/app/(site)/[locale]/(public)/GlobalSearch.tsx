@@ -616,7 +616,7 @@ export function GlobalSearch() {
               setActiveIndex(0);
             }}
             onKeyDown={onInputKeyDown}
-            className="flex-1 py-[1.1rem] text-sm text-[var(--ink)] placeholder:text-[var(--subtle)] bg-transparent outline-none focus:outline-none focus:ring-0 [&:focus-visible]:outline-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
+            className="flex-1 py-[1.1rem] text-base sm:text-sm text-[var(--ink)] placeholder:text-[var(--subtle)] bg-transparent outline-none focus:outline-none focus:ring-0 [&:focus-visible]:outline-none [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
             autoComplete="off"
             spellCheck={false}
           />

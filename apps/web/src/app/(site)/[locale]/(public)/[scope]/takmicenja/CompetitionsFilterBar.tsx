@@ -125,7 +125,7 @@ export function CompetitionsFilterBar({
             defaultValue={currentQ}
             onChange={(e) => onSearch(e.target.value)}
             placeholder={t("list.search")}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] pl-8 pr-3 py-1.5 text-sm text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] pl-8 pr-3 py-1.5 text-base sm:text-sm text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none"
           />
         </div>
         <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)] tabular-nums ml-auto shrink-0">

@@ -154,7 +154,7 @@ export function StrelciFilterBar({
             onChange={(e) => setQ(e.target.value)}
             placeholder={t("search")}
             aria-label={locale === "en" ? "Search shooters" : "Pretraži strelce"}
-            className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--bg)] pl-9 pr-3 py-0 text-xs text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
+            className="h-9 w-full rounded-md border border-[var(--border)] bg-[var(--bg)] pl-9 pr-3 py-0 text-base sm:text-xs text-[var(--ink)] placeholder:text-[var(--subtle)] focus:outline-none"
           />
         </div>
 
