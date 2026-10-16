@@ -189,17 +189,26 @@ html.dark .countdown-chip {
   color: var(--muted);
 }
 
-/* ── Swipe: mreža prati prst (samo dodir) ─────────────────── */
-.kalendar-swipe .react-calendar__viewContainer {
+/* ── Swipe: pomeraju se samo dani; oznake dana u nedelji ostaju na mestu ─────── */
+.kalendar-swipe .react-calendar__month-view__days,
+.kalendar-swipe .react-calendar__year-view__months,
+.kalendar-swipe .react-calendar__decade-view__years,
+.kalendar-swipe .react-calendar__century-view__decades {
   transform: translateX(var(--drag-x, 0px));
   will-change: transform;
 }
-.kalendar-swipe[data-swipe="settle"] .react-calendar__viewContainer {
+.kalendar-swipe[data-swipe="settle"] .react-calendar__month-view__days,
+.kalendar-swipe[data-swipe="settle"] .react-calendar__year-view__months,
+.kalendar-swipe[data-swipe="settle"] .react-calendar__decade-view__years,
+.kalendar-swipe[data-swipe="settle"] .react-calendar__century-view__decades {
   transition: transform 220ms var(--ease-out);
 }
-.kalendar-swipe[data-swipe="idle"] .react-calendar__viewContainer { will-change: auto; }
+.kalendar-swipe[data-swipe="idle"] .react-calendar__month-view__days { will-change: auto; }
 @media (prefers-reduced-motion: reduce) {
-  .kalendar-swipe[data-swipe="settle"] .react-calendar__viewContainer { transition: none; }
+  .kalendar-swipe[data-swipe="settle"] .react-calendar__month-view__days,
+  .kalendar-swipe[data-swipe="settle"] .react-calendar__year-view__months,
+  .kalendar-swipe[data-swipe="settle"] .react-calendar__decade-view__years,
+  .kalendar-swipe[data-swipe="settle"] .react-calendar__century-view__decades { transition: none; }
 }
 
 /* ── Mobilna traka: mesec + strelice, otvara punu mrežu ─────── */
