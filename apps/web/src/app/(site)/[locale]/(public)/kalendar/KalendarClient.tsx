@@ -27,6 +27,75 @@ function shiftPeriod(date: Date, view: CalendarView, dir: 1 | -1) {
 const LEVEL_ORDER = ["olympic", "world", "continental", "international", "national", "regional", "club"];
 const levelRank = (level: string) => { const i = LEVEL_ORDER.indexOf(level); return i === -1 ? LEVEL_ORDER.length : i; };
 
+// Prati prst po horizontali; na otpuštanju klizi van, poziva onShift i novi sadržaj ulazi sa suprotne strane.
+function SwipeArea({ onShift, className, children }: { onShift: (dir: 1 | -1) => void; className: string; children: React.ReactNode }) {
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const gesture = useRef<SwipeGesture | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const shift = useRef(onShift);
+  useEffect(() => { shift.current = onShift; });
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const [dragX, setDragX] = useState(0);
+  const [mode, setMode] = useState<"idle" | "drag" | "settle">("idle");
+
+  const finish = (cancelled: boolean) => {
+    const g = gesture.current;
+    gesture.current = null;
+    if (!g || g.axis !== "x") return;
+    const width = node?.offsetWidth ?? 0;
+    const passed = !cancelled && width > 0 && dragX !== 0 && (Math.abs(dragX) > width * SWIPE_DISTANCE_RATIO || Math.abs(g.vx) > SWIPE_VELOCITY);
+    const dir: 1 | -1 | 0 = passed ? (dragX < 0 ? 1 : -1) : 0; // swipe levo → sledeći period
+    setMode("settle");
+    setDragX(dir === 0 ? 0 : -dir * width);
+    timer.current = window.setTimeout(() => {
+      if (dir === 0) { setMode("idle"); return; }
+      shift.current(dir);
+      setMode("drag");
+      setDragX(dir * width);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        setMode("settle");
+        setDragX(0);
+        timer.current = window.setTimeout(() => setMode("idle"), SETTLE_MS);
+      }));
+    }, SETTLE_MS);
+  };
+
+  const handlers = {
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType !== "touch" || mode !== "idle") return;
+      gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastT: e.timeStamp, vx: 0, axis: null };
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+      const g = gesture.current;
+      if (!g || g.id !== e.pointerId) return;
+      const dx = e.clientX - g.x;
+      const dy = e.clientY - g.y;
+      if (!g.axis) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+        if (g.axis === "x") {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setMode("drag");
+        }
+      }
+      if (g.axis !== "x") return;
+      const dt = e.timeStamp - g.lastT;
+      if (dt > 0) g.vx = (e.clientX - g.lastX) / dt;
+      g.lastX = e.clientX;
+      g.lastT = e.timeStamp;
+      setDragX(dx);
+    },
+    onPointerUp: () => finish(false),
+    onPointerCancel: () => finish(true),
+  };
+
+  return (
+    <div ref={setNode} className={className} data-swipe={mode} style={{ "--drag-x": `${dragX}px` } as React.CSSProperties} {...handlers}>
+      {children}
+    </div>
+  );
+}
+
 export type CalendarComp = {
   id: number;
   name: string;
@@ -138,65 +207,14 @@ export function KalendarClient({ competitions }: Props) {
     return map;
   }, [competitions]);
 
-  // Swipe (samo dodir): mreža prati prst; na otpuštanju klizi na susedni period ili se vraća.
-  const swipeRef = useRef<HTMLDivElement>(null);
-  const gesture = useRef<SwipeGesture | null>(null);
-  const swipeTimer = useRef<number | undefined>(undefined);
-  const [dragX, setDragX] = useState(0);
-  const [swipeMode, setSwipeMode] = useState<"idle" | "drag" | "settle">("idle");
-  useEffect(() => () => window.clearTimeout(swipeTimer.current), []);
-
-  const finishSwipe = (cancelled: boolean) => {
-    const g = gesture.current;
-    gesture.current = null;
-    if (!g || g.axis !== "x") return;
-    const width = swipeRef.current?.offsetWidth ?? 0;
-    const passed = !cancelled && width > 0 && dragX !== 0 && (Math.abs(dragX) > width * SWIPE_DISTANCE_RATIO || Math.abs(g.vx) > SWIPE_VELOCITY);
-    const dir: 1 | -1 | 0 = passed ? (dragX < 0 ? 1 : -1) : 0; // swipe levo → sledeći period
-    setSwipeMode("settle");
-    setDragX(dir === 0 ? 0 : -dir * width);
-    swipeTimer.current = window.setTimeout(() => {
-      if (dir === 0) { setSwipeMode("idle"); return; }
-      setActiveStartDate((current) => shiftPeriod(current, view, dir));
-      setSelectedDate(null);
-      // Novi period ulazi s suprotne strane.
-      setSwipeMode("drag");
-      setDragX(dir * width);
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        setSwipeMode("settle");
-        setDragX(0);
-        swipeTimer.current = window.setTimeout(() => setSwipeMode("idle"), SETTLE_MS);
-      }));
-    }, SETTLE_MS);
+  // Swipe (samo dodir): kalendar menja prikazani period, lista menja mesec.
+  const shiftCalendar = (dir: 1 | -1) => {
+    setActiveStartDate((current) => shiftPeriod(current, view, dir));
+    setSelectedDate(null);
   };
-
-  const swipeHandlers = {
-    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
-      if (e.pointerType !== "touch" || swipeMode !== "idle") return;
-      gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastT: e.timeStamp, vx: 0, axis: null };
-    },
-    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
-      const g = gesture.current;
-      if (!g || g.id !== e.pointerId) return;
-      const dx = e.clientX - g.x;
-      const dy = e.clientY - g.y;
-      if (!g.axis) {
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-        g.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-        if (g.axis === "x") {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          setSwipeMode("drag");
-        }
-      }
-      if (g.axis !== "x") return;
-      const dt = e.timeStamp - g.lastT;
-      if (dt > 0) g.vx = (e.clientX - g.lastX) / dt;
-      g.lastX = e.clientX;
-      g.lastT = e.timeStamp;
-      setDragX(dx);
-    },
-    onPointerUp: () => finishSwipe(false),
-    onPointerCancel: () => finishSwipe(true),
+  const shiftList = (dir: 1 | -1) => {
+    setActiveStartDate((current) => shiftPeriod(current, "month", dir));
+    setSelectedDate(null);
   };
 
   const filteredComps = useMemo(
@@ -261,13 +279,7 @@ export function KalendarClient({ competitions }: Props) {
 
       {/* ── Calendar ──────────────────────────────────────────── */}
       <div className="w-full lg:w-auto lg:shrink-0 lg:sticky lg:top-[calc(var(--site-header-h,3.5rem)+2rem)]">
-        <div
-          ref={swipeRef}
-          className="kalendar-swipe touch-pan-y"
-          data-swipe={swipeMode}
-          style={{ "--drag-x": `${dragX}px` } as React.CSSProperties}
-          {...swipeHandlers}
-        >
+        <SwipeArea onShift={shiftCalendar} className="kalendar-swipe touch-pan-y">
         <Calendar
           value={selectedDate}
           onChange={(val) => {
@@ -309,7 +321,7 @@ export function KalendarClient({ competitions }: Props) {
           minDetail="year"
           className="shadow-sm"
         />
-        </div>
+        </SwipeArea>
         <p className="mt-2 text-center text-[0.65rem] text-[var(--subtle)]">
           {t("clickHint")}
         </p>
@@ -388,6 +400,7 @@ export function KalendarClient({ competitions }: Props) {
           </span>
         </div>
 
+        <SwipeArea onShift={shiftList} className="kalendar-list-swipe">
         {listComps.length === 0 ? (
           <div
             key={listKey}
@@ -493,6 +506,7 @@ export function KalendarClient({ competitions }: Props) {
             })}
           </div>
         )}
+        </SwipeArea>
       </div>
     </div>
   );

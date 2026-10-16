@@ -240,3 +240,10 @@ html.dark .countdown-chip {
 @media (prefers-reduced-motion: reduce) {
   .kalendar-swipe[data-swipe="settle"] .react-calendar__viewContainer { transition: none; }
 }
+
+/* Lista takmičenja: swipe menja mesec */
+.kalendar-list-swipe { touch-action: pan-y; transform: translateX(var(--drag-x, 0px)); }
+.kalendar-list-swipe[data-swipe="settle"] { transition: transform 220ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  .kalendar-list-swipe[data-swipe="settle"] { transition: none; }
+}
