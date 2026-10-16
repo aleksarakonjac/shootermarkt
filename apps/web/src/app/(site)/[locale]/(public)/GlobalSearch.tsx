@@ -632,9 +632,11 @@ export function GlobalSearch() {
             type="button"
             onClick={closeModal}
             aria-label={t("navEsc")}
-            className="shrink-0 min-h-11 px-2 font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] rounded bg-[var(--surface-2)] border border-[var(--border)] text-[var(--subtle)] hover:text-[var(--muted)] transition-colors select-none"
+            className="flex size-11 shrink-0 items-center justify-center rounded text-[var(--subtle)] hover:bg-[var(--surface-2)] hover:text-[var(--muted)] transition-colors select-none"
           >
-            ESC
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+            </svg>
           </button>
         </div>
 
