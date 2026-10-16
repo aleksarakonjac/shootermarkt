@@ -459,6 +459,12 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
     return `/takmicenja?${p.toString()}`;
   }
 
+  // Susedne godine koje imaju takmičenja; ostaje se na istom tabu (Nadolazeća / Prošla).
+  const yearNum = Number(activeYear);
+  const prevYear = availableYears.includes(String(yearNum - 1)) ? String(yearNum - 1) : null;
+  const nextYear = availableYears.includes(String(yearNum + 1)) ? String(yearNum + 1) : null;
+  const yearHref = (y: string) => filterParams({ year: y, ...(activeWhen === "past" ? { when: "past" } : {}) });
+
   const whenHref = (w: string) => filterParams(w === "past" ? { when: "past" } : {});
   const pastMoreHref = filterParams({ when: "past", archiveAll: "1" });
 
@@ -719,6 +725,33 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
           )}
 
         </div>
+      )}
+
+      {/* Prelistavanje po godinama: prethodna / sledeća godina koja ima takmičenja */}
+      {(prevYear || nextYear) && (
+        <nav
+          aria-label={locale === "en" ? "Browse by year" : "Prelistavanje po godinama"}
+          className="mt-10 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4"
+        >
+          {prevYear ? (
+            <ScopedLink
+              href={yearHref(prevYear)}
+              className="group inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[var(--muted)] no-underline hover:bg-[var(--surface-2)] hover:text-[var(--ink)] transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M7.5 2L3.5 6L7.5 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
+              <span className="font-[family-name:var(--font-jetbrains-mono)] tabular-nums">{prevYear}</span>
+            </ScopedLink>
+          ) : <span />}
+          {nextYear ? (
+            <ScopedLink
+              href={yearHref(nextYear)}
+              className="group inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-[var(--muted)] no-underline hover:bg-[var(--surface-2)] hover:text-[var(--ink)] transition-colors"
+            >
+              <span className="font-[family-name:var(--font-jetbrains-mono)] tabular-nums">{nextYear}</span>
+              <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
+            </ScopedLink>
+          ) : <span />}
+        </nav>
       )}
       </div>
       </div>
