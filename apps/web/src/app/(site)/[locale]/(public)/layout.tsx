@@ -7,7 +7,7 @@ import { LocaleSwitcher } from "./components/LocaleSwitcher";
 import { ScopedLink } from "./components/ScopedLink";
 import Link from "next/link";
 import { SiteHeader } from "./components/SiteHeader";
-import { HeaderLiveTicker } from "./components/HeaderLiveTicker";
+import { HeaderLiveTicker, TopOfPageTicker } from "./components/HeaderLiveTicker";
 import { TickerDataProvider } from "./components/live-ticker-data";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
@@ -63,6 +63,8 @@ export default async function PublicLayout({ children, params }: Props) {
         </div>
         <HeaderLiveTicker />
       </SiteHeader>
+
+      <TopOfPageTicker />
 
       <main className="flex-1">{children}</main>
 

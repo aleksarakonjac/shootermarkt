@@ -167,7 +167,7 @@ function HomepageError({ retry, compact = false }: { retry: () => void; compact?
 }
 
 export function HomepageTickerClient() {
-  // Dok je nešto LIVE, traka je u sticky header-u (HeaderLiveTicker); ovde ostaje samo marquee nadolazećih.
+  // Dok je takmičenje u toku, traka je u layout-u (sticky header ako je LIVE, inače na vrhu stranice); ovde ostaje samo marquee nadolazećih.
   const { state, liveItems, upcomingItems, retry } = useTickerData();
   if (state === "loading") return <div aria-busy="true" className="h-10 animate-pulse bg-[var(--surface)]" />;
   if (state === "error") return <HomepageError retry={retry} compact />;
