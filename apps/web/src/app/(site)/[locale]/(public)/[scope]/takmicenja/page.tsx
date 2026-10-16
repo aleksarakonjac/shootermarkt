@@ -9,11 +9,10 @@ import { ScopedLink } from "../../components/ScopedLink";
 import { Suspense } from "react";
 import "./takmicenja.css";
 import { CompetitionsFilterBar } from "./CompetitionsFilterBar";
-import { ViewToggle } from "./ViewToggle";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
-import { KalendarClient, type CalendarComp } from "../../kalendar/KalendarClient";
-import { asc } from "drizzle-orm";
+import { CompetitionCalendar, type CalendarComp } from "./CompetitionCalendar";
+import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { buildAlternates } from "@/i18n/alternates";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
@@ -213,7 +212,7 @@ function CompRow({
       </div>
 
       {/* Disciplines */}
-      <div className="hidden lg:flex items-center gap-1 shrink-0 flex-wrap justify-end" style={{ maxWidth: "130px" }}>
+      <div className="hidden xl:flex items-center gap-1 shrink-0 flex-wrap justify-end" style={{ maxWidth: "130px" }}>
         {discCodes.slice(0, 4).map((code) => (
           <span
             key={code}
@@ -255,7 +254,7 @@ function CompRow({
 
       {/* Result count */}
       {hasResults && (
-        <span className="hidden xl:block shrink-0 text-[0.65rem] font-semibold text-green-600 dark:text-green-400 font-[family-name:var(--font-jetbrains-mono)] tabular-nums whitespace-nowrap">
+        <span className="hidden 2xl:block shrink-0 text-[0.65rem] font-semibold text-green-600 dark:text-green-400 font-[family-name:var(--font-jetbrains-mono)] tabular-nums whitespace-nowrap">
           ✓ {comp.resultCount}
         </span>
       )}
@@ -285,12 +284,19 @@ function CompRow({
 
 interface Props {
   params: Promise<{ scope: Scope }>;
-  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; archiveAll?: string; when?: string; location?: string }>;
+  searchParams: Promise<{ year?: string; level?: string; q?: string; tag?: string; view?: string; day?: string; archiveAll?: string; when?: string; location?: string }>;
 }
 
 export default async function TakmicenjaPage({ params, searchParams }: Props) {
   const { scope } = await params;
-  const { year, level, q, tag, view, archiveAll, when, location } = await searchParams;
+  const { year, level, q, tag, view, day, archiveAll, when, location } = await searchParams;
+
+  // Stari link ?view=cal: kalendar je sada deo istog ekrana.
+  if (view) {
+    const rest = new URLSearchParams();
+    for (const [k, v] of Object.entries({ year, level, q, tag, day, archiveAll, when, location })) if (v) rest.set(k, v);
+    redirect(`/${scope}/takmicenja${rest.size ? `?${rest.toString()}` : ""}`);
+  }
   const [locale, t] = await Promise.all([getLocale(), getTranslations("competition")]);
 
   const defaultYear  = new Date().getFullYear().toString();
@@ -298,7 +304,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
   const activeLevel  = level && level !== "all"     ? level : "all";
   const activeQ      = q?.trim() ?? "";
   const activeTag    = tag?.trim() ?? "";
-  const activeView     = view === "cal" ? "cal" : "list";
+  const activeDay      = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
   const activeWhen     = when === "past" ? "past" : "upcoming";
   const activeLocation = location?.trim() ?? "";
 
@@ -315,7 +321,8 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
   const sqlFilters = [
     scopeFilter,
     activeQ        ? ilike(competitions.name, `%${activeQ}%`)                          : undefined,
-    activeYear  !== "all" ? ilike(competitions.date, `${activeYear}%`)               : undefined,
+    activeYear  !== "all" && !activeDay ? ilike(competitions.date, `${activeYear}%`)  : undefined,
+    activeDay      ? sql`${competitions.date} <= ${activeDay} AND coalesce(${competitions.dateEnd}, ${competitions.date}) >= ${activeDay}` : undefined,
     activeLevel !== "all" ? eq(competitions.level, activeLevel as CompetitionLevel)  : undefined,
     activeTag      ? sql`${competitions.tags} @> ARRAY[${activeTag}]::varchar[]`     : undefined,
     activeLocation ? ilike(competitions.location, `%${activeLocation}%`)             : undefined,
@@ -367,24 +374,27 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
         dateEnd: competitions.dateEnd,
         location: competitions.location,
         level:   competitions.level,
+        tags:    competitions.tags,
       })
       .from(competitions)
       .where(scopeFilter)
-      .orderBy(asc(competitions.date)),
+      .orderBy(competitions.date),
   ]);
 
   const availableYears = yearRows.map((r) => r.year).filter(Boolean) as string[];
 
   const filtered = rows as CompItem[];
 
-  const calComps: CalendarComp[] = calRows.map((r) => ({
-    id:       r.id,
-    name:     locale === "en" ? (r.nameEn ?? r.name) : (r.nameSr ?? r.name),
-    date:     r.date,
-    dateEnd:  r.dateEnd ?? null,
-    location: r.location ?? null,
-    level:    r.level as CompetitionLevel,
-  }));
+  // Tačke u mreži prate filtere (pretraga, nivo, tag, lokacija) ali ne i godinu, da se vide svi meseci.
+  const qLower = activeQ.toLowerCase();
+  const locLower = activeLocation.toLowerCase();
+  const calComps: CalendarComp[] = calRows
+    .filter((r) =>
+      (!qLower || r.name.toLowerCase().includes(qLower)) &&
+      (activeLevel === "all" || r.level === activeLevel) &&
+      (!activeTag || (r.tags ?? []).includes(activeTag)) &&
+      (!locLower || (r.location ?? "").toLowerCase().includes(locLower)))
+    .map((r) => ({ id: r.id, date: r.date, dateEnd: r.dateEnd ?? null, level: r.level }));
 
   const translatedFiltered = filtered.map((comp) => ({
     ...comp,
@@ -405,7 +415,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
     .filter((c) => c.date < recentCutoffStr)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const isFiltered = activeQ || activeYear !== defaultYear || activeLevel !== "all" || activeTag || activeLocation;
+  const isFiltered = activeQ || activeDay || activeYear !== defaultYear || activeLevel !== "all" || activeTag || activeLocation;
 
   // Hero: live comps OR first-date upcoming group, sorted by level
   const heroItems: (CompItem & { isLive: boolean })[] = !isFiltered
@@ -464,33 +474,49 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
             {t("list.title")}
           </h1>
         </div>
-        <Suspense fallback={<div className="w-[148px] h-9 shrink-0 rounded-lg bg-[var(--surface-2)]" />}>
-          <ViewToggle activeView={activeView} />
-        </Suspense>
       </div>
 
-      {/* Filter bar — list view only */}
-      {activeView === "list" && (
-        <Suspense fallback={<div className="h-20 mb-6" />}>
-          <CompetitionsFilterBar
-            availableYears={availableYears}
-            currentYear={activeYear}
-            currentLevel={activeLevel}
-            currentQ={activeQ}
-            currentTag={activeTag}
-            totalCount={translatedFiltered.length}
-            scope={scope}
-          />
+      {/* Filter bar */}
+      <Suspense fallback={<div className="h-20 mb-6" />}>
+        <CompetitionsFilterBar
+          availableYears={availableYears}
+          currentYear={activeYear}
+          currentLevel={activeLevel}
+          currentQ={activeQ}
+          currentTag={activeTag}
+          currentDay={activeDay}
+          totalCount={translatedFiltered.length}
+          scope={scope}
+        />
+      </Suspense>
+
+      {/* Hybrid: kalendar je filter po danu za listu */}
+      <div className="lg:grid lg:grid-cols-[19.5rem_minmax(0,1fr)] lg:items-start lg:gap-8">
+      <div className="mb-6 lg:mb-0">
+        <Suspense fallback={<div className="h-11 rounded-xl bg-[var(--surface-2)] lg:h-80" />}>
+          <CompetitionCalendar competitions={calComps} selectedDay={activeDay || null} />
         </Suspense>
+      </div>
+      <div className="min-w-0">
+
+      {/* Izabran dan: zamenjuje Nadolazeća/Prošla */}
+      {activeDay && (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="font-[family-name:var(--font-barlow-condensed)] text-xl font-extrabold uppercase text-[var(--ink)]">
+            {formatDate(activeDay, null, locale)} {activeDay.slice(0, 4)}
+          </h2>
+          <ScopedLink
+            href={filterParams()}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-[var(--muted)] hover:text-[var(--brand-primary)] transition-colors"
+          >
+            {locale === "en" ? "Clear day" : "Poništi dan"}
+            <svg width="10" height="10" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" /></svg>
+          </ScopedLink>
+        </div>
       )}
 
-      {/* Calendar view */}
-      {activeView === "cal" && (
-        <KalendarClient competitions={calComps} />
-      )}
-
-      {/* When toggle — list view only */}
-      {activeView === "list" && (
+      {/* When toggle */}
+      {!activeDay && (
         <WhenTabs
           activeWhen={activeWhen}
           upcomingHref={whenHref("upcoming")}
@@ -501,11 +527,11 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
         />
       )}
 
-      {/* List view — empty state (no SQL results) */}
-      {activeView === "list" && translatedFiltered.length === 0 && (
+      {/* Empty state (no SQL results) */}
+      {translatedFiltered.length === 0 && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-20 flex flex-col items-center gap-3">
           <p className="text-sm text-[var(--muted)] text-center max-w-none">
-            {isFiltered ? t("list.noResults") : (locale === "en" ? "No competitions added yet." : "Još nema unetih takmičenja.")}
+            {activeDay ? (locale === "en" ? "No competitions on this day." : "Nema takmičenja za izabrani dan.") : isFiltered ? t("list.noResults") : (locale === "en" ? "No competitions added yet." : "Još nema unetih takmičenja.")}
           </p>
           {isFiltered && (
             <ScopedLink
@@ -518,8 +544,17 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
         </div>
       )}
 
-      {/* List view — filtered results */}
-      {activeView === "list" && translatedFiltered.length > 0 && (
+      {/* Izabran dan: ravna lista */}
+      {activeDay && translatedFiltered.length > 0 && (
+        <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+          {translatedFiltered.map((c, i) => (
+            <CompRow key={c.id} comp={c} isLast={i === translatedFiltered.length - 1} showCountdown={c.date > todayStr} locale={locale} levelLabel={getLevelLabel(c.level, locale)} />
+          ))}
+        </div>
+      )}
+
+      {/* Filtered results */}
+      {!activeDay && translatedFiltered.length > 0 && (
         <div className="space-y-10">
 
           {/* ── UPCOMING TAB ──────────────────────────────────────────── */}
@@ -710,6 +745,8 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
 
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 }

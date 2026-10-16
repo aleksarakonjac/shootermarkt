@@ -189,45 +189,6 @@ html.dark .countdown-chip {
   color: var(--muted);
 }
 
-/* ── List entrance animations ──────────────────────────────── */
-@keyframes kalendar-slide-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.kalendar-list {
-  animation: kalendar-slide-in 0.15s ease-out both;
-}
-
-.kalendar-item {
-  animation: kalendar-slide-in 0.2s ease-out both;
-  animation-delay: calc(min(var(--idx, 0), 8) * 50ms);
-}
-
-/* Don't animate past items to full opacity — keep at 0.6 */
-.kalendar-item.opacity-60 {
-  animation: kalendar-item-past 0.2s ease-out both;
-  animation-delay: calc(min(var(--idx, 0), 8) * 50ms);
-}
-
-@keyframes kalendar-item-past {
-  from { opacity: 0;   transform: translateY(8px); }
-  to   { opacity: 0.6; transform: translateY(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .kalendar-list,
-  .kalendar-item,
-  .kalendar-item.opacity-60 {
-    animation: none;
-    opacity: inherit;
-  }
-
-  .kalendar-item.opacity-60 {
-    opacity: 0.6;
-  }
-}
-
 /* ── Swipe: mreža prati prst (samo dodir) ─────────────────── */
 .kalendar-swipe .react-calendar__viewContainer {
   transform: translateX(var(--drag-x, 0px));
@@ -241,9 +202,34 @@ html.dark .countdown-chip {
   .kalendar-swipe[data-swipe="settle"] .react-calendar__viewContainer { transition: none; }
 }
 
-/* Lista takmičenja: swipe menja mesec */
-.kalendar-list-swipe { touch-action: pan-y; transform: translateX(var(--drag-x, 0px)); }
-.kalendar-list-swipe[data-swipe="settle"] { transition: transform 220ms var(--ease-out); }
+/* ── Mobilna traka: mesec + strelice, otvara punu mrežu ─────── */
+.cal-strip-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  border-radius: 0.5rem;
+  color: var(--ink);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cal-strip-btn:hover { background: var(--surface-2); }
+.cal-strip-chevron { transition: transform var(--dur-fast) var(--ease-out); }
+.cal-strip-chevron[data-open="true"] { transform: rotate(180deg); }
+.cal-collapse {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--dur-base) var(--ease-out);
+}
+.cal-collapse > div { overflow: hidden; min-height: 0; }
+@media (max-width: 1023.98px) {
+  .cal-collapse[data-open="false"] { grid-template-rows: 0fr; }
+  /* Na telefonu navigaciju vodi traka, pa se ugrađena sakriva */
+  .cal-collapse .react-calendar__navigation { display: none; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .kalendar-list-swipe[data-swipe="settle"] { transition: none; }
+  .cal-collapse, .cal-strip-chevron { transition: none; }
 }

@@ -7,5 +7,5 @@ export default async function ScopedKalendarPage({
   params: Promise<{ scope: Scope }>;
 }) {
   const { scope } = await params;
-  redirect(`/${scope}/takmicenja?view=cal`);
+  redirect(`/${scope}/takmicenja`);
 }

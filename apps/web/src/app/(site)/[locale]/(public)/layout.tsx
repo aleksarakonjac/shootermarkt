@@ -117,11 +117,6 @@ export default async function PublicLayout({ children, params }: Props) {
                       {t("competitionList")}
                     </ScopedLink>
                   </li>
-                  <li>
-                    <ScopedLink href="/takmicenja?view=cal" className="text-sm text-[var(--muted)] hover:text-[var(--ink)] transition-colors">
-                      {t("calendar")}
-                    </ScopedLink>
-                  </li>
                 </ul>
               </div>
 

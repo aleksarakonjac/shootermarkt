@@ -303,6 +303,8 @@
     "daysCountShort": "za {count}d",
     "allMonth": "Ceo mesec",
     "competitionPlural": "{count, plural, =1 {# takmičenje} other {# takmičenja}}",
+    "prevMonth": "Prethodni mesec",
+    "nextMonth": "Sledeći mesec",
     "clickHint": "Klikni naziv meseca za pregled godine",
     "legend": {
       "world": "Svetsko",

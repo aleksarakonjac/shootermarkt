@@ -303,6 +303,8 @@
     "daysCountShort": "in {count}d",
     "allMonth": "Whole month",
     "competitionPlural": "{count, plural, =1 {# competition} other {# competitions}}",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
     "clickHint": "Click month name to browse by year",
     "legend": {
       "world": "World",
