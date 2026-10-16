@@ -389,7 +389,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
           <div className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-4 hover:border-[var(--brand-primary)] transition-colors">
             <ScopedLink href={`/takmicenja/${lead.id}`} className="block no-underline">
               <div className="flex items-center gap-2 flex-nowrap">
-                {lead.isLive && <LiveBadge className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</LiveBadge>}
+                {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
                 <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
                   {leadLevelLabel}
                 </span>
@@ -424,7 +424,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   aria-expanded={isExpanded}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--surface-2)] active:bg-[var(--surface-2)] active:scale-[0.995] motion-reduce:active:scale-100 transition-[background-color,transform] duration-150 ease-[var(--ease-out)]"
                 >
-                  {item.isLive && <LiveBadge className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</LiveBadge>}
+                  {item.isLive && <span className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
                   <span className="hidden sm:block shrink-0 text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={rowLevelStyle}>
                     {rowLevelLabel}
                   </span>
