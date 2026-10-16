@@ -48,10 +48,9 @@ function buildNav(t: TFn): NavGroup[] {
     },
     {
       key: "takmicenja",
-      label: t("competitions"),
-      items: [
-        { href: "/takmicenja", label: t("competitionList"),desc: t("competitionListDesc") },
-      ],
+      label: t("competitionList"),
+      directHref: "/takmicenja",
+      items: [],
     },
     {
       key: "vesti",
