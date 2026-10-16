@@ -61,10 +61,10 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
   const firstRow = singleRow ? entries : useFallback ? entries.slice(0, 2) : entries.slice(0, 1);
   const secondRow = singleRow ? [] : useFallback ? entries.slice(2) : entries.slice(1);
   return <div ref={containerRef} className="relative overflow-clip">
-    <div className={`flex items-center gap-x-3 gap-y-1 ${reserveToggleSpace ? "pr-11" : ""} ${singleRow ? "flex-nowrap" : "flex-wrap"}`}>{prefix}{firstRow.map(place)}</div>
+    <div className={`flex items-center gap-x-3 gap-y-1 ${singleRow ? "flex-nowrap" : "flex-wrap"}`}>{prefix}{firstRow.map(place)}</div>
     {secondRow.length > 0 && (
       <div className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
-        <div className="overflow-hidden">
+        <div className={`overflow-hidden ${collapsed ? "[contain:inline-size]" : ""}`}>
           <div className={`mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 transition-opacity duration-150 motion-reduce:transition-none ${collapsed ? "opacity-0" : "opacity-100 delay-75"}`}>
             {secondRow.map((entry, index) => place(entry, useFallback ? index + 2 : index + 1))}
           </div>
@@ -269,7 +269,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                     onClick={() => toggleQual(qualKey)}
                     aria-expanded={qualExpanded}
                     aria-label={qualExpanded ? t("showLessQualificationResults") : t("showMoreQualificationResults", { count: extraQualificationResults })}
-                    className="absolute right-0 top-0 flex size-11 -translate-y-0.5 items-start justify-start pl-2 pt-2 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
+                    className="-mb-[22px] flex min-h-11 shrink-0 -translate-y-0.5 items-start justify-start px-2 pt-2 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
                   >
                     <span className="flex items-center gap-0.5 leading-none">
                     <span>{qualExpanded ? t("showLess") : `+${extraQualificationResults}`}</span>
@@ -296,10 +296,10 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                 }
                 return (
                   <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className="w-full" data-phase-row>
-                    <div className="relative min-w-0 w-fit max-w-full">
+                    <div className="flex min-w-0 w-fit max-w-full items-start">
                       <ScopedLink
                         href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)}
-                        className="block min-w-0 w-fit max-w-full no-underline hover:opacity-80 transition-opacity"
+                        className="block min-w-0 w-fit shrink max-w-full no-underline hover:opacity-80 transition-opacity"
                       >
                         {phase.qualTop3.length > 0 && <InlinePlaces entries={phase.qualTop3} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} reserveToggleSpace={qualToggle != null} collapsed={isCollapsibleQual && !qualExpanded} />}
                       </ScopedLink>
