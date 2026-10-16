@@ -4,7 +4,7 @@ import { routing } from "@/i18n/routing";
 import "../globals.css";
 import { Suspense } from "react";
 import { NavigationProgress } from "@/components/NavigationProgress";
-import { PullToRefresh } from "@/components/PullToRefresh";
+import { PullToRefresh, PULL_CONTENT_ID } from "@/components/PullToRefresh";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
@@ -56,7 +56,7 @@ export default function RootLayout({
         {/* useSearchParams u traci zahteva Suspense da ne bi forsirao dinamički render */}
         <Suspense fallback={null}><NavigationProgress /></Suspense>
         <PullToRefresh />
-        {children}
+        <div id={PULL_CONTENT_ID} className="flex flex-1 flex-col">{children}</div>
       </body>
     </html>
   );

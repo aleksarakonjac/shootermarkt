@@ -13,6 +13,9 @@ import { useUiLocale } from "@/hooks/use-ui-locale";
 
 export const PULL_THRESHOLD = 70;
 const MAX_PULL = 110;
+const SETTLE_MS = 200;
+const RING = 2 * Math.PI * 9;
+export const PULL_CONTENT_ID = "page-content";
 
 /** Otpor: prst prelazi više nego indikator (kao nativni gest). */
 export function pullDistance(dy: number) {
@@ -43,6 +46,22 @@ export function PullToRefresh({ onRefresh = reloadPage }: { onRefresh?: () => vo
   const pullRef = useRef(0);
   const onRefreshRef = useRef(onRefresh);
   useEffect(() => { onRefreshRef.current = onRefresh; }, [onRefresh]);
+
+  // Stranica (a ne indikator) prati prst. Transform stoji samo dok traje gest/osvežavanje,
+  // da ne utiče na fixed elemente u mirovanju.
+  useEffect(() => {
+    const content = document.getElementById(PULL_CONTENT_ID);
+    if (!content) return;
+    if (pull > 0 || refreshing) {
+      content.style.transition = dragging ? "none" : `transform ${SETTLE_MS}ms ease`;
+      content.style.transform = `translateY(${pull}px)`;
+      return;
+    }
+    content.style.transition = `transform ${SETTLE_MS}ms ease`;
+    content.style.transform = "translateY(0)";
+    const timeout = window.setTimeout(() => { content.style.transform = ""; content.style.transition = ""; }, SETTLE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [pull, dragging, refreshing]);
 
   useEffect(() => {
     if (!isStandalone()) return;
@@ -94,26 +113,40 @@ export function PullToRefresh({ onRefresh = reloadPage }: { onRefresh?: () => vo
     };
   }, []);
 
-  if (pull === 0 && !refreshing) return null;
+  const active = pull > 0 || refreshing;
   const ready = pull >= PULL_THRESHOLD;
+  const progress = Math.min(1, pull / PULL_THRESHOLD);
 
+  // Cela stranica klizi nadole i otkriva prazan prostor; indikator živi u tom prostoru.
   return (
     <div
-      role="status"
-      aria-label={en
-        ? (refreshing ? "Refreshing" : ready ? "Release to refresh" : "Pull to refresh")
-        : (refreshing ? "Osvežavanje" : ready ? "Pusti za osvežavanje" : "Povuci za osvežavanje")}
-      className="pointer-events-none fixed left-1/2 z-[var(--z-tooltip)] flex size-9 -translate-x-1/2 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg)] shadow-md"
-      style={{ top: `calc(var(--site-header-h, 3.5rem) + ${pull - 28}px)`, opacity: Math.min(1, pull / PULL_THRESHOLD), transition: dragging ? "none" : "top 200ms ease, opacity 200ms ease" }}
+      role={active ? "status" : undefined}
+      aria-label={active
+        ? (en
+          ? (refreshing ? "Refreshing" : ready ? "Release to refresh" : "Pull to refresh")
+          : (refreshing ? "Osvežavanje" : ready ? "Pusti za osvežavanje" : "Povuci za osvežavanje"))
+        : undefined}
+      aria-hidden={active ? undefined : true}
+      className="pointer-events-none fixed inset-x-0 top-0 flex items-center justify-center overflow-hidden bg-[var(--bg)]"
+      style={{ height: pull, transition: dragging ? "none" : `height ${SETTLE_MS}ms ease` }}
     >
       <svg
-        width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand-primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+        width="28" height="28" viewBox="0 0 24 24" fill="none" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
         className={refreshing ? "animate-spin motion-reduce:animate-none" : undefined}
-        style={refreshing ? undefined : { transform: `rotate(${(pull / PULL_THRESHOLD) * 270}deg)` }}
+        style={{
+          opacity: refreshing ? 1 : progress,
+          transform: refreshing ? undefined : `scale(${0.5 + 0.5 * progress}) rotate(${progress * 270}deg)`,
+          transition: dragging ? "none" : `opacity ${SETTLE_MS}ms ease`,
+        }}
         aria-hidden="true"
       >
-        <path d="M21 12a9 9 0 1 1-3-6.7" />
-        <path d="M21 3v6h-6" />
+        <circle cx="12" cy="12" r="9" stroke="var(--border)" />
+        <circle
+          cx="12" cy="12" r="9" stroke="var(--brand-primary)"
+          strokeDasharray={RING}
+          strokeDashoffset={RING * (refreshing ? 0.7 : 1 - progress)}
+          transform="rotate(-90 12 12)"
+        />
       </svg>
     </div>
   );
