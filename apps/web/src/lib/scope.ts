@@ -5,7 +5,7 @@ export type Scope = 'srb' | 'issf';
 export const VALID_SCOPES: readonly Scope[] = ['srb', 'issf'] as const;
 export const DEFAULT_SCOPE: Scope = 'srb';
 
-export const ISSF_LEVELS = ['continental', 'world', 'olympic'] as const;
+export const ISSF_LEVELS = ['international', 'continental', 'world', 'olympic'] as const;
 
 export function buildCompetitionScopeFilter(scope: Scope) {
   if (scope === 'issf') {

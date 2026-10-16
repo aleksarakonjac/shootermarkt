@@ -17,8 +17,8 @@ export const LEVEL_GROUPS = [
 ] as const;
 export type LevelGroupKey = (typeof LEVEL_GROUPS)[number]["key"];
 
-/** ISSF opseg sadrži samo svetski/olimpijski i kontinentalni nivo. */
-export const ISSF_LEVEL_GROUP_KEYS: readonly LevelGroupKey[] = ["world", "continental"];
+/** ISSF opseg: svetski (uklj. olimpijski), kontinentalni i međunarodni nivo. */
+export const ISSF_LEVEL_GROUP_KEYS: readonly LevelGroupKey[] = ["world", "continental", "international"];
 
 const LEVEL_KEY_BY_LEVEL: Record<string, LevelGroupKey> = Object.fromEntries(
   LEVEL_GROUPS.flatMap((group) => group.levels.map((level) => [level, group.key])),
