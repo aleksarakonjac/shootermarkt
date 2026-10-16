@@ -123,31 +123,33 @@
   color: white !important;
 }
 
-/* ── Level-colored event dots ──────────────────────────────── */
-.tile-has-event::after {
-  content: '';
+/* ── Event dots: jedna tačka po takmičenju, boja po nivou ───── */
+.tile-dots {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.tile-dot {
   display: block;
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  position: absolute;
-  bottom: 5px;
-  left: 50%;
-  transform: translateX(-50%);
+}
+.tile-dot-more {
+  font-size: 7px;
+  line-height: 5px;
+  font-weight: 700;
+  color: var(--subtle);
 }
 
-.tile-level-club::after          { background: var(--level-club-fg); }
-.tile-level-regional::after      { background: var(--level-regional-fg); }
-.tile-level-national::after      { background: var(--level-national-fg); }
-.tile-level-international::after { background: var(--level-international-fg); }
-.tile-level-continental::after   { background: var(--level-continental-fg); }
-.tile-level-world::after         { background: var(--level-world-fg); }
-.tile-level-olympic::after       { background: var(--level-olympic-fg); }
-
-/* Dot on selected tile */
-.react-calendar__tile--active.tile-has-event::after {
-  background: rgba(255, 255, 255, 0.65);
-}
+/* Na izabranom danu (crvena pozadina) tačke postaju bele */
+.react-calendar__tile--active .tile-dot { background: rgba(255, 255, 255, 0.85) !important; }
+.react-calendar__tile--active .tile-dot-more { color: rgba(255, 255, 255, 0.85); }
 
 /* Year/decade/century tiles */
 .react-calendar__year-view,

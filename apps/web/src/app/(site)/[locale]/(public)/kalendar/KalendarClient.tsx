@@ -9,6 +9,10 @@ import { LEVEL_STYLE } from "@/lib/competition-utils";
 import { useTranslations, useLocale } from "next-intl";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
+const MAX_DOTS = 4;
+const LEVEL_ORDER = ["olympic", "world", "continental", "international", "national", "regional", "club"];
+const levelRank = (level: string) => { const i = LEVEL_ORDER.indexOf(level); return i === -1 ? LEVEL_ORDER.length : i; };
+
 export type CalendarComp = {
   id: number;
   name: string;
@@ -204,19 +208,18 @@ export function KalendarClient({ competitions }: Props) {
           }
           formatMonth={(_, date) => t(`months.${date.getMonth()}`)}
           formatShortWeekday={(_, date) => t(`weekdays.${date.getDay()}`)}
-          tileClassName={({ date, view }) => {
+          tileContent={({ date, view }) => {
             if (view !== "month") return null;
-            const key = toKey(date);
-            const dayComps = eventMap.get(key);
-            if (!dayComps) return null;
-            const levels = dayComps.map((c) => c.level);
-            if (levels.some((l) => l === "olympic"))      return "tile-has-event tile-level-olympic";
-            if (levels.some((l) => l === "world"))        return "tile-has-event tile-level-world";
-            if (levels.some((l) => l === "continental"))  return "tile-has-event tile-level-continental";
-            if (levels.some((l) => l === "international"))return "tile-has-event tile-level-international";
-            if (levels.some((l) => l === "national"))     return "tile-has-event tile-level-national";
-            if (levels.some((l) => l === "regional"))     return "tile-has-event tile-level-regional";
-            return "tile-has-event tile-level-club";
+            const dayComps = eventMap.get(toKey(date));
+            if (!dayComps?.length) return null;
+            const dots = dayComps.toSorted((x, y) => levelRank(x.level) - levelRank(y.level));
+            const shown = dots.slice(0, MAX_DOTS);
+            return (
+              <span className="tile-dots" aria-hidden="true">
+                {shown.map((c) => <span key={c.id} className="tile-dot" style={{ background: `var(--level-${c.level}-fg)` }} />)}
+                {dots.length > shown.length && <span className="tile-dot-more">+</span>}
+              </span>
+            );
           }}
           calendarType="iso8601"
           minDetail="year"
