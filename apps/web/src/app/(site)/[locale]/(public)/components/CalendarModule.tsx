@@ -394,15 +394,16 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
         </h3>
         {/* Today: centered in the space between the title and the month nav */}
         <div className="flex min-w-0 flex-1 justify-center">
-          {!isCurrentMonthView && (
-            <button
-              type="button"
-              onClick={goToCurrent}
-              className="rounded border border-white/60 px-2 py-px text-[11px] font-semibold uppercase leading-4 tracking-wide text-white transition-colors hover:bg-white/15"
-            >
-              {locale === "en" ? "Today" : "Danas"}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={goToCurrent}
+            disabled={isCurrentMonthView}
+            tabIndex={isCurrentMonthView ? -1 : undefined}
+            aria-hidden={isCurrentMonthView ? true : undefined}
+            className={`rounded border border-white/60 px-2 py-px text-[11px] font-semibold uppercase leading-4 tracking-wide text-white transition-[opacity,transform,background-color] duration-200 ease-out hover:bg-white/15 active:scale-95 motion-reduce:transition-none ${isCurrentMonthView ? "pointer-events-none scale-75 opacity-0" : "scale-100 opacity-100"}`}
+          >
+            {locale === "en" ? "Today" : "Danas"}
+          </button>
         </div>
         <div className="flex items-center">
           <button
