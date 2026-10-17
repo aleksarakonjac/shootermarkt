@@ -5,8 +5,9 @@ import { fetchAllCalendarEvents, normalizeEventName } from "@/lib/calendar/adapt
 import type { CalendarSource } from "@/lib/calendar/adapters";
 import { detectCompetitionLevel, isRiflePistolCompetition } from "@shootermarkt/adapters/issf/competition-level";
 import { db } from "@shootermarkt/db";
-import { competitions, countries } from "@shootermarkt/db/schema";
+import { competitions, countries, competitionLevelEnum, eventTypeEnum, ageCategoryEnum } from "@shootermarkt/db/schema";
 import { inArray, sql } from "drizzle-orm";
+import { FOCUS_PRIORITY_MAX, FOCUS_PRIORITY_MIN } from "@/lib/competition-priority";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 
 function isAdmin(email: string | undefined) {
@@ -18,6 +19,17 @@ const SOURCE_DEFAULT_LEVEL: Record<CalendarSource, CompetitionLevel | null> = {
   esc:  "continental",
   issf: null,
 };
+
+async function loadCountryLookup() {
+  const rows = await db
+    .select({ id: countries.id, code: countries.code, code2: countries.code2, nocCode: countries.nocCode, name: countries.name })
+    .from(countries);
+  const ids = new Map<string, number>();
+  for (const c of rows) {
+    for (const v of [c.code, c.code2, c.nocCode, c.name]) if (v) ids.set(v.trim().toLowerCase(), c.id);
+  }
+  return (country: string | null | undefined) => ids.get(country?.trim().toLowerCase() ?? "") ?? null;
+}
 
 function buildKey(source: CalendarSource, externalId: string | null, name: string, dateFrom: string | null, year: number): string {
   if (source === "issf" && externalId) return `issf:${externalId}`;
@@ -121,6 +133,7 @@ export async function GET(req: NextRequest) {
   const extTagMap  = new Map(existingExt.map((r) => [r.externalId!, r.tags ?? []]));
 
   const conflictGroups = detectConflictGroups(deduped);
+  const countryIdOf = await loadCountryLookup();
 
   const result = deduped.map((e) => {
     const currentTags: string[] =
@@ -139,6 +152,8 @@ export async function GET(req: NextRequest) {
       dateTo: e.dateTo,
       location: e.location,
       country: e.country,
+      countryId: countryIdOf(e.country),
+      disciplineGroups: groupsFromName(e.name),
       issfId: e.source === "issf" ? e.externalId : null,
       competitionTypeId: e.competitionTypeId ?? null,
       competitionTypeName: e.competitionTypeName ?? null,
@@ -160,15 +175,40 @@ interface CommitEvent {
   key: string;
   source: CalendarSource;
   name: string;
+  nameSr?: string | null;
+  nameEn?: string | null;
   dateFrom: string;
   dateTo: string | null;
   location: string | null;
-  country: string | null;
-  issfId: string | null;
+  locationSr?: string | null;
+  locationEn?: string | null;
+  countryId: number | null;
   level: CompetitionLevel;
+  eventType?: string;
+  ageCategory?: string;
+  focusPriority?: number | null;
+  organizer?: string | null;
+  issfId: string | null;
+  siusId?: string | null;
+  disciplineGroups?: string[];
+  tags?: string[];
 }
 
 const tagMergeSql = sql`array(SELECT DISTINCT unnest(array_cat(${competitions.tags}, EXCLUDED.tags)))`;
+const blank = (v: string | null | undefined) => v?.trim() || null;
+
+function validate(e: CommitEvent): string | null {
+  const label = e.name?.trim() || e.key;
+  if (!e.name?.trim()) return `${e.key}: naziv je obavezan`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.dateFrom ?? "")) return `${label}: datum početka je obavezan`;
+  if (e.dateTo && !/^\d{4}-\d{2}-\d{2}$/.test(e.dateTo)) return `${label}: neispravan datum završetka`;
+  if (e.dateTo && e.dateTo < e.dateFrom) return `${label}: kraj je pre početka`;
+  if (!(competitionLevelEnum.enumValues as readonly string[]).includes(e.level)) return `${label}: nivo nije izabran`;
+  if (e.eventType && !(eventTypeEnum.enumValues as readonly string[]).includes(e.eventType)) return `${label}: nepoznat tip`;
+  if (e.ageCategory && !(ageCategoryEnum.enumValues as readonly string[]).includes(e.ageCategory)) return `${label}: nepoznata kategorija`;
+  if (e.focusPriority != null && (!Number.isInteger(e.focusPriority) || e.focusPriority < FOCUS_PRIORITY_MIN || e.focusPriority > FOCUS_PRIORITY_MAX)) return `${label}: prioritet van opsega`;
+  return null;
+}
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -180,64 +220,81 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nema evenata" }, { status: 400 });
   }
 
-  const toInsert = events.filter((e) => e.dateFrom);
-  if (!toInsert.length) return NextResponse.json({ inserted: 0, skipped: events.length });
+  for (const e of events) {
+    const problem = validate(e);
+    if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+  }
 
-  const countryRows = await db
-    .select({ id: countries.id, code: countries.code, code2: countries.code2, nocCode: countries.nocCode, name: countries.name })
-    .from(countries);
-  const countryIds = new Map<string, number>();
-  for (const country of countryRows) {
-    for (const value of [country.code, country.code2, country.nocCode, country.name]) {
-      if (value) countryIds.set(value.trim().toLowerCase(), country.id);
+  // scius_id is unique but not an upsert target — report clashes instead of a 500 that aborts the batch.
+  const siusIds = events.map((e) => blank(e.siusId)).filter((v): v is string => !!v);
+  if (new Set(siusIds).size !== siusIds.length) {
+    return NextResponse.json({ error: "SIUS UUID se ponavlja u listi" }, { status: 400 });
+  }
+  if (siusIds.length) {
+    const taken = await db.select({ siusId: competitions.siusId, name: competitions.name })
+      .from(competitions).where(inArray(competitions.siusId, siusIds));
+    if (taken.length) {
+      return NextResponse.json({ error: `SIUS UUID već koristi: ${taken.map((t) => t.name).join(", ")}` }, { status: 400 });
     }
   }
 
   const makeValue = (e: CommitEvent) => ({
-    name: e.name,
+    name: e.name.trim(),
+    nameSr: blank(e.nameSr),
+    nameEn: blank(e.nameEn),
     date: e.dateFrom,
     dateEnd: e.dateTo && e.dateTo !== e.dateFrom ? e.dateTo : null,
-    location: e.location ?? null,
-    countryId: countryIds.get(e.country?.trim().toLowerCase() ?? "") ?? null,
+    location: blank(e.location),
+    locationSr: blank(e.locationSr),
+    locationEn: blank(e.locationEn),
+    countryId: e.countryId ?? null,
     level: e.level,
-    organizer: e.source.toUpperCase(),
+    ...(e.eventType ? { eventType: e.eventType as (typeof eventTypeEnum.enumValues)[number] } : {}),
+    ...(e.ageCategory ? { ageCategory: e.ageCategory as (typeof ageCategoryEnum.enumValues)[number] } : {}),
+    focusPriority: e.focusPriority ?? null,
+    organizer: blank(e.organizer) ?? e.source.toUpperCase(),
     externalId: e.key,
-    tags: [e.source] as string[],
-    disciplineGroups: groupsFromName(e.name),
-    ...(e.issfId ? { issfId: e.issfId } : {}),
+    tags: [...new Set([e.source, ...(e.tags ?? []).map((t) => t.trim()).filter(Boolean)])],
+    disciplineGroups: e.disciplineGroups ?? groupsFromName(e.name),
+    siusId: blank(e.siusId),
+    ...(blank(e.issfId) ? { issfId: blank(e.issfId)! } : {}),
   });
 
   // ISSF events: conflict on issf_id (unique column)
-  const issfEvents = toInsert.filter((e) => e.issfId);
+  const issfEvents = events.filter((e) => blank(e.issfId));
   // SSS/ESC events: conflict on external_id (partial unique index)
-  const otherEvents = toInsert.filter((e) => !e.issfId);
+  const otherEvents = events.filter((e) => !blank(e.issfId));
 
   let insertedCount = 0;
 
-  if (issfEvents.length) {
-    const res = await db
-      .insert(competitions)
-      .values(issfEvents.map(makeValue))
-      .onConflictDoUpdate({
-        target: competitions.issfId,
-        set: { tags: tagMergeSql, countryId: sql`COALESCE(${competitions.countryId}, EXCLUDED.country_id)` },
-      })
-      .returning({ id: competitions.id });
-    insertedCount += res.length;
+  try {
+    if (issfEvents.length) {
+      const res = await db
+        .insert(competitions)
+        .values(issfEvents.map(makeValue))
+        .onConflictDoUpdate({
+          target: competitions.issfId,
+          set: { tags: tagMergeSql, countryId: sql`COALESCE(${competitions.countryId}, EXCLUDED.country_id)` },
+        })
+        .returning({ id: competitions.id });
+      insertedCount += res.length;
+    }
+
+    if (otherEvents.length) {
+      const res = await db
+        .insert(competitions)
+        .values(otherEvents.map(makeValue))
+        .onConflictDoUpdate({
+          target: competitions.externalId,
+          targetWhere: sql`${competitions.externalId} IS NOT NULL`,
+          set: { tags: tagMergeSql, countryId: sql`COALESCE(${competitions.countryId}, EXCLUDED.country_id)` },
+        })
+        .returning({ id: competitions.id });
+      insertedCount += res.length;
+    }
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Greška pri upisu" }, { status: 500 });
   }
 
-  if (otherEvents.length) {
-    const res = await db
-      .insert(competitions)
-      .values(otherEvents.map(makeValue))
-      .onConflictDoUpdate({
-        target: competitions.externalId,
-        targetWhere: sql`${competitions.externalId} IS NOT NULL`,
-        set: { tags: tagMergeSql, countryId: sql`COALESCE(${competitions.countryId}, EXCLUDED.country_id)` },
-      })
-      .returning({ id: competitions.id });
-    insertedCount += res.length;
-  }
-
-  return NextResponse.json({ inserted: insertedCount, skipped: toInsert.length - insertedCount });
+  return NextResponse.json({ inserted: insertedCount, skipped: events.length - insertedCount });
 }

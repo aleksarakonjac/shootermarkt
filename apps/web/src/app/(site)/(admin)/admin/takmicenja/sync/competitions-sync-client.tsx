@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { formatDateRangeSr } from "@/lib/date-utils";
+import { SyncRowEditor, type Country, type Draft } from "./sync-row-editor";
 
 interface SyncEvent {
   key: string;
@@ -13,6 +14,8 @@ interface SyncEvent {
   dateTo: string | null;
   location: string | null;
   country: string | null;
+  countryId: number | null;
+  disciplineGroups: string[];
   issfId: string | null;
   competitionTypeId: number | null;
   competitionTypeName: string | null;
@@ -114,6 +117,51 @@ function LevelPill({
   );
 }
 
+function toDraft(e: SyncEvent): Draft {
+  return {
+    name: e.name,
+    nameSr: "",
+    nameEn: "",
+    dateFrom: e.dateFrom ?? "",
+    dateTo: e.dateTo ?? "",
+    location: e.location ?? "",
+    locationSr: "",
+    locationEn: "",
+    countryId: e.countryId == null ? "" : String(e.countryId),
+    level: e.detectedLevel ?? "",
+    eventType: "other",
+    ageCategory: "open",
+    focusPriority: "",
+    organizer: e.source.toUpperCase(),
+    issfId: e.issfId ?? "",
+    siusId: "",
+    disciplineGroups: e.disciplineGroups,
+    tags: [],
+  };
+}
+
+const sameDraft = (a: Draft, b: Draft) => JSON.stringify(a) === JSON.stringify(b);
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" aria-hidden="true" className={`shrink-0 transition-transform duration-150 motion-reduce:transition-none ${open ? "rotate-90" : ""}`}>
+      <path d="M3.5 2L6.5 5L3.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function RowStatus({ e, hasSourceTag }: { e: SyncEvent; hasSourceTag: boolean }) {
+  if (!e.alreadyInDb) return <span className="text-[0.7rem] text-[var(--subtle)]">Novi</span>;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {e.currentTags.map((t) => (
+        <span key={t} className={`rounded px-1.5 py-0.5 text-[0.65rem] font-semibold font-[family-name:var(--font-jetbrains-mono)] ${SOURCE_COLORS[t] ?? "bg-gray-100 text-gray-600"}`}>{t.toUpperCase()}</span>
+      ))}
+      {!hasSourceTag && <span className="text-[0.65rem] font-medium text-blue-700">+ {e.source.toUpperCase()} tag</span>}
+    </div>
+  );
+}
+
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
 
@@ -122,7 +170,7 @@ type Source = typeof ALL_SOURCES[number];
 
 const SOURCE_LABELS: Record<Source, string> = { issf: "ISSF", sss: "SSS", esc: "ESC" };
 
-export function CompetitionsSyncClient() {
+export function CompetitionsSyncClient({ countries }: { countries: Country[] }) {
   const [year, setYear] = useState(CURRENT_YEAR);
   const [activeSources, setActiveSources] = useState<Set<Source>>(new Set(ALL_SOURCES));
   const [events, setEvents] = useState<SyncEvent[]>([]);
@@ -132,7 +180,9 @@ export function CompetitionsSyncClient() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [levelOverrides, setLevelOverrides] = useState<Record<string, CompetitionLevel>>({});
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [baseline, setBaseline] = useState<Record<string, Draft>>({});
+  const [open, setOpen] = useState<Set<string>>(new Set());
 
   function toggleSource(s: Source) {
     setActiveSources((prev) => {
@@ -150,14 +200,19 @@ export function CompetitionsSyncClient() {
     setError(null);
     setResult(null);
     setSelected(new Set());
-    setLevelOverrides({});
+    setDrafts({});
+    setBaseline({});
+    setOpen(new Set());
     setLoaded(false);
     try {
       const sources = [...activeSources].join(",");
       const res = await fetch(`/api/admin/competitions/sync?year=${year}&sources=${sources}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Greška");
+      const initial = Object.fromEntries((data as SyncEvent[]).map((e) => [e.key, toDraft(e)]));
       setEvents(data);
+      setDrafts(initial);
+      setBaseline(initial);
       setLoaded(true);
 
       // Per conflict group: keep only highest-priority source selected
@@ -193,7 +248,12 @@ export function CompetitionsSyncClient() {
   }
 
   function getEffectiveLevel(e: SyncEvent): CompetitionLevel | null {
-    return levelOverrides[e.key] ?? e.detectedLevel;
+    return (drafts[e.key]?.level || null) as CompetitionLevel | null;
+  }
+
+  function isComplete(e: SyncEvent) {
+    const d = drafts[e.key];
+    return !!d && d.name.trim() !== "" && d.dateFrom !== "" && d.level !== "";
   }
 
   function toggle(key: string) {
@@ -204,18 +264,34 @@ export function CompetitionsSyncClient() {
     });
   }
 
-  function setOverride(key: string, level: CompetitionLevel) {
-    setLevelOverrides((prev) => ({ ...prev, [key]: level }));
-    setSelected((prev) => new Set([...prev, key]));
+  function toggleOpen(key: string) {
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) { next.delete(key); } else { next.add(key); }
+      return next;
+    });
+  }
+
+  function patchDraft(key: string, patch: Partial<Draft>) {
+    const next = { ...drafts[key], ...patch };
+    setDrafts((prev) => ({ ...prev, [key]: next }));
+    // Editing a row opts it in to the import once it has name, start date and level.
+    if (next.name.trim() && next.dateFrom && next.level) setSelected((prev) => new Set([...prev, key]));
+    else setSelected((prev) => { const n = new Set(prev); n.delete(key); return n; });
+  }
+
+  function resetDraft(e: SyncEvent) {
+    setDrafts((prev) => ({ ...prev, [e.key]: baseline[e.key] }));
   }
 
   // Rows that need action: new ones, OR in DB but missing current source tag
   const needsAction = events.filter((e) =>
     !e.alreadyInDb || !e.currentTags.includes(e.source)
   );
-  const allSelectableKeys = needsAction.filter((e) => getEffectiveLevel(e) !== null).map((e) => e.key);
+  const allSelectableKeys = needsAction.filter(isComplete).map((e) => e.key);
   const allSelected = allSelectableKeys.length > 0 && allSelectableKeys.every((k) => selected.has(k));
-  const unknownCount = needsAction.filter((e) => e.detectedLevel === null).length;
+  const unknownCount = needsAction.filter((e) => !drafts[e.key]?.level).length;
+  const editedCount = events.filter((e) => drafts[e.key] && baseline[e.key] && !sameDraft(drafts[e.key], baseline[e.key])).length;
   const tagAddCount = events.filter((e) => e.alreadyInDb && !e.currentTags.includes(e.source)).length;
   const conflictGroupIds = new Set(events.map((e) => e.conflictGroupId).filter(Boolean));
   const conflictCount = conflictGroupIds.size;
@@ -257,8 +333,32 @@ export function CompetitionsSyncClient() {
 
   async function handleCommit() {
     const toCommit = events
-      .filter((e) => selected.has(e.key) && e.dateFrom)
-      .map((e) => ({ ...e, level: getEffectiveLevel(e)! }));
+      .filter((e) => selected.has(e.key) && isComplete(e))
+      .map((e) => {
+        const d = drafts[e.key];
+        return {
+          key: e.key,
+          source: e.source,
+          name: d.name,
+          nameSr: d.nameSr,
+          nameEn: d.nameEn,
+          dateFrom: d.dateFrom,
+          dateTo: d.dateTo || null,
+          location: d.location,
+          locationSr: d.locationSr,
+          locationEn: d.locationEn,
+          countryId: d.countryId ? Number(d.countryId) : null,
+          level: d.level as CompetitionLevel,
+          eventType: d.eventType,
+          ageCategory: d.ageCategory,
+          focusPriority: d.focusPriority === "" ? null : Number(d.focusPriority),
+          organizer: d.organizer,
+          issfId: d.issfId.trim() || null,
+          siusId: d.siusId.trim() || null,
+          disciplineGroups: d.disciplineGroups,
+          tags: d.tags,
+        };
+      });
     if (!toCommit.length) return;
     setSyncing(true);
     setError(null);
@@ -281,7 +381,7 @@ export function CompetitionsSyncClient() {
   }
 
   return (
-    <div className="max-w-5xl">
+    <div className="max-w-6xl">
       <div className="mb-6">
         <h1
           className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase tracking-tight text-[var(--ink)]"
@@ -379,6 +479,9 @@ export function CompetitionsSyncClient() {
                   · {unknownCount} bez nivoa — izaberi ručno
                 </span>
               )}
+              {editedCount > 0 && (
+                <span className="text-xs font-medium text-[var(--brand-primary)]">· {editedCount} izmenjeno</span>
+              )}
               {conflictCount > 0 && (
                 <span className="text-orange-600 text-xs font-medium">
                   · {conflictCount} potencijalnih duplikata — proveri
@@ -396,122 +499,104 @@ export function CompetitionsSyncClient() {
             )}
           </div>
 
-          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="rounded-xl border border-[var(--border)]">
             {events.length === 0 ? (
               <div className="py-12 text-center text-sm text-[var(--muted)]">Nema takmičenja za {year}.</div>
             ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                    <th className="w-10 px-3 py-2.5">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={toggleAll}
-                        disabled={allSelectableKeys.length === 0}
-                        className="accent-[var(--brand-primary)]"
-                      />
-                    </th>
-                    <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Izvor</th>
-                    <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Naziv</th>
-                    <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Tip</th>
-                    <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Nivo</th>
-                    <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Datum</th>
-                    <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Lokacija</th>
-                    <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {displayEvents.map((e) => {
-                    const effectiveLevel = getEffectiveLevel(e);
+              <>
+                <div className="hidden items-center gap-3 rounded-t-xl border-b border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] md:grid md:grid-cols-[2.25rem_3.5rem_minmax(0,1fr)_9rem_13rem_10rem_6rem]">
+                  <input
+                    type="checkbox"
+                    aria-label="Izaberi sva"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    disabled={allSelectableKeys.length === 0}
+                    className="accent-[var(--brand-primary)]"
+                  />
+                  <span>Izvor</span>
+                  <span>Naziv</span>
+                  <span>Nivo</span>
+                  <span>Datum</span>
+                  <span>Lokacija</span>
+                  <span>Status</span>
+                </div>
+                <ul className="divide-y divide-[var(--border)]">
+                  {displayEvents.map((e, idx) => {
+                    const d = drafts[e.key];
+                    if (!d) return null;
                     const hasSourceTag = e.currentTags.includes(e.source);
                     const fullyDone = e.alreadyInDb && hasSourceTag;
-                    const canSelect = !fullyDone && effectiveLevel !== null;
+                    const complete = isComplete(e);
+                    const canSelect = !fullyDone && complete;
                     const isConflict = !!e.conflictGroupId;
+                    const isOpen = open.has(e.key);
+                    const edited = !sameDraft(d, baseline[e.key]);
+                    const panelId = `sync-row-${idx}`;
+                    const countryName = countries.find((c) => String(c.id) === d.countryId)?.name ?? e.country;
                     return (
-                      <tr
-                        key={e.key}
-                        className={`transition-colors border-l-2 ${
-                          fullyDone
-                            ? "opacity-35 border-l-transparent"
-                            : isConflict
-                            ? "border-l-orange-400 bg-orange-50/40 hover:bg-orange-50 cursor-pointer"
-                            : "border-l-transparent hover:bg-[var(--surface)] cursor-pointer"
-                        }`}
-                        onClick={() => canSelect && toggle(e.key)}
-                      >
-                        <td className="px-3 py-2.5 text-center">
+                      <li key={e.key} className={`${isConflict && !fullyDone ? "bg-orange-50/40" : ""} ${isOpen ? "bg-[var(--surface)]" : ""}`}>
+                        <div className={`grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0 px-3 py-1 md:grid-cols-[2.25rem_3.5rem_minmax(0,1fr)_9rem_13rem_10rem_6rem] ${fullyDone ? "opacity-40" : ""}`}>
                           <input
                             type="checkbox"
+                            aria-label={`Izaberi: ${d.name}`}
                             checked={selected.has(e.key)}
                             disabled={!canSelect}
                             onChange={() => toggle(e.key)}
-                            onClick={(ev) => ev.stopPropagation()}
-                            className="accent-[var(--brand-primary)]"
+                            className="accent-[var(--brand-primary)] md:col-start-1"
                           />
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <span className={`text-[0.7rem] font-semibold px-2 py-0.5 rounded font-[family-name:var(--font-jetbrains-mono)] ${SOURCE_COLORS[e.source]}`}>
-                            {SOURCE_LABELS[e.source]}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 font-medium text-[var(--ink)] max-w-[220px]">
-                          <span className="line-clamp-2">{e.name}</span>
-                          {isConflict && (
-                            <span className="block text-[0.65rem] text-orange-600 font-medium mt-0.5">
-                              ⚠ moguć duplikat
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 min-w-[140px]">
-                          {e.competitionTypeName ? (
-                            <span className="text-xs text-[var(--ink)]">
-                              {e.competitionTypeName}{" "}
-                              <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.7rem] text-[var(--muted)]">
-                                ({e.competitionTypeAcronym})
+                          <span className={`hidden w-fit rounded px-2 py-0.5 text-[0.7rem] font-semibold md:col-start-2 md:row-start-1 md:inline-block font-[family-name:var(--font-jetbrains-mono)] ${SOURCE_COLORS[e.source]}`}>{SOURCE_LABELS[e.source]}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleOpen(e.key)}
+                            disabled={e.alreadyInDb}
+                            aria-expanded={isOpen}
+                            aria-controls={panelId}
+                            className="col-start-2 row-start-1 flex min-h-11 min-w-0 items-center gap-2 py-1 text-left disabled:cursor-default md:col-start-3"
+                          >
+                            <span className="shrink-0 text-[var(--muted)]">{!e.alreadyInDb && <Chevron open={isOpen} />}</span>
+                            <span className="min-w-0">
+                              <span className="line-clamp-2 text-sm font-medium text-[var(--ink)]">{d.name || "(bez naziva)"}</span>
+                              <span className="flex flex-wrap items-center gap-x-2 text-[0.7rem] font-medium">
+                                {e.competitionTypeName && <span className="text-[var(--muted)]">{e.competitionTypeName}{e.competitionTypeAcronym ? ` (${e.competitionTypeAcronym})` : ""}</span>}
+                                {isConflict && !fullyDone && <span className="text-orange-700">moguć duplikat</span>}
+                                {edited && <span className="text-[var(--brand-primary)]">izmenjeno</span>}
+                                {!complete && !fullyDone && <span className="text-amber-700">nepotpuno</span>}
                               </span>
                             </span>
-                          ) : (
-                            <span className="text-xs text-[var(--subtle)]">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <LevelPill
-                            value={effectiveLevel}
-                            onChange={(v) => setOverride(e.key, v)}
-                            disabled={e.alreadyInDb}
+                          </button>
+                          <div className="col-start-3 row-start-1 md:col-start-4">
+                            <LevelPill value={getEffectiveLevel(e)} onChange={(v) => patchDraft(e.key, { level: v })} disabled={e.alreadyInDb} />
+                          </div>
+                          <span className="hidden font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] md:col-start-5 md:row-start-1 md:block">{formatDateRangeSr(d.dateFrom || null, d.dateTo || null)}</span>
+                          <span className="hidden text-xs text-[var(--muted)] md:col-start-6 md:row-start-1 md:block">{[d.location, countryName && countryName !== "SRB" ? countryName : null].filter(Boolean).join(", ")}</span>
+                          <div className="hidden md:col-start-7 md:row-start-1 md:block">
+                            <RowStatus e={e} hasSourceTag={hasSourceTag} />
+                          </div>
+                          {/* Mobile meta line */}
+                          <div className="col-start-2 col-span-2 row-start-2 flex flex-wrap items-center gap-x-3 gap-y-1 pb-2 pl-5 text-xs text-[var(--muted)] md:hidden">
+                            <span className={`rounded px-1.5 py-0.5 text-[0.65rem] font-semibold font-[family-name:var(--font-jetbrains-mono)] ${SOURCE_COLORS[e.source]}`}>{SOURCE_LABELS[e.source]}</span>
+                            <span className="font-[family-name:var(--font-jetbrains-mono)]">{formatDateRangeSr(d.dateFrom || null, d.dateTo || null)}</span>
+                            <span>{[d.location, countryName && countryName !== "SRB" ? countryName : null].filter(Boolean).join(", ")}</span>
+                            <RowStatus e={e} hasSourceTag={hasSourceTag} />
+                          </div>
+                        </div>
+                        {isOpen && !e.alreadyInDb && (
+                          <SyncRowEditor
+                            id={panelId}
+                            draft={d}
+                            source={e.source}
+                            countries={countries}
+                            sourceCountry={e.country}
+                            edited={edited}
+                            onChange={(patch) => patchDraft(e.key, patch)}
+                            onReset={() => resetDraft(e)}
                           />
-                        </td>
-                        <td className="px-3 py-2.5 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] whitespace-nowrap">
-                          {formatDateRangeSr(e.dateFrom, e.dateTo)}
-                        </td>
-                        <td className="px-3 py-2.5 text-[var(--muted)] text-xs">
-                          {e.location ?? ""}
-                          {e.country && e.country !== "SRB" ? `, ${e.country}` : ""}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {e.alreadyInDb ? (
-                            <div className="flex flex-col gap-1">
-                              <div className="flex flex-wrap gap-1">
-                                {e.currentTags.map((t) => (
-                                  <span key={t} className={`text-[0.65rem] font-semibold px-1.5 py-0.5 rounded font-[family-name:var(--font-jetbrains-mono)] ${SOURCE_COLORS[t] ?? "bg-gray-100 text-gray-600"}`}>
-                                    {t.toUpperCase()}
-                                  </span>
-                                ))}
-                              </div>
-                              {!hasSourceTag && (
-                                <span className="text-[0.65rem] text-blue-600 font-medium">+ {e.source.toUpperCase()} tag</span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-[0.7rem] text-[var(--subtle)]">Novi</span>
-                          )}
-                        </td>
-                      </tr>
+                        )}
+                      </li>
                     );
                   })}
-                </tbody>
-              </table>
+                </ul>
+              </>
             )}
           </div>
         </>
