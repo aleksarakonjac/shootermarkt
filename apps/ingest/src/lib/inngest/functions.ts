@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
-import { issfDirectImportJobs, issfImportJobs, pdfImportJobs, shooters, clubs } from "@shootermarkt/db/schema";
+import { issfDirectImportJobs, issfImportJobs, issfRefreshJobs, pdfImportJobs, shooters, clubs } from "@shootermarkt/db/schema";
+import { createIssfRefreshJob, needsIssfRefresh, refreshShooter } from "@shootermarkt/adapters/issf/sync";
 import { importIssfNation } from "@shootermarkt/adapters/issf/import-nation";
 import {
   extractMixedTeamEvents,
@@ -169,6 +170,70 @@ export const processIssfImport = inngest.createFunction(
       .returning({ status: issfImportJobs.status });
     if (updated?.status === "processing") await inngest.send({ name: "issf-import/next", data: { jobId } });
     return { noc, current, total: job.total };
+  }
+);
+
+const ISSF_REFRESH_BATCH = 25;
+const ISSF_REFRESH_CONCURRENCY = 5;
+
+/** Jedan batch strelaca po pozivu; lanac preko "issf-refresh/next" dok ima posla. */
+export const processIssfRefresh = inngest.createFunction(
+  {
+    id: "process-issf-refresh",
+    retries: 2,
+    concurrency: { limit: 1 },
+    triggers: [{ event: "issf-refresh/queued" }, { event: "issf-refresh/next" }],
+    onFailure: async ({ event, error }) => {
+      const jobId = Number(event.data.event.data.jobId);
+      if (Number.isInteger(jobId)) {
+        await db.update(issfRefreshJobs).set({ status: "failed", error: error.message, completedAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(issfRefreshJobs.id, jobId), inArray(issfRefreshJobs.status, ["queued", "processing"])));
+      }
+    },
+  },
+  async ({ event }) => {
+    const jobId = event.data.jobId;
+    const [job] = await db.select().from(issfRefreshJobs).where(eq(issfRefreshJobs.id, jobId));
+    if (!job || job.status === "cancelled" || job.status === "completed" || job.status === "failed") return { skipped: true };
+
+    await db.update(issfRefreshJobs).set({ status: "processing", startedAt: job.startedAt ?? new Date(), updatedAt: new Date() })
+      .where(and(eq(issfRefreshJobs.id, jobId), inArray(issfRefreshJobs.status, ["queued", "processing"])));
+
+    const batch = await db.select().from(shooters)
+      .where(needsIssfRefresh(job.createdAt))
+      .orderBy(sql`${shooters.issfSyncedAt} asc nulls first`, shooters.id)
+      .limit(ISSF_REFRESH_BATCH);
+
+    const outcomes: Awaited<ReturnType<typeof refreshShooter>>[] = [];
+    for (let i = 0; i < batch.length; i += ISSF_REFRESH_CONCURRENCY) {
+      outcomes.push(...await Promise.all(batch.slice(i, i + ISSF_REFRESH_CONCURRENCY).map(refreshShooter)));
+    }
+
+    const done = batch.length < ISSF_REFRESH_BATCH;
+    const [updated] = await db.update(issfRefreshJobs)
+      .set({
+        processed: sql`${issfRefreshJobs.processed} + ${batch.length}`,
+        updated: sql`${issfRefreshJobs.updated} + ${outcomes.filter((o) => o === "updated").length}`,
+        linked: sql`${issfRefreshJobs.linked} + ${outcomes.filter((o) => o === "linked").length}`,
+        status: done ? "completed" : "processing",
+        completedAt: done ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(issfRefreshJobs.id, jobId), eq(issfRefreshJobs.status, "processing")))
+      .returning({ status: issfRefreshJobs.status });
+    if (updated?.status === "processing") await inngest.send({ name: "issf-refresh/next", data: { jobId } });
+    return { processed: batch.length, done };
+  }
+);
+
+/** Nedeljni refresh — hvata nove slike i strelce koje je live cron napravio bez issfId. */
+export const scheduleIssfRefresh = inngest.createFunction(
+  { id: "schedule-issf-refresh", triggers: [{ cron: "0 4 * * 1" }] },
+  async () => {
+    const job = await createIssfRefreshJob();
+    if (!job?.created) return { skipped: true, activeJobId: job?.id ?? null };
+    await inngest.send({ name: "issf-refresh/queued", data: { jobId: job.id } });
+    return job;
   }
 );
 

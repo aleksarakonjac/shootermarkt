@@ -11,6 +11,7 @@
     "./sius/public-adapter": "./src/sius/public-adapter.ts",
     "./issf/adapter": "./src/issf/adapter.ts",
     "./issf/import-nation": "./src/issf/import-nation.ts",
+    "./issf/sync": "./src/issf/sync.ts",
     "./issf/competition-level": "./src/issf/competition-level.ts",
     "./pdf-import/gemini-adapter": "./src/pdf-import/gemini-adapter.ts",
     "./pdf-import/parse-import": "./src/pdf-import/parse-import.ts",

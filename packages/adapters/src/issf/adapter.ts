@@ -186,7 +186,7 @@ const API_LIMIT = 300;
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const PREFIX_CONCURRENCY = 8;
 
-async function searchRaw(query: string, signal?: AbortSignal): Promise<ISSFAthlete[]> {
+export async function searchRaw(query: string, signal?: AbortSignal): Promise<ISSFAthlete[]> {
   const res = await fetch(
     `${ISSF_API}/athletes?search=${encodeURIComponent(query)}`,
     { cache: "no-store", signal }

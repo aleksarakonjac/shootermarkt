@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { ReviewRow } from "@shootermarkt/db/pdf-import-types";
+import { IssfLookup } from "@/components/ui/IssfLookup";
 
 type ShooterHit = { id: number; firstName: string; lastName: string; nationality: string | null; clubName: string | null };
 
@@ -101,9 +102,10 @@ export function UnmatchedPanel({ rows, onRowChange }: Props) {
   const [profiles, setProfiles] = useState<Record<string, CreateProfile>>({});
   const [linked, setLinked] = useState<Record<string, ShooterHit>>({});
   const [applied, setApplied] = useState<Set<string>>(new Set());
-  const [issfLoading, setIssfLoading] = useState<Record<string, boolean>>({});
+  const [issfLoading, setIssfLoading] = useState<Record<string, string>>({});
   const [issfImported, setIssfImported] = useState<Record<string, ImportedShooter>>({});
   const [issfError, setIssfError] = useState<Record<string, string>>({});
+  const [lookupOpen, setLookupOpen] = useState<Record<string, boolean>>({});
 
   const unmatched: UnmatchedShooter[] = [];
   const seen = new Set<string>();
@@ -145,15 +147,16 @@ export function UnmatchedPanel({ rows, onRowChange }: Props) {
     setProfiles((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
   }
 
-  async function importFromIssf(u: UnmatchedShooter) {
-    if (!u.issfId) return;
-    setIssfLoading((prev) => ({ ...prev, [u.key]: true }));
+  // issfId: iz rezultata (ISSF/SIUS) ili izabran kroz ISSF lookup po imenu
+  async function importFromIssf(u: UnmatchedShooter, issfId = u.issfId) {
+    if (!issfId) return;
+    setIssfLoading((prev) => ({ ...prev, [u.key]: issfId }));
     setIssfError((prev) => { const n = { ...prev }; delete n[u.key]; return n; });
     try {
       const res = await fetch("/api/admin/issf/athletes/import-one", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ issfId: u.issfId, nationCode: u.teamNoc }),
+        body: JSON.stringify({ issfId, nationCode: u.teamNoc }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Import failed");
@@ -282,6 +285,15 @@ export function UnmatchedPanel({ rows, onRowChange }: Props) {
                         {fetchingIssf ? "Preuzimam…" : "⬇ Preuzmi sa ISSF"}
                       </button>
                     )}
+                    {!u.issfId && (
+                      <button
+                        onClick={() => setLookupOpen((prev) => ({ ...prev, [u.key]: !prev[u.key] }))}
+                        className="px-3 py-1 rounded-md text-xs font-semibold transition-colors border"
+                        style={{ background: "oklch(0.95 0.04 260)", borderColor: "oklch(0.7 0.12 260)", color: "oklch(0.3 0.12 260)" }}
+                      >
+                        🔍 Traži u ISSF
+                      </button>
+                    )}
                     {(["link", "create", "skip"] as const).map((a) => (
                       <button
                         key={a}
@@ -297,6 +309,19 @@ export function UnmatchedPanel({ rows, onRowChange }: Props) {
                       </button>
                     ))}
                   </div>
+
+                  {lookupOpen[u.key] && !u.issfId && (
+                    <div className="rounded-lg border border-[var(--border)] p-3 bg-[var(--surface)]">
+                      <IssfLookup
+                        firstName={u.firstName}
+                        lastName={u.lastName}
+                        noc={u.teamNoc}
+                        pickLabel="Uvezi i poveži"
+                        busyId={issfLoading[u.key]}
+                        onPick={(c) => importFromIssf(u, c.issfId)}
+                      />
+                    </div>
+                  )}
 
                   {issfError[u.key] && (
                     <p className="text-xs" style={{ color: "var(--error)" }}>ISSF greška: {issfError[u.key]}</p>

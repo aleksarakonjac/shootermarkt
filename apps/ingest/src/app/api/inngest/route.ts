@@ -4,7 +4,9 @@ import {
   cleanupExpiredPdfImports,
   processIssfDirectImport,
   processIssfImport,
+  processIssfRefresh,
   processPdfImport,
+  scheduleIssfRefresh,
 } from "@/lib/inngest/functions";
 
 export const maxDuration = 300;
@@ -16,5 +18,7 @@ export const { GET, POST, PUT } = serve({
     cleanupExpiredPdfImports,
     processIssfImport,
     processIssfDirectImport,
+    processIssfRefresh,
+    scheduleIssfRefresh,
   ],
 });

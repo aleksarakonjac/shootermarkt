@@ -327,6 +327,8 @@ export const shooters = pgTable(
     supabaseUserId: text("supabase_user_id").unique(),
     issfId: varchar("issf_id", { length: 50 }).unique(),
     siusAthleteId: varchar("sius_athlete_id", { length: 50 }).unique(),
+    // Last ISSF refresh attempt (profile fill or name auto-link); NULL = never
+    issfSyncedAt: timestamp("issf_synced_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [
@@ -658,6 +660,24 @@ export const issfDirectImportJobs = pgTable(
   (t) => [index("issf_direct_import_jobs_status_idx").on(t.status)]
 );
 
+
+export const issfRefreshJobs = pgTable(
+  "issf_refresh_jobs",
+  {
+    id: serial("id").primaryKey(),
+    status: varchar("status", { length: 20 }).notNull().default("queued"),
+    total: integer("total").notNull(),
+    processed: integer("processed").notNull().default(0),
+    updated: integer("updated").notNull().default(0),
+    linked: integer("linked").notNull().default(0),
+    error: text("error"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    startedAt: timestamp("started_at"),
+    completedAt: timestamp("completed_at"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [index("issf_refresh_jobs_status_idx").on(t.status)]
+);
 
 // ── Competition Schedule ──────────────────────────────────────────────────────
 

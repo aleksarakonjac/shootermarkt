@@ -8,6 +8,7 @@ import { DatePicker } from "@/components/ui/DatePicker";
 import { NocDropdown } from "@/components/ui/NocDropdown";
 import { GenderDropdown } from "@/components/ui/GenderDropdown";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
+import { IssfLookup } from "@/components/ui/IssfLookup";
 
 interface ShooterData {
   id: number;
@@ -73,6 +74,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
   const [verifying, startVerifying] = useTransition();
   const [flash, setFlash] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const [clubs, setClubs] = useState(initialClubs);
+  const [issfBusy, setIssfBusy] = useState<string | null>(null);
 
   useEffect(() => {
     if (!flash || flash.type === "err") return;
@@ -165,7 +167,28 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
     });
   }
 
-  const anyBusy = saving || deleting || verifying;
+  // Poveži sa ISSF (ili osveži već povezanog): upiše issfId, popuni prazna polja + avatar
+  async function linkIssf(issfId: string) {
+    setIssfBusy(issfId);
+    try {
+      const res = await fetch(`/api/admin/shooters/${shooter.id}/issf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issfId }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setFlash({ type: "err", msg: d.shooterId ? `${d.error} — spoji ručno (/admin/strelci/${d.shooterId})` : d.error ?? "Greška" });
+      } else {
+        setFlash({ type: "ok", msg: d.updated.length ? `ISSF: ažurirano ${d.updated.join(", ")}` : "ISSF: nema novih podataka" });
+        router.refresh();
+      }
+    } finally {
+      setIssfBusy(null);
+    }
+  }
+
+  const anyBusy = saving || deleting || verifying || !!issfBusy;
 
   return (
     <div className="max-w-4xl">
@@ -402,6 +425,35 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
             </button>
           )}
         </div>
+      </section>
+
+      {/* ISSF */}
+      <section className="mb-10">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-4">ISSF</h2>
+        {shooter.issfId ? (
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)]">{shooter.issfId}</span>
+            <button
+              onClick={() => linkIssf(shooter.issfId!)}
+              disabled={anyBusy}
+              className="rounded-md border border-[var(--border)] px-4 py-1.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors disabled:opacity-50"
+            >
+              {issfBusy ? "Osvežavam…" : "Osveži sa ISSF"}
+            </button>
+          </div>
+        ) : (
+          <div className="max-w-xl">
+            <p className="text-xs text-[var(--muted)] mb-2">Strelac nije povezan sa ISSF. Pronađi ga po imenu da povučeš datum rođenja, oružje i sliku.</p>
+            <IssfLookup
+              firstName={shooter.firstName}
+              lastName={shooter.lastName}
+              noc={shooter.nationality}
+              pickLabel="Poveži"
+              busyId={issfBusy}
+              onPick={(c) => linkIssf(c.issfId)}
+            />
+          </div>
+        )}
       </section>
 
       {/* Results */}

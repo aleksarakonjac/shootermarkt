@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 
@@ -16,6 +16,7 @@ interface ISSFAthlete {
 }
 
 interface BulkResult { noc: string; inserted: number; skipped: number; total: number }
+interface IssfRefreshJob { id: number; status: "queued" | "processing" | "completed" | "cancelled" | "failed"; total: number; processed: number; updated: number; linked: number; error: string | null; completedAt: string | null }
 interface IssfImportJob { id: number; status: "queued" | "processing" | "completed" | "cancelled" | "failed"; current: number; total: number; currentNoc: string | null; inserted: number; skipped: number; error: string | null }
 
 export function ISSFAthleteImportClient() {
@@ -33,38 +34,37 @@ export function ISSFAthleteImportClient() {
   const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
   const [selectedNoc, setSelectedNoc] = useState("SRB");
 
-  // Enrich existing shooters
-  const [enrichRunning, setEnrichRunning] = useState(false);
-  const [enrichProgress, setEnrichProgress] = useState<{ processed: number; enriched: number; done: boolean } | null>(null);
-  const enrichAbortRef = useRef(false);
+  // ISSF refresh postojećih (Inngest job, progres po strelcima)
+  const [refreshJob, setRefreshJob] = useState<IssfRefreshJob | null>(null);
+  const refreshActive = refreshJob?.status === "queued" || refreshJob?.status === "processing";
 
-  async function handleEnrich() {
-    enrichAbortRef.current = false;
-    setEnrichRunning(true);
-    setEnrichProgress({ processed: 0, enriched: 0, done: false });
-    let offset = 0;
-    let totalEnriched = 0;
-    let totalProcessed = 0;
-    while (!enrichAbortRef.current) {
-      try {
-        const res = await fetch("/api/admin/issf/athletes/enrich", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ batchSize: 20, offset }),
-        });
-        const data = await res.json();
-        if (!res.ok) break;
-        totalEnriched  += data.enriched;
-        totalProcessed += data.processed;
-        setEnrichProgress({ processed: totalProcessed, enriched: totalEnriched, done: data.done });
-        if (data.done) break;
-        offset += 20;
-        await new Promise((r) => setTimeout(r, 500));
-      } catch {
-        break;
-      }
-    }
-    setEnrichRunning(false);
+  useEffect(() => {
+    fetch("/api/admin/issf/refresh-jobs").then((r) => r.ok ? r.json() : null).then(setRefreshJob).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!refreshActive || !refreshJob) return;
+    const id = refreshJob.id;
+    const interval = window.setInterval(async () => {
+      const res = await fetch(`/api/admin/issf/refresh-jobs/${id}`).catch(() => null);
+      if (res?.ok) setRefreshJob(await res.json());
+    }, 1500);
+    return () => window.clearInterval(interval);
+  }, [refreshActive, refreshJob?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function startRefresh() {
+    setError(null);
+    const res = await fetch("/api/admin/issf/refresh-jobs", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) return setError(data.error ?? "Pokretanje nije uspelo");
+    const jobRes = await fetch(`/api/admin/issf/refresh-jobs/${data.id}`);
+    if (jobRes.ok) setRefreshJob(await jobRes.json());
+  }
+
+  async function stopRefresh() {
+    if (!refreshJob) return;
+    const res = await fetch(`/api/admin/issf/refresh-jobs/${refreshJob.id}`, { method: "PATCH" });
+    if (res.ok) setRefreshJob({ ...refreshJob, status: "cancelled" });
   }
 
   // Scan all
@@ -316,43 +316,47 @@ export function ISSFAthleteImportClient() {
         )}
       </div>
 
-      {/* Enrich existing shooters */}
+      {/* ISSF refresh postojećih */}
       <div className="rounded-xl border border-[var(--border)] p-4 mb-5 max-w-lg">
-        <p className="text-sm font-semibold text-[var(--ink)] mb-1">Ažuriraj postojeće strelce</p>
+        <p className="text-sm font-semibold text-[var(--ink)] mb-1">Osveži postojeće strelce sa ISSF</p>
         <p className="text-xs text-[var(--muted)] mb-3">
-          Dohvata pun datum rođenja i oružje (puška/pištolj) sa ISSF profila za sve strelce koji imaju ISSF ID.
+          Popunjava prazna polja (slika, datum rođenja, oružje, pol) za povezane strelce, a strelce bez ISSF ID-a
+          (npr. iz live SIUS uvoza) automatski povezuje kada je pogodak po imenu jedinstven. Radi u pozadini — možeš zatvoriti stranicu. Automatski svakog ponedeljka.
         </p>
-        {enrichRunning ? (
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-[var(--muted)]">
-                Obrađeno <span className="font-semibold text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{enrichProgress?.processed}</span>
-                {" · "}ažurirano <span className="font-semibold text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{enrichProgress?.enriched}</span>
+        {refreshJob && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1.5 text-xs text-[var(--muted)]">
+              <span>
+                <span className="font-semibold text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{refreshJob.processed}/{refreshJob.total}</span>
+                {" · "}ažurirano <span className="font-semibold text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{refreshJob.updated}</span>
+                {" · "}povezano <span className="font-semibold text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{refreshJob.linked}</span>
               </span>
-              <button
-                onClick={() => { enrichAbortRef.current = true; }}
-                className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
-              >
-                Zaustavi
-              </button>
+              <span style={{ color: refreshJob.status === "failed" ? "var(--error)" : refreshJob.status === "completed" ? "var(--success)" : undefined }}>
+                {{ queued: "u redu", processing: "radi", completed: "gotovo", cancelled: "zaustavljeno", failed: "greška" }[refreshJob.status]}
+              </span>
             </div>
             <div className="h-1 rounded-full bg-[var(--surface-2)] overflow-hidden">
-              <div className="h-full rounded-full bg-[var(--brand-primary)] animate-pulse" style={{ width: "100%" }} />
+              <div
+                className="h-full rounded-full bg-[var(--brand-primary)] transition-[width]"
+                style={{ width: `${Math.min(100, (refreshJob.processed / Math.max(1, refreshJob.total)) * 100)}%` }}
+              />
             </div>
+            {refreshJob.error && <p className="text-xs mt-1.5" style={{ color: "var(--error)" }}>{refreshJob.error}</p>}
           </div>
-        ) : enrichProgress?.done ? (
-          <div className="text-sm">
-            <span className="font-semibold" style={{ color: "var(--success)" }}>Gotovo</span>
-            <span className="text-[var(--muted)] ml-2">
-              {enrichProgress.enriched} ažurirano od {enrichProgress.processed} strelaca
-            </span>
-          </div>
+        )}
+        {refreshActive ? (
+          <button
+            onClick={stopRefresh}
+            className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)] transition-colors"
+          >
+            Zaustavi
+          </button>
         ) : (
           <button
-            onClick={handleEnrich}
+            onClick={startRefresh}
             className="w-full rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
           >
-            Pokreni ažuriranje
+            Pokreni osvežavanje
           </button>
         )}
       </div>
