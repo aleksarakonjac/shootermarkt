@@ -122,28 +122,6 @@ type Source = typeof ALL_SOURCES[number];
 
 const SOURCE_LABELS: Record<Source, string> = { issf: "ISSF", sss: "SSS", esc: "ESC" };
 
-// Brzi uvoz: ISSF tipovi 1 = Svetski kup, 2 = Finale svetskog kupa, 3 = Svetsko prvenstvo, 5 = Evropsko prvenstvo.
-const QUICK_TYPE_IDS = new Set([1, 2, 3, 5]);
-const QUICK_YEARS = [CURRENT_YEAR - 1, CURRENT_YEAR];
-
-/** Podrazumevani izbor: novi (ili bez taga izvora) sa poznatim nivoom, bez gubitnika u grupi duplikata. */
-function autoSelectKeys(data: SyncEvent[]): Set<string> {
-  const groupBest = new Map<string, { priority: number; key: string }>();
-  for (const e of data) {
-    if (!e.conflictGroupId) continue;
-    const cur = groupBest.get(e.conflictGroupId);
-    if (!cur || e.conflictPriority < cur.priority) groupBest.set(e.conflictGroupId, { priority: e.conflictPriority, key: e.key });
-  }
-  const conflictLoserKeys = new Set(
-    data.filter((e) => e.conflictGroupId && groupBest.get(e.conflictGroupId)?.key !== e.key).map((e) => e.key),
-  );
-  return new Set(
-    data
-      .filter((e) => e.detectedLevel !== null && (!e.alreadyInDb || !e.currentTags.includes(e.source)) && !conflictLoserKeys.has(e.key))
-      .map((e) => e.key),
-  );
-}
-
 export function CompetitionsSyncClient() {
   const [year, setYear] = useState(CURRENT_YEAR);
   const [activeSources, setActiveSources] = useState<Set<Source>>(new Set(ALL_SOURCES));
@@ -182,36 +160,31 @@ export function CompetitionsSyncClient() {
       setEvents(data);
       setLoaded(true);
 
-      setSelected(autoSelectKeys(data as SyncEvent[]));
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
+      // Per conflict group: keep only highest-priority source selected
+      const groupBest = new Map<string, { priority: number; key: string }>();
+      for (const e of data as SyncEvent[]) {
+        if (!e.conflictGroupId) continue;
+        const cur = groupBest.get(e.conflictGroupId);
+        if (!cur || e.conflictPriority < cur.priority) {
+          groupBest.set(e.conflictGroupId, { priority: e.conflictPriority, key: e.key });
+        }
+      }
+      const conflictLoserKeys = new Set(
+        (data as SyncEvent[])
+          .filter((e) => e.conflictGroupId && groupBest.get(e.conflictGroupId)?.key !== e.key)
+          .map((e) => e.key)
+      );
 
-  /** Jednim klikom: ISSF svetski kupovi, svetska i evropska prvenstva za prošlu i tekuću godinu. */
-  async function quickLoad() {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    setSelected(new Set());
-    setLevelOverrides({});
-    setLoaded(false);
-    try {
-      const batches = await Promise.all(QUICK_YEARS.map(async (y) => {
-        const res = await fetch(`/api/admin/competitions/sync?year=${y}&sources=issf`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? `Greška za ${y}`);
-        return data as SyncEvent[];
-      }));
-      const data = batches.flat()
-        .filter((e) => e.competitionTypeId != null && QUICK_TYPE_IDS.has(e.competitionTypeId))
-        .sort((a, b) => (a.dateFrom ?? "").localeCompare(b.dateFrom ?? ""));
-      setActiveSources(new Set(["issf"]));
-      setEvents(data);
-      setLoaded(true);
-      setSelected(autoSelectKeys(data));
+      // Auto-select: new with level, missing source tag, not a conflict loser
+      setSelected(new Set(
+        (data as SyncEvent[])
+          .filter((e) =>
+            e.detectedLevel !== null &&
+            (!e.alreadyInDb || !e.currentTags.includes(e.source)) &&
+            !conflictLoserKeys.has(e.key)
+          )
+          .map((e) => e.key)
+      ));
     } catch (e) {
       setError(String(e));
     } finally {
@@ -332,24 +305,6 @@ export function CompetitionsSyncClient() {
           )}
         </div>
       )}
-
-      {/* Brzi uvoz */}
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 mb-5 flex flex-wrap items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-[var(--ink)]">Brzi uvoz iz ISSF</p>
-          <p className="text-xs text-[var(--muted)] mt-0.5">
-            Svetski kupovi (uklj. finale), svetska i evropska prvenstva za {QUICK_YEARS.join(" i ")}. Već uvezena se preskaču.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={quickLoad}
-          disabled={loading}
-          className="rounded-md px-5 py-2 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50"
-        >
-          {loading ? "Učitavam..." : "Učitaj ISSF događaje"}
-        </button>
-      </div>
 
       {/* Controls */}
       <div className="rounded-xl border border-[var(--border)] p-5 mb-5 flex flex-wrap gap-6 items-end">
