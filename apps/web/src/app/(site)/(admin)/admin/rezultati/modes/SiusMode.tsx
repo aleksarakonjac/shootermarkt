@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { ReviewRow, CommitPayload } from "@shootermarkt/db/pdf-import-types";
 import type { SiusFinalEntry } from "@/app/api/admin/sius/public-import/route";
-import { mergeSiusFinals } from "@/lib/sius-import";
+import { mergeSiusFinals } from "@/lib/sius-merge";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
 import { MixedTeamQualTable, MixedTeamFinalsTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
