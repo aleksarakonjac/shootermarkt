@@ -131,11 +131,13 @@ export async function applyIssfProfile(shooterId: number, issfId: string): Promi
  * ne protivreči nacionalnosti ni godištu. Inače ništa — admin ručno.
  */
 export async function autoLinkShooter(s: { id: number; firstName: string; lastName: string; nationality: string | null; birthYear: number | null }): Promise<string[] | null> {
+  // Bez nacionalnosti nema dovoljno signala za automatsko povezivanje — samo ručno
+  if (!s.nationality) return null;
   const candidates = await lookupIssfAthletes(s.firstName, s.lastName, s.nationality);
   const exact = candidates.filter((c) =>
     c.match === "exact" &&
     !c.existingShooterId &&
-    (!s.nationality || c.nationCode === s.nationality) &&
+    c.nationCode === s.nationality &&
     (!s.birthYear || !c.birthYear || c.birthYear === s.birthYear)
   );
   if (exact.length !== 1) return null;
