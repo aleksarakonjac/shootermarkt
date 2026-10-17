@@ -1,16 +1,26 @@
-import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, MIXED_TEAM_CODES } from "@shootermarkt/adapters/sius/public-adapter";
+import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, MIXED_TEAM_CODES, type SiusExtraRemarks } from "@shootermarkt/adapters/sius/public-adapter";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
-import type { ReviewRow } from "@shootermarkt/db/pdf-import-types";
+import type { ReviewRow, StageRemarks } from "@shootermarkt/db/pdf-import-types";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
 import { buildSiusFinalDetails } from "@/lib/final-detail";
 import { matchShooter } from "@shootermarkt/db/name-match";
 
 const SUPPORTED_CODES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW"] as const;
 
-export interface SiusFinalEntry {
+/** Only the non-empty penalty / shoot-off / record marks, or undefined when there are none. */
+export function stageRemarks(r: SiusExtraRemarks): StageRemarks | undefined {
+  const out: StageRemarks = {};
+  if (r.penalty) out.penalty = r.penalty;
+  if (r.shootOff) out.shootOff = r.shootOff;
+  if (r.record) out.record = r.record;
+  return Object.keys(out).length ? out : undefined;
+}
+
+export interface SiusFinalEntry extends SiusExtraRemarks {
   disciplineCode: string;
-  rank: number;
+  rank: number | null; // null = DSQ/DNS without a rank
+  remark: string | null;
   firstName: string;
   lastName: string;
   nation: string;
@@ -38,7 +48,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   let siusData: Awaited<ReturnType<typeof fetchLiveSiusResults>> = new Map();
   if (codes.length > 0) {
     try {
-      siusData = await fetchLiveSiusResults(siusId, codes);
+      siusData = await fetchLiveSiusResults(siusId, codes, { includeUnranked: true });
     } catch (e) {
       throw new SiusImportError(`SIUS fetch failed: ${e}`, 502);
     }
@@ -47,7 +57,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   let mixedData: Awaited<ReturnType<typeof fetchLiveSiusMixedTeamResults>> = new Map();
   if (mixedCodes.length > 0) {
     try {
-      mixedData = await fetchLiveSiusMixedTeamResults(siusId, mixedCodes);
+      mixedData = await fetchLiveSiusMixedTeamResults(siusId, mixedCodes, { includeUnranked: true });
     } catch (e) {
       throw new SiusImportError(`SIUS mixed-team fetch failed: ${e}`, 502);
     }
@@ -83,12 +93,14 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         teamNoc: r.nation,
         disciplineCode: code,
         category: "senior",
-        qualTotal: r.total,
-        qualInners: r.inners,
-        qualRank: r.rank,
+        // Unranked (DSQ/DNS) rows have no real score — null, not 0, so they never count as a result.
+        qualTotal: r.rank === null ? null : r.total,
+        qualInners: r.rank === null ? null : r.inners,
+        qualRank: r.rank ?? undefined,
         qualSeries: r.series.length > 0 ? r.series : undefined,
         qualified: null,
         remark: r.remark,
+        remarkDetails: stageRemarks(r) ? { qual: stageRemarks(r) } : undefined,
         finalTotal: null,
         finalRank: null,
         warning: shooterId ? undefined : "Novi strelac — biće kreiran",
@@ -106,7 +118,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
               r.firstName.toLowerCase() === e.firstName.toLowerCase())
         );
         if (!row) {
-          if (data.qual.length > 0) continue; // qual exists but shooter not found — skip
+          if (data.qual.length > 0 && e.rank !== null) continue; // qual exists but shooter not found — skip (DSQ/DNS stay visible)
           const match = matchShooter(e.firstName, e.lastName, e.nation, allShooters);
           const shooterId = match.kind === "exact" ? match.id : undefined;
           row = {
@@ -129,10 +141,13 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         }
         if (row.elimRound == null || round > row.elimRound) {
           row.elimRound = round;
-          row.elimTotal = Math.round(e.total);
+          row.elimTotal = e.rank === null ? null : Math.round(e.total);
           row.elimInners = e.inners;
-          row.elimRank = e.rank;
+          row.elimRank = e.rank ?? undefined;
           row.elimSeries = e.series.length > 0 ? e.series.map(Math.round) : null;
+          row.elimRemark = e.remark;
+          const elimExtra = stageRemarks(e);
+          if (elimExtra) row.remarkDetails = { ...row.remarkDetails, elim: elimExtra };
         }
       }
     }
@@ -151,6 +166,10 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
       finalEntries.push({
         disciplineCode,
         rank: f.rank,
+        remark: f.remark,
+        penalty: f.penalty,
+        shootOff: f.shootOff,
+        record: f.record,
         firstName: f.firstName,
         lastName: f.lastName,
         nation: f.nation,
@@ -186,9 +205,10 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         teamNumber: nextTeamNumber(r.nocCode),
         disciplineCode,
         qualRank: r.rank,
-        qualTotal: r.total,
+        qualTotal: r.rank === null ? null : r.total,
         inners: r.inners,
-        qualRemark: r.remark,
+        qualRemark: r.statusRemark, // short mark only (qual_remark is varchar(10)); the penalty text goes to remarkDetails
+        qualExtras: stageRemarks(r),
         qualified: r.qualified,
         finalRank: null,
         finalTotal: null,
@@ -212,8 +232,9 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
       const existing = byKey.get(key);
       if (existing) {
         existing.finalRank = r.rank;
-        existing.finalTotal = r.total;
+        existing.finalTotal = r.rank === null ? null : r.total;
         existing.finalRemark = r.remark;
+        existing.finalExtras = stageRemarks(r);
         existing.mFinalSeries = r.athletes[0]?.series ?? [];
         existing.fFinalSeries = r.athletes[1]?.series ?? [];
       } else {
@@ -229,8 +250,9 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
           qualRemark: null,
           qualified: true,
           finalRank: r.rank,
-          finalTotal: r.total,
+          finalTotal: r.rank === null ? null : r.total,
           finalRemark: r.remark,
+          finalExtras: stageRemarks(r),
           mIssfId: a1?.siusAthleteId ?? null,
           mLastName: a1?.lastName ?? "",
           mFirstName: a1?.firstName ?? "",
@@ -255,6 +277,17 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   return { rows, finalEntries, teamEntries, eventCount: siusData.size + mixedData.size, errors };
 }
 
+const finalMarks = (f: SiusFinalEntry) => ({
+  finalTotal: f.rank === null ? null : f.total,
+  finalRank: f.rank,
+  finalRemark: f.remark,
+  finalShootOff: f.shootOff ? true : null,
+});
+const withFinal = (existing: ReviewRow["remarkDetails"], f: SiusFinalEntry) => {
+  const extra = stageRemarks(f);
+  return extra ? { ...existing, final: extra } : existing;
+};
+
 /** Merges SIUS finals into qualification rows (shared by admin UI and CLI import). */
 export function mergeSiusFinals(rows: ReviewRow[], finalEntries: SiusFinalEntry[]): ReviewRow[] {
   const activeFinals = finalEntries.filter((f) => !f.skip);
@@ -263,7 +296,7 @@ export function mergeSiusFinals(rows: ReviewRow[], finalEntries: SiusFinalEntry[
   // svake serije (lib/final-detail.ts), umesto čistih zbirova serija.
   const finalFields = new Map<SiusFinalEntry, Pick<ReviewRow, "finalCumulative" | "finalSeriesLabels" | "finalRanks">>();
   for (const code of new Set(activeFinals.map((f) => f.disciplineCode))) {
-    const finalists = activeFinals.filter((f) => f.disciplineCode === code && f.series.length > 0).sort((a, b) => a.rank - b.rank);
+    const finalists = activeFinals.filter((f) => f.disciplineCode === code && f.series.length > 0).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
     buildSiusFinalDetails(code, finalists).forEach((detail, i) => finalFields.set(finalists[i], {
       finalCumulative: detail.cumulative ?? null,
       finalSeriesLabels: detail.seriesLabels ?? null,
@@ -282,8 +315,8 @@ export function mergeSiusFinals(rows: ReviewRow[], finalEntries: SiusFinalEntry[
     return {
       ...r,
       qualified: true,
-      finalTotal: f.total,
-      finalRank: f.rank,
+      ...finalMarks(f),
+      remarkDetails: withFinal(r.remarkDetails, f),
       ...finalFields.get(f),
     };
   });
@@ -309,8 +342,8 @@ export function mergeSiusFinals(rows: ReviewRow[], finalEntries: SiusFinalEntry[
         qualTotal: null,
         qualInners: null,
         qualified: true,
-        finalTotal: f.total,
-        finalRank: f.rank,
+        ...finalMarks(f),
+        remarkDetails: withFinal(undefined, f),
         ...finalFields.get(f),
       });
     }

@@ -1,3 +1,8 @@
+/** Dodatne SIUS/ISSF oznake jedne faze: tekst kazne, shoot-off ("SO", "+10", "+1+1+3"), rekord ("WR", "QWR"…). */
+export type StageRemarks = { penalty?: string; shootOff?: string; record?: string };
+/** Oznake po fazi; kvalifikacije/eliminacije/finale su odvojeni nastupi. */
+export type RemarkDetails = { qual?: StageRemarks; elim?: StageRemarks; final?: StageRemarks };
+
 export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "ARMT" | "APMT" | "R3PM" | "R3PW" | "SPW";
 export const MIXED_TEAM_CODES = ["ARMT", "APMT"] as const;
 export type MixedTeamCode = typeof MIXED_TEAM_CODES[number];
@@ -199,6 +204,12 @@ export interface ReviewRow {
 
   /** ISSF/SIUS remark: RPO, DSQ, DNS, DNF, SO */
   remark?: string | null;
+  /** Remark eliminacije, odvojen od `remark` kvalifikacija. */
+  elimRemark?: string | null;
+  /** Remark finala (DSQ/DNS/DNF…), odvojen od `remark` kvalifikacija. */
+  finalRemark?: string | null;
+  /** Kazna / shoot-off / rekord po fazi (SIUS). */
+  remarkDetails?: RemarkDetails;
 
   /** UI controls */
   skip?: boolean;

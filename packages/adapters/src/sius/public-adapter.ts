@@ -19,8 +19,19 @@ export interface SiusSubEvent {
   hidden: boolean;
 }
 
-export interface SiusLiveResult {
-  rank: number;
+/** Extra per-row SIUS marks: PenaltyRemark text, ShootOffRemark ("SO", "+10", "+1+1+3"), RecordRemark ("WR", "QWR"…). */
+export interface SiusExtraRemarks {
+  penalty: string | null;
+  shootOff: string | null;
+  record: string | null;
+}
+
+/** `includeUnranked`: also return DSQ/DNS rows that SIUS leaves without a rank (live cron leaves them out). */
+export interface FetchOpts { includeUnranked?: boolean }
+
+export interface SiusLiveResult extends SiusExtraRemarks {
+  /** null = SIUS gave no rank (DSQ/DNS rows). Such rows carry a status remark and total 0. */
+  rank: number | null;
   displayName: string;
   firstName: string;
   lastName: string;
@@ -96,7 +107,8 @@ export async function fetchSiusSubEventsAll(
 export async function fetchSiusSeries(
   compUuid: string,
   eventUuid: string,
-  subEventUuid: string
+  subEventUuid: string,
+  opts: FetchOpts = {}
 ): Promise<SiusLiveResult[]> {
   const raw = await pub<RawSeries | RawSeries[]>(
     `/series?runningCompetitionId=${compUuid}` +
@@ -108,8 +120,11 @@ export async function fetchSiusSeries(
   const data: RawSeries = Array.isArray(raw) ? (raw[0] ?? {}) : raw;
   const rows = data["Series-Individual"] ?? [];
   return rows.flatMap((row) => {
-    const rank = parseInt(row.Rank?.DisplayText ?? "", 10);
-    if (isNaN(rank)) return [];
+    const parsedRank = parseInt(row.Rank?.DisplayText ?? "", 10);
+    const rank = isNaN(parsedRank) ? null : parsedRank;
+    const extensions = row.Result?.Extensions ?? [];
+    // Unranked rows are kept only when SIUS marks a status (DSQ/DNS/DNF); otherwise they are in-progress noise.
+    if (rank === null && !(opts.includeUnranked && extensions.some((e) => e.Key === "StatusRemark"))) return [];
 
     const athlete = row.AthletesSeries?.[0];
     if (!athlete) return [];
@@ -121,11 +136,12 @@ export async function fetchSiusSeries(
     const series = parseSeriesTotals(athlete.Series ?? []);
 
     const { firstName, lastName } = splitDisplayName(row.DisplayName ?? "");
-    const { qualified, remark } = parseRemark(row.Result?.Extensions ?? []);
+    const { qualified, remark, ...extra } = parseRemark(extensions);
 
     return [
       {
         rank,
+        ...extra,
         displayName: row.DisplayName ?? "",
         firstName,
         lastName,
@@ -171,7 +187,8 @@ function elimRoundNumber(name: string, fallback: number): number {
  */
 export async function fetchLiveSiusResults(
   compUuid: string,
-  disciplineCodes: string[]
+  disciplineCodes: string[],
+  opts: FetchOpts = {}
 ): Promise<Map<string, SiusLiveData>> {
   const out = new Map<string, SiusLiveData>();
 
@@ -199,20 +216,23 @@ export async function fetchLiveSiusResults(
       // Fetch ALL qual sub-events in parallel and merge (R3P has multiple relays)
       const qualResults = await Promise.all(
         qualSubs.map((sub) =>
-          fetchSiusSeries(compUuid, event.runningId, sub.runningId).catch(() => [])
+          fetchSiusSeries(compUuid, event.runningId, sub.runningId, opts).catch(() => [])
         )
       );
       data.qual.push(...qualResults.flat());
       // Re-rank merged qual by total desc
       if (qualSubs.length > 1 && data.qual.length > 0) {
-        data.qual.sort((a, b) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0));
-        data.qual.forEach((r, i) => { r.rank = i + 1; });
+        const ranked = data.qual.filter((r) => r.rank !== null);
+        const unranked = data.qual.filter((r) => r.rank === null);
+        ranked.sort((a, b) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0));
+        ranked.forEach((r, i) => { r.rank = i + 1; });
+        data.qual = [...ranked, ...unranked];
       }
 
       // Elimination rounds (one per sub-event, ordered by round number), fetched in parallel
       const elimResults = await Promise.all(
         elimSubs.map((sub, i) =>
-          fetchSiusSeries(compUuid, event.runningId, sub.runningId)
+          fetchSiusSeries(compUuid, event.runningId, sub.runningId, opts)
             .then((r) => ({ round: elimRoundNumber(sub.name, i + 1), results: r }))
             .catch(() => ({ round: elimRoundNumber(sub.name, i + 1), results: [] as SiusLiveResult[] }))
         )
@@ -224,7 +244,7 @@ export async function fetchLiveSiusResults(
       // Final sub-event
       if (finalSub) {
         try {
-          data.final = await fetchSiusSeries(compUuid, event.runningId, finalSub.runningId);
+          data.final = await fetchSiusSeries(compUuid, event.runningId, finalSub.runningId, opts);
         } catch { /* ignore */ }
       }
 
@@ -256,13 +276,14 @@ export interface SiusTeamAthlete {
   series: number[];
 }
 
-export interface SiusTeamResult {
-  rank: number;
+export interface SiusTeamResult extends SiusExtraRemarks {
+  rank: number | null; // null = no rank from SIUS (DSQ/DNS)
   nocCode: string;
   total: number;
   inners: number | null; // APMT qual only — ARMT and any final is plain decimal
   qualified: boolean;
   remark: string | null;
+  statusRemark: string | null;
   athletes: SiusTeamAthlete[]; // ordered by TeamIndex, len 2
 }
 
@@ -299,18 +320,26 @@ function parseTeamValue(value: string): { total: number; inners: number | null }
 function parseTeamRemark(extensions: Array<{ Key: string; Value: string }>): {
   qualified: boolean;
   remark: string | null;
-} {
+  /** Short mark only (DSQ/DNS/DNF/RPO) — fits qual_remark; `remark` below may be a long penalty sentence. */
+  statusRemark: string | null;
+} & SiusExtraRemarks {
   const byKey = Object.fromEntries(extensions.map((e) => [e.Key, e.Value]));
+  const statusRemark = byKey.StatusRemark ?? byKey.ShooterGroupRemark ?? null;
   return {
     qualified: byKey.QualificationRemark === "Q",
     remark: byKey.StatusRemark ?? byKey.PenaltyRemark ?? byKey.ShooterGroupRemark ?? null,
+    statusRemark,
+    penalty: byKey.PenaltyRemark ?? null,
+    shootOff: byKey.ShootOffRemark ?? null,
+    record: byKey.RecordRemark ?? null,
   };
 }
 
 async function fetchSiusTeamSeries(
   compUuid: string,
   eventUuid: string,
-  subEventUuid: string
+  subEventUuid: string,
+  opts: FetchOpts = {}
 ): Promise<SiusTeamResult[]> {
   const raw = await pub<RawTeamSeries | RawTeamSeries[]>(
     `/series?runningCompetitionId=${compUuid}` +
@@ -322,8 +351,10 @@ async function fetchSiusTeamSeries(
   const data: RawTeamSeries = Array.isArray(raw) ? (raw[0] ?? {}) : raw;
   const rows = data["Series-TeamOfIndividuals"] ?? [];
   return rows.flatMap((row) => {
-    const rank = parseInt(row.Rank?.DisplayText ?? "", 10);
-    if (isNaN(rank)) return [];
+    const parsedRank = parseInt(row.Rank?.DisplayText ?? "", 10);
+    const rank = isNaN(parsedRank) ? null : parsedRank;
+    const teamExt = row.Result?.Extensions ?? [];
+    if (rank === null && !(opts.includeUnranked && teamExt.some((e) => e.Key === "StatusRemark"))) return [];
 
     const { total, inners } = parseTeamValue(row.Result?.Value ?? "");
     const athletes: SiusTeamAthlete[] = (row.AthletesSeries ?? [])
@@ -350,7 +381,7 @@ async function fetchSiusTeamSeries(
         total,
         inners,
         athletes,
-        ...parseTeamRemark(row.Result?.Extensions ?? []),
+        ...parseTeamRemark(teamExt),
       },
     ];
   });
@@ -362,7 +393,8 @@ async function fetchSiusTeamSeries(
  *  have blank trailing series instead of a separate elim sub-event. */
 export async function fetchLiveSiusMixedTeamResults(
   compUuid: string,
-  disciplineCodes: string[]
+  disciplineCodes: string[],
+  opts: FetchOpts = {}
 ): Promise<Map<string, SiusMixedTeamData>> {
   const out = new Map<string, SiusMixedTeamData>();
 
@@ -386,18 +418,21 @@ export async function fetchLiveSiusMixedTeamResults(
 
       const qualResults = await Promise.all(
         qualSubs.map((sub) =>
-          fetchSiusTeamSeries(compUuid, event.runningId, sub.runningId).catch(() => [])
+          fetchSiusTeamSeries(compUuid, event.runningId, sub.runningId, opts).catch(() => [])
         )
       );
       data.qual.push(...qualResults.flat());
       if (qualSubs.length > 1 && data.qual.length > 0) {
-        data.qual.sort((a, b) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0));
-        data.qual.forEach((r, i) => { r.rank = i + 1; });
+        const ranked = data.qual.filter((r) => r.rank !== null);
+        const unranked = data.qual.filter((r) => r.rank === null);
+        ranked.sort((a, b) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0));
+        ranked.forEach((r, i) => { r.rank = i + 1; });
+        data.qual = [...ranked, ...unranked];
       }
 
       if (finalSub) {
         try {
-          data.final = await fetchSiusTeamSeries(compUuid, event.runningId, finalSub.runningId);
+          data.final = await fetchSiusTeamSeries(compUuid, event.runningId, finalSub.runningId, opts);
         } catch { /* ignore */ }
       }
 
@@ -431,11 +466,14 @@ function parseSeriesTotals(
 function parseRemark(extensions: Array<{ Key: string; Value: string }>): {
   qualified: boolean;
   remark: string | null;
-} {
+} & SiusExtraRemarks {
   const byKey = Object.fromEntries(extensions.map((e) => [e.Key, e.Value]));
   return {
     qualified: byKey.QualificationRemark === "Q",
     remark: byKey.StatusRemark ?? byKey.ShooterGroupRemark ?? null,
+    penalty: byKey.PenaltyRemark ?? null,
+    shootOff: byKey.ShootOffRemark ?? null,
+    record: byKey.RecordRemark ?? null,
   };
 }
 

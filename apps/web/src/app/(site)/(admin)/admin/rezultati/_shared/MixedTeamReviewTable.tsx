@@ -1,4 +1,4 @@
-import { DISCIPLINE_META, type DisciplineCode } from "@shootermarkt/db/pdf-import-types";
+import { DISCIPLINE_META, type DisciplineCode, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
 import { NocFlag } from "./ReviewTable";
 
 export interface MixedTeamEntry {
@@ -10,10 +10,12 @@ export interface MixedTeamEntry {
   qualTotal: number | null;
   inners: number | null;
   qualRemark?: string | null;
+  qualExtras?: StageRemarks;
   qualified: boolean;
   finalRank: number | null;
   finalTotal: number | null;
   finalRemark?: string | null;
+  finalExtras?: StageRemarks;
   mIssfId: string | null;
   mLastName: string;
   mFirstName: string;

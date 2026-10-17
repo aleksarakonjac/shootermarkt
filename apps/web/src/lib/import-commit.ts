@@ -24,6 +24,9 @@ async function addCompetitionTags(competitionId: number, tags: string[]) {
   }).where(eq(competitions.id, competitionId));
 }
 
+/** Shallow per-stage merge so a re-import of one stage never wipes another stage's marks. */
+const mergeRemarkDetails = sql`coalesce(${results.remarkDetails}, '{}'::jsonb) || coalesce(excluded.remark_details, '{}'::jsonb)`;
+
 /** Commits reviewed individual result rows and refreshes their forma cache. */
 export async function commitImportReview(payload: CommitPayload): Promise<CommitResult> {
   const { competition: comp, rows } = payload;
@@ -134,13 +137,15 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
               ...(row.finalShots ? { shots: row.finalShots } : {}), ...(row.finalShotsByStage ? { shotsByStage: row.finalShotsByStage } : {}),
               ...(row.finalCumulative ? { cumulative: row.finalCumulative } : {}), ...(row.finalRanks ? { ranks: row.finalRanks } : {}),
               ...(row.finalShootOff ? { shootOff: true } : {}) } : null,
-        ...(isElimOnly ? { elimRemark: row.remark ?? null } : { qualRemark: row.remark ?? null }),
+        ...(isElimOnly ? { elimRemark: row.elimRemark ?? row.remark ?? null } : { qualRemark: row.remark ?? null, elimRemark: row.elimRemark ?? null }),
+        finalRemark: row.finalRemark ?? null,
+        remarkDetails: row.remarkDetails ?? null,
         source: payload.source ?? "pdf_import",
       };
       if (isElimOnly) {
         await db.insert(results).values(values).onConflictDoUpdate({
           target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
-          set: { elimRound: sql`excluded.elim_round`, elimTotal: sql`excluded.elim_total`, elimRank: sql`excluded.elim_rank`, elimDetail: sql`excluded.elim_detail` },
+          set: { elimRound: sql`excluded.elim_round`, elimTotal: sql`excluded.elim_total`, elimRank: sql`excluded.elim_rank`, elimDetail: sql`excluded.elim_detail`, elimRemark: sql`excluded.elim_remark`, remarkDetails: mergeRemarkDetails },
         });
       } else await db.insert(results).values(values).onConflictDoUpdate({
         target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
@@ -150,6 +155,8 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
           qualified: sql`excluded.qualified`,
           finalTotal: sql`excluded.final_total`, finalRank: sql`excluded.final_rank`, finalDetail: sql`excluded.final_detail`,
           qualRemark: sql`excluded.qual_remark`, finalRemark: sql`excluded.final_remark`,
+          elimRemark: sql`coalesce(excluded.elim_remark, ${results.elimRemark})`,
+          remarkDetails: mergeRemarkDetails,
           source: sql`excluded.source`,
         },
       });

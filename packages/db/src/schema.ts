@@ -16,7 +16,7 @@ import {
   customType,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
-import type { ReviewRow } from "./pdf-import-types";
+import type { ReviewRow, RemarkDetails } from "./pdf-import-types";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType() {
@@ -524,6 +524,8 @@ export const results = pgTable(
     finalDetail: jsonb("final_detail").$type<FinalDetail>(),
     // ISSF/SIUS remark for the final performance — see elimRemark above.
     finalRemark: varchar("final_remark", { length: 10 }),
+    // Kazna (PenaltyRemark), shoot-off (ShootOffRemark) i rekord (RecordRemark) po fazi.
+    remarkDetails: jsonb("remark_details").$type<RemarkDetails>(),
 
     // Snapshot of competition forma_weight at time of recording (for audit/history)
     formaWeightSnapshot: decimal("forma_weight_snapshot", { precision: 3, scale: 2 }),
@@ -581,6 +583,7 @@ export const mixedTeamResults = pgTable(
     finalRank: integer("final_rank"),
     finalTotal: decimal("final_total", { precision: 7, scale: 1 }),
     finalRemark: varchar("final_remark", { length: 200 }), // PenaltyRemark can be a long sentence
+    remarkDetails: jsonb("remark_details").$type<RemarkDetails>(), // samo qual/final
     source: resultSourceEnum("source").notNull().default("manual"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },

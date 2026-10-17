@@ -185,7 +185,7 @@ async function processCompetition(
 
       if (slot.stage === "final" && eventData.final.length > 0) {
         // Kumulativni zbir po seriji (kao ISSF sajt) — vidi lib/final-detail.ts.
-        const finalists = [...eventData.final].sort((a, b) => a.rank - b.rank);
+        const finalists = [...eventData.final].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
         const finalDetails = buildSiusFinalDetails(slot.disciplineCode, finalists);
         for (const [index, r] of finalists.entries()) {
           const shooterId = await resolveOrCreateShooter(r, allShooters);
@@ -629,7 +629,7 @@ async function fetchFromIssf(
         finalResults = await fetchFinalResultsFromHtml(issfCompId, event.finalPhase.resultKey, true);
       } catch { continue; }
       // Kumulativ po seriji discipline (trostav 10/10/5/5, vazdušno 5/5, pa hici) — vidi lib/final-detail.ts.
-      const finalists = [...finalResults].sort((a, b) => a.rank - b.rank);
+      const finalists = [...finalResults].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
       const finalDetails = buildIssfFinalDetails(slot.disciplineCode, finalists);
 
       for (const [index, r] of finalists.entries()) {

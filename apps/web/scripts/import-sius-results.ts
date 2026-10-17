@@ -33,7 +33,9 @@ async function main() {
       const perDisc = new Map<string, number>();
       for (const r of rows) perDisc.set(r.disciplineCode, (perDisc.get(r.disciplineCode) ?? 0) + 1);
       const newShooters = rows.filter((r) => !r.shooterId).length;
-      console.log(`${rows.length} redova [${[...perDisc].map(([k, v]) => `${k}:${v}`).join(" ")}], timova: ${data.teamEntries.length}, novih strelaca: ${newShooters}${data.errors.length ? `, upozorenja: ${data.errors.join("; ")}` : ""}`);
+      const unranked = rows.filter((r) => r.qualRank == null && r.finalRank == null && r.elimRank == null).length;
+      const withMarks = rows.filter((r) => r.remarkDetails).length;
+      console.log(`${rows.length} redova [${[...perDisc].map(([k, v]) => `${k}:${v}`).join(" ")}], timova: ${data.teamEntries.length}, novih strelaca: ${newShooters}, bez plasmana (DSQ/DNS): ${unranked}, sa kaznom/SO/rekordom: ${withMarks}${data.errors.length ? `, upozorenja: ${data.errors.join("; ")}` : ""}`);
       totalRows += rows.length;
       if (commit && data.teamEntries.length) {
         const mixed = await commitMixedTeamsDirect(c.id, data.teamEntries);

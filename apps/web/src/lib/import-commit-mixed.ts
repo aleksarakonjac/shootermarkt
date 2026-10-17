@@ -1,8 +1,8 @@
 import { db } from "@shootermarkt/db";
 import { competitions, disciplines, mixedTeamResults } from "@shootermarkt/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
-import type { CompetitionLevel, EventType } from "@shootermarkt/db/pdf-import-types";
+import type { CompetitionLevel, EventType, StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 export class MixedCommitError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -32,7 +32,12 @@ export interface MixedCommitEntry {
   finalRemark?: string | null;
   mFinalSeries?: number[];
   fFinalSeries?: number[];
+  /** Penalty / shoot-off / record marks of the stage being committed. */
+  extras?: StageRemarks;
 }
+
+/** Shallow per-stage merge: qualification and finals are committed in separate calls. */
+const mergeRemarkDetails = sql`coalesce(${mixedTeamResults.remarkDetails}, '{}'::jsonb) || coalesce(excluded.remark_details, '{}'::jsonb)`;
 
 export interface MixedCommitInput {
   discipline: string;
@@ -98,6 +103,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
             finalRemark: e.finalRemark ?? null,
             shooter1FinalDetail: e.mFinalSeries?.length ? { series: e.mFinalSeries } : null,
             shooter2FinalDetail: e.fFinalSeries?.length ? { series: e.fFinalSeries } : null,
+            remarkDetails: e.extras ? { final: e.extras } : null,
             source: "manual",
           })
           .onConflictDoUpdate({
@@ -108,6 +114,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
               finalRemark: e.finalRemark ?? null,
               shooter1FinalDetail: e.mFinalSeries?.length ? { series: e.mFinalSeries } : null,
               shooter2FinalDetail: e.fFinalSeries?.length ? { series: e.fFinalSeries } : null,
+              remarkDetails: mergeRemarkDetails,
             },
           });
       } else {
@@ -127,6 +134,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
             qualInners: e.qualInners ?? null,
             qualRemark: e.qualRemark ?? null,
             qualified: e.qualified ?? null,
+            remarkDetails: e.extras ? { qual: e.extras } : null,
             source: "manual",
           })
           .onConflictDoUpdate({
@@ -141,6 +149,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
               qualInners: e.qualInners ?? null,
               qualRemark: e.qualRemark ?? null,
               qualified: e.qualified ?? null,
+              remarkDetails: mergeRemarkDetails,
             },
           });
       }
@@ -163,7 +172,7 @@ export async function commitMixedTeamsDirect(competitionId: number, entries: Mix
 
   for (const [discipline, rows] of byDiscipline) {
     const qual = await commitMixedTeamEntries({ competitionId, discipline, isFinals: false, entries: rows.map((e) => ({
-      skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber, qualRank: e.qualRank, qualTotal: e.qualTotal, qualInners: e.inners, qualRemark: e.qualRemark, qualified: e.qualified,
+      skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber, qualRank: e.qualRank, qualTotal: e.qualTotal, qualInners: e.inners, qualRemark: e.qualRemark, qualified: e.qualified, extras: e.qualExtras,
       m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mInners: e.mInners, mTotal: e.mTotal,
       f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
     })) });
@@ -172,7 +181,7 @@ export async function commitMixedTeamsDirect(competitionId: number, entries: Mix
     const finalists = rows.filter((e) => !e.skip && e.finalRank != null);
     if (!finalists.length) continue;
     const fin = await commitMixedTeamEntries({ competitionId, discipline, isFinals: true, entries: finalists.map((e) => ({
-      nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark, mFinalSeries: e.mFinalSeries, fFinalSeries: e.fFinalSeries,
+      nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark, mFinalSeries: e.mFinalSeries, fFinalSeries: e.fFinalSeries, extras: e.finalExtras,
     })) });
     errors.push(...fin.errors);
   }
