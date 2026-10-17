@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { ReviewRow, CommitPayload } from "@shootermarkt/db/pdf-import-types";
 import type { SiusFinalEntry } from "@/app/api/admin/sius/public-import/route";
-import { buildSiusFinalDetails } from "@/lib/final-detail";
+import { mergeSiusFinals } from "@/lib/sius-import";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
 import { MixedTeamQualTable, MixedTeamFinalsTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
@@ -219,65 +219,7 @@ export function SiusMode() {
     setLoading(true); setError(null);
 
     // Merge active final entries into qual rows before committing
-    const activeFinals = finalEntries.filter((f) => !f.skip);
-
-    // Isti oblik kao live cron: kumulativ po seriji discipline + nazivi kolona + plasman posle
-    // svake serije (lib/final-detail.ts), umesto čistih zbirova serija.
-    const finalFields = new Map<SiusFinalEntry, Pick<ReviewRow, "finalCumulative" | "finalSeriesLabels" | "finalRanks">>();
-    for (const code of new Set(activeFinals.map((f) => f.disciplineCode))) {
-      const finalists = activeFinals.filter((f) => f.disciplineCode === code && f.series.length > 0).sort((a, b) => a.rank - b.rank);
-      buildSiusFinalDetails(code, finalists).forEach((detail, i) => finalFields.set(finalists[i], {
-        finalCumulative: detail.cumulative ?? null,
-        finalSeriesLabels: detail.seriesLabels ?? null,
-        finalRanks: detail.ranks ?? null,
-      }));
-    }
-    const mergedRows = rows.map((r) => {
-      const f = activeFinals.find(
-        (fe) => fe.disciplineCode === r.disciplineCode && (
-          (fe.siusAthleteId && fe.siusAthleteId === r.issfId) ||
-          (fe.lastName.toLowerCase() === r.lastName.toLowerCase() &&
-           fe.firstName.toLowerCase() === r.firstName.toLowerCase())
-        )
-      );
-      if (!f) return r;
-      return {
-        ...r,
-        qualified: true,
-        finalTotal: f.total,
-        finalRank: f.rank,
-        ...finalFields.get(f),
-      };
-    });
-
-    // A final can be published before its qualification table reaches SIUS.
-    // Keep it importable instead of leaving this visible review row uncommitted.
-    for (const f of activeFinals) {
-      const matched = mergedRows.some((r) =>
-        f.disciplineCode === r.disciplineCode && (
-          (f.siusAthleteId && f.siusAthleteId === r.issfId) ||
-          (f.lastName.toLowerCase() === r.lastName.toLowerCase() &&
-           f.firstName.toLowerCase() === r.firstName.toLowerCase())
-        )
-      );
-      if (!matched) {
-        mergedRows.push({
-          issfId: f.siusAthleteId ?? undefined,
-          firstName: f.firstName,
-          lastName: f.lastName,
-          teamNoc: f.nation,
-          disciplineCode: f.disciplineCode as ReviewRow["disciplineCode"],
-          category: "senior",
-          qualTotal: null,
-          qualInners: null,
-          qualified: true,
-          finalTotal: f.total,
-          finalRank: f.rank,
-          ...finalFields.get(f),
-        });
-      }
-    }
-
+    const mergedRows = mergeSiusFinals(rows, finalEntries);
     const payload: CommitPayload = { source: "sius_import", competitionId: selectedComp.id, rows: mergedRows };
     let inserted = 0, skipped = 0;
     const errors: string[] = [];

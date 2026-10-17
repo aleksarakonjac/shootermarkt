@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
@@ -228,8 +228,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
 
             // Span position + tooltip placement
             const col = idx % 7;
-            const row = Math.floor(idx / 7);
-            const tooltipH = row === 0 ? "top-full mt-2" : "bottom-full mb-2";
+            const tooltipH = "top-full mt-2";
             const tooltipX = col <= 1 ? "left-0" : col >= 5 ? "right-0" : "left-1/2 -translate-x-1/2";
             // Round only where the highlighted run really ends — a neighbouring
             // day with any competition (even a different one) keeps it joined.
@@ -326,6 +325,18 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<{ id: number; x: number; y: number; lastX: number; lastT: number; vx: number; axis: "x" | "y" | null } | null>(null);
   const settleTimer = useRef<number | undefined>(undefined);
+  const activePanelRef = useRef<HTMLDivElement>(null);
+  const [panelHeight, setPanelHeight] = useState<number | undefined>(undefined);
+  // Track is as tall as the tallest of 3 months; size the viewport to the active one so 5-row months have no blank row.
+  useLayoutEffect(() => {
+    const el = activePanelRef.current;
+    if (!el) return;
+    const measure = () => setPanelHeight(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [viewYear, viewMonth, currentState]);
   const [dragX, setDragX] = useState(0);
   const [settling, setSettling] = useState(false);
   useEffect(() => () => window.clearTimeout(settleTimer.current), []);
@@ -506,16 +517,16 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
           <button type="button" onClick={() => void loadMonth(viewYear, viewMonth)} className="font-semibold text-[var(--brand-primary)] hover:underline">{common("retry")}</button>
         </div>
       ) : <div className="p-3 flex flex-col gap-2">
-        <div ref={viewportRef} className="overflow-hidden touch-pan-y" {...swipeHandlers}>
+        <div ref={viewportRef} className="overflow-x-clip touch-pan-y" style={{ height: panelHeight }} {...swipeHandlers}>
           <div
-            className="flex"
+            className="flex items-start"
             style={{
               transform: `translateX(calc(-100% + ${dragX}px))`,
               transition: settling ? `transform ${SETTLE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` : "none",
             }}
           >
             {panels.map(({ offset, year, month }) => (
-              <div key={offset} className="flex w-full shrink-0 flex-col gap-2" inert={offset !== 0} aria-hidden={offset !== 0 ? true : undefined}>
+              <div key={offset} ref={offset === 0 ? activePanelRef : undefined} className="flex w-full shrink-0 flex-col gap-2" inert={offset !== 0} aria-hidden={offset !== 0 ? true : undefined}>
                 {renderMonth(year, month, offset === 0)}
               </div>
             ))}
