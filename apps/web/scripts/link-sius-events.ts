@@ -6,42 +6,18 @@ import { createInterface } from "node:readline/promises";
 import { and, gte, isNull, eq } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { competitions } from "@shootermarkt/db/schema";
+import { fetchSiusCompetitions } from "@shootermarkt/adapters/sius/public-adapter";
+import { rankSiusCandidates } from "@/lib/sius-match";
 
-const SIUS_PUB = "https://shootingsportscloud.com:8594/api/v1/pub";
 const FROM = `${new Date().getFullYear() - 1}-01-01`;
-const DAYS = 5;
 const auto = process.argv.includes("--auto");
 const commit = process.argv.includes("--commit");
 // Sigurno poklapanje: dovoljan skor, jasna prednost nad drugim kandidatom, SIUS UUID nije već zauzet.
 const MIN_SCORE = 0.5;
 const MIN_MARGIN = 0.2;
 
-interface SiusComp { id: string; name: string; city: string | null; country: string | null; start: string; end: string }
-
-async function fetchSiusComps(): Promise<SiusComp[]> {
-  const qs = new URLSearchParams({ Page: "1", PageSize: "9999", Name: "", Sort: '{"StartDate":"desc"}', IsPublic: "true" });
-  const res = await fetch(`${SIUS_PUB}/competitions?${qs}`, { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error(`SIUS /competitions → ${res.status}`);
-  const json = (await res.json()) as { data: Array<Record<string, string | null>> };
-  return json.data
-    .map((c) => ({
-      id: c.RunningId!, name: c.Name ?? "", city: c.City ?? null, country: c.Country ?? null,
-      start: (c.StartDate ?? "").slice(0, 10), end: (c.EndDate ?? "").slice(0, 10),
-    }))
-    .filter((c) => c.start >= FROM);
-}
-
-const tokens = (s: string) => new Set(s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2));
-function jaccard(a: string, b: string) {
-  const ta = tokens(a), tb = tokens(b);
-  const inter = [...ta].filter((w) => tb.has(w)).length;
-  const union = new Set([...ta, ...tb]).size;
-  return union ? inter / union : 0;
-}
-const dayDiff = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000;
-
 async function main() {
-  const sius = await fetchSiusComps();
+  const sius = await fetchSiusCompetitions(FROM);
   console.log(`SIUS: ${sius.length} javnih takmičenja od ${FROM}`);
 
   const dbComps = await db
@@ -57,15 +33,7 @@ async function main() {
 
   for (const c of dbComps) {
     const date = String(c.date).slice(0, 10);
-    const cands = sius
-      .filter((s) => dayDiff(s.start, date) <= DAYS)
-      .map((s) => {
-        const city = s.city?.toLowerCase();
-        const cityHit = !!city && `${c.name} ${c.location ?? ""}`.toLowerCase().includes(city);
-        return { s, score: jaccard(c.name, s.name) + (cityHit ? 0.5 : 0) - dayDiff(s.start, date) * 0.02 };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
+    const cands = rankSiusCandidates({ name: c.name, date, location: c.location }, sius).slice(0, 5);
     if (!cands.length) { noCand++; continue; }
 
     if (auto) {

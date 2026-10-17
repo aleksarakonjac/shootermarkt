@@ -6,7 +6,9 @@ import type { CalendarSource } from "@/lib/calendar/adapters";
 import { detectCompetitionLevel, isRiflePistolCompetition } from "@shootermarkt/adapters/issf/competition-level";
 import { db } from "@shootermarkt/db";
 import { competitions, countries, competitionLevelEnum, eventTypeEnum, ageCategoryEnum } from "@shootermarkt/db/schema";
-import { inArray, sql } from "drizzle-orm";
+import { inArray, isNotNull, sql } from "drizzle-orm";
+import { fetchSiusCompetitions } from "@shootermarkt/adapters/sius/public-adapter";
+import { matchSiusCompetition, type SiusMatch } from "@/lib/sius-match";
 import { FOCUS_PRIORITY_MAX, FOCUS_PRIORITY_MIN } from "@/lib/competition-priority";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 
@@ -84,6 +86,40 @@ function detectConflictGroups(events: Array<{ key: string; source: CalendarSourc
   return groups;
 }
 
+/**
+ * Auto-finds the SIUS UUID of ISSF calendar events by date + name/city (see lib/sius-match.ts).
+ * Skips events that already have one, UUIDs used by another competition, and loses ties:
+ * a UUID is suggested to only one event of the list (the best-scoring), so the commit never sees duplicates.
+ */
+async function suggestSiusLinks(
+  events: Array<{ key: string; source: CalendarSource; externalId: string | null; name: string; dateFrom: string | null; location: string | null }>,
+  linkedSiusId: (e: { key: string; source: CalendarSource; externalId: string | null }) => string | null,
+): Promise<Map<string, SiusMatch>> {
+  const candidates = events.filter((e) => e.source === "issf" && e.dateFrom);
+  if (!candidates.length) return new Map();
+  const from = candidates.reduce((min, e) => (e.dateFrom! < min ? e.dateFrom! : min), candidates[0].dateFrom!);
+  let sius;
+  try {
+    sius = await fetchSiusCompetitions(new Date(Date.parse(from) - 7 * 86_400_000).toISOString().slice(0, 10));
+  } catch (err) {
+    console.warn("[sync] SIUS competitions lookup failed:", err);
+    return new Map();
+  }
+  const taken = new Set((await db.select({ id: competitions.siusId }).from(competitions).where(isNotNull(competitions.siusId))).map((r) => r.id!));
+  const matches: Array<[string, SiusMatch]> = [];
+  for (const e of candidates) {
+    if (linkedSiusId(e)) continue;
+    const m = matchSiusCompetition({ name: e.name, date: e.dateFrom!, location: e.location }, sius, taken);
+    if (m) matches.push([e.key, m]);
+  }
+  const bestById = new Map<string, [string, SiusMatch]>();
+  for (const entry of matches) {
+    const cur = bestById.get(entry[1].id);
+    if (!cur || entry[1].score > cur[1].score) bestById.set(entry[1].id, entry);
+  }
+  return new Map([...bestById.values()]);
+}
+
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -120,17 +156,22 @@ export async function GET(req: NextRequest) {
 
   const [existingIssf, existingExt] = await Promise.all([
     issfIds.length
-      ? db.select({ issfId: competitions.issfId, tags: competitions.tags })
+      ? db.select({ issfId: competitions.issfId, tags: competitions.tags, siusId: competitions.siusId })
           .from(competitions).where(inArray(competitions.issfId, issfIds))
       : Promise.resolve([]),
     extIds.length
-      ? db.select({ externalId: competitions.externalId, tags: competitions.tags })
+      ? db.select({ externalId: competitions.externalId, tags: competitions.tags, siusId: competitions.siusId })
           .from(competitions).where(inArray(competitions.externalId, extIds))
       : Promise.resolve([]),
   ]);
 
   const issfTagMap = new Map(existingIssf.map((r) => [r.issfId!, r.tags ?? []]));
   const extTagMap  = new Map(existingExt.map((r) => [r.externalId!, r.tags ?? []]));
+
+  const issfSiusMap = new Map(existingIssf.map((r) => [r.issfId!, r.siusId]));
+  const extSiusMap  = new Map(existingExt.map((r) => [r.externalId!, r.siusId]));
+  const siusSuggestions = await suggestSiusLinks(deduped, (e) =>
+    (e.source === "issf" && e.externalId ? issfSiusMap.get(e.externalId) : undefined) ?? extSiusMap.get(e.key) ?? null);
 
   const conflictGroups = detectConflictGroups(deduped);
   const countryIdOf = await loadCountryLookup();
@@ -155,6 +196,8 @@ export async function GET(req: NextRequest) {
       countryId: countryIdOf(e.country),
       disciplineGroups: groupsFromName(e.name),
       issfId: e.source === "issf" ? e.externalId : null,
+      siusSuggestion: siusSuggestions.get(e.key) ?? null,
+      currentSiusId: (e.source === "issf" && e.externalId ? issfSiusMap.get(e.externalId) : undefined) ?? extSiusMap.get(e.key) ?? null,
       competitionTypeId: e.competitionTypeId ?? null,
       competitionTypeName: e.competitionTypeName ?? null,
       competitionTypeAcronym: e.competitionTypeAcronym ?? null,
@@ -231,10 +274,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "SIUS UUID se ponavlja u listi" }, { status: 400 });
   }
   if (siusIds.length) {
-    const taken = await db.select({ siusId: competitions.siusId, name: competitions.name })
+    const takenRows = await db.select({ siusId: competitions.siusId, name: competitions.name, issfId: competitions.issfId, externalId: competitions.externalId })
       .from(competitions).where(inArray(competitions.siusId, siusIds));
-    if (taken.length) {
-      return NextResponse.json({ error: `SIUS UUID već koristi: ${taken.map((t) => t.name).join(", ")}` }, { status: 400 });
+    // A UUID already on the very same competition (re-sync) is fine; only another competition's UUID is a clash.
+    const clashes = takenRows.filter((t) => !events.some((e) =>
+      blank(e.siusId) === t.siusId && ((blank(e.issfId) && blank(e.issfId) === t.issfId) || e.key === t.externalId)));
+    if (clashes.length) {
+      return NextResponse.json({ error: `SIUS UUID već koristi: ${clashes.map((t) => t.name).join(", ")}` }, { status: 400 });
     }
   }
 
@@ -274,7 +320,11 @@ export async function POST(req: NextRequest) {
         .values(issfEvents.map(makeValue))
         .onConflictDoUpdate({
           target: competitions.issfId,
-          set: { tags: tagMergeSql, countryId: sql`COALESCE(${competitions.countryId}, EXCLUDED.country_id)` },
+          set: {
+            tags: tagMergeSql,
+            countryId: sql`COALESCE(${competitions.countryId}, EXCLUDED.country_id)`,
+            siusId: sql`COALESCE(${competitions.siusId}, EXCLUDED.scius_id)`,
+          },
         })
         .returning({ id: competitions.id });
       insertedCount += res.length;
@@ -287,7 +337,11 @@ export async function POST(req: NextRequest) {
         .onConflictDoUpdate({
           target: competitions.externalId,
           targetWhere: sql`${competitions.externalId} IS NOT NULL`,
-          set: { tags: tagMergeSql, countryId: sql`COALESCE(${competitions.countryId}, EXCLUDED.country_id)` },
+          set: {
+            tags: tagMergeSql,
+            countryId: sql`COALESCE(${competitions.countryId}, EXCLUDED.country_id)`,
+            siusId: sql`COALESCE(${competitions.siusId}, EXCLUDED.scius_id)`,
+          },
         })
         .returning({ id: competitions.id });
       insertedCount += res.length;

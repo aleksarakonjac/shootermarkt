@@ -30,6 +30,16 @@ export interface Draft {
   tags: string[];
 }
 
+export interface SiusSuggestion {
+  id: string;
+  name: string;
+  city: string | null;
+  start: string;
+  score: number;
+  /** Strong match — pre-filled into the draft automatically. */
+  confident: boolean;
+}
+
 export type Country = { id: number; name: string; code2: string | null };
 
 const EVENT_TYPES = [
@@ -120,6 +130,7 @@ export function SyncRowEditor({
   source,
   countries,
   sourceCountry,
+  siusSuggestion,
   edited,
   onChange,
   onReset,
@@ -129,6 +140,7 @@ export function SyncRowEditor({
   source: string;
   countries: Country[];
   sourceCountry: string | null;
+  siusSuggestion?: SiusSuggestion | null;
   edited: boolean;
   onChange: (patch: Partial<Draft>) => void;
   onReset: () => void;
@@ -200,6 +212,14 @@ export function SyncRowEditor({
       </Field>
       <Field label="SIUS UUID" htmlFor={`${id}-sius`} className="md:col-span-8">
         <input id={`${id}-sius`} value={draft.siusId} onChange={(e) => onChange({ siusId: e.target.value })} placeholder="3c4bac7a-06f1-4726-b512-521623fccb2e" className={`${inputCls} font-[family-name:var(--font-jetbrains-mono)]`} />
+        {siusSuggestion && draft.siusId === siusSuggestion.id && (
+          <p className="mt-1 text-xs text-green-700">Automatski pronađeno: {siusSuggestion.name}{siusSuggestion.city ? ` · ${siusSuggestion.city}` : ""} · {siusSuggestion.start}</p>
+        )}
+        {siusSuggestion && draft.siusId !== siusSuggestion.id && (
+          <button type="button" onClick={() => onChange({ siusId: siusSuggestion.id })} className="mt-1 min-h-11 text-left text-xs text-[var(--brand-primary)] underline underline-offset-2">
+            {siusSuggestion.confident ? "Predlog" : "Mogući SIUS (nesiguran)"}: {siusSuggestion.name}{siusSuggestion.city ? ` · ${siusSuggestion.city}` : ""} · {siusSuggestion.start} — primeni
+          </button>
+        )}
       </Field>
 
       <div className="md:col-span-6">

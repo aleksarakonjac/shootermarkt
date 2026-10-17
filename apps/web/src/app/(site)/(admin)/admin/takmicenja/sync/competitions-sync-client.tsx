@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { formatDateRangeSr } from "@/lib/date-utils";
-import { SyncRowEditor, type Country, type Draft } from "./sync-row-editor";
+import { SyncRowEditor, type Country, type Draft, type SiusSuggestion } from "./sync-row-editor";
 
 interface SyncEvent {
   key: string;
@@ -17,6 +17,8 @@ interface SyncEvent {
   countryId: number | null;
   disciplineGroups: string[];
   issfId: string | null;
+  siusSuggestion: SiusSuggestion | null;
+  currentSiusId: string | null;
   competitionTypeId: number | null;
   competitionTypeName: string | null;
   competitionTypeAcronym: string | null;
@@ -134,7 +136,7 @@ function toDraft(e: SyncEvent): Draft {
     focusPriority: "",
     organizer: e.source.toUpperCase(),
     issfId: e.issfId ?? "",
-    siusId: "",
+    siusId: e.siusSuggestion?.confident ? e.siusSuggestion.id : "",
     disciplineGroups: e.disciplineGroups,
     tags: [],
   };
@@ -150,6 +152,9 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
+/** Existing competition that has no SIUS UUID yet but got a confident one from the lookup. */
+const gainsSius = (e: SyncEvent) => e.alreadyInDb && !e.currentSiusId && !!e.siusSuggestion?.confident;
+
 function RowStatus({ e, hasSourceTag }: { e: SyncEvent; hasSourceTag: boolean }) {
   if (!e.alreadyInDb) return <span className="text-[0.7rem] text-[var(--subtle)]">Novi</span>;
   return (
@@ -158,6 +163,7 @@ function RowStatus({ e, hasSourceTag }: { e: SyncEvent; hasSourceTag: boolean })
         <span key={t} className={`rounded px-1.5 py-0.5 text-[0.65rem] font-semibold font-[family-name:var(--font-jetbrains-mono)] ${SOURCE_COLORS[t] ?? "bg-gray-100 text-gray-600"}`}>{t.toUpperCase()}</span>
       ))}
       {!hasSourceTag && <span className="text-[0.65rem] font-medium text-blue-700">+ {e.source.toUpperCase()} tag</span>}
+      {gainsSius(e) && <span className="text-[0.65rem] font-medium text-green-700">+ SIUS UUID</span>}
     </div>
   );
 }
@@ -235,7 +241,7 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
         (data as SyncEvent[])
           .filter((e) =>
             e.detectedLevel !== null &&
-            (!e.alreadyInDb || !e.currentTags.includes(e.source)) &&
+            (!e.alreadyInDb || !e.currentTags.includes(e.source) || gainsSius(e)) &&
             !conflictLoserKeys.has(e.key)
           )
           .map((e) => e.key)
@@ -525,7 +531,7 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
                     const d = drafts[e.key];
                     if (!d) return null;
                     const hasSourceTag = e.currentTags.includes(e.source);
-                    const fullyDone = e.alreadyInDb && hasSourceTag;
+                    const fullyDone = e.alreadyInDb && hasSourceTag && !gainsSius(e);
                     const complete = isComplete(e);
                     const canSelect = !fullyDone && complete;
                     const isConflict = !!e.conflictGroupId;
@@ -559,6 +565,7 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
                               <span className="flex flex-wrap items-center gap-x-2 text-[0.7rem] font-medium">
                                 {e.competitionTypeName && <span className="text-[var(--muted)]">{e.competitionTypeName}{e.competitionTypeAcronym ? ` (${e.competitionTypeAcronym})` : ""}</span>}
                                 {isConflict && !fullyDone && <span className="text-orange-700">moguć duplikat</span>}
+                                {d.siusId && <span className="text-green-700">SIUS povezan</span>}
                                 {edited && <span className="text-[var(--brand-primary)]">izmenjeno</span>}
                                 {!complete && !fullyDone && <span className="text-amber-700">nepotpuno</span>}
                               </span>
@@ -587,6 +594,7 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
                             source={e.source}
                             countries={countries}
                             sourceCountry={e.country}
+                            siusSuggestion={e.siusSuggestion}
                             edited={edited}
                             onChange={(patch) => patchDraft(e.key, patch)}
                             onReset={() => resetDraft(e)}

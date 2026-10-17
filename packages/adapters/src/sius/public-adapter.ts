@@ -58,6 +58,27 @@ async function pub<T>(path: string): Promise<T> {
 
 // ── API calls ─────────────────────────────────────────────────────────────────
 
+export interface SiusCompetition {
+  id: string; // RunningId = the "SIUS UUID" stored in competitions.scius_id
+  name: string;
+  city: string | null;
+  country: string | null;
+  start: string; // YYYY-MM-DD
+  end: string;
+}
+
+/** All public SIUS competitions starting on/after `fromDate` (YYYY-MM-DD). */
+export async function fetchSiusCompetitions(fromDate: string): Promise<SiusCompetition[]> {
+  const qs = new URLSearchParams({ Page: "1", PageSize: "9999", Name: "", Sort: '{"StartDate":"desc"}', IsPublic: "true" });
+  const json = await pub<{ data: Array<Record<string, string | null>> }>(`/competitions?${qs}`);
+  return json.data
+    .map((c) => ({
+      id: c.RunningId!, name: c.Name ?? "", city: c.City ?? null, country: c.Country ?? null,
+      start: (c.StartDate ?? "").slice(0, 10), end: (c.EndDate ?? "").slice(0, 10),
+    }))
+    .filter((c) => c.id && c.start >= fromDate);
+}
+
 export async function fetchSiusEvents(compUuid: string): Promise<SiusEvent[]> {
   const data = await pub<RawEvent[]>(
     `/competitions/events?CompetitionId=${compUuid}`
