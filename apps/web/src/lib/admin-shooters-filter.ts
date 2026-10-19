@@ -1,9 +1,8 @@
-import { and, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { shooters } from "@shootermarkt/db/schema";
-import { MVP_APPARATUS } from "@/lib/mvp-scope";
 
 /** Filter params shared by the admin shooters list and its bulk actions. */
-export type ShooterFilterParams = Partial<Record<"q" | "nat" | "gender" | "apparatus" | "verified" | "no_apparatus", string>>;
+export type ShooterFilterParams = Partial<Record<"q" | "nat" | "gender" | "apparatus" | "verified", string>>;
 
 export function buildShootersWhere(sp: ShooterFilterParams) {
   const q = sp.q?.trim() ?? "";
@@ -11,14 +10,13 @@ export function buildShootersWhere(sp: ShooterFilterParams) {
   const gender = sp.gender?.trim() ?? "";
   const apparatus = sp.apparatus?.trim() ?? "";
   return and(
-    // Neverifikovani (npr. novi iz live cron-a) često nemaju oružje — ne sakrivaj ih iza MVP filtera
-    sp.no_apparatus === "1" || sp.verified === "0" ? undefined : inArray(shooters.apparatus, [...MVP_APPARATUS]),
     q
       ? and(...q.split(/\s+/).filter(Boolean).map((word) => or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`))))
       : undefined,
     nat ? eq(shooters.nationality, nat) : undefined,
     gender ? eq(shooters.gender, gender) : undefined,
-    apparatus ? eq(shooters.apparatus, apparatus) : undefined,
+    // "none" = strelci bez oružja (npr. novi iz live cron-a)
+    apparatus === "none" ? isNull(shooters.apparatus) : apparatus ? eq(shooters.apparatus, apparatus) : undefined,
     sp.verified === "0" ? eq(shooters.verified, false) : undefined,
   );
 }

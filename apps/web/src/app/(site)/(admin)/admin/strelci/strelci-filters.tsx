@@ -16,11 +16,10 @@ interface Props {
   onlyUnverified: boolean;
   gender: string;
   apparatus: string;
-  includeNoApparatus: boolean;
 }
 
 
-export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatus, includeNoApparatus }: Props) {
+export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatus }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -96,6 +95,7 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
           { value: "rifle", label: "Puška" },
           { value: "pistol", label: "Pištolj" },
           { value: "both", label: "Puška + Pištolj" },
+          { value: "none", label: "Bez oružja" },
         ]}
         placeholder="Disciplina"
         className="sm:w-48"
@@ -118,12 +118,6 @@ export function StrelciFilters({ nationalities, onlyUnverified, gender, apparatu
           checked={onlyUnverified}
           onChange={(checked) => update("verified", checked ? "0" : "")}
           label="Samo neverifikovani"
-          className=""
-        />
-      <CustomCheckbox
-          checked={includeNoApparatus}
-          onChange={(checked) => update("no_apparatus", checked ? "1" : "")}
-          label="Bez aparatusa"
           className=""
         />
     </div>
