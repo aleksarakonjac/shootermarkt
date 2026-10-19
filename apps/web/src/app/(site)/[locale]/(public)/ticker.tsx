@@ -230,7 +230,7 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review }: { items: T
     <span
       ref={textRef}
       key={`${segment.item.id}-${idx}`}
-      className="inline-block whitespace-nowrap font-semibold text-xs leading-none"
+      className="inline-block whitespace-nowrap font-semibold text-xs leading-4"
       style={{ color: "white", ...scrollStyle }}
     >
       {segment.text}
@@ -383,7 +383,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
 
       {/* Name + detail */}
       <span className="flex items-center gap-2 flex-1 min-w-0">
-        <span className="font-semibold text-xs leading-none truncate min-w-0" style={{ color: "white" }}>
+        <span className="font-semibold text-xs leading-4 truncate min-w-0" style={{ color: "white" }}>
           {item.name}
         </span>
 
@@ -575,10 +575,10 @@ function UpcomingItem({ item, locale }: { item: TickerItem; locale: string }) {
 
   const content = (
     <span className="flex items-center gap-1.5">
-      <span className="font-bold shrink-0" style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 10, lineHeight: 1, color: "rgba(255,255,255,0.7)" }}>
+      <span className="font-bold shrink-0" style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 10, lineHeight: 1.4, color: "rgba(255,255,255,0.7)" }}>
         {dateStr}
       </span>
-      <span className="font-medium whitespace-nowrap" style={{ fontSize: 11, lineHeight: 1, color: "white" }}>
+      <span className="font-medium whitespace-nowrap" style={{ fontSize: 11, lineHeight: 1.4, color: "white" }}>
         {item.name}
       </span>
     </span>
