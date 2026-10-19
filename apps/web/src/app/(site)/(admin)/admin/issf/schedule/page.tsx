@@ -18,6 +18,7 @@ export default async function ISSFScheduleImportPage() {
       date: competitions.date,
       dateEnd: competitions.dateEnd,
       location: competitions.location,
+      issfId: competitions.issfId,
       nocCode: countries.nocCode,
     })
       .from(competitions)

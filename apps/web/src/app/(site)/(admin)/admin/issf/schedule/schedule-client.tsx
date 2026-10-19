@@ -4,7 +4,7 @@ import { useState, useTransition, useId } from "react";
 import type { ISSFScheduleEntry } from "@shootermarkt/adapters/issf/adapter";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 
-interface CompOption { id: number; name: string; date: string; dateEnd: string | null; location: string | null; nocCode: string | null; }
+interface CompOption { id: number; name: string; date: string; dateEnd: string | null; location: string | null; issfId: string | null; nocCode: string | null; }
 interface FeaturedComp extends CompOption { status: "current" | "upcoming" | "past"; }
 interface DiscOption  { id: number; code: string; name: string; }
 
@@ -56,6 +56,15 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
   const [importMsg,  setImportMsg]  = useState<string | null>(null);
   const [importing,  startImport]   = useTransition();
   const [fetching,   startFetch]    = useTransition();
+
+  function selectComp(id: number | "") {
+    setDbCompId(id);
+    const comp = competitions.find((c) => c.id === id);
+    if (comp?.issfId) {
+      setIssfInput(comp.issfId);
+      setYear(parseInt(comp.date.slice(0, 4)) || year);
+    }
+  }
 
   function toggleAll() {
     if (selected.size === displayEntries.length) {
@@ -165,7 +174,7 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
               <button
                 key={c.id}
                 type="button"
-                onClick={() => setDbCompId(c.id)}
+                onClick={() => selectComp(c.id)}
                 className={`text-left px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
                   dbCompId === c.id
                     ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/10"
@@ -190,7 +199,7 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
           <SearchDropdown
             id={`${uid}-comp`}
             value={String(dbCompId)}
-            onChange={(value) => setDbCompId(value ? parseInt(value) : "")}
+            onChange={(value) => selectComp(value ? parseInt(value) : "")}
             options={competitions.map((competition) => ({
               value: String(competition.id),
               label: competition.name,
