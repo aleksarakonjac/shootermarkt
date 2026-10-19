@@ -1,3 +1,4 @@
+import { decodeHtmlEntities } from "@/lib/html-entities";
 import { getSssCompetitionTags, type SssCompetitionTag } from "./competition-tags";
 
 const SSS_BASE = "https://serbianshooting.rs";
@@ -81,11 +82,7 @@ export async function fetchSssCalendar(): Promise<SssCalendarEvent[]> {
 }
 
 function stripTags(s: string): string {
-  return s
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&#\d+;/g, "")
+  return decodeHtmlEntities(s.replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 }

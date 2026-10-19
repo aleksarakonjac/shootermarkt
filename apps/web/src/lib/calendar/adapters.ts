@@ -1,3 +1,4 @@
+import { decodeHtmlEntities } from "@/lib/html-entities";
 import { fetchCompetitions } from "@shootermarkt/adapters/issf/adapter";
 import { fetchSssCalendar } from "@/lib/sss/adapter";
 
@@ -116,10 +117,7 @@ async function fetchEscEvents(year: number): Promise<CalendarEvent[]> {
 }
 
 function stripTags(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&nbsp;/g, " ")
+  return decodeHtmlEntities(html.replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 }

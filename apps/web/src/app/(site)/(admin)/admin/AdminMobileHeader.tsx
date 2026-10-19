@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AdminNav } from "./AdminNav";
+import ThemeToggle from "../../[locale]/(public)/components/ThemeToggle";
 
 export function AdminMobileHeader({ email }: { email: string }) {
   const [open, setOpen] = useState(false);
@@ -32,6 +33,7 @@ export function AdminMobileHeader({ email }: { email: string }) {
           <span className="font-[family-name:var(--font-barlow-condensed)] font-semibold text-[1.1rem] uppercase tracking-tight text-[var(--ink)] leading-none">markt</span>
         </Link>
         <span className="inline-flex items-center text-[0.55rem] font-bold uppercase tracking-widest px-2 py-1 rounded bg-[var(--brand-primary)] text-white leading-none">Admin</span>
+        <div className="ml-auto"><ThemeToggle /></div>
       </div>
 
       {/* Drawer */}

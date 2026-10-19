@@ -108,6 +108,32 @@ html.dark {
 
 
 
+/* ── Admin dark: Tailwind status pastels (bg-red-50, text-red-700, ...) flipped for dark ── */
+html.dark [data-admin] {
+  --h-red: 25; --h-amber: 80; --h-green: 150; --h-blue: 260; --h-purple: 300; --h-orange: 50; --h-emerald: 165; --h-sky: 235; --h-yellow: 95;
+  --color-red-50: oklch(0.24 0.05 var(--h-red)); --color-red-100: oklch(0.27 0.06 var(--h-red)); --color-red-200: oklch(0.35 0.08 var(--h-red));
+  --color-red-600: oklch(0.72 0.15 var(--h-red)); --color-red-700: oklch(0.76 0.14 var(--h-red)); --color-red-800: oklch(0.82 0.1 var(--h-red)); --color-red-900: oklch(0.86 0.07 var(--h-red));
+  --color-amber-50: oklch(0.24 0.05 var(--h-amber)); --color-amber-100: oklch(0.27 0.06 var(--h-amber)); --color-amber-200: oklch(0.35 0.08 var(--h-amber));
+  --color-amber-600: oklch(0.72 0.15 var(--h-amber)); --color-amber-700: oklch(0.76 0.14 var(--h-amber)); --color-amber-800: oklch(0.82 0.1 var(--h-amber)); --color-amber-900: oklch(0.86 0.07 var(--h-amber));
+  --color-green-50: oklch(0.24 0.05 var(--h-green)); --color-green-100: oklch(0.27 0.06 var(--h-green)); --color-green-200: oklch(0.35 0.08 var(--h-green));
+  --color-green-600: oklch(0.72 0.15 var(--h-green)); --color-green-700: oklch(0.76 0.14 var(--h-green)); --color-green-800: oklch(0.82 0.1 var(--h-green)); --color-green-900: oklch(0.86 0.07 var(--h-green));
+  --color-blue-50: oklch(0.24 0.05 var(--h-blue)); --color-blue-100: oklch(0.27 0.06 var(--h-blue)); --color-blue-200: oklch(0.35 0.08 var(--h-blue));
+  --color-blue-600: oklch(0.72 0.15 var(--h-blue)); --color-blue-700: oklch(0.76 0.14 var(--h-blue)); --color-blue-800: oklch(0.82 0.1 var(--h-blue)); --color-blue-900: oklch(0.86 0.07 var(--h-blue));
+  --color-purple-50: oklch(0.24 0.05 var(--h-purple)); --color-purple-100: oklch(0.27 0.06 var(--h-purple)); --color-purple-200: oklch(0.35 0.08 var(--h-purple));
+  --color-purple-600: oklch(0.72 0.15 var(--h-purple)); --color-purple-700: oklch(0.76 0.14 var(--h-purple)); --color-purple-800: oklch(0.82 0.1 var(--h-purple)); --color-purple-900: oklch(0.86 0.07 var(--h-purple));
+  --color-orange-50: oklch(0.24 0.05 var(--h-orange)); --color-orange-100: oklch(0.27 0.06 var(--h-orange)); --color-orange-200: oklch(0.35 0.08 var(--h-orange));
+  --color-orange-600: oklch(0.72 0.15 var(--h-orange)); --color-orange-700: oklch(0.76 0.14 var(--h-orange)); --color-orange-800: oklch(0.82 0.1 var(--h-orange)); --color-orange-900: oklch(0.86 0.07 var(--h-orange));
+  --color-emerald-50: oklch(0.24 0.05 var(--h-emerald)); --color-emerald-100: oklch(0.27 0.06 var(--h-emerald)); --color-emerald-200: oklch(0.35 0.08 var(--h-emerald));
+  --color-emerald-600: oklch(0.72 0.15 var(--h-emerald)); --color-emerald-700: oklch(0.76 0.14 var(--h-emerald)); --color-emerald-800: oklch(0.82 0.1 var(--h-emerald)); --color-emerald-900: oklch(0.86 0.07 var(--h-emerald));
+  --color-sky-50: oklch(0.24 0.05 var(--h-sky)); --color-sky-100: oklch(0.27 0.06 var(--h-sky)); --color-sky-200: oklch(0.35 0.08 var(--h-sky));
+  --color-sky-600: oklch(0.72 0.15 var(--h-sky)); --color-sky-700: oklch(0.76 0.14 var(--h-sky)); --color-sky-800: oklch(0.82 0.1 var(--h-sky)); --color-sky-900: oklch(0.86 0.07 var(--h-sky));
+  --color-yellow-50: oklch(0.24 0.05 var(--h-yellow)); --color-yellow-100: oklch(0.27 0.06 var(--h-yellow)); --color-yellow-200: oklch(0.35 0.08 var(--h-yellow));
+  --color-yellow-600: oklch(0.72 0.15 var(--h-yellow)); --color-yellow-700: oklch(0.76 0.14 var(--h-yellow)); --color-yellow-800: oklch(0.82 0.1 var(--h-yellow)); --color-yellow-900: oklch(0.86 0.07 var(--h-yellow));
+}
+
+/* dark: variant follows the .dark class (ThemeToggle), not the OS setting */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Tailwind theme bridge ─────────────────────────────────────────────────── */
 @theme inline {
   --color-background:   var(--bg);

@@ -4,6 +4,7 @@ import { isAdminEmail } from "@/lib/admin-auth";
 import { redirect } from "next/navigation";
 import { AdminNav } from "./AdminNav";
 import { AdminMobileHeader } from "./AdminMobileHeader";
+import ThemeToggle from "../../[locale]/(public)/components/ThemeToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg)]">
+    <div data-admin className="flex min-h-screen bg-[var(--bg)]">
 
       {/* ── Sidebar — desktop only ───────────────────────────────────── */}
       <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] sticky top-0 h-screen">
@@ -41,6 +42,7 @@ export default async function AdminLayout({
         <div className="shrink-0 border-t border-[var(--border)] px-4 py-3">
           <p className="text-[0.65rem] text-[var(--subtle)] truncate mb-1">{user.email}</p>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Link href="/" className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">← Nazad na sajt</Link>
             <span className="text-[var(--border-strong)]">·</span>
             <form action="/logout" method="post">
