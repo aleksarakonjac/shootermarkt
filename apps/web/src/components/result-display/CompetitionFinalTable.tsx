@@ -8,7 +8,7 @@ import { Link } from "@/i18n/navigation";
 import type { FinalDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
-import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, type RemarkLegendItem } from "./RemarkBadge";
+import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 export type FinalResultRow = {
@@ -234,9 +234,9 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
       return a.finalRank - b.finalRank;
     });
 
-  const remarkCodes = assignRemarkCodes(sorted.map((r) => r.remark));
+  const remarkCodes = assignRemarkCodes(sorted.map((r) => remarkText(r.remark, r.remarkDetails)));
   const remarkLegend: RemarkLegendItem[] = sorted
-    .map((r, idx) => (remarkCodes[idx] ? { code: remarkCodes[idx]!, remark: r.remark!, label: `${r.lastName} ${r.firstName}` } : null))
+    .map((r, idx) => (remarkCodes[idx] ? { code: remarkCodes[idx]!, remark: remarkText(r.remark, r.remarkDetails)!, label: `${r.lastName} ${r.firstName}` } : null))
     .filter((item): item is RemarkLegendItem => item != null);
 
   if (sorted.length === 0) {
@@ -420,7 +420,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
 
                   {/* Remark — e.g. SO (shoot-off decided who's out of the final) */}
                   <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)]`}>
-                    {remarkLabel(r.remark, r.remarkDetails) && <RemarkBadge remark={remarkLabel(r.remark, r.remarkDetails)!} code={r.remark ? remarkCodes[idx] : null} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />}
+                    {remarkLabel(r.remark, r.remarkDetails, remarkCodes[idx]) && <RemarkBadge remark={remarkLabel(r.remark, r.remarkDetails, remarkCodes[idx])!} code={remarkCodes[idx]} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />}
                   </div>
 
                   {/* Expand chevron — mobile only, rightmost column; desktop shows series inline instead */}

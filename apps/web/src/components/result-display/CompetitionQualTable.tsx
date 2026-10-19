@@ -7,7 +7,7 @@ import { Link } from "@/i18n/navigation";
 import type { QualDetail, PositionsQualDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
-import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, type RemarkLegendItem } from "./RemarkBadge";
+import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 const POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"] as const;
@@ -246,9 +246,9 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
     return a.qualRank - b.qualRank;
   });
 
-  const remarkCodes = assignRemarkCodes(sorted.map((r) => r.remark));
+  const remarkCodes = assignRemarkCodes(sorted.map((r) => remarkText(r.remark, r.remarkDetails)));
   const remarkLegend: RemarkLegendItem[] = sorted
-    .map((r, idx) => (remarkCodes[idx] ? { code: remarkCodes[idx]!, remark: r.remark!, label: `${r.lastName} ${r.firstName}` } : null))
+    .map((r, idx) => (remarkCodes[idx] ? { code: remarkCodes[idx]!, remark: remarkText(r.remark, r.remarkDetails)!, label: `${r.lastName} ${r.firstName}` } : null))
     .filter((item): item is RemarkLegendItem => item != null);
 
   const seriesHeaders = hasSeriesDetail ? buildSeriesHeaders(sorted, isPositionsType, flatGroups, posSeriesCounts) : [];
@@ -453,7 +453,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                     ) : (
                       <span className="flex items-center gap-1.5">
                         {isTopQual && <QualifiedBadge />}
-                        {remarkLabel(null, r.remarkDetails) && <RemarkBadge remark={remarkLabel(null, r.remarkDetails)!} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />}
+                        {remarkLabel(null, r.remarkDetails, remarkCodes[idx]) && <RemarkBadge remark={remarkLabel(null, r.remarkDetails, remarkCodes[idx])!} code={remarkCodes[idx]} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />}
                       </span>
                     )}
                   </div>

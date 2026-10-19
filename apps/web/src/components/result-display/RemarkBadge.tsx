@@ -42,9 +42,14 @@ const RECORDS: Record<string, [sr: string, en: string]> = {
 
 const hasDetails = (d: StageRemarks | null | undefined): d is StageRemarks => !!(d?.penalty || d?.shootOff || d?.record);
 
-/** Label for the remark column: status mark first, otherwise the record or shoot-off. */
-export function remarkLabel(remark: string | null | undefined, details?: StageRemarks | null): string | null {
-  return remark ?? details?.record ?? (details?.shootOff ? "SO" : null);
+/** Text that gets an A1, A2… code (assignRemarkCodes): a long remark, or a penalty with no other mark to show. */
+export function remarkText(remark: string | null | undefined, details?: StageRemarks | null): string | null {
+  return remark ?? (details?.record || details?.shootOff ? null : details?.penalty ?? null);
+}
+
+/** Label for the remark column: status mark first, otherwise the record, shoot-off, or the penalty's A-code. */
+export function remarkLabel(remark: string | null | undefined, details?: StageRemarks | null, code?: string | null): string | null {
+  return remark ?? details?.record ?? (details?.shootOff ? "SO" : null) ?? code ?? null;
 }
 
 /** Predugi remark (npr. puna kaznena rečenica) dobija kratku "A1", "A2"...
@@ -92,6 +97,50 @@ export function RemarkBadge({ remark, code, label, details, className = "ml-1.5"
   const [open, setOpen] = useState(false);
   const en = useUiLocale() === "en";
 
+  // Known status marks (DSQ/DNS/DNF/RPO) are always clickable — the modal explains them even without SIUS details.
+  if (hasDetails(details) || STATUS[remark]) {
+    const d: StageRemarks = details ?? {};
+    const status = STATUS[remark];
+    const record = d.record ? RECORDS[d.record] : undefined;
+    // The badge shows the record/"SO" itself when there is no status mark — then there is no status row.
+    const isStatus = remark !== code && !RECORDS[remark] && remark !== "SO";
+    const rows: Array<[string, string, string?]> = [
+      ...(isStatus ? [[en ? "Status" : "Status", remark, status ? status[en ? 1 : 0] : undefined] as [string, string, string?]] : []),
+      ...(d.penalty ? [[en ? "Penalty" : "Kazna", d.penalty] as [string, string]] : []),
+      ...(d.shootOff ? [["Shoot-off", d.shootOff, en ? "placing decided by extra shots after a tie" : "plasman odlučen dodatnim hicima zbog nerešenog rezultata"] as [string, string, string?]] : []),
+      ...(d.record ? [[en ? "Record" : "Rekord", d.record, record?.[en ? 1 : 0]] as [string, string, string?]] : []),
+    ];
+    return (
+      <>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+          className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none underline decoration-dotted underline-offset-2 ${className}`}
+          style={{ color: remarkColor(remark) }}
+          aria-haspopup="dialog"
+          title={en ? "Show details" : "Prikaži detalje"}
+        >
+          {code ?? remark}
+        </button>
+        {open && (
+          <RemarkModal label={label} onClose={() => setOpen(false)}>
+            <dl className="space-y-3">
+              {rows.map(([term, value, note]) => (
+                <div key={term}>
+                  <dt className="text-xs font-semibold text-[var(--muted)]">{term}</dt>
+                  <dd className="text-sm text-[var(--ink)]">
+                    <span className="font-semibold font-[family-name:var(--font-jetbrains-mono)]">{value}</span>
+                    {note && <span className="text-[var(--muted)]"> — {note}</span>}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </RemarkModal>
+        )}
+      </>
+    );
+  }
+
   if (code) {
     return (
       <>
@@ -107,48 +156,6 @@ export function RemarkBadge({ remark, code, label, details, className = "ml-1.5"
         {open && (
           <RemarkModal label={label} onClose={() => setOpen(false)}>
             <p className="text-sm text-[var(--ink)] whitespace-pre-wrap">{remark}</p>
-          </RemarkModal>
-        )}
-      </>
-    );
-  }
-
-  if (hasDetails(details)) {
-    const status = STATUS[remark];
-    const record = details.record ? RECORDS[details.record] : undefined;
-    // The badge shows the record/"SO" itself when there is no status mark — then there is no status row.
-    const isStatus = !RECORDS[remark] && remark !== "SO";
-    const rows: Array<[string, string, string?]> = [
-      ...(isStatus ? [[en ? "Status" : "Status", remark, status ? status[en ? 1 : 0] : undefined] as [string, string, string?]] : []),
-      ...(details.penalty ? [[en ? "Penalty" : "Kazna", details.penalty] as [string, string]] : []),
-      ...(details.shootOff ? [["Shoot-off", details.shootOff, details.shootOff === "SO" ? undefined : (en ? "extra shots fired to break a tie" : "dodatni hici za razrešenje nerešenog")] as [string, string, string?]] : []),
-      ...(details.record ? [[en ? "Record" : "Rekord", details.record, record?.[en ? 1 : 0]] as [string, string, string?]] : []),
-    ];
-    return (
-      <>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-          className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none underline decoration-dotted underline-offset-2 ${className}`}
-          style={{ color: remarkColor(remark) }}
-          aria-haspopup="dialog"
-          title={en ? "Show details" : "Prikaži detalje"}
-        >
-          {remark}
-        </button>
-        {open && (
-          <RemarkModal label={label} onClose={() => setOpen(false)}>
-            <dl className="space-y-3">
-              {rows.map(([term, value, note]) => (
-                <div key={term}>
-                  <dt className="text-xs font-semibold text-[var(--muted)]">{term}</dt>
-                  <dd className="text-sm text-[var(--ink)]">
-                    <span className="font-semibold font-[family-name:var(--font-jetbrains-mono)]">{value}</span>
-                    {note && <span className="text-[var(--muted)]"> — {note}</span>}
-                  </dd>
-                </div>
-              ))}
-            </dl>
           </RemarkModal>
         )}
       </>
