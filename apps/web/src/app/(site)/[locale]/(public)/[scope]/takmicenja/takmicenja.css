@@ -38,3 +38,34 @@
     animation: none;
   }
 }
+
+/* ── Sezona: sažeti prošli meseci ─────────────────────────────────────────── */
+.season-ledger {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+.season-ledger > details + details { border-top: 1px solid var(--border); }
+.season-fold[open] > .season-fold-summary { background: var(--surface); }
+
+/* Otvaranje meseca: visina raste na licu mesta, redovi ulaze kratkim nizom. Zatvaranje brže.
+   Bez podrške za ::details-content / interpolate-size visina skače, redovi i dalje ulaze. */
+.season-fold { interpolate-size: allow-keywords; }
+.season-fold::details-content {
+  block-size: 0;
+  overflow: clip;
+  transition: block-size 160ms var(--ease-out), content-visibility 160ms allow-discrete;
+}
+.season-fold[open]::details-content {
+  block-size: auto;
+  transition-duration: 280ms;
+}
+.season-fold[open] .season-fold-body > * {
+  animation: comp-row-in 220ms var(--ease-out) both;
+  animation-delay: calc(min(var(--row-idx, 0), 6) * 25ms + 40ms);
+}
+@keyframes season-row-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .season-fold::details-content { transition: none; }
+  .season-fold[open] .season-fold-body > * { animation: season-row-fade 150ms linear both; animation-delay: 0ms; }
+}

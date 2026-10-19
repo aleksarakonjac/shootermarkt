@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Calendar from "react-calendar";
 import { useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 import { startNavigationProgress } from "@/components/NavigationProgress";
+import { CalendarDayEvents } from "../../components/CalendarDayEvents";
 import "./competition-calendar.css";
 
 const MAX_DOTS = 4;
@@ -22,6 +23,10 @@ type SwipeGesture = { id: number; x: number; y: number; lastX: number; lastT: nu
 
 export type CalendarComp = {
   id: number;
+  name: string;
+  location: string | null;
+  countryName: string | null;
+  countryCode2: string | null;
   date: string;
   dateEnd: string | null;
   level: string;
@@ -108,6 +113,10 @@ function SwipeArea({ onShift, className, children }: { onShift: (dir: 1 | -1) =>
   );
 }
 
+function formatPeekDay(key: string, locale: string) {
+  return new Date(key + "T00:00:00").toLocaleDateString(locale === "en" ? "en-GB" : "sr-Latn", { day: "numeric", month: "long" });
+}
+
 function Arrow({ dir }: { dir: "prev" | "next" }) {
   return (
     <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true">
@@ -121,12 +130,18 @@ interface Props {
 }
 
 const FOCUS_MS = 1400;
+const PEEK_W = 224; // širina prozora za dan (w-56)
+const PEEK_CLOSE_MS = 120;
+
+type Peek = { key: string; left: number; top: number; width: number; pinned: boolean; ctx: string };
 
 // Pronalazi redove u listi čiji period obuhvata dan, skroluje do prvog i kratko ih istakne.
 function focusDayInList(key: string): boolean {
   const matches = [...document.querySelectorAll<HTMLElement>("[data-comp-start]")]
     .filter((el) => el.dataset.compStart! <= key && (el.dataset.compEnd ?? el.dataset.compStart!) >= key);
   if (matches.length === 0) return false;
+  // Red može biti u sažetom mesecu (<details>): otvori ga pre skrola.
+  for (const el of matches) el.closest("details")?.setAttribute("open", "");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   matches[0].scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
   for (const el of matches) {
@@ -148,11 +163,11 @@ export function CompetitionCalendar({ competitions }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const scopedHref = useScopedHref();
+  const locale = useLocale();
 
   const [view, setView] = useState<CalendarView>("month");
   const [open, setOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [emptyNote, setEmptyNote] = useState(false);
   const [activeStartDate, setActiveStartDate] = useState<Date>(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -178,6 +193,52 @@ export function CompetitionCalendar({ competitions }: Props) {
     return map;
   }, [competitions]);
 
+  // Prozor sa takmičenjima dana: desktop na hover, telefon (bez hovera) na tap. Pozicija ispod polja, unutar korena.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [rawPeek, setPeek] = useState<Peek | null>(null);
+  // Prozor važi samo za mesec/prikaz u kom je otvoren; promena meseca ga sakriva.
+  const peekCtx = `${activeStartDate.getTime()}|${view}|${open}`;
+  const peek = rawPeek?.ctx === peekCtx ? rawPeek : null;
+  const closeTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+
+  function peekAt(tile: Element, key: string, pinned: boolean) {
+    const root = rootRef.current;
+    if (!root) return;
+    window.clearTimeout(closeTimer.current);
+    const rr = root.getBoundingClientRect();
+    const tr = tile.getBoundingClientRect();
+    const top = tr.bottom - rr.top + 6;
+    // Telefon (zakačen): cela širina kalendara; desktop: uzak prozor centriran ispod polja.
+    if (pinned) { setPeek({ key, left: 0, top, width: rr.width, pinned, ctx: peekCtx }); return; }
+    const left = Math.min(Math.max(tr.left - rr.left + tr.width / 2 - PEEK_W / 2, 0), Math.max(rr.width - PEEK_W, 0));
+    setPeek({ key, left, top, width: PEEK_W, pinned, ctx: peekCtx });
+  }
+  function closePeekSoon() {
+    window.clearTimeout(closeTimer.current);
+    closeTimer.current = window.setTimeout(() => setPeek((p) => (p?.pinned ? p : null)), PEEK_CLOSE_MS);
+  }
+  const tileKey = (target: EventTarget) => {
+    const tile = (target as Element).closest?.(".react-calendar__tile");
+    const key = tile?.querySelector<HTMLElement>("[data-day]")?.dataset.day;
+    return tile && key ? { tile, key } : null;
+  };
+
+  // Zakačen prozor (telefon): zatvara ga tap van njega, Escape ili promena meseca.
+  const pinned = peek?.pinned ?? false;
+  useEffect(() => {
+    if (!pinned) return;
+    const onDown = (e: PointerEvent) => {
+      const el = e.target as Element;
+      if (el.closest?.(".cal-peek") || el.closest?.(".react-calendar__tile")) return;
+      setPeek(null);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPeek(null); };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("pointerdown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [pinned]);
+
   // Dolazak sa ?focus=YYYY-MM-DD (posle prebacivanja liste): istakni dan i skloni parametar iz URL-a.
   const focusParam = searchParams.get("focus");
   useEffect(() => {
@@ -196,18 +257,24 @@ export function CompetitionCalendar({ competitions }: Props) {
   function pickDay(day: Date | null) {
     if (!day) return;
     const key = toKey(day);
+    // Ponovni klik na isti dan: zatvori prozor i poništi izbor.
+    if (key === selectedDay) { setSelectedDay(null); setPeek(null); return; }
+    // Telefon (bez hovera) i dan bez takmičenja: prozor uz dan, kalendar ostaje otvoren.
+    if (!eventMap.has(key) || window.matchMedia("(hover: none)").matches) {
+      const tile = rootRef.current?.querySelector(`[data-day="${key}"]`)?.closest(".react-calendar__tile");
+      if (tile) { setSelectedDay(key); peekAt(tile, key, true); return; }
+    }
+    jumpToDay(key);
+  }
+
+  function jumpToDay(key: string) {
+    setPeek(null);
     setOpen(false);
-    setEmptyNote(false);
-    if (key === selectedDay) { setSelectedDay(null); return; }
     setSelectedDay(key);
     if (focusDayInList(key)) return;
-    if (!eventMap.has(key)) { setEmptyNote(true); return; }
-    // Dan postoji, ali nije u trenutnoj listi: prebaci godinu i Nadolazeća/Prošla pa istakni.
+    // Dan postoji, ali nije u trenutnoj listi: prebaci godinu pa istakni.
     const params = new URLSearchParams(searchParams.toString());
-    const today = toKey(new Date());
     params.set("year", key.slice(0, 4));
-    if (key < today) { params.set("when", "past"); params.set("archiveAll", "1"); }
-    else { params.delete("when"); params.delete("archiveAll"); }
     params.set("focus", key);
     const href = scopedHref(`/takmicenja?${params.toString()}`);
     startNavigationProgress(href);
@@ -224,7 +291,7 @@ export function CompetitionCalendar({ competitions }: Props) {
   };
 
   return (
-    <div className="w-full lg:sticky lg:top-[calc(var(--site-header-h,3.5rem)+1.5rem)]">
+    <div ref={rootRef} className="relative w-full lg:sticky lg:top-[calc(var(--site-header-h,3.5rem)+1.5rem)]">
       {/* Telefon: traka u stilu kalendara sa početne. Zatvorena: klik bilo gde je otvara. Otvorena: mesec, Danas, strelice */}
       <div
         onClick={() => { if (!open) setOpen(true); }}
@@ -265,6 +332,15 @@ export function CompetitionCalendar({ competitions }: Props) {
 
       <div id="competition-calendar-grid" className="cal-collapse mt-2 lg:mt-0" data-open={open}>
         <div>
+          <div
+            onPointerOver={(e) => {
+              if (e.pointerType !== "mouse") return;
+              const hit = tileKey(e.target);
+              if (hit && eventMap.has(hit.key)) peekAt(hit.tile, hit.key, false);
+              else closePeekSoon();
+            }}
+            onPointerLeave={(e) => { if (e.pointerType === "mouse") closePeekSoon(); }}
+          >
           <SwipeArea onShift={shift} className="kalendar-swipe touch-pan-y">
             <Calendar
               value={selectedDay ? new Date(selectedDay + "T00:00:00") : null}
@@ -280,11 +356,11 @@ export function CompetitionCalendar({ competitions }: Props) {
               tileContent={({ date, view: tileView }) => {
                 if (tileView !== "month") return null;
                 const dayComps = eventMap.get(toKey(date));
-                if (!dayComps?.length) return null;
+                if (!dayComps?.length) return <span hidden data-day={toKey(date)} />;
                 const sorted = dayComps.toSorted((x, y) => levelRank(x.level) - levelRank(y.level));
                 const shown = sorted.slice(0, MAX_DOTS);
                 return (
-                  <span className="tile-dots" aria-hidden="true">
+                  <span className="tile-dots" aria-hidden="true" data-day={toKey(date)}>
                     {shown.map((c) => <span key={c.id} className="tile-dot" style={{ background: `var(--level-${c.level}-fg)` }} />)}
                     {sorted.length > shown.length && <span className="tile-dot-more">+</span>}
                   </span>
@@ -295,6 +371,7 @@ export function CompetitionCalendar({ competitions }: Props) {
               className="shadow-sm"
             />
           </SwipeArea>
+          </div>
         </div>
       </div>
       {/* Desktop: povratak na tekući mesec ispod mreže (ne pomera ništa iznad) */}
@@ -305,8 +382,31 @@ export function CompetitionCalendar({ competitions }: Props) {
           </button>
         </div>
       )}
-      {emptyNote && (
-        <p role="status" className="mt-2 text-center text-xs text-[var(--muted)]">{t("noEventsDay")}</p>
+      {peek && (
+        <div
+          role="dialog"
+          aria-label={formatPeekDay(peek.key, locale)}
+          className="cal-peek absolute z-50 max-h-[60vh] overflow-y-auto overscroll-contain rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white shadow-lg"
+          style={{ left: peek.left, top: peek.top, width: peek.width }}
+          onPointerEnter={(e) => { if (e.pointerType === "mouse") window.clearTimeout(closeTimer.current); }}
+          onPointerLeave={(e) => { if (e.pointerType === "mouse") closePeekSoon(); }}
+        >
+          {peek.pinned && eventMap.has(peek.key) && (
+            <div className="mb-1 flex items-center justify-between gap-2 border-b border-white/15 pb-1.5">
+              <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-semibold text-white/70">{formatPeekDay(peek.key, locale)}</span>
+              <button
+                type="button"
+                onClick={() => jumpToDay(peek.key)}
+                className="min-h-8 rounded px-1.5 text-[11px] font-semibold text-white underline-offset-2 hover:underline"
+              >
+                {locale === "en" ? "Show in list" : "Prikaži u listi"}
+              </button>
+            </div>
+          )}
+          {eventMap.has(peek.key)
+            ? <CalendarDayEvents comps={eventMap.get(peek.key)!.map((c) => ({ ...c, endDate: c.dateEnd }))} locale={locale} />
+            : <p role="status" className="py-0.5 text-white/80"><span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-white">{formatPeekDay(peek.key, locale)}</span> · {t("noEventsDay")}</p>}
+        </div>
       )}
     </div>
   );

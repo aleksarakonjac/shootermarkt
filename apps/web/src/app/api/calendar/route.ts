@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, asc, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
-import { competitions } from "@shootermarkt/db/schema";
+import { competitions, countries } from "@shootermarkt/db/schema";
 import { buildCompetitionScopeFilter, DEFAULT_SCOPE, type Scope, VALID_SCOPES } from "@/lib/scope";
 
 export async function GET(request: NextRequest) {
@@ -19,8 +19,9 @@ export async function GET(request: NextRequest) {
   const end = `${year}-${String(month + 1).padStart(2, "0")}-01`;
   const startedAt = performance.now();
   const rows = await db
-    .select({ id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, dateEnd: competitions.dateEnd, location: competitions.location, level: competitions.level })
+    .select({ id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, dateEnd: competitions.dateEnd, location: competitions.location, locationSr: competitions.locationSr, locationEn: competitions.locationEn, level: competitions.level, countryName: countries.name, countryCode2: countries.code2 })
     .from(competitions)
+    .leftJoin(countries, eq(competitions.countryId, countries.id))
     .where(and(sql`${competitions.date} < ${end} AND COALESCE(${competitions.dateEnd}, ${competitions.date}) >= ${start}`, buildCompetitionScopeFilter(scope)))
     .orderBy(asc(competitions.date));
 
@@ -29,8 +30,10 @@ export async function GET(request: NextRequest) {
     name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name),
     date: competition.date,
     endDate: competition.dateEnd ?? null,
-    location: competition.location,
+    location: (locale === "en" ? competition.locationEn : competition.locationSr) ?? competition.location,
     level: competition.level,
+    countryName: competition.countryName,
+    countryCode2: competition.countryCode2,
   })), {
     headers: {
       "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",

@@ -4,7 +4,8 @@ import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } fr
 import { useTranslations, useLocale } from "next-intl";
 import { useParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
-import { getLevelLabel, LEVEL_DOT_COLOR, LEVEL_STYLE } from "@/lib/competition-utils";
+import { LEVEL_DOT_COLOR } from "@/lib/competition-utils";
+import { CalendarDayEvents } from "./CalendarDayEvents";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 import { useHomepageDataStatus } from "../[scope]/homepage-data-status";
 
@@ -15,6 +16,8 @@ interface Competition {
   endDate?: string | null;
   location: string | null;
   level: string;
+  countryName?: string | null;
+  countryCode2?: string | null;
 }
 
 interface CalendarModuleProps {
@@ -296,18 +299,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                     id={`calendar-events-${dateStr}`}
                     className={`absolute z-50 w-52 rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white ${tooltipH} ${tooltipX}`}
                   >
-                    {selectedHere.map((c) => {
-                      const levelStyle = LEVEL_STYLE[c.level.toLowerCase()] ?? LEVEL_STYLE.club;
-                      return <Link key={c.id} href={scopedHref(`/takmicenja/${c.id}`)} className="flex flex-col gap-1 py-1 border-b border-white/10 last:border-0 hover:text-white/80">
-                        <span className="self-start rounded px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider" style={levelStyle}>
-                          {getLevelLabel(c.level.toLowerCase(), locale)}
-                        </span>
-                        <span className="font-semibold leading-tight">{c.name}</span>
-                        {c.location && (
-                          <span className="text-white/80">{c.location}</span>
-                        )}
-                      </Link>;
-                    })}
+                    <CalendarDayEvents comps={selectedHere.map((c) => ({ ...c, endDate: c.endDate ?? null }))} locale={locale} />
                   </div>
                 )}
               </div>
