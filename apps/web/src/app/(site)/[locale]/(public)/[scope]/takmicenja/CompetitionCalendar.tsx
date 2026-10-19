@@ -166,6 +166,7 @@ export function CompetitionCalendar({ competitions }: Props) {
   const locale = useLocale();
 
   const [view, setView] = useState<CalendarView>("month");
+  const monthBeforeYear = useRef(0);
   const [open, setOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [activeStartDate, setActiveStartDate] = useState<Date>(() => {
@@ -333,6 +334,7 @@ export function CompetitionCalendar({ competitions }: Props) {
       <div id="competition-calendar-grid" className="cal-collapse mt-2 lg:mt-0" data-open={open}>
         <div>
           <div
+            className={`relative ${showingCurrentMonth ? "" : "cal-has-today"}`}
             onPointerOver={(e) => {
               if (e.pointerType !== "mouse") return;
               const hit = tileKey(e.target);
@@ -341,14 +343,32 @@ export function CompetitionCalendar({ competitions }: Props) {
             }}
             onPointerLeave={(e) => { if (e.pointerType === "mouse") closePeekSoon(); }}
           >
+          {/* Desktop: povratak na tekući mesec, u zaglavlju kalendara (ispod reda sa strelicama) */}
+          {!showingCurrentMonth && (
+            <button type="button" onClick={goToday} className="cal-today-btn absolute left-1/2 z-10 hidden -translate-x-1/2 rounded border border-[var(--brand-primary)] px-2 py-px text-[11px] font-semibold uppercase leading-4 tracking-wide text-[var(--brand-primary)] transition-colors hover:bg-[var(--brand-primary)]/10 lg:block">
+              {t("goToday")}
+            </button>
+          )}
           <SwipeArea onShift={shift} className="kalendar-swipe touch-pan-y">
             <Calendar
               value={selectedDay ? new Date(selectedDay + "T00:00:00") : null}
               onChange={(val) => pickDay(val as Date | null)}
               activeStartDate={activeStartDate}
               view={view}
-              onViewChange={({ view: next }) => { if (next) setView(next as CalendarView); }}
-              onActiveStartDateChange={({ activeStartDate: d }) => { if (d) setActiveStartDate(d); }}
+              // Klik na labelu u godišnjem prikazu zatvara selektor: nazad na mesec (decade prikaz nam ne treba).
+              onViewChange={({ view: next, action }) => {
+                if (!next) return;
+                if (action === "drillUp" && next === "decade") {
+                  setView("month");
+                  setActiveStartDate((cur) => new Date(cur.getFullYear(), monthBeforeYear.current, 1));
+                } else {
+                  if (action === "drillUp" && next === "year") monthBeforeYear.current = activeStartDate.getMonth();
+                  setView(next as CalendarView);
+                }
+              }}
+              onActiveStartDateChange={({ activeStartDate: d, action }) => {
+                if (d && !(action === "drillUp" && view === "year")) setActiveStartDate(d);
+              }}
               formatDay={(_, date) => String(date.getDate())}
               formatMonthYear={(_, date) => `${t(`months.${date.getMonth()}`)} ${date.getFullYear()}`}
               formatMonth={(_, date) => t(`months.${date.getMonth()}`)}
@@ -367,21 +387,13 @@ export function CompetitionCalendar({ competitions }: Props) {
                 );
               }}
               calendarType="iso8601"
-              minDetail="year"
+              minDetail="decade"
               className="shadow-sm"
             />
           </SwipeArea>
           </div>
         </div>
       </div>
-      {/* Desktop: povratak na tekući mesec ispod mreže (ne pomera ništa iznad) */}
-      {!showingCurrentMonth && (
-        <div className="mt-2 hidden justify-center lg:flex">
-          <button type="button" onClick={goToday} className="rounded border border-[var(--brand-primary)] px-2 py-px text-[11px] font-semibold uppercase leading-4 tracking-wide text-[var(--brand-primary)] transition-colors hover:bg-[var(--brand-primary)]/10">
-            {t("goToday")}
-          </button>
-        </div>
-      )}
       {peek && (
         <div
           role="dialog"

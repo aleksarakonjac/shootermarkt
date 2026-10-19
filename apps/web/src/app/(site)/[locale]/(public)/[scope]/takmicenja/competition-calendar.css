@@ -15,9 +15,12 @@
   display: flex;
   align-items: center;
   padding: 0.5rem 0.5rem 0;
-  gap: 0.125rem;
+  gap: 0;
   margin-bottom: 0;
 }
+/* Today dugme sedi u zaglavlju, ispod reda sa strelicama; mesto se rezerviše samo dok je prikazano */
+.cal-has-today .react-calendar__navigation { margin-bottom: 1.375rem; }
+.cal-today-btn { top: 3.25rem; }
 
 .react-calendar__navigation button {
   background: none;
@@ -37,9 +40,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px !important;
+  min-width: 30px !important;
   height: 44px;
-  padding: 0 !important;
+  padding: 0 0 0.4rem !important; /* glif strelice sedi nisko u fontu, podiži ga na liniju labela */
   font-size: 1.75rem !important;
   line-height: 1;
 }
@@ -59,8 +62,9 @@
   font-weight: 700;
   font-size: 0.875rem;
   color: var(--ink);
-  text-align: left;
-  padding-left: 0.5rem !important;
+  text-align: center;
+  white-space: nowrap;
+  padding: 0 !important;
 }
 
 /* Weekday labels */

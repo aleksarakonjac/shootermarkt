@@ -30,16 +30,9 @@ export async function generateMetadata({ params }: { params: Promise<{ scope: Sc
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const DISC_ORDER = ["ARM","ARW","APM","APW","R3PM","R3PW","R3JM","R3JW","SPW","RFPM","FPM"];
 
 const LEVEL_PRIORITY: Record<string, number> = {
   olympic: 0, world: 1, continental: 2, international: 3, national: 4, regional: 5, club: 6,
-};
-
-// Grupa discipline na kartici: kratka oznaka, puno ime u title (filter koristi puna imena).
-const DISCIPLINE_BADGE: Record<string, { short: string; sr: string; en: string; style: { background: string; color: string } }> = {
-  air:       { short: "10m", sr: "Vazdušno",       en: "Air",        style: { background: "#dbeafe", color: "#1d4ed8" } },
-  smallbore: { short: "MK",  sr: "Malokalibarsko", en: "Small-bore", style: { background: "#fef3c7", color: "#a16207" } },
 };
 
 const FALLBACK_BADGE = { background: "var(--surface-2)", color: "var(--muted)" };
@@ -94,14 +87,6 @@ function formatCountdown(days: number, locale: string): string {
   if (days < 30) return "za 3 ned.";
   if (days < 45) return "za mesec";
   return `za ${Math.floor(days / 30)} mes.`;
-}
-
-function sortDiscs(codes: string[]): string[] {
-  return [...codes].sort(
-    (a, b) =>
-      (DISC_ORDER.indexOf(a) >= 0 ? DISC_ORDER.indexOf(a) : 99) -
-      (DISC_ORDER.indexOf(b) >= 0 ? DISC_ORDER.indexOf(b) : 99)
-  );
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -167,7 +152,6 @@ function CompRow({
   animStyle?: CSSProperties;
 }) {
   const levelStyle = LEVEL_STYLE[comp.level] ?? FALLBACK_BADGE;
-  const discCodes = sortDiscs(comp.disciplineCodes ?? []);
   const countdown = status === "next" || status === "upcoming" ? formatCountdown(daysUntil(comp.date), locale) : null;
 
   return (
@@ -220,21 +204,6 @@ function CompRow({
             </span>
           )}
         </div>
-      </div>
-
-      {/* Disciplines */}
-      <div className="hidden xl:flex items-center gap-1 shrink-0 flex-wrap justify-end" style={{ maxWidth: "130px" }}>
-        {discCodes.slice(0, 4).map((code) => (
-          <span
-            key={code}
-            className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.58rem] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--muted)]"
-          >
-            {code}
-          </span>
-        ))}
-        {discCodes.length > 4 && (
-          <span className="text-[0.58rem] text-[var(--subtle)]">+{discCodes.length - 4}</span>
-        )}
       </div>
 
       {/* Level badge */}
@@ -559,20 +528,6 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
                   {formatCountdown(daysUntil(hero.date), locale)}
                 </span>
               )}
-              {(hero.disciplineGroups ?? []).map((g) => {
-                const badge = DISCIPLINE_BADGE[g];
-                if (!badge) return null;
-                return (
-                  <span
-                    key={g}
-                    title={locale === "en" ? badge.en : badge.sr}
-                    className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.6rem] uppercase px-1.5 py-0.5 rounded"
-                    style={badge.style}
-                  >
-                    {badge.short}
-                  </span>
-                );
-              })}
             </div>
 
             {/* Name */}
@@ -604,18 +559,6 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
                 </span>
               )}
             </div>
-            {sortDiscs(hero.disciplineCodes ?? []).length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                {sortDiscs(hero.disciplineCodes ?? []).map((code) => (
-                  <span
-                    key={code}
-                    className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[0.65rem] uppercase tracking-wide px-2 py-1 rounded bg-[var(--surface-2)] text-[var(--muted)]"
-                  >
-                    {code}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
 
         </div>
