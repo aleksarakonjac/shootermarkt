@@ -26,7 +26,8 @@ const GROUPS: NavGroup[] = [
   {
     label: "Rezultati",
     items: [
-      { href: "/admin/rezultati", label: "Uvoz rezultata" },
+      { href: "/admin/rezultati",        label: "Uvoz rezultata" },
+      { href: "/admin/rezultati/period", label: "Uvoz za period" },
     ],
   },
   {

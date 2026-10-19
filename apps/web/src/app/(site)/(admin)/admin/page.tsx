@@ -12,8 +12,10 @@ const DAY = 86_400_000;
 const isoDay = (offsetDays: number) => new Date(Date.now() + offsetDays * DAY).toISOString().slice(0, 10);
 const ISSF_LEVELS = ["international", "continental", "world", "olympic"] as const;
 
-const hasResults = sql<boolean>`(exists (select 1 from ${results} where ${results.competitionId} = ${competitions.id})
-  or exists (select 1 from ${mixedTeamResults} where ${mixedTeamResults.competitionId} = ${competitions.id}))`;
+// Correlated subqueries: column refs are written table-qualified — drizzle renders bare ${col} unqualified in a
+// single-table select, which would bind both sides to the subquery's own table.
+const hasResults = sql<boolean>`(exists (select 1 from ${results} where ${results}.competition_id = "competitions"."id")
+  or exists (select 1 from ${mixedTeamResults} where ${mixedTeamResults}.competition_id = "competitions"."id"))`;
 const endDate = sql`coalesce(${competitions.dateEnd}, ${competitions.date})`;
 
 export default async function AdminDashboardPage() {
@@ -32,8 +34,8 @@ export default async function AdminDashboardPage() {
         level: competitions.level,
         siusId: competitions.siusId,
         issfId: competitions.issfId,
-        slots: sql<number>`(select count(*)::int from ${competitionSchedule} where ${competitionSchedule.competitionId} = ${competitions.id})`,
-        resultCount: sql<number>`(select count(*)::int from ${results} where ${results.competitionId} = ${competitions.id})`,
+        slots: sql<number>`(select count(*)::int from ${competitionSchedule} where ${competitionSchedule}.competition_id = "competitions"."id")`,
+        resultCount: sql<number>`(select count(*)::int from ${results} where ${results}.competition_id = "competitions"."id")`,
       })
       .from(competitions)
       .where(and(lte(competitions.date, isoDay(14)), gte(endDate, today)))
@@ -59,7 +61,7 @@ export default async function AdminDashboardPage() {
   ]);
 
   const todo = [
-    { count: unresolved.length, label: "Završena takmičenja bez rezultata", hint: "Poslednjih 60 dana", href: "/admin/rezultati", action: "Uvezi rezultate" },
+    { count: unresolved.length, label: "Završena takmičenja bez rezultata", hint: "Poslednjih 60 dana", href: "/admin/rezultati/period", action: "Uvezi rezultate" },
     { count: missingSius.length, label: "Međunarodna takmičenja bez izvora za live rezultate", hint: "Narednih 30 dana, bez SIUS UUID-a i ISSF ID-a", href: "/admin/takmicenja/sync", action: "Poveži" },
     { count: unverified, label: "Strelci čekaju verifikaciju", hint: "Profili koje su strelci sami napravili", href: "/admin/strelci?verified=0", action: "Pregledaj" },
   ].filter((item) => item.count > 0);

@@ -4,9 +4,8 @@
 import { and, gte, isNotNull, lte, eq } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { competitions } from "@shootermarkt/db/schema";
-import { commitImportReview } from "@/lib/import-commit";
-import { commitMixedTeamsDirect } from "@/lib/import-commit-mixed";
-import { buildSiusImport, mergeSiusFinals, SiusImportError } from "@/lib/sius-import";
+import { SiusImportError } from "@/lib/sius-import";
+import { importSiusCompetition, type SiusImportResult, type SiusImportSummary } from "@/lib/sius-bulk";
 
 const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
 const commit = process.argv.includes("--commit");
@@ -34,22 +33,11 @@ async function main() {
     if (!c.siusId) { console.log(`[${c.id}] ${c.name}: nema scius_id`); continue; }
     process.stdout.write(`[${c.id}] ${String(c.date).slice(0, 10)} ${c.name} ... `);
     try {
-      const data = await buildSiusImport(c.siusId);
-      const rows = mergeSiusFinals(data.rows, data.finalEntries);
-      const perDisc = new Map<string, number>();
-      for (const r of rows) perDisc.set(r.disciplineCode, (perDisc.get(r.disciplineCode) ?? 0) + 1);
-      const newShooters = rows.filter((r) => !r.shooterId).length;
-      const unranked = rows.filter((r) => r.qualRank == null && r.finalRank == null && r.elimRank == null).length;
-      const withMarks = rows.filter((r) => r.remarkDetails).length;
-      console.log(`${rows.length} redova [${[...perDisc].map(([k, v]) => `${k}:${v}`).join(" ")}], timova: ${data.teamEntries.length}, novih strelaca: ${newShooters}, bez plasmana (DSQ/DNS): ${unranked}, sa kaznom/SO/rekordom: ${withMarks}${data.errors.length ? `, upozorenja: ${data.errors.join("; ")}` : ""}`);
-      totalRows += rows.length;
-      if (commit && data.teamEntries.length) {
-        const mixed = await commitMixedTeamsDirect(c.id, data.teamEntries);
-        console.log(`    mešani timovi: upisano ${mixed.inserted}, preskočeno ${mixed.skipped}${mixed.errors.length ? `, greške: ${mixed.errors.slice(0, 5).join("; ")}` : ""}`);
-      }
-      if (commit && rows.length) {
-        const res = await commitImportReview({ source: "sius_import", competitionId: c.id, rows });
-        console.log(`    upisano ${res.inserted}, preskočeno ${res.skipped}${res.errors.length ? `, greške: ${res.errors.slice(0, 5).join("; ")}` : ""}`);
+      const r: SiusImportSummary & Partial<SiusImportResult> = commit ? await importSiusCompetition(c.id, c.siusId, { commit: true }) : await importSiusCompetition(c.id, c.siusId);
+      console.log(`${r.rows} redova [${Object.entries(r.perDiscipline).map(([k, v]) => `${k}:${v}`).join(" ")}], timova: ${r.teams}, novih strelaca: ${r.newShooters}, bez plasmana (DSQ/DNS): ${r.unranked}, sa kaznom/SO/rekordom: ${r.withMarks}${r.warnings.length ? `, upozorenja: ${r.warnings.join("; ")}` : ""}`);
+      totalRows += r.rows;
+      if (r.inserted !== undefined) {
+        console.log(`    upisano ${r.inserted}, preskočeno ${r.skipped}, mešani timovi: ${r.teamsInserted}${r.errors?.length ? `, greške: ${r.errors.slice(0, 5).join("; ")}` : ""}`);
       }
     } catch (e) {
       failed++;
