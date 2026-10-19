@@ -11,7 +11,8 @@ export function buildShootersWhere(sp: ShooterFilterParams) {
   const gender = sp.gender?.trim() ?? "";
   const apparatus = sp.apparatus?.trim() ?? "";
   return and(
-    sp.no_apparatus === "1" ? undefined : inArray(shooters.apparatus, [...MVP_APPARATUS]),
+    // Neverifikovani (npr. novi iz live cron-a) često nemaju oružje — ne sakrivaj ih iza MVP filtera
+    sp.no_apparatus === "1" || sp.verified === "0" ? undefined : inArray(shooters.apparatus, [...MVP_APPARATUS]),
     q
       ? and(...q.split(/\s+/).filter(Boolean).map((word) => or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`))))
       : undefined,
