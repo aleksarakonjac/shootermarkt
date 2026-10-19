@@ -166,13 +166,9 @@ function CompRow({
   animClass?: string;
   animStyle?: CSSProperties;
 }) {
-  const past = status === "past";
   const levelStyle = LEVEL_STYLE[comp.level] ?? FALLBACK_BADGE;
   const discCodes = sortDiscs(comp.disciplineCodes ?? []);
-  const hasResults = comp.resultCount > 0;
-  const groups = comp.disciplineGroups ?? [];
   const countdown = status === "next" || status === "upcoming" ? formatCountdown(daysUntil(comp.date), locale) : null;
-  const resultNote = past ? (hasResults ? `${comp.resultCount} ${locale === "en" ? "results" : "rez."}` : (locale === "en" ? "no results" : "bez rez.")) : null;
 
   return (
     <ScopedLink
@@ -196,11 +192,6 @@ function CompRow({
             {countdown}
           </span>
         )}
-        {resultNote && (
-          <span className={`text-[0.65rem] font-semibold font-[family-name:var(--font-jetbrains-mono)] tabular-nums leading-none ${hasResults ? "text-green-700 dark:text-green-400" : "text-[var(--subtle)]"}`}>
-            {resultNote}
-          </span>
-        )}
       </div>
 
       {/* Name + location */}
@@ -211,7 +202,7 @@ function CompRow({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
           <span className="sm:hidden flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)] tabular-nums">
             <StatusPill status={status} locale={locale} />
-            {formatDate(comp.date, comp.dateEnd, locale)}{countdown ? ` · ${countdown}` : ""}{resultNote ? ` · ${resultNote}` : ""}
+            {formatDate(comp.date, comp.dateEnd, locale)}{countdown ? ` · ${countdown}` : ""}
           </span>
           {(comp.location || comp.countryCode2) && (
             <span className="flex w-full sm:w-auto items-center gap-1 text-xs text-[var(--subtle)] min-w-0">
@@ -245,26 +236,6 @@ function CompRow({
           <span className="text-[0.58rem] text-[var(--subtle)]">+{discCodes.length - 4}</span>
         )}
       </div>
-
-      {/* Discipline group */}
-      {groups.length > 0 && (
-        <div className="hidden sm:flex items-center gap-1 shrink-0">
-          {groups.map((g) => {
-            const badge = DISCIPLINE_BADGE[g];
-            if (!badge) return null;
-            return (
-              <span
-                key={g}
-                title={locale === "en" ? badge.en : badge.sr}
-                className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[0.6rem] uppercase px-1.5 py-0.5 rounded"
-                style={badge.style}
-              >
-                {badge.short}
-              </span>
-            );
-          })}
-        </div>
-      )}
 
       {/* Level badge */}
       <span
