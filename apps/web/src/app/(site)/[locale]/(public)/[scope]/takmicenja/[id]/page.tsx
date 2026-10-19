@@ -98,6 +98,7 @@ export default async function CompetitionPage({ params }: Props) {
       finalRank: results.finalRank,
       finalDetail: results.finalDetail,
       finalRemark: results.finalRemark,
+      remarkDetails: results.remarkDetails,
     })
     .from(results)
     .innerJoin(shooters, eq(results.shooterId, shooters.id))
@@ -129,6 +130,7 @@ export default async function CompetitionPage({ params }: Props) {
       finalRank: mixedTeamResults.finalRank,
       finalTotal: mixedTeamResults.finalTotal,
       finalRemark: mixedTeamResults.finalRemark,
+      remarkDetails: mixedTeamResults.remarkDetails,
       shooter1FinalDetail: mixedTeamResults.shooter1FinalDetail,
       shooter2FinalDetail: mixedTeamResults.shooter2FinalDetail,
     })
@@ -247,6 +249,7 @@ export default async function CompetitionPage({ params }: Props) {
       finalRank: r.finalRank,
       finalDetail: r.finalDetail,
       finalRemark: r.finalRemark,
+      remarkDetails: r.remarkDetails,
     });
   }
 

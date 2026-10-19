@@ -8,7 +8,8 @@ import { Link } from "@/i18n/navigation";
 import type { FinalDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
-import { RemarkBadge, RemarkLegend, assignRemarkCodes, type RemarkLegendItem } from "./RemarkBadge";
+import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, type RemarkLegendItem } from "./RemarkBadge";
+import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 export type FinalResultRow = {
   id: number;
@@ -23,6 +24,7 @@ export type FinalResultRow = {
   finalRank: number | null;
   finalDetail: FinalDetail | null;
   remark: string | null | undefined;
+  remarkDetails?: StageRemarks | null;
 };
 
 function Avatar({ firstName, lastName, avatarUrl }: { firstName: string; lastName: string; avatarUrl: string | null }) {
@@ -418,7 +420,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
 
                   {/* Remark — e.g. SO (shoot-off decided who's out of the final) */}
                   <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)]`}>
-                    {r.remark && <RemarkBadge remark={r.remark} code={remarkCodes[idx]} label={`${r.lastName} ${r.firstName}`} className="" />}
+                    {remarkLabel(r.remark, r.remarkDetails) && <RemarkBadge remark={remarkLabel(r.remark, r.remarkDetails)!} code={r.remark ? remarkCodes[idx] : null} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />}
                   </div>
 
                   {/* Expand chevron — mobile only, rightmost column; desktop shows series inline instead */}

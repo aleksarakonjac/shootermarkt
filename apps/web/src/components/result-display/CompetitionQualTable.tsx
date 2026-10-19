@@ -7,7 +7,8 @@ import { Link } from "@/i18n/navigation";
 import type { QualDetail, PositionsQualDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
-import { RemarkBadge, RemarkLegend, assignRemarkCodes, type RemarkLegendItem } from "./RemarkBadge";
+import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, type RemarkLegendItem } from "./RemarkBadge";
+import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 const POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"] as const;
 const POSITION_LABELS_EN = ["Kneeling", "Prone", "Standing"] as const;
@@ -50,6 +51,7 @@ export type CompResultRow = {
   qualified: boolean | null;
   qualDetail: QualDetail | null;
   remark: string | null | undefined;
+  remarkDetails?: StageRemarks | null;
   disciplineCode: string | undefined;
   apparatus: string | null;
 };
@@ -447,10 +449,13 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                   {/* Remark / Q badge — own narrow column, not inline with the total */}
                   <div className={`${cellCls} justify-center group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
                     {r.remark ? (
-                      <RemarkBadge remark={r.remark} code={remarkCodes[idx]} label={`${r.lastName} ${r.firstName}`} className="" />
-                    ) : isTopQual ? (
-                      <QualifiedBadge />
-                    ) : null}
+                      <RemarkBadge remark={r.remark} code={remarkCodes[idx]} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />
+                    ) : (
+                      <span className="flex items-center gap-1.5">
+                        {isTopQual && <QualifiedBadge />}
+                        {remarkLabel(null, r.remarkDetails) && <RemarkBadge remark={remarkLabel(null, r.remarkDetails)!} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />}
+                      </span>
+                    )}
                   </div>
 
                   {/* Expand chevron — mobile only, rightmost column; desktop shows series inline instead */}

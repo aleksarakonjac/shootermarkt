@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useUiLocale } from "@/hooks/use-ui-locale";
+import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 // Boja po značenju kazne/napomene — bez box-a, samo obojeno slovo/oznaka.
 // DSQ i A-kaznene oznake (A1, A2...) su diskvalifikacije → crveno (--danger).
@@ -16,7 +17,34 @@ const RPO_COLOR = "oklch(0.55 0.16 75)";
 function remarkColor(remark: string): string {
   if (remark === "DSQ" || /^A\d/.test(remark)) return "var(--danger)";
   if (remark === "RPO") return RPO_COLOR;
+  if (RECORDS[remark]) return "var(--success)";
   return "var(--muted)";
+}
+
+const STATUS: Record<string, [sr: string, en: string]> = {
+  DSQ: ["Diskvalifikovan", "Disqualified"],
+  DNS: ["Nije startovao", "Did not start"],
+  DNF: ["Nije završio", "Did not finish"],
+  RPO: ["Samo za bodove rang liste — ne ulazi u finale (kvota nacije)", "Ranking points only — cannot enter the final (nation quota)"],
+};
+
+// ISSF record codes: Q = qualification record, E = equalled, J = junior.
+const RECORDS: Record<string, [sr: string, en: string]> = {
+  WR: ["Svetski rekord", "World record"],
+  EWR: ["Izjednačen svetski rekord", "Equalled world record"],
+  WRJ: ["Svetski juniorski rekord", "Junior world record"],
+  EWRJ: ["Izjednačen svetski juniorski rekord", "Equalled junior world record"],
+  QWR: ["Svetski rekord u kvalifikacijama", "Qualification world record"],
+  EQWR: ["Izjednačen svetski rekord u kvalifikacijama", "Equalled qualification world record"],
+  QWRJ: ["Juniorski svetski rekord u kvalifikacijama", "Junior qualification world record"],
+  EQWRJ: ["Izjednačen juniorski svetski rekord u kvalifikacijama", "Equalled junior qualification world record"],
+};
+
+const hasDetails = (d: StageRemarks | null | undefined): d is StageRemarks => !!(d?.penalty || d?.shootOff || d?.record);
+
+/** Label for the remark column: status mark first, otherwise the record or shoot-off. */
+export function remarkLabel(remark: string | null | undefined, details?: StageRemarks | null): string | null {
+  return remark ?? details?.record ?? (details?.shootOff ? "SO" : null);
 }
 
 /** Predugi remark (npr. puna kaznena rečenica) dobija kratku "A1", "A2"...
@@ -27,7 +55,7 @@ export function assignRemarkCodes(remarks: Array<string | null | undefined>): Ar
   return remarks.map((remark) => (remark && remark.length > 3 ? `A${++n}` : null));
 }
 
-function RemarkModal({ remark, label, onClose }: { remark: string; label?: string; onClose: () => void }) {
+function RemarkModal({ label, onClose, children }: { label?: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -50,7 +78,7 @@ function RemarkModal({ remark, label, onClose }: { remark: string; label?: strin
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{label || (en ? "Remark" : "Napomena")}</p>
           <button type="button" onClick={onClose} aria-label={en ? "Close" : "Zatvori"} className="text-[var(--subtle)] hover:text-[var(--ink)] text-sm leading-none">✕</button>
         </div>
-        <p className="text-sm text-[var(--ink)] whitespace-pre-wrap">{remark}</p>
+        {children}
       </div>
     </div>,
     document.body
@@ -59,7 +87,8 @@ function RemarkModal({ remark, label, onClose }: { remark: string; label?: strin
 
 /** `code` (npr. "A1") se prosleđuje samo kad je remark predugačak da stane u
  *  kolonu — tad se prikazuje kao dugme koje na klik otvara modal sa punim tekstom. */
-export function RemarkBadge({ remark, code, label, className = "ml-1.5" }: { remark: string; code?: string | null; label?: string; className?: string }) {
+/** `details` (kazna / shoot-off / rekord iz SIUS-a) čini oznaku klikabilnom — modal prikazuje sve detalje. */
+export function RemarkBadge({ remark, code, label, details, className = "ml-1.5" }: { remark: string; code?: string | null; label?: string; details?: StageRemarks | null; className?: string }) {
   const [open, setOpen] = useState(false);
   const en = useUiLocale() === "en";
 
@@ -75,7 +104,53 @@ export function RemarkBadge({ remark, code, label, className = "ml-1.5" }: { rem
         >
           {code}
         </button>
-        {open && <RemarkModal remark={remark} label={label} onClose={() => setOpen(false)} />}
+        {open && (
+          <RemarkModal label={label} onClose={() => setOpen(false)}>
+            <p className="text-sm text-[var(--ink)] whitespace-pre-wrap">{remark}</p>
+          </RemarkModal>
+        )}
+      </>
+    );
+  }
+
+  if (hasDetails(details)) {
+    const status = STATUS[remark];
+    const record = details.record ? RECORDS[details.record] : undefined;
+    // The badge shows the record/"SO" itself when there is no status mark — then there is no status row.
+    const isStatus = !RECORDS[remark] && remark !== "SO";
+    const rows: Array<[string, string, string?]> = [
+      ...(isStatus ? [[en ? "Status" : "Status", remark, status ? status[en ? 1 : 0] : undefined] as [string, string, string?]] : []),
+      ...(details.penalty ? [[en ? "Penalty" : "Kazna", details.penalty] as [string, string]] : []),
+      ...(details.shootOff ? [["Shoot-off", details.shootOff, details.shootOff === "SO" ? undefined : (en ? "extra shots fired to break a tie" : "dodatni hici za razrešenje nerešenog")] as [string, string, string?]] : []),
+      ...(details.record ? [[en ? "Record" : "Rekord", details.record, record?.[en ? 1 : 0]] as [string, string, string?]] : []),
+    ];
+    return (
+      <>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+          className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none underline decoration-dotted underline-offset-2 ${className}`}
+          style={{ color: remarkColor(remark) }}
+          aria-haspopup="dialog"
+          title={en ? "Show details" : "Prikaži detalje"}
+        >
+          {remark}
+        </button>
+        {open && (
+          <RemarkModal label={label} onClose={() => setOpen(false)}>
+            <dl className="space-y-3">
+              {rows.map(([term, value, note]) => (
+                <div key={term}>
+                  <dt className="text-xs font-semibold text-[var(--muted)]">{term}</dt>
+                  <dd className="text-sm text-[var(--ink)]">
+                    <span className="font-semibold font-[family-name:var(--font-jetbrains-mono)]">{value}</span>
+                    {note && <span className="text-[var(--muted)]"> — {note}</span>}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </RemarkModal>
+        )}
       </>
     );
   }

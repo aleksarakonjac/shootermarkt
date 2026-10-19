@@ -6,14 +6,15 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
-import { RemarkBadge, RemarkLegend, assignRemarkCodes, type RemarkLegendItem } from "./RemarkBadge";
+import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, type RemarkLegendItem } from "./RemarkBadge";
+import type { RemarkDetails } from "@shootermarkt/db/pdf-import-types";
 
 export type MixedTeamRow = {
   id: number; nocCode: string; teamNumber: number; shooter1Id: number | null; shooter2Id: number | null;
   shooter1Name: string | null; shooter2Name: string | null;
   shooter1Detail: { series: number[]; inners?: number | null; total: number } | null; shooter2Detail: { series: number[]; inners?: number | null; total: number } | null;
   shooter1FinalDetail?: { series: number[] } | null; shooter2FinalDetail?: { series: number[] } | null;
-  qualRank: number | null; qualTotal: string | null; qualInners: number | null; qualRemark: string | null; qualified: boolean | null; finalRank: number | null; finalTotal: string | null; finalRemark: string | null;
+  qualRank: number | null; qualTotal: string | null; qualInners: number | null; qualRemark: string | null; qualified: boolean | null; finalRank: number | null; finalTotal: string | null; finalRemark: string | null; remarkDetails?: RemarkDetails | null;
 };
 
 // showMedals: false dok finale traje — prva tri mesta bez medalja.
@@ -53,6 +54,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const rank = (team: MixedTeamRow) => isFinal ? team.finalRank : team.qualRank;
   const total = (team: MixedTeamRow) => isFinal ? team.finalTotal : team.qualTotal;
   const remark = (team: MixedTeamRow) => isFinal ? team.finalRemark : team.qualRemark;
+  const stageDetails = (team: MixedTeamRow) => (isFinal ? team.remarkDetails?.final : team.remarkDetails?.qual) ?? null;
   const detail1 = (team: MixedTeamRow) => isFinal ? team.shooter1FinalDetail ?? null : team.shooter1Detail;
   const detail2 = (team: MixedTeamRow) => isFinal ? team.shooter2FinalDetail ?? null : team.shooter2Detail;
   const shooterTotal1 = (team: MixedTeamRow) => isFinal ? sumOrNull(detail1(team)?.series) : (team.shooter1Detail?.total ?? null);
@@ -119,7 +121,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
             {hasSeries && seriesHeaders.map((_, i) => { const s1 = detail1(team)?.series; const v = s1?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s1 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}
             <div className={subtotalCell} style={{ gridRow: r1, background: rowBg }}>{shooterTotal1(team) != null ? fmt(shooterTotal1(team)!) : <span className="text-[var(--subtle)]">—</span>}</div>
             <div className={`${cell} justify-end gap-1 font-[family-name:var(--font-jetbrains-mono)] text-lg font-bold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{total(team) != null ? <>{fmt(Number(total(team)))}{showInners && team.qualInners != null && <span className="text-xs font-normal text-[var(--muted)]">{team.qualInners}<span className="text-[0.6rem]">×</span></span>}</> : <span className="font-normal text-[var(--subtle)]">—</span>}</div>
-            <div className={`${cell} justify-end pr-4 font-[family-name:var(--font-jetbrains-mono)] text-base font-bold text-[var(--success)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{remark(team) ? <RemarkBadge remark={remark(team)!} code={remarkCodes[index]} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className="" /> : !isFinal && team.qualified ? "Q" : null}</div>
+            <div className={`${cell} justify-end pr-4 font-[family-name:var(--font-jetbrains-mono)] text-base font-bold text-[var(--success)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{remark(team) ? <RemarkBadge remark={remark(team)!} code={remarkCodes[index]} details={stageDetails(team)} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className="" /> : <span className="flex items-center gap-1.5">{!isFinal && team.qualified ? "Q" : null}{remarkLabel(null, stageDetails(team)) && <RemarkBadge remark={remarkLabel(null, stageDetails(team))!} details={stageDetails(team)} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className="" />}</span>}</div>
             <div className={`${cell} hidden justify-center !px-0.5 group-hover:bg-[var(--surface-2)] sm:flex`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}><ChevronIcon open={hasSeries && isExpanded} /></div>
             {hasSeries && <div className={`${cell} justify-center group-hover:bg-[var(--surface-2)] sm:hidden`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}><ChevronIcon open={isExpanded} /></div>}
             <div className={`${memberCell} ${!isLast || isExpanded ? "border-b border-[var(--border)]" : ""} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r2, background: rowBg }}><TeamMember id={team.shooter2Id} name={team.shooter2Name} /></div>

@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import type { QualDetail, FinalDetail, ElimDetail, AgeCategory } from "@shootermarkt/db/schema";
-import { CATEGORY_LABEL } from "@shootermarkt/db/pdf-import-types";
+import { CATEGORY_LABEL, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
 import {
   CompetitionQualTable,
   type CompResultRow,
@@ -54,6 +54,7 @@ export type DisciplineGroup = {
       finalRank: number | null;
       finalDetail: FinalDetail | null;
       finalRemark: string | null;
+      remarkDetails: RemarkDetails | null;
     }>;
   }>;
 };
@@ -666,6 +667,7 @@ function CompetitionDetail({
       qualified: r.qualified,
       qualDetail: r.qualDetail,
       remark: r.qualRemark,
+      remarkDetails: r.remarkDetails?.qual ?? null,
       disciplineCode: group?.code ?? "",
       apparatus: group?.apparatus ?? null,
     })) ?? [];
@@ -691,13 +693,15 @@ function CompetitionDetail({
         qualified: null,
         qualDetail: r.elimDetail,
         remark: r.elimRemark,
+        remarkDetails: r.remarkDetails?.elim ?? null,
         disciplineCode: group?.code ?? "",
         apparatus: group?.apparatus ?? null,
       })) ?? [];
 
   const rawFinalRows: FinalResultRow[] =
     catGroup?.results
-      .filter((r) => r.finalRank != null || r.finalTotal != null)
+      // DSQ/DNS in the final has neither rank nor total — keep it visible via its remark.
+      .filter((r) => r.finalRank != null || r.finalTotal != null || r.finalRemark != null)
       .map((r) => ({
         id: r.id,
         shooterId: r.shooterId,
@@ -711,6 +715,7 @@ function CompetitionDetail({
         finalRank: r.finalRank,
         finalDetail: r.finalDetail,
         remark: r.finalRemark,
+        remarkDetails: r.remarkDetails?.final ?? null,
       })) ?? [];
   // Stara finala (samo zbirovi serija) → isti prikaz kao live: Klečeći/Ležeći… ili S1, S2, 11–12…
   const finalRowsByRank = [...rawFinalRows].sort((a, b) => (a.finalRank ?? Infinity) - (b.finalRank ?? Infinity));
