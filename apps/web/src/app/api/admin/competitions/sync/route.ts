@@ -8,6 +8,7 @@ import { competitions, countries, competitionLevelEnum, eventTypeEnum, ageCatego
 import { inArray, isNotNull, sql } from "drizzle-orm";
 import { fetchSiusCompetitions } from "@shootermarkt/adapters/sius/public-adapter";
 import { matchSiusCompetition, type SiusMatch } from "@/lib/sius-match";
+import { nameSimilarity } from "@/lib/name-similarity";
 import { FOCUS_PRIORITY_MAX, FOCUS_PRIORITY_MIN } from "@/lib/competition-priority";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -37,23 +38,6 @@ function buildKey(source: CalendarSource, externalId: string | null, name: strin
 
 // ── Cross-source fuzzy duplicate detection ────────────────────────────────────
 
-function tokenize(name: string): Set<string> {
-  return new Set(
-    name.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 2)
-  );
-}
-
-function jaccardSimilarity(a: string, b: string): number {
-  const ta = tokenize(a);
-  const tb = tokenize(b);
-  const intersection = [...ta].filter((w) => tb.has(w)).length;
-  const union = new Set([...ta, ...tb]).size;
-  return union === 0 ? 0 : intersection / union;
-}
-
 function datesClose(d1: string | null, d2: string | null, windowDays = 4): boolean {
   if (!d1 || !d2) return false;
   return Math.abs(new Date(d1).getTime() - new Date(d2).getTime()) <= windowDays * 86_400_000;
@@ -70,7 +54,7 @@ function detectConflictGroups(events: Array<{ key: string; source: CalendarSourc
       const a = events[i], b = events[j];
       if (a.source === b.source) continue;
       if (!datesClose(a.dateFrom, b.dateFrom)) continue;
-      if (jaccardSimilarity(a.name, b.name) < 0.35) continue;
+      if (nameSimilarity(a.name, b.name) < 0.35) continue;
 
       const gA = groups.get(a.key);
       const gB = groups.get(b.key);

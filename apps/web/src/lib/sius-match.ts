@@ -1,3 +1,4 @@
+import { nameSimilarity } from "@/lib/name-similarity";
 import type { SiusCompetition } from "@shootermarkt/adapters/sius/public-adapter";
 
 const DAYS = 5;
@@ -14,13 +15,6 @@ export interface SiusMatch {
   confident: boolean;
 }
 
-const tokens = (s: string) => new Set(s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2));
-function jaccard(a: string, b: string) {
-  const ta = tokens(a), tb = tokens(b);
-  const inter = [...ta].filter((w) => tb.has(w)).length;
-  const union = new Set([...ta, ...tb]).size;
-  return union ? inter / union : 0;
-}
 const dayDiff = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000;
 
 /** Candidates within ±5 days, best first. Score = name overlap + city hit − 0.02/day. */
@@ -30,7 +24,7 @@ export function rankSiusCandidates(target: { name: string; date: string; locatio
     .map((s) => {
       const city = s.city?.toLowerCase();
       const cityHit = !!city && `${target.name} ${target.location ?? ""}`.toLowerCase().includes(city);
-      return { s, score: jaccard(target.name, s.name) + (cityHit ? 0.5 : 0) - dayDiff(s.start, target.date) * 0.02 };
+      return { s, score: nameSimilarity(target.name, s.name) + (cityHit ? 0.5 : 0) - dayDiff(s.start, target.date) * 0.02 };
     })
     .sort((a, b) => b.score - a.score);
 }
