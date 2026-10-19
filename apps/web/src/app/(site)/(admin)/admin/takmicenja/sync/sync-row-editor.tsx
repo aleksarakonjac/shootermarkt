@@ -8,6 +8,7 @@ import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { TranslatedNameInput } from "@/components/ui/TranslatedNameInput";
 import { FocusPriorityField } from "@/components/ui/FocusPriorityField";
 import { defaultFocusPriority } from "@/lib/competition-priority";
+import { formatDateSr } from "@/lib/date-utils";
 
 export interface Draft {
   name: string;
@@ -131,6 +132,9 @@ export function SyncRowEditor({
   countries,
   sourceCountry,
   siusSuggestion,
+  dbMatch,
+  linked = false,
+  onLinkChange,
   edited,
   onChange,
   onReset,
@@ -141,6 +145,10 @@ export function SyncRowEditor({
   countries: Country[];
   sourceCountry: string | null;
   siusSuggestion?: SiusSuggestion | null;
+  /** Existing DB competition this event may duplicate; `linked` = complete it instead of inserting. */
+  dbMatch?: { id: number; name: string; date: string } | null;
+  linked?: boolean;
+  onLinkChange?: (linked: boolean) => void;
   edited: boolean;
   onChange: (patch: Partial<Draft>) => void;
   onReset: () => void;
@@ -156,6 +164,23 @@ export function SyncRowEditor({
 
   return (
     <div id={id} className="grid grid-cols-1 gap-x-4 gap-y-4 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-5 md:grid-cols-12">
+      {dbMatch && (
+        <fieldset className="rounded-lg border border-[var(--border-strong)] bg-[var(--bg)] px-4 py-3 md:col-span-12">
+          <legend className="sr-only">Već postoji u bazi</legend>
+          <p className="text-sm font-semibold text-[var(--ink)]">Već postoji u bazi: {dbMatch.name} <span className="font-normal text-[var(--muted)]">· {formatDateSr(dbMatch.date)}</span></p>
+          <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:gap-6">
+            <label className="flex min-h-11 items-center gap-2 text-sm text-[var(--ink)]">
+              <input type="radio" name={`${id}-link`} checked={linked} onChange={() => onLinkChange?.(true)} className="accent-[var(--brand-primary)]" />
+              Dopuni postojeće (ISSF ID, SIUS UUID, država)
+            </label>
+            <label className="flex min-h-11 items-center gap-2 text-sm text-[var(--ink)]">
+              <input type="radio" name={`${id}-link`} checked={!linked} onChange={() => onLinkChange?.(false)} className="accent-[var(--brand-primary)]" />
+              Uvezi kao novo takmičenje
+            </label>
+          </div>
+          {linked && <p className="mt-1 text-xs text-[var(--muted)]">Naziv, datumi i nivo postojećeg takmičenja ostaju kakvi jesu; polja ispod se koriste samo za ISSF ID, SIUS UUID i državu.</p>}
+        </fieldset>
+      )}
       <Field label="Naziv *" htmlFor={`${id}-name`} className="md:col-span-12">
         <input id={`${id}-name`} value={draft.name} onChange={(e) => onChange({ name: e.target.value })} className={inputCls} />
       </Field>

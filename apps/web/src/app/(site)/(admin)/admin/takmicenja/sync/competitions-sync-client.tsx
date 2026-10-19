@@ -19,6 +19,8 @@ interface SyncEvent {
   issfId: string | null;
   siusSuggestion: SiusSuggestion | null;
   currentSiusId: string | null;
+  /** Same competition already in the DB without an ISSF id (manual/SSS/ESC); confident = link by default. */
+  dbMatch: { id: number; name: string; date: string; score: number; confident: boolean } | null;
   competitionTypeId: number | null;
   competitionTypeName: string | null;
   competitionTypeAcronym: string | null;
@@ -155,7 +157,8 @@ function Chevron({ open }: { open: boolean }) {
 /** Existing competition that has no SIUS UUID yet but got a confident one from the lookup. */
 const gainsSius = (e: SyncEvent) => e.alreadyInDb && !e.currentSiusId && !!e.siusSuggestion?.confident;
 
-function RowStatus({ e, hasSourceTag }: { e: SyncEvent; hasSourceTag: boolean }) {
+function RowStatus({ e, hasSourceTag, linked }: { e: SyncEvent; hasSourceTag: boolean; linked: boolean }) {
+  if (linked) return <span className="text-[0.7rem] font-medium text-green-700">Dopuna postojećeg</span>;
   if (!e.alreadyInDb) return <span className="text-[0.7rem] text-[var(--subtle)]">Novi</span>;
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -184,7 +187,9 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const [result, setResult] = useState<{ inserted: number; linked?: number; skipped: number } | null>(null);
+  // event key → existing competition id to complete instead of inserting (null = import as new)
+  const [linkTo, setLinkTo] = useState<Record<string, number | null>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [baseline, setBaseline] = useState<Record<string, Draft>>({});
@@ -219,6 +224,7 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
       setEvents(data);
       setDrafts(initial);
       setBaseline(initial);
+      setLinkTo(Object.fromEntries((data as SyncEvent[]).map((e) => [e.key, e.dbMatch?.confident ? e.dbMatch.id : null])));
       setLoaded(true);
 
       // Per conflict group: keep only highest-priority source selected
@@ -363,6 +369,7 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
           siusId: d.siusId.trim() || null,
           disciplineGroups: d.disciplineGroups,
           tags: d.tags,
+          linkCompetitionId: linkTo[e.key] ?? null,
         };
       });
     if (!toCommit.length) return;
@@ -406,6 +413,7 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
       {result && (
         <div className="mb-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm">
           <span style={{ color: "var(--success)" }} className="font-semibold">{result.inserted} uvezeno</span>
+          {!!result.linked && <span className="ml-2 font-semibold" style={{ color: "var(--success)" }}>· {result.linked} dopunjeno postojećih</span>}
           {result.skipped > 0 && (
             <span className="text-[var(--muted)] ml-2">· {result.skipped} preskočeno (već postoje)</span>
           )}
@@ -565,6 +573,11 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
                               <span className="flex flex-wrap items-center gap-x-2 text-[0.7rem] font-medium">
                                 {e.competitionTypeName && <span className="text-[var(--muted)]">{e.competitionTypeName}{e.competitionTypeAcronym ? ` (${e.competitionTypeAcronym})` : ""}</span>}
                                 {isConflict && !fullyDone && <span className="text-orange-700">moguć duplikat</span>}
+                                {e.dbMatch && !e.alreadyInDb && (
+                                  <span className={linkTo[e.key] != null ? "text-green-700" : "text-orange-700"}>
+                                    {linkTo[e.key] != null ? "dopunjuje" : "možda već postoji"}: {e.dbMatch.name}
+                                  </span>
+                                )}
                                 {d.siusId && <span className="text-green-700">SIUS povezan</span>}
                                 {edited && <span className="text-[var(--brand-primary)]">izmenjeno</span>}
                                 {!complete && !fullyDone && <span className="text-amber-700">nepotpuno</span>}
@@ -577,14 +590,14 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
                           <span className="hidden font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] md:col-start-5 md:row-start-1 md:block">{formatDateRangeSr(d.dateFrom || null, d.dateTo || null)}</span>
                           <span className="hidden text-xs text-[var(--muted)] md:col-start-6 md:row-start-1 md:block">{[d.location, countryName && countryName !== "SRB" ? countryName : null].filter(Boolean).join(", ")}</span>
                           <div className="hidden md:col-start-7 md:row-start-1 md:block">
-                            <RowStatus e={e} hasSourceTag={hasSourceTag} />
+                            <RowStatus e={e} hasSourceTag={hasSourceTag} linked={linkTo[e.key] != null} />
                           </div>
                           {/* Mobile meta line */}
                           <div className="col-start-2 col-span-2 row-start-2 flex flex-wrap items-center gap-x-3 gap-y-1 pb-2 pl-5 text-xs text-[var(--muted)] md:hidden">
                             <span className={`rounded px-1.5 py-0.5 text-[0.65rem] font-semibold font-[family-name:var(--font-jetbrains-mono)] ${SOURCE_COLORS[e.source]}`}>{SOURCE_LABELS[e.source]}</span>
                             <span className="font-[family-name:var(--font-jetbrains-mono)]">{formatDateRangeSr(d.dateFrom || null, d.dateTo || null)}</span>
                             <span>{[d.location, countryName && countryName !== "SRB" ? countryName : null].filter(Boolean).join(", ")}</span>
-                            <RowStatus e={e} hasSourceTag={hasSourceTag} />
+                            <RowStatus e={e} hasSourceTag={hasSourceTag} linked={linkTo[e.key] != null} />
                           </div>
                         </div>
                         {isOpen && !e.alreadyInDb && (
@@ -595,6 +608,9 @@ export function CompetitionsSyncClient({ countries }: { countries: Country[] }) 
                             countries={countries}
                             sourceCountry={e.country}
                             siusSuggestion={e.siusSuggestion}
+                            dbMatch={e.dbMatch}
+                            linked={linkTo[e.key] != null}
+                            onLinkChange={(on) => setLinkTo((prev) => ({ ...prev, [e.key]: on ? e.dbMatch!.id : null }))}
                             edited={edited}
                             onChange={(patch) => patchDraft(e.key, patch)}
                             onReset={() => resetDraft(e)}

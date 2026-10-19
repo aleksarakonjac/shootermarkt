@@ -5,7 +5,7 @@ import type { CalendarSource } from "@/lib/calendar/adapters";
 import { detectCompetitionLevel, isRiflePistolCompetition } from "@shootermarkt/adapters/issf/competition-level";
 import { db } from "@shootermarkt/db";
 import { competitions, countries, competitionLevelEnum, eventTypeEnum, ageCategoryEnum } from "@shootermarkt/db/schema";
-import { inArray, isNotNull, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { fetchSiusCompetitions } from "@shootermarkt/adapters/sius/public-adapter";
 import { matchSiusCompetition, type SiusMatch } from "@/lib/sius-match";
 import { nameSimilarity } from "@/lib/name-similarity";
@@ -64,6 +64,56 @@ function detectConflictGroups(events: Array<{ key: string; source: CalendarSourc
     }
   }
   return groups;
+}
+
+const ISSF_LEVELS = ["international", "continental", "world", "olympic"] as const;
+
+export interface DbMatch {
+  id: number;
+  name: string;
+  date: string;
+  siusId: string | null;
+  score: number;
+  /** Strong enough to link by default; weaker matches are only offered. */
+  confident: boolean;
+}
+
+/**
+ * ISSF events not yet in the DB are matched against competitions that have no ISSF id
+ * (entered by hand, or from SSS/ESC) by start date (±4 days) and name similarity, so the import
+ * can complete the existing row instead of inserting a duplicate. Each DB row goes to one event only.
+ */
+async function findDbMatches(events: Array<{ key: string; source: CalendarSource; name: string; dateFrom: string | null }>): Promise<Map<string, DbMatch>> {
+  const candidates = events.filter((e) => e.source === "issf" && e.dateFrom);
+  if (!candidates.length) return new Map();
+  const dates = candidates.map((e) => Date.parse(e.dateFrom!));
+  const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const rows = await db
+    .select({ id: competitions.id, name: competitions.name, date: competitions.date, level: competitions.level, siusId: competitions.siusId })
+    .from(competitions)
+    .where(and(isNull(competitions.issfId), gte(competitions.date, day(Math.min(...dates) - 5 * 86_400_000)), lte(competitions.date, day(Math.max(...dates) + 5 * 86_400_000))));
+
+  const pairs: Array<{ key: string; match: DbMatch }> = [];
+  for (const e of candidates) {
+    for (const r of rows) {
+      if (!datesClose(e.dateFrom, r.date)) continue;
+      let score = nameSimilarity(e.name, r.name);
+      // Names in another language ("Juniorski Svetski kup" vs "ISSF Junior World Cup") share no words:
+      // an international DB row in the same ±4-day window is still offered, but never linked by default.
+      if (score < 0.35 && (ISSF_LEVELS as readonly string[]).includes(r.level)) score = 0.3;
+      if (score < 0.3) continue;
+      pairs.push({ key: e.key, match: { id: r.id, name: r.name, date: r.date, siusId: r.siusId, score, confident: score >= 0.5 } });
+    }
+  }
+  pairs.sort((a, b) => b.match.score - a.match.score);
+  const out = new Map<string, DbMatch>();
+  const usedRows = new Set<number>();
+  for (const { key, match } of pairs) {
+    if (out.has(key) || usedRows.has(match.id)) continue;
+    out.set(key, match);
+    usedRows.add(match.id);
+  }
+  return out;
 }
 
 /**
@@ -149,8 +199,10 @@ export async function GET(req: NextRequest) {
 
   const issfSiusMap = new Map(existingIssf.map((r) => [r.issfId!, r.siusId]));
   const extSiusMap  = new Map(existingExt.map((r) => [r.externalId!, r.siusId]));
-  const siusSuggestions = await suggestSiusLinks(deduped, (e) =>
-    (e.source === "issf" && e.externalId ? issfSiusMap.get(e.externalId) : undefined) ?? extSiusMap.get(e.key) ?? null);
+  const dbMatches = await findDbMatches(deduped.filter((e) => !(e.externalId && issfSiusMap.has(e.externalId)) && !extSiusMap.has(e.key)));
+  const linkedSiusId = (e: { key: string; source: CalendarSource; externalId: string | null }) =>
+    (e.source === "issf" && e.externalId ? issfSiusMap.get(e.externalId) : undefined) ?? extSiusMap.get(e.key) ?? dbMatches.get(e.key)?.siusId ?? null;
+  const siusSuggestions = await suggestSiusLinks(deduped, linkedSiusId);
 
   const conflictGroups = detectConflictGroups(deduped);
   const countryIdOf = await loadCountryLookup();
@@ -176,7 +228,8 @@ export async function GET(req: NextRequest) {
       disciplineGroups: groupsFromName(e.name),
       issfId: e.source === "issf" ? e.externalId : null,
       siusSuggestion: siusSuggestions.get(e.key) ?? null,
-      currentSiusId: (e.source === "issf" && e.externalId ? issfSiusMap.get(e.externalId) : undefined) ?? extSiusMap.get(e.key) ?? null,
+      currentSiusId: linkedSiusId(e),
+      dbMatch: dbMatches.get(e.key) ?? null,
       competitionTypeId: e.competitionTypeId ?? null,
       competitionTypeName: e.competitionTypeName ?? null,
       competitionTypeAcronym: e.competitionTypeAcronym ?? null,
@@ -214,6 +267,8 @@ interface CommitEvent {
   siusId?: string | null;
   disciplineGroups?: string[];
   tags?: string[];
+  /** Complete this existing competition (ISSF id, SIUS UUID, tag) instead of inserting a new one. */
+  linkCompetitionId?: number | null;
 }
 
 const tagMergeSql = sql`array(SELECT DISTINCT unnest(array_cat(${competitions.tags}, EXCLUDED.tags)))`;
@@ -252,11 +307,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "SIUS UUID se ponavlja u listi" }, { status: 400 });
   }
   if (siusIds.length) {
-    const takenRows = await db.select({ siusId: competitions.siusId, name: competitions.name, issfId: competitions.issfId, externalId: competitions.externalId })
+    const takenRows = await db.select({ id: competitions.id, siusId: competitions.siusId, name: competitions.name, issfId: competitions.issfId, externalId: competitions.externalId })
       .from(competitions).where(inArray(competitions.siusId, siusIds));
     // A UUID already on the very same competition (re-sync) is fine; only another competition's UUID is a clash.
     const clashes = takenRows.filter((t) => !events.some((e) =>
-      blank(e.siusId) === t.siusId && ((blank(e.issfId) && blank(e.issfId) === t.issfId) || e.key === t.externalId)));
+      blank(e.siusId) === t.siusId && ((blank(e.issfId) && blank(e.issfId) === t.issfId) || e.key === t.externalId || e.linkCompetitionId === t.id)));
     if (clashes.length) {
       return NextResponse.json({ error: `SIUS UUID već koristi: ${clashes.map((t) => t.name).join(", ")}` }, { status: 400 });
     }
@@ -284,14 +339,38 @@ export async function POST(req: NextRequest) {
     ...(blank(e.issfId) ? { issfId: blank(e.issfId)! } : {}),
   });
 
+  const linkEvents = events.filter((e) => e.linkCompetitionId);
+  const newEvents = events.filter((e) => !e.linkCompetitionId);
+
+  // issf_id is unique: refuse to link an ISSF id that another competition already carries.
+  const linkIssfIds = linkEvents.map((e) => blank(e.issfId)).filter((v): v is string => !!v);
+  if (linkIssfIds.length) {
+    const owners = await db.select({ id: competitions.id, name: competitions.name, issfId: competitions.issfId })
+      .from(competitions).where(inArray(competitions.issfId, linkIssfIds));
+    const clash = owners.find((o) => !linkEvents.some((e) => e.linkCompetitionId === o.id && blank(e.issfId) === o.issfId));
+    if (clash) return NextResponse.json({ error: `ISSF ID ${clash.issfId} već ima takmičenje „${clash.name}"` }, { status: 400 });
+  }
+
   // ISSF events: conflict on issf_id (unique column)
-  const issfEvents = events.filter((e) => blank(e.issfId));
+  const issfEvents = newEvents.filter((e) => blank(e.issfId));
   // SSS/ESC events: conflict on external_id (partial unique index)
-  const otherEvents = events.filter((e) => !blank(e.issfId));
+  const otherEvents = newEvents.filter((e) => !blank(e.issfId));
 
   let insertedCount = 0;
+  let linkedCount = 0;
 
   try {
+    // Linking only fills what is missing — the admin's name, dates and level on the existing row stay.
+    for (const e of linkEvents) {
+      const res = await db.update(competitions).set({
+        issfId: sql`COALESCE(${competitions.issfId}, ${blank(e.issfId)})`,
+        siusId: sql`COALESCE(${competitions.siusId}, ${blank(e.siusId)})`,
+        countryId: sql`COALESCE(${competitions.countryId}, ${e.countryId ?? null}::int)`,
+        tags: sql`array(SELECT DISTINCT unnest(array_append(${competitions.tags}, ${e.source}::varchar)))`,
+      }).where(eq(competitions.id, e.linkCompetitionId!)).returning({ id: competitions.id });
+      linkedCount += res.length;
+    }
+
     if (issfEvents.length) {
       const res = await db
         .insert(competitions)
@@ -328,5 +407,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Greška pri upisu" }, { status: 500 });
   }
 
-  return NextResponse.json({ inserted: insertedCount, skipped: events.length - insertedCount });
+  return NextResponse.json({ inserted: insertedCount, linked: linkedCount, skipped: events.length - insertedCount - linkedCount });
 }
