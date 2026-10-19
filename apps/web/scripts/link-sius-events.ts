@@ -3,13 +3,20 @@
 // Automatski: -- --auto (dry-run, ispis predloga) pa -- --auto --commit (upisuje samo sigurna poklapanja; ostala preskače).
 // Redosled: ENTER = prihvati predlog, 1-5 = izaberi drugog kandidata, u = nalepi UUID, s = preskoči, q = kraj.
 import { createInterface } from "node:readline/promises";
-import { and, gte, isNull, eq } from "drizzle-orm";
+import { and, gte, lte, isNull, eq } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { competitions } from "@shootermarkt/db/schema";
 import { fetchSiusCompetitions } from "@shootermarkt/adapters/sius/public-adapter";
 import { rankSiusCandidates } from "@/lib/sius-match";
 
-const FROM = `${new Date().getFullYear() - 1}-01-01`;
+const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
+const THIS_YEAR = new Date().getFullYear();
+// --from=GODINA --to=GODINA (podrazumevano: prošla i tekuća godina)
+const FROM_YEAR = Number(arg("from") ?? THIS_YEAR - 1);
+const TO_YEAR = Number(arg("to") ?? THIS_YEAR);
+if (!Number.isInteger(FROM_YEAR) || !Number.isInteger(TO_YEAR) || FROM_YEAR > TO_YEAR) throw new Error("Neispravan --from/--to (godine, from <= to)");
+const FROM = `${FROM_YEAR}-01-01`;
+const TO = `${TO_YEAR}-12-31`;
 const auto = process.argv.includes("--auto");
 const commit = process.argv.includes("--commit");
 // Sigurno poklapanje: dovoljan skor, jasna prednost nad drugim kandidatom, SIUS UUID nije već zauzet.
@@ -17,13 +24,13 @@ const MIN_SCORE = 0.5;
 const MIN_MARGIN = 0.2;
 
 async function main() {
-  const sius = await fetchSiusCompetitions(FROM);
-  console.log(`SIUS: ${sius.length} javnih takmičenja od ${FROM}`);
+  const sius = (await fetchSiusCompetitions(FROM)).filter((s) => s.start <= TO);
+  console.log(`SIUS: ${sius.length} javnih takmičenja ${FROM_YEAR}–${TO_YEAR}`);
 
   const dbComps = await db
     .select({ id: competitions.id, name: competitions.name, date: competitions.date, location: competitions.location })
     .from(competitions)
-    .where(and(isNull(competitions.siusId), gte(competitions.date, FROM)))
+    .where(and(isNull(competitions.siusId), gte(competitions.date, FROM), lte(competitions.date, TO)))
     .orderBy(competitions.date);
   const linked = new Set((await db.select({ s: competitions.siusId }).from(competitions)).map((r) => r.s).filter(Boolean));
   console.log(`Baza: ${dbComps.length} takmičenja bez SIUS UUID-a. Već povezanih SIUS UUID-ova: ${linked.size}\n`);

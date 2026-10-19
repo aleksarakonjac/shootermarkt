@@ -1,5 +1,5 @@
-// Jednokratni uvoz ISSF kalendara (svetski kup, finale SK, SP, EP) za prošlu i tekuću godinu.
-// Dry-run po defaultu; upis tek sa --commit.  Pokretanje: pnpm db:import-issf [-- --commit]
+// Jednokratni uvoz ISSF kalendara (svetski kup, finale SK, SP, EP) za opseg godina (podrazumevano prošla + tekuća).
+// Dry-run po defaultu; upis tek sa --commit.  Pokretanje: pnpm db:import-issf [-- --from=2023 --to=2026] [-- --commit]
 import { inArray } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { competitions, countries } from "@shootermarkt/db/schema";
@@ -9,11 +9,16 @@ import { groupsFromName } from "@/lib/competition-filters";
 
 // ISSF tipovi: 1 Svetski kup, 2 Finale SK, 3 Svetsko prvenstvo, 5 Evropsko prvenstvo
 const TYPE_IDS = new Set([1, 2, 3, 5]);
-const YEAR = new Date().getFullYear();
+const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
+const THIS_YEAR = new Date().getFullYear();
+// --from=GODINA --to=GODINA (podrazumevano: prošla i tekuća godina)
+const FROM_YEAR = Number(arg("from") ?? THIS_YEAR - 1);
+const TO_YEAR = Number(arg("to") ?? THIS_YEAR);
+if (!Number.isInteger(FROM_YEAR) || !Number.isInteger(TO_YEAR) || FROM_YEAR > TO_YEAR) throw new Error("Neispravan --from/--to (godine, from <= to)");
 const commit = process.argv.includes("--commit");
 
 async function main() {
-  const batches = await Promise.all([YEAR - 1, YEAR].map(async (y) => {
+  const batches = await Promise.all(Array.from({ length: TO_YEAR - FROM_YEAR + 1 }, (_, i) => FROM_YEAR + i).map(async (y) => {
     const ev = await fetchIssfEvents(y);
     console.log(`${y}: ISSF vratio ${ev.length} događaja`);
     return ev;
