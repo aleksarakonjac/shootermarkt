@@ -26,7 +26,7 @@ function looksComplete(detailsByRank: Array<FinalDetail | null>) {
     && (second.cumulative?.length ?? 0) >= THREE_POSITION_ENTRIES;
 }
 
-export function isFinalInProgress(slot: FinalSlot | undefined, now: Date) {
+function isFinalInProgress(slot: FinalSlot | undefined, now: Date) {
   if (!slot) return false;
   const start = new Date(slot.startTime).getTime();
   const end = slot.endTime ? new Date(slot.endTime).getTime() : start + DEFAULT_FINAL_MS;

@@ -20,7 +20,7 @@ export interface CalendarEvent {
 
 // ── SSS ───────────────────────────────────────────────────────────────────────
 
-export async function fetchSssEvents(year: number): Promise<CalendarEvent[]> {
+async function fetchSssEvents(year: number): Promise<CalendarEvent[]> {
   const raw = await fetchSssCalendar();
   // SSS calendar has no year in dates — publishes only current season, include all
   return raw
@@ -87,7 +87,7 @@ export async function fetchIssfEvents(year: number): Promise<CalendarEvent[]> {
 
 const ESC_BASE = "https://esc-shooting.org";
 
-export async function fetchEscEvents(year: number): Promise<CalendarEvent[]> {
+async function fetchEscEvents(year: number): Promise<CalendarEvent[]> {
   // ESC shows one month at a time — fetch all 12 in parallel
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
   const results = await Promise.allSettled(

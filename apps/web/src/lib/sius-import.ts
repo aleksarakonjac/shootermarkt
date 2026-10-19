@@ -1,5 +1,5 @@
 // Čiste funkcije žive u sius-merge.ts (client-safe, bez DB-a) — ovde re-export za postojeće pozivaoce
-export { mergeSiusFinals, stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
+export { mergeSiusFinals, type SiusFinalEntry } from "@/lib/sius-merge";
 import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, MIXED_TEAM_CODES } from "@shootermarkt/adapters/sius/public-adapter";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";

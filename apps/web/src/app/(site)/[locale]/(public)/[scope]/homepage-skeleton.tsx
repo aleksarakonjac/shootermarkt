@@ -27,11 +27,3 @@ export function MainSkeleton() {
   );
 }
 
-export function ClubsSkeleton() {
-  return (
-    <div aria-busy="true" className="min-h-48 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]">
-      <div className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2"><div className="sk h-5 w-40" /></div>
-      <div className="flex flex-col gap-3 p-4">{[0, 1, 2, 3].map((row) => <div key={row} className="sk h-4" style={{ width: `${90 - row * 12}%` }} />)}</div>
-    </div>
-  );
-}

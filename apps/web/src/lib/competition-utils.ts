@@ -8,7 +8,7 @@ export const LEVEL_LABEL: Record<string, string> = {
   olympic:       "Olimpijsko",
 };
 
-export const LEVEL_LABEL_EN: Record<string, string> = {
+const LEVEL_LABEL_EN: Record<string, string> = {
   club:          "Club",
   regional:      "Regional",
   national:      "National",
@@ -21,19 +21,6 @@ export const LEVEL_LABEL_EN: Record<string, string> = {
 export function getLevelLabel(level: string, locale: string): string {
   const map = locale === "en" ? LEVEL_LABEL_EN : LEVEL_LABEL;
   return map[level] ?? level;
-}
-
-/**
- * Resolve the best competition name for the given locale.
- * Falls back to canonical `name` when translation is absent.
- */
-export function getCompetitionName(
-  comp: { name: string; nameSr?: string | null; nameEn?: string | null },
-  locale: string
-): string {
-  if (locale === "en") return comp.nameEn ?? comp.name;
-  if (locale === "sr") return comp.nameSr ?? comp.name;
-  return comp.name;
 }
 
 export const LEVEL_STYLE: Record<string, { background: string; color: string }> = {

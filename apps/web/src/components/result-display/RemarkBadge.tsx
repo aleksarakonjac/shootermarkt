@@ -11,9 +11,9 @@ import { useUiLocale } from "@/hooks/use-ui-locale";
 // razlikuje i od diskvalifikacije i od DNS/DNF (koji nemaju rezultat uopšte).
 // --warning token je presvetao za tekst (2.5:1 na belom) pa koristimo tamniju
 // nijansu istog hue-a koja prolazi AA kontrast.
-export const RPO_COLOR = "oklch(0.55 0.16 75)";
+const RPO_COLOR = "oklch(0.55 0.16 75)";
 
-export function remarkColor(remark: string): string {
+function remarkColor(remark: string): string {
   if (remark === "DSQ" || /^A\d/.test(remark)) return "var(--danger)";
   if (remark === "RPO") return RPO_COLOR;
   return "var(--muted)";

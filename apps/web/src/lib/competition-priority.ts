@@ -39,13 +39,13 @@ export const FOCUS_300M_OFFSET = 4;
 const UNKNOWN_AGE_OFFSET = 0;
 
 /** Starosna kategorija takmičenja = najstarija kategorija koja se na njemu takmiči. */
-export function competitionAgeOffset(categories: Iterable<string>, fallbackAgeCategory: string) {
+function competitionAgeOffset(categories: Iterable<string>, fallbackAgeCategory: string) {
   const offsets = [...categories].map((c) => FOCUS_AGE_OFFSET[c]).filter((o): o is number => o != null);
   if (offsets.length) return Math.min(...offsets);
   return FOCUS_AGE_OFFSET[fallbackAgeCategory] ?? UNKNOWN_AGE_OFFSET;
 }
 
-export function is300mCompetition(name: string) {
+function is300mCompetition(name: string) {
   return /(^|[^\d])300\s?m\b/i.test(name);
 }
 

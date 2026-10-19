@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 
-export const EXCEL_RESULT_COLUMNS = [
+const EXCEL_RESULT_COLUMNS = [
   { key: "competition_id", required: false, description: "ID postojećeg takmičenja. Ako je popunjen, ostali podaci o takmičenju se ignorišu." },
   { key: "competition_name", required: true, description: "Naziv takmičenja. Obavezan ako competition_id nije popunjen." },
   { key: "competition_date", required: true, description: "Datum početka u formatu YYYY-MM-DD." },

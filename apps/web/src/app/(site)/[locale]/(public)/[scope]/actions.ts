@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@shootermarkt/db";
-import { shooters, clubs, results } from "@shootermarkt/db/schema";
+import { shooters, results } from "@shootermarkt/db/schema";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
 import { computeFormaFromEntries } from "@/lib/forma";
 import { getFormaEntriesForShooter } from "@/lib/forma-query";
@@ -31,23 +31,6 @@ export interface ComparisonResult {
     draws: number;
     total: number;
   };
-}
-
-export async function getVerifiedShooters() {
-  const list = await db
-    .select({
-      id: shooters.id,
-      firstName: shooters.firstName,
-      lastName: shooters.lastName,
-      clubName: clubs.name,
-      nationality: shooters.nationality,
-    })
-    .from(shooters)
-    .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-    .where(eq(shooters.verified, true))
-    .orderBy(shooters.lastName, shooters.firstName);
-
-  return list;
 }
 
 export async function compareShooters(idA: number, idB: number): Promise<ComparisonResult> {

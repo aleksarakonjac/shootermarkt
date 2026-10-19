@@ -12,7 +12,7 @@ import { ScopedLink } from "../components/ScopedLink";
 import { TopFormaClient } from "./top-forma-client";
 import { useHomepageDataStatus } from "./homepage-data-status";
 import { LEVEL_STYLE } from "@/lib/competition-utils";
-import { ClubsSkeleton, MainSkeleton, TickerSkeleton } from "./homepage-skeleton";
+import { MainSkeleton, TickerSkeleton } from "./homepage-skeleton";
 import { MIXED_TEAM_CODES } from "@shootermarkt/db/pdf-import-types";
 import type { HomepageMainData } from "@/lib/homepage-data";
 
@@ -465,11 +465,3 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
   </>;
 }
 
-export function HomepageClubsClient() {
-  const t = useTranslations("home");
-  const common = useTranslations("common");
-  const { data, state, retry } = useHomepageData<Array<{ clubId: number; name: string; city: string | null; avgPercentile: number; activeShooters: number }>>("/api/homepage/clubs");
-  if (state === "loading") return <ClubsSkeleton />;
-  if (state === "error" || !data) return <HomepageError retry={retry} />;
-  return <section className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]"><div className="flex items-baseline justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2"><h3 className="font-[family-name:var(--font-barlow-condensed)] text-lg font-bold uppercase text-[var(--ink)]">{t("clubLeaderboard")}</h3><span className="text-xs text-[var(--muted)]">{t("clubLeaderboardMetric")}</span></div><div className="p-4">{data.length === 0 ? <p className="py-4 text-center text-sm text-[var(--muted)]">{t("noClubData")}</p> : data.map((club, index) => <div key={club.clubId} className="flex items-center justify-between py-2 text-sm"><span><b className="mr-3 text-[var(--subtle)]">{index + 1}</b><b>{club.name}</b> <span className="text-[var(--muted)]">{club.city || common("serbia")}</span></span><span className="font-mono font-bold tabular-nums text-[var(--ink)]">{club.avgPercentile.toFixed(1)}%</span></div>)}</div></section>;
-}

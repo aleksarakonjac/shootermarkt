@@ -8,7 +8,7 @@ export type PeriodType = "karijera" | SeasonType;
 
 /** Minimalan broj nastupa da bi statistika (osim peak-a) bila prikazana — sprečava
  * da 1 rezultat izgleda kao "prosek". Forma ima sopstveni prag (RANKING_MIN_SAMPLE=5). */
-export const METRIC_MIN_SAMPLE = 3;
+const METRIC_MIN_SAMPLE = 3;
 
 export function currentSeasonStartYear(type: SeasonType, today: Date = new Date()): number {
   const y = today.getFullYear();
@@ -28,7 +28,7 @@ export function seasonLabel(type: SeasonType, startYear: number): string {
   return `${startYear}/${String((startYear + 1) % 100).padStart(2, "0")}`;
 }
 
-export function inWindow(date: string, win: { from: string; to: string }): boolean {
+function inWindow(date: string, win: { from: string; to: string }): boolean {
   return date >= win.from && date <= win.to;
 }
 

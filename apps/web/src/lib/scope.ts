@@ -5,7 +5,7 @@ export type Scope = 'srb' | 'issf';
 export const VALID_SCOPES: readonly Scope[] = ['srb', 'issf'] as const;
 export const DEFAULT_SCOPE: Scope = 'srb';
 
-export const ISSF_LEVELS = ['international', 'continental', 'world', 'olympic'] as const;
+const ISSF_LEVELS = ['international', 'continental', 'world', 'olympic'] as const;
 
 export function buildCompetitionScopeFilter(scope: Scope) {
   if (scope === 'issf') {
@@ -27,8 +27,3 @@ export function buildCompetitionScopeFilter(scope: Scope) {
   );
 }
 
-// Shooter queries are not scope-filtered — use UI country filters instead.
-// Homepage widgets apply explicit nationality filters where there is no UI.
-export function buildShooterScopeFilter(_scope: Scope) {
-  return undefined;
-}

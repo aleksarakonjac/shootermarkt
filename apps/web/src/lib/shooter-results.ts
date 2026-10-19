@@ -3,7 +3,7 @@ import { db } from "@shootermarkt/db";
 import { competitions, countries, disciplines, results } from "@shootermarkt/db/schema";
 import type { ResultRowData } from "@/components/result-display/ResultsHistoryTable";
 
-export const SHOOTER_RESULTS_PAGE_SIZE = 8;
+const SHOOTER_RESULTS_PAGE_SIZE = 8;
 
 export type ResultsCursor = { date: string; id: number };
 export type ResultsFilters = { from?: string; to?: string; query?: string };

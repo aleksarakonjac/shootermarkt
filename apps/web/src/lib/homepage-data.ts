@@ -428,23 +428,3 @@ export async function getHomepageMain(scope: Scope) {
 
 export type HomepageMainData = Awaited<ReturnType<typeof getHomepageMain>>;
 
-export async function getHomepageClubs(scope: Scope) {
-  const nationalityFilter = scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined;
-  const rows = await db.select({ clubId: shooters.clubId, clubName: clubs.name, clubCity: clubs.city, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).innerJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, rankedFormaCacheFilter()));
-
-  // forma svih strelaca po disciplini (rastuce sortirano) — baza za percentil, spaja discipline u jedan unit-less broj
-  const disciplineValues = new Map<string, number[]>();
-  for (const row of rows) { const arr = disciplineValues.get(row.discCode) ?? []; arr.push(Number(row.forma)); disciplineValues.set(row.discCode, arr); }
-  for (const arr of disciplineValues.values()) arr.sort((a, b) => a - b);
-  const percentileOf = (discCode: string, value: number) => {
-    const arr = disciplineValues.get(discCode)!;
-    if (arr.length <= 1) return 100;
-    let lo = 0, hi = arr.length;
-    while (lo < hi) { const mid = (lo + hi) >> 1; if (arr[mid] < value) lo = mid + 1; else hi = mid; }
-    return (lo / (arr.length - 1)) * 100;
-  };
-
-  const grouped = new Map<number, { name: string; city: string | null; percentiles: number[] }>();
-  for (const row of rows) if (row.clubId) { const club = grouped.get(row.clubId) ?? { name: row.clubName, city: row.clubCity, percentiles: [] }; club.percentiles.push(percentileOf(row.discCode, Number(row.forma))); grouped.set(row.clubId, club); }
-  return Array.from(grouped.entries()).map(([clubId, club]) => ({ clubId, name: club.name, city: club.city, avgPercentile: Math.round((club.percentiles.reduce((sum, value) => sum + value, 0) / club.percentiles.length) * 10) / 10, activeShooters: club.percentiles.length })).sort((a, b) => b.avgPercentile - a.avgPercentile).slice(0, 5);
-}

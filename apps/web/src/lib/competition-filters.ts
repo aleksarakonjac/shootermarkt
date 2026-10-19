@@ -58,10 +58,6 @@ export function levelsForGroups(keys: readonly LevelGroupKey[]): string[] {
   return LEVEL_GROUPS.filter((group) => keys.includes(group.key)).flatMap((group) => [...group.levels]);
 }
 
-export function levelGroupOf(level: string): LevelGroupKey | null {
-  return LEVEL_KEY_BY_LEVEL[level] ?? null;
-}
-
 // ── Izvođenje grupa disciplina ──────────────────────────────────────────────
 
 /** `disciplines.distance`: 10 -> vazdušno, 25 / 50 -> malokalibarsko. */
