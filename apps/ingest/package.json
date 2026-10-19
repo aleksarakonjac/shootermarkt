@@ -13,7 +13,6 @@
     "@shootermarkt/adapters": "workspace:*",
     "@shootermarkt/db": "workspace:*",
     "@shootermarkt/queue": "workspace:*",
-    "@supabase/supabase-js": "^2.108.2",
     "drizzle-orm": "^0.45.2",
     "inngest": "^4.12.0",
     "next": "16.2.9",
@@ -25,7 +24,6 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
     "typescript": "^5",
     "vitest": "^3.2.6"
   }
