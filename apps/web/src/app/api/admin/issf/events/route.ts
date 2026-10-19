@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { fetchCompetitionResults, extractMvpEvents, extractMixedTeamEvents } from "@shootermarkt/adapters/issf/adapter";
-
-function isAdmin(email: string | undefined) {
-  return !!email && email === process.env.ADMIN_EMAIL;
-}
+import { requireAdmin } from "@/lib/admin-auth";
 
 const LABEL: Record<string, string> = {
   ARM: "10m Air Rifle Men", ARW: "10m Air Rifle Women",
@@ -17,9 +13,8 @@ const LABEL: Record<string, string> = {
 // Lists disciplines available for a competition so the admin can pick which
 // ones to actually pull (mixed team events are common standalone picks).
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const competitionId = parseInt(req.nextUrl.searchParams.get("competitionId") ?? "");
   if (isNaN(competitionId)) return NextResponse.json({ error: "competitionId required" }, { status: 400 });

@@ -3,16 +3,11 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { pdfImportJobs } from "@shootermarkt/db/schema";
 import { inngest } from "@shootermarkt/queue";
-import { createClient } from "@/lib/supabase/server";
-
-function isAdmin(email: string | undefined) {
-  return !!email && email === process.env.ADMIN_EMAIL;
-}
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id < 1) return NextResponse.json({ error: "Neispravan job" }, { status: 400 });

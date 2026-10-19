@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { fetchSssBilteni } from "@/lib/sss/adapter";
 
-function isAdmin(email: string | undefined) {
-  return !!email && email === process.env.ADMIN_EMAIL;
-}
-
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   try {
     const bilteni = await fetchSssBilteni();

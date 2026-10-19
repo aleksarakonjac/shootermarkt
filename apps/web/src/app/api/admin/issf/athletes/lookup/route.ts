@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { lookupIssfAthletes } from "@shootermarkt/adapters/issf/sync";
 
 // GET ?first=&last=&noc= → rangirani ISSF kandidati za strelca koga nemamo
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user?.email || user.email !== process.env.ADMIN_EMAIL) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const sp = req.nextUrl.searchParams;
   const last = sp.get("last")?.trim() ?? "";

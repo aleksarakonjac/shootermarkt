@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminEmail } from "@/lib/admin-auth";
 import { redirect } from "next/navigation";
 import { AdminNav } from "./AdminNav";
 import { AdminMobileHeader } from "./AdminMobileHeader";
 
 export const dynamic = "force-dynamic";
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
 export default async function AdminLayout({
   children,
@@ -16,7 +15,7 @@ export default async function AdminLayout({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !isAdminEmail(user.email)) {
     redirect("/login");
   }
 

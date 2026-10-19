@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CommitValidationError, commitImportReview } from "@/lib/import-commit";
 import type { CommitPayload } from "@shootermarkt/db/pdf-import-types";
-import { createClient } from "@/lib/supabase/server";
-
-function isAdmin(email: string | undefined) {
-  return !!email && email === process.env.ADMIN_EMAIL;
-}
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   try {
     return NextResponse.json(await commitImportReview((await req.json()) as CommitPayload));

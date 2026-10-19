@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { db } from "@shootermarkt/db";
 import { competitions } from "@shootermarkt/db/schema";
 import { desc } from "drizzle-orm";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { parseFocusPriorityInput } from "@/lib/competition-priority";
-
-function isAdmin(email: string | undefined) {
-  return !!email && email === process.env.ADMIN_EMAIL;
-}
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET(_req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const data = await db
     .select()
@@ -24,9 +19,8 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const body = await req.json();
   const { name, nameSr, nameEn, date, dateEnd, location, locationSr, locationEn, countryId, level, issfId, focusPriority } = body;

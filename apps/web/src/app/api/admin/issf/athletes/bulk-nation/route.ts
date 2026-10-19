@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { importIssfNation } from "@shootermarkt/adapters/issf/import-nation";
-
-function isAdmin(email: string | undefined) {
-  return !!email && email === process.env.ADMIN_EMAIL;
-}
+import { requireAdmin } from "@/lib/admin-auth";
 
 function hasScriptSecret(req: NextRequest) {
   const secret = process.env.IMPORT_SECRET;
@@ -17,9 +13,8 @@ function cancelled() {
 
 export async function POST(req: NextRequest) {
   if (!hasScriptSecret(req)) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const denied = await requireAdmin();
+    if (denied) return denied;
   }
 
   const { noc } = await req.json();

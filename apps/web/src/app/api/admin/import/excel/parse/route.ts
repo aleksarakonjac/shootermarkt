@@ -1,25 +1,18 @@
 import * as XLSX from "xlsx";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { db } from "@shootermarkt/db";
 import { clubs, shooters } from "@shootermarkt/db/schema";
 import { parseExcelResultRows } from "@/lib/excel-results/parse";
 import { matchShooter } from "@shootermarkt/db/name-match";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-function isAdmin(email: string | undefined) {
-  return !!email && email === process.env.ADMIN_EMAIL;
-}
-
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const formData = await req.formData();
   const file = formData.get("file");

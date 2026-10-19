@@ -1,6 +1,5 @@
 import { groupsFromName } from "@/lib/competition-filters";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { fetchAllCalendarEvents, normalizeEventName } from "@/lib/calendar/adapters";
 import type { CalendarSource } from "@/lib/calendar/adapters";
 import { detectCompetitionLevel, isRiflePistolCompetition } from "@shootermarkt/adapters/issf/competition-level";
@@ -11,10 +10,7 @@ import { fetchSiusCompetitions } from "@shootermarkt/adapters/sius/public-adapte
 import { matchSiusCompetition, type SiusMatch } from "@/lib/sius-match";
 import { FOCUS_PRIORITY_MAX, FOCUS_PRIORITY_MIN } from "@/lib/competition-priority";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
-
-function isAdmin(email: string | undefined) {
-  return !!email && email === process.env.ADMIN_EMAIL;
-}
+import { requireAdmin } from "@/lib/admin-auth";
 
 const SOURCE_DEFAULT_LEVEL: Record<CalendarSource, CompetitionLevel | null> = {
   sss:  "national",
@@ -121,9 +117,8 @@ async function suggestSiusLinks(
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const sp = req.nextUrl.searchParams;
   const year = parseInt(sp.get("year") ?? String(new Date().getFullYear()));
@@ -254,9 +249,8 @@ function validate(e: CommitEvent): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const { events } = (await req.json()) as { events: CommitEvent[] };
   if (!Array.isArray(events) || events.length === 0) {

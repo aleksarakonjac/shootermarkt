@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { and, inArray, eq } from "drizzle-orm";
 import { buildShootersWhere, type ShooterFilterParams } from "@/lib/admin-shooters-filter";
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.email !== process.env.ADMIN_EMAIL) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const body = await req.json() as { ids?: number[]; all?: boolean; filter?: ShooterFilterParams };
 

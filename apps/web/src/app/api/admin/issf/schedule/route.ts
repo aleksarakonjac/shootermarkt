@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { db } from "@shootermarkt/db";
 import { competitions, competitionSchedule, disciplines, disciplineCodeEnum } from "@shootermarkt/db/schema";
 import { eq, inArray } from "drizzle-orm";
@@ -7,16 +6,12 @@ import { eq, inArray } from "drizzle-orm";
 type DisciplineCode = typeof disciplineCodeEnum.enumValues[number];
 import { fetchScheduleFromHtml, type ISSFScheduleEntry } from "@shootermarkt/adapters/issf/adapter";
 import { venueLocalToUtc } from "@/lib/timezone";
-
-function isAdmin(email: string | undefined) {
-  return !!email && email === process.env.ADMIN_EMAIL;
-}
+import { requireAdmin } from "@/lib/admin-auth";
 
 // GET /api/admin/issf/schedule?issfId=3574&year=2026
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const issfId = parseInt(req.nextUrl.searchParams.get("issfId") ?? "");
   const year   = parseInt(req.nextUrl.searchParams.get("year") ?? "") || new Date().getFullYear();
@@ -30,9 +25,8 @@ export async function GET(req: NextRequest) {
 // POST /api/admin/issf/schedule
 // Body: { dbCompetitionId: number, entries: ISSFScheduleEntry[] }
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const body = await req.json() as { dbCompetitionId: number; entries: ISSFScheduleEntry[] };
   const { dbCompetitionId, entries } = body;

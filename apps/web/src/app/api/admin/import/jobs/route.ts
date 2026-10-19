@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { db } from "@shootermarkt/db";
 import { competitions, pdfImportJobs } from "@shootermarkt/db/schema";
 import { queuePdfImportJob } from "@/lib/pdf-import/jobs";
@@ -7,8 +6,7 @@ import { removePdfImports, uploadPdfImport } from "@shootermarkt/adapters/pdf-im
 import { and, desc, eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import type { CompetitionLevel, EventType } from "@shootermarkt/db/pdf-import-types";
-
-function isAdmin(email: string | undefined) { return !!email && email === process.env.ADMIN_EMAIL; }
+import { requireAdmin } from "@/lib/admin-auth";
 
 async function resolveCompetitionId(formData: FormData) {
   const existingId = Number(formData.get("competitionId"));
@@ -41,9 +39,8 @@ async function resolveCompetitionId(formData: FormData) {
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const jobs = await db
     .select({
@@ -67,9 +64,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const formData = await req.formData();
   const file = formData.get("pdf") as File | null;

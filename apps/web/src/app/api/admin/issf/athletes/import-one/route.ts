@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { fetchAthleteProfile, inferApparatus } from "@shootermarkt/adapters/issf/adapter";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import { uploadAvatarFromUrl } from "@shootermarkt/db/upload-avatar";
-
-function isAdmin(email: string | undefined) {
-  return !!email && email === process.env.ADMIN_EMAIL;
-}
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!isAdmin(user?.email)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const { issfId, nationCode } = await req.json() as { issfId: string; nationCode?: string };
   if (!issfId) return NextResponse.json({ error: "issfId required" }, { status: 400 });
