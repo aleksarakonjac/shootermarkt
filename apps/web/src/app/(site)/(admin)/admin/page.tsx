@@ -173,7 +173,7 @@ export default async function AdminDashboardPage() {
             Verifikacije
           </Link>
           <Link
-            href="/admin/import"
+            href="/admin/rezultati?mode=pdf"
             className="inline-flex min-h-11 items-center rounded-full bg-[var(--brand-primary)] px-5 py-3 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)] transition-colors"
           >
             PDF import
@@ -384,7 +384,7 @@ export default async function AdminDashboardPage() {
                 {[
                   { href: "/admin/strelci/novi", label: "Novi strelac", desc: "Ručni unos profila" },
                   { href: "/admin/takmicenja/novi", label: "Novo takmičenje", desc: "Unesi manifestaciju" },
-                  { href: "/admin/import", label: "PDF import", desc: "Bilten → pregled" },
+                  { href: "/admin/rezultati?mode=pdf", label: "PDF import", desc: "Bilten → pregled" },
                   { href: "/admin/takmicenja/sync", label: "Sync takmičenja", desc: "ISSF / SSS / ESC" },
                 ].map((action) => (
                   <Link
