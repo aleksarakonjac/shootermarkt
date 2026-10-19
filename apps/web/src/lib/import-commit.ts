@@ -25,7 +25,7 @@ async function addCompetitionTags(competitionId: number, tags: string[]) {
 }
 
 /** Shallow per-stage merge so a re-import of one stage never wipes another stage's marks. */
-const mergeRemarkDetails = sql`coalesce(${results.remarkDetails}, '{}'::jsonb) || coalesce(excluded.remark_details, '{}'::jsonb)`;
+const mergeRemarkDetails = sql`coalesce(${results.remarkDetails} || excluded.remark_details, excluded.remark_details, ${results.remarkDetails})`;
 
 /** Commits reviewed individual result rows and refreshes their forma cache. */
 export async function commitImportReview(payload: CommitPayload): Promise<CommitResult> {

@@ -37,7 +37,7 @@ export interface MixedCommitEntry {
 }
 
 /** Shallow per-stage merge: qualification and finals are committed in separate calls. */
-const mergeRemarkDetails = sql`coalesce(${mixedTeamResults.remarkDetails}, '{}'::jsonb) || coalesce(excluded.remark_details, '{}'::jsonb)`;
+const mergeRemarkDetails = sql`coalesce(${mixedTeamResults.remarkDetails} || excluded.remark_details, excluded.remark_details, ${mixedTeamResults.remarkDetails})`;
 
 export interface MixedCommitInput {
   discipline: string;

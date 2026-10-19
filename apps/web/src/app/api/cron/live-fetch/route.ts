@@ -8,6 +8,11 @@ import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity,
 import { matchShooter } from "@shootermarkt/db/name-match";
 import { buildIssfFinalDetails, buildSiusFinalDetails } from "@/lib/final-detail";
 import { recomputeFormaCache } from "@/lib/forma-cache";
+import { stageRemarks } from "@/lib/sius-merge";
+
+// Same per-stage jsonb merge as the manual/CLI import (lib/import-commit.ts): one stage never wipes another.
+const mergeRemarks = (col: typeof results.remarkDetails | typeof mixedTeamResults.remarkDetails) =>
+  sql`coalesce(${col} || excluded.remark_details, excluded.remark_details, ${col})`;
 
 export const maxDuration = 30;
 
@@ -130,7 +135,7 @@ async function processCompetition(
     let siusData: Map<string, SiusLiveData> = new Map();
     if (disciplineCodes.length > 0) {
       try {
-        siusData = await fetchLiveSiusResults(siusId, disciplineCodes);
+        siusData = await fetchLiveSiusResults(siusId, disciplineCodes, { includeUnranked: true });
         console.log("[cron] SIUS data:", [...siusData.entries()].map(([k, v]) => `${k}: qual=${v.qual.length} elim=${v.elim.length} final=${v.final.length}`));
       } catch (e) {
         console.error("[cron] SIUS fetch failed:", e);
@@ -150,11 +155,13 @@ async function processCompetition(
             competitionId,
             disciplineId: slot.disciplineId,
             category: slot.category,
-            qualTotal: r.total.toFixed(1),
-            qualInners: r.inners ?? null,
+            // DSQ/DNS without a rank: no score (null, never 0) — coalesce keeps any earlier real value.
+            qualTotal: r.rank === null ? null : r.total.toFixed(1),
+            qualInners: r.rank === null ? null : r.inners ?? null,
             qualRank: r.rank,
             qualified: r.qualified || null,
             qualRemark: r.remark,
+            ...(stageRemarks(r) ? { remarkDetails: { qual: stageRemarks(r) } } : {}),
             ...(r.series.length > 0 ? { qualDetail: { series: r.series } } : {}),
             source: "sius_import",
           });
@@ -172,8 +179,9 @@ async function processCompetition(
               disciplineId: slot.disciplineId,
               category: slot.category,
               elimRound: round,
-              elimTotal: Math.round(r.total),
+              elimTotal: r.rank === null ? null : Math.round(r.total),
               elimRank: r.rank,
+              ...(stageRemarks(r) ? { remarkDetails: { elim: stageRemarks(r) } } : {}),
               elimDetail: { series: r.series.map(Math.round), inners: r.inners },
               qualified: r.qualified || null,
               elimRemark: r.remark,
@@ -185,9 +193,10 @@ async function processCompetition(
 
       if (slot.stage === "final" && eventData.final.length > 0) {
         // Kumulativni zbir po seriji (kao ISSF sajt) — vidi lib/final-detail.ts.
-        const finalists = [...eventData.final].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
-        const finalDetails = buildSiusFinalDetails(slot.disciplineCode, finalists);
-        for (const [index, r] of finalists.entries()) {
+        const finalists = [...eventData.final].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity));
+        const withSeries = finalists.filter((r) => r.series.length > 0);
+        const detailOf = new Map(buildSiusFinalDetails(slot.disciplineCode, withSeries).map((d, i) => [withSeries[i], d]));
+        for (const r of finalists) {
           const shooterId = await resolveOrCreateShooter(r, allShooters);
           if (!shooterId) continue;
           rows.push({
@@ -195,10 +204,11 @@ async function processCompetition(
             competitionId,
             disciplineId: slot.disciplineId,
             category: slot.category,
-            finalTotal: r.total.toFixed(1),
+            finalTotal: r.rank === null ? null : r.total.toFixed(1),
             finalRank: r.rank,
             finalRemark: r.remark,
-            ...(r.series.length > 0 ? { finalDetail: finalDetails[index] } : {}),
+            ...(detailOf.has(r) ? { finalDetail: { ...detailOf.get(r)!, ...(r.shootOff ? { shootOff: true } : {}) } } : {}),
+            ...(stageRemarks(r) ? { remarkDetails: { final: stageRemarks(r) } } : {}),
             source: "sius_import",
           });
         }
@@ -225,7 +235,8 @@ async function processCompetition(
   // fails the whole batch. Merge stages into one row per key.
   const dedupedRows = [...rows.reduce((byKey, row) => {
     const key = `${row.shooterId}|${row.competitionId}|${row.disciplineId}|${row.category}`;
-    byKey.set(key, { ...byKey.get(key), ...row });
+    const prev = byKey.get(key);
+    byKey.set(key, { ...prev, ...row, remarkDetails: prev?.remarkDetails || row.remarkDetails ? { ...prev?.remarkDetails, ...row.remarkDetails } : undefined });
     return byKey;
   }, new Map<string, typeof results.$inferInsert>()).values()];
 
@@ -258,6 +269,7 @@ async function processCompetition(
           finalRank: sql`coalesce(excluded.final_rank, ${results.finalRank})`,
           finalDetail: sql`coalesce(excluded.final_detail, ${results.finalDetail})`,
           finalRemark: sql`coalesce(excluded.final_remark, ${results.finalRemark})`,
+          remarkDetails: mergeRemarks(results.remarkDetails),
         },
       });
   }
@@ -277,6 +289,7 @@ async function processCompetition(
           elimDetail: sql`excluded.elim_detail`,
           qualified: sql`coalesce(excluded.qualified, ${results.qualified})`,
           elimRemark: sql`coalesce(excluded.elim_remark, ${results.elimRemark})`,
+          remarkDetails: mergeRemarks(results.remarkDetails),
         },
       });
   }
@@ -304,7 +317,7 @@ async function processMixedTeamSlots(
   if (siusId) {
     let siusData;
     try {
-      siusData = await fetchLiveSiusMixedTeamResults(siusId, disciplineCodes);
+      siusData = await fetchLiveSiusMixedTeamResults(siusId, disciplineCodes, { includeUnranked: true });
     } catch (e) {
       console.error("[cron] SIUS mixed-team fetch failed:", e);
       siusData = new Map();
@@ -344,8 +357,10 @@ async function processMixedTeamSlots(
           ...(a1 ? isFinal ? { shooter1FinalDetail: { series: a1.series } } : { shooter1Detail: { series: a1.series, inners: a1.inners, total: a1.total } } : {}),
           ...(a2 ? isFinal ? { shooter2FinalDetail: { series: a2.series } } : { shooter2Detail: { series: a2.series, inners: a2.inners, total: a2.total } } : {}),
           ...(isFinal
-            ? { finalRank: r.rank, finalTotal: r.total.toFixed(1), finalRemark: r.remark }
-            : { qualRank: r.rank, qualTotal: r.total.toFixed(1), qualInners: r.inners, qualified: r.qualified || null, qualRemark: r.remark }),
+            ? { finalRank: r.rank, finalTotal: r.rank === null ? null : r.total.toFixed(1), finalRemark: r.remark }
+            // qual_remark is varchar(10): only the short status mark; the penalty sentence goes to remark_details.
+            : { qualRank: r.rank, qualTotal: r.rank === null ? null : r.total.toFixed(1), qualInners: r.inners, qualified: r.qualified || null, qualRemark: r.statusRemark }),
+          ...(stageRemarks(r) ? { remarkDetails: isFinal ? { final: stageRemarks(r) } : { qual: stageRemarks(r) } } : {}),
           source: "sius_import",
         });
       };
@@ -366,7 +381,8 @@ async function processMixedTeamSlots(
   const merged = new Map<string, typeof mixedTeamResults.$inferInsert>();
   for (const r of rows) {
     const key = `${r.competitionId}|${r.disciplineId}|${r.nocCode}|${r.teamNumber}`;
-    merged.set(key, { ...merged.get(key), ...r });
+    const prev = merged.get(key);
+    merged.set(key, { ...prev, ...r, remarkDetails: prev?.remarkDetails || r.remarkDetails ? { ...prev?.remarkDetails, ...r.remarkDetails } : undefined });
   }
   const dedupedRows = [...merged.values()];
   if (dedupedRows.length === 0) return 0;
@@ -393,6 +409,7 @@ async function processMixedTeamSlots(
         shooter1FinalDetail: sql`coalesce(excluded.shooter1_final_detail, ${mixedTeamResults.shooter1FinalDetail})`,
         shooter2FinalDetail: sql`coalesce(excluded.shooter2_final_detail, ${mixedTeamResults.shooter2FinalDetail})`,
         finalRemark: sql`coalesce(excluded.final_remark, ${mixedTeamResults.finalRemark})`,
+        remarkDetails: mergeRemarks(mixedTeamResults.remarkDetails),
       },
     });
 
