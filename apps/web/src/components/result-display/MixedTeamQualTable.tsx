@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { Fragment, useState, type CSSProperties } from "react";
 import { useLocale } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
@@ -54,6 +54,17 @@ export function matchTeams(teams: MixedTeamRow[], medal: "gold" | "bronze"): Mix
   return teams.filter((team) => team.finalRank != null && places.includes(team.finalRank));
 }
 
+/** Meč: runde su kolone (hitac strelca 1, strelac 2, zbir tima); boldovane su runde koje su donele poene (pobeda ili nerešeno). */
+function MatchRoundsGrid({ rows, sums, won, fmt }: { rows: Array<{ name: string | null; shots: number[] }>; sums: Array<number | null>; won: boolean[]; fmt: (value: number) => string }) {
+  const cell = "text-center font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums";
+  const tone = (round: number) => (won[round] ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]");
+  return <div className="overflow-x-auto py-2"><div className="inline-grid items-center gap-x-1 gap-y-1" style={{ gridTemplateColumns: `5.5rem repeat(${sums.length}, 2.75rem)` }}>
+    <span />{sums.map((_, round) => <span key={round} className={`${cell} text-[0.6rem] text-[var(--subtle)]`}>{round + 1}</span>)}
+    {rows.map(({ name, shots }, row) => <Fragment key={row}><span className="truncate pr-2 text-xs font-semibold text-[var(--ink)]">{name?.split(/\s+/)[0] ?? "—"}</span>{sums.map((_, round) => <span key={round} className={`${cell} ${tone(round)}`}>{shots[round] != null ? fmt(shots[round]) : "—"}</span>)}</Fragment>)}
+    <span className="border-t border-[var(--border)] pt-1 text-xs font-semibold text-[var(--muted)]">Σ</span>{sums.map((sum, round) => <span key={round} className={`${cell} border-t border-[var(--border)] pt-1 ${tone(round)}`}>{sum != null ? fmt(sum) : "—"}</span>)}
+  </div></div>;
+}
+
 function sumOrNull(series: number[] | undefined): number | null {
   return series && series.length ? series.reduce((a, b) => a + b, 0) : null;
 }
@@ -74,11 +85,15 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const fmt = (value: number) => (isFinal || apparatus === "air_rifle" ? value.toFixed(1) : Math.round(value).toString());
   const sorted = teams.filter((team) => !isFinal || total(team) != null || rank(team) != null || remark(team) != null).toSorted((a, b) => (rank(a) ?? Infinity) - (rank(b) ?? Infinity));
   const isMatch = isFinal && isMatchFormat(sorted);
-  const opponentPoints = (team: MixedTeamRow) => {
-    const place = team.finalRank;
-    if (place == null) return null;
-    const opponent = sorted.find((other) => other.finalRank === (place % 2 ? place + 1 : place - 1));
-    return opponent?.finalTotal != null ? Math.round(Number(opponent.finalTotal)) : null;
+  // Zlatni meč igraju 1. i 2. mesto, bronzani 3. i 4. — protivnik je drugi tim iz para.
+  const opponentOf = (team: MixedTeamRow) => (team.finalRank == null ? undefined : sorted.find((other) => other.finalRank === (team.finalRank! % 2 ? team.finalRank! + 1 : team.finalRank! - 1)));
+  // Po rundi: zbir hitaca oba strelca tima; veći zbir nosi poene (2), jednaki zbirovi po 1 poen (oba tima).
+  const teamRoundSums = (team: MixedTeamRow) => (detail1(team)?.series ?? []).map((shot, i) => { const second = detail2(team)?.series[i]; return second == null ? null : Math.round((shot + second) * 10) / 10; });
+  const roundOutcomes = (team: MixedTeamRow) => {
+    const own = teamRoundSums(team);
+    const opponent = opponentOf(team);
+    const theirs = opponent ? teamRoundSums(opponent) : [];
+    return { sums: own, won: own.map((sum, i) => sum != null && theirs[i] != null && sum >= theirs[i]!) };
   };
   const remarkCodes = assignRemarkCodes(sorted.map((team) => remarkText(remark(team), stageDetails(team))));
   const remarkLegend: RemarkLegendItem[] = sorted
@@ -126,7 +141,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
         const r1 = 2 + index * 3; const r2 = r1 + 1; const accordionRow = r1 + 2;
         const cell = `flex items-center px-2 py-2.5 text-sm transition-colors sm:px-3 ${!isLast || isExpanded ? "border-b border-[var(--border)]" : ""}`;
         const memberCell = `flex min-w-0 items-center px-2 py-1.5 text-sm transition-colors sm:px-3`;
-        const noc = displayNoc(team.nocCode); const nocEntry = NOC_LIST.find((country) => country.noc === noc); const alpha2 = nocEntry?.alpha2;
+        const rounds = isMatch ? roundOutcomes(team) : null; const noc = displayNoc(team.nocCode); const nocEntry = NOC_LIST.find((country) => country.noc === noc); const alpha2 = nocEntry?.alpha2;
         const subtotalCell = `flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`;
         return <div key={team.id} role="rowgroup" style={{ display: "contents" }}>
           <div role="row" className={`group ${hasSeries ? (isMatch ? "cursor-pointer" : "cursor-pointer sm:cursor-default") : ""}`} style={{ display: "contents" }} onClick={hasSeries ? () => toggle(team.id) : undefined}>
@@ -140,7 +155,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
             <div className={`${memberCell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}><TeamMember id={team.shooter1Id} name={team.shooter1Name} /></div>
             {hasSeries && seriesHeaders.map((_, i) => { const s1 = detail1(team)?.series; const v = s1?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s1 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}
             <div className={subtotalCell} style={{ gridRow: r1, background: rowBg }}>{shooterTotal1(team) != null ? fmt(shooterTotal1(team)!) : <span className="text-[var(--subtle)]">—</span>}</div>
-            <div className={`${cell} justify-end gap-1 font-[family-name:var(--font-jetbrains-mono)] text-lg font-bold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{total(team) != null ? <>{isMatch ? Math.round(Number(total(team))) : fmt(Number(total(team)))}{isMatch && opponentPoints(team) != null && <span className="text-xs font-normal text-[var(--muted)]">:{opponentPoints(team)}</span>}{showInners && team.qualInners != null && <span className="text-xs font-normal text-[var(--muted)]">{team.qualInners}<span className="text-[0.6rem]">×</span></span>}</> : <span className="font-normal text-[var(--subtle)]">—</span>}</div>
+            <div className={`${cell} justify-end gap-1 font-[family-name:var(--font-jetbrains-mono)] text-lg font-bold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{total(team) != null ? <>{isMatch ? Math.round(Number(total(team))) : fmt(Number(total(team)))}{showInners && team.qualInners != null && <span className="text-xs font-normal text-[var(--muted)]">{team.qualInners}<span className="text-[0.6rem]">×</span></span>}</> : <span className="font-normal text-[var(--subtle)]">—</span>}</div>
             <div className={`${cell} justify-end pr-4 font-[family-name:var(--font-jetbrains-mono)] text-base font-bold text-[var(--success)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{remark(team) ? <RemarkBadge remark={remark(team)!} code={remarkCodes[index]} details={stageDetails(team)} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className="" /> : <span className="flex items-center gap-1.5">{!isFinal && team.qualified ? "Q" : null}{remarkLabel(null, stageDetails(team), remarkCodes[index]) && <RemarkBadge remark={remarkLabel(null, stageDetails(team), remarkCodes[index])!} code={remarkCodes[index]} details={stageDetails(team)} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className="" />}</span>}</div>
             <div className={`${cell} hidden justify-center !px-0.5 group-hover:bg-[var(--surface-2)] sm:flex`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{isMatch && hasSeries && <ChevronIcon open={isExpanded} />}</div>
             {hasSeries && <div className={`${cell} justify-center group-hover:bg-[var(--surface-2)] sm:hidden`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}><ChevronIcon open={isExpanded} /></div>}
@@ -148,7 +163,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
             {hasSeries && seriesHeaders.map((_, i) => { const s2 = detail2(team)?.series; const v = s2?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r2, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s2 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}
             <div className={subtotalCell} style={{ gridRow: r2, background: rowBg }}>{shooterTotal2(team) != null ? fmt(shooterTotal2(team)!) : <span className="text-[var(--subtle)]">—</span>}</div>
           </div>
-          <AnimatePresence initial={false}>{hasSeries && isExpanded && <motion.div role="row" initial={reducedMotion ? false : { height: 0, opacity: 0, y: -4 }} animate={{ height: "auto", opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { height: 0, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : 0.2 }} style={{ gridColumn: "1 / -1", gridRow: accordionRow, background: rowBg }} className={`min-h-0 overflow-hidden px-3 ${isMatch ? "" : "sm:hidden"} ${isLast ? "" : "border-b border-[var(--border)]"}`}><div className="flex flex-col gap-1.5 py-2">{[{ name: team.shooter1Name, detail: detail1(team) }, { name: team.shooter2Name, detail: detail2(team) }].map(({ name, detail }) => detail?.series.length ? <div key={name} className="flex min-w-0 items-center gap-3"><span className="w-24 shrink-0 truncate text-xs font-semibold text-[var(--ink)]">{name?.split(/\s+/)[0] ?? "—"}</span><div className="flex flex-wrap gap-x-2 gap-y-1 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">{detail.series.map((value, seriesIndex) => <span key={seriesIndex} className={!isFinal && value === Math.max(...detail.series) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(value)}</span>)}</div></div> : null)}</div></motion.div>}</AnimatePresence>
+          <AnimatePresence initial={false}>{hasSeries && isExpanded && <motion.div role="row" initial={reducedMotion ? false : { height: 0, opacity: 0, y: -4 }} animate={{ height: "auto", opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { height: 0, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : 0.2 }} style={{ gridColumn: "1 / -1", gridRow: accordionRow, background: rowBg }} className={`min-h-0 overflow-hidden px-3 ${isMatch ? "" : "sm:hidden"} ${isLast ? "" : "border-b border-[var(--border)]"}`}>{rounds ? <MatchRoundsGrid rows={[{ name: team.shooter1Name, shots: detail1(team)?.series ?? [] }, { name: team.shooter2Name, shots: detail2(team)?.series ?? [] }]} sums={rounds.sums} won={rounds.won} fmt={fmt} /> : <div className="flex flex-col gap-1.5 py-2">{[{ name: team.shooter1Name, detail: detail1(team) }, { name: team.shooter2Name, detail: detail2(team) }].map(({ name, detail }) => detail?.series.length ? <div key={name} className="flex min-w-0 items-center gap-3"><span className="w-24 shrink-0 truncate text-xs font-semibold text-[var(--ink)]">{name?.split(/\s+/)[0] ?? "—"}</span><div className="flex flex-wrap gap-x-2 gap-y-1 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">{detail.series.map((value, seriesIndex) => <span key={seriesIndex} className={!isFinal && value === Math.max(...detail.series) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(value)}</span>)}</div></div> : null)}</div>}</motion.div>}</AnimatePresence>
         </div>;
       })}
     </div></div>
