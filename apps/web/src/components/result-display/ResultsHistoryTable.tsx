@@ -128,9 +128,9 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                 <Fragment key={`${group[0]!.competitionId}:${group[0]!.id}`}>
                   <tr>
                     <td colSpan={4} className="px-3 pb-0.5 pt-3 sm:px-4">
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                        <span className="min-w-0 flex-1 break-words font-semibold leading-snug text-[var(--ink)]">{group[0]!.competitionName}</span>
-                        <span className="ml-auto whitespace-nowrap text-right font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-normal text-[var(--subtle)] sm:text-xs">{formatCompetitionDate(group[0]!.competitionDate, group[0]!.competitionDateEnd)}{group[0]!.competitionLocation && !group[0]!.competitionName.toLocaleLowerCase().includes(group[0]!.competitionLocation.toLocaleLowerCase()) && ` · ${group[0]!.competitionLocation}`}{group[0]!.competitionCountry && " · "}{group[0]!.competitionCountryCode2 && <span className={`fi fi-${group[0]!.competitionCountryCode2.toLowerCase()} inline-block mx-1`} style={{ width: "14px", height: "10px", borderRadius: "1px" }} />}{group[0]!.competitionCountry}</span>
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                        <span className="min-w-0 break-words font-semibold leading-snug text-[var(--ink)]">{group[0]!.competitionName}</span>
+                        <span className="whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-normal text-[var(--subtle)] sm:text-xs">{formatCompetitionDate(group[0]!.competitionDate, group[0]!.competitionDateEnd)}{group[0]!.competitionLocation && !group[0]!.competitionName.toLocaleLowerCase().includes(group[0]!.competitionLocation.toLocaleLowerCase()) && ` · ${group[0]!.competitionLocation}`}{group[0]!.competitionCountry && " · "}{group[0]!.competitionCountryCode2 && <span className={`fi fi-${group[0]!.competitionCountryCode2.toLowerCase()} inline-block mx-1`} style={{ width: "14px", height: "10px", borderRadius: "1px" }} />}{group[0]!.competitionCountry}</span>
                       </div>
                     </td>
                   </tr>

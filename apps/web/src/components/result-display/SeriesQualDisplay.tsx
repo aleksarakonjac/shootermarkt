@@ -24,10 +24,10 @@ export function SeriesQualDisplay({ detail, hasDecimals = false, inners, total: 
 
   return (
     <div>
-      <table className="w-full table-fixed border-collapse">
+      <table className="w-full table-fixed border-collapse sm:w-auto">
         <colgroup>
-          {displaySeries.map((_, i) => <col key={i} style={{ width: `${(showTotal ? 80 : 100) / displaySeries.length}%` }} />)}
-          {showTotal && <col style={{ width: "20%" }} />}
+          {displaySeries.map((_, i) => <col key={i} className="sm:!w-[4.5rem]" style={{ width: `${(showTotal ? 80 : 100) / displaySeries.length}%` }} />)}
+          {showTotal && <col className="sm:!w-[5.5rem]" style={{ width: "20%" }} />}
         </colgroup>
         {groupLabels && (
           <thead>
@@ -42,7 +42,7 @@ export function SeriesQualDisplay({ detail, hasDecimals = false, inners, total: 
             {displaySeries.map((v, i) => (
               <td
                 key={i}
-                className={`whitespace-nowrap px-1 py-1.5 text-center font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums border-r border-[var(--border)] last:border-r-0 sm:px-2 sm:text-sm ${
+                className={`whitespace-nowrap px-1 py-1 text-center font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums border-r border-[var(--border)] last:border-r-0 sm:px-2 sm:text-sm ${
                   v != null && v === bestValue
                     ? "text-[var(--ink)] bg-[var(--surface-2)]"
                     : "text-[var(--muted)]"
