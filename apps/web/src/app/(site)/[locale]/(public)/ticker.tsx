@@ -362,20 +362,21 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
       {(() => {
         const s = LEVEL_STYLE[item.level] ?? { background: "var(--surface)", color: "var(--ink)" };
         return (
-          <span className="hidden sm:inline-flex items-center gap-1.5 shrink-0 rounded px-1.5 leading-none" style={{ background: "white", height: 20 }}>
-            <span className="inline-flex items-center rounded font-extrabold uppercase px-1 pb-[2px] h-full leading-none" style={{ fontSize: 11, letterSpacing: "0.06em", background: s.background, color: s.color }}>
-              {getLevelLabel(item.level, locale)}
+          <span className="hidden sm:inline-flex items-center gap-1.5 shrink-0">
+            <span className="inline-flex rounded overflow-hidden" style={{ background: "white", height: 20 }}>
+              <span className="inline-flex items-center font-extrabold uppercase px-1.5 pb-[2px] leading-none" style={{ fontSize: 11, letterSpacing: "0.06em", background: s.background, color: s.color }}>
+                {getLevelLabel(item.level, locale)}
+              </span>
             </span>
             {item.countryCode2 && (
-              <>
-                <span style={{ color: "rgba(0,0,0,0.2)", fontSize: 9, lineHeight: 1 }}>·</span>
+              <span className="inline-flex items-center gap-1.5 rounded px-1.5 leading-none" style={{ background: "white", height: 20 }}>
                 <span className={`fi fi-${item.countryCode2.toLowerCase()}`} style={{ fontSize: 11, borderRadius: 2 }} />
                 {item.nocCode && (
                   <span className="font-bold" style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 11, lineHeight: 1, fontWeight: 800, color: "var(--ink)", letterSpacing: "0.06em" }}>
                     {item.nocCode}
                   </span>
                 )}
-              </>
+              </span>
             )}
           </span>
         );
