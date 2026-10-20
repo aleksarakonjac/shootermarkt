@@ -24,6 +24,7 @@ import {
   type MetricEntry,
 } from "@/lib/ranking-metrics";
 import { CATEGORY_LABEL, type AgeCategory } from "@shootermarkt/db/pdf-import-types";
+import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { FormaScoreMark } from "@/components/shooter/FormaScoreMark";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -216,6 +217,20 @@ export function RangiranjeClient({
     () =>
       Array.from(new Set(categoryRows.map((s) => s.nationality).filter(Boolean) as string[])).sort(),
     [categoryRows]
+  );
+
+  const nocOptions = useMemo(
+    () =>
+      allNocs.map((noc) => {
+        const a2 = nocAlpha2(noc);
+        return {
+          value: noc,
+          label: noc,
+          sublabel: NOC_LIST.find((n) => n.noc === noc)?.name,
+          prefix: a2 ? <span className={`fi fi-${a2.toLowerCase()}`} style={{ fontSize: "0.95em", borderRadius: 2 }} /> : undefined,
+        };
+      }),
+    [allNocs]
   );
 
   const allRanked = useMemo(() => {
@@ -416,44 +431,17 @@ export function RangiranjeClient({
 
       {/* Country filter */}
       {allNocs.length > 1 && (
-        <div className="flex flex-wrap items-center gap-1 mb-5">
-          <button
-            aria-pressed={!activeZemlja}
-            onClick={() => setActiveZemlja(null)}
-            className="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors font-[family-name:var(--font-jetbrains-mono)]"
-            style={
-              !activeZemlja
-                ? { background: "var(--ink)", color: "var(--bg)" }
-                : { background: "var(--surface-2)", color: "var(--muted)" }
-            }
-          >
-            {labels.all}
-          </button>
-          {allNocs.map((noc) => {
-            const a2 = nocAlpha2(noc);
-            const active = activeZemlja === noc;
-            return (
-              <button
-                key={noc}
-                aria-pressed={active}
-                onClick={() => setActiveZemlja(active ? null : noc)}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors font-[family-name:var(--font-jetbrains-mono)]"
-                style={
-                  active
-                    ? { background: "var(--ink)", color: "var(--bg)" }
-                    : { background: "var(--surface-2)", color: "var(--muted)" }
-                }
-              >
-                {a2 && (
-                  <span
-                    className={`fi fi-${a2.toLowerCase()} shrink-0`}
-                    style={{ width: "13px", height: "9px", borderRadius: "1px", display: "inline-block" }}
-                  />
-                )}
-                {noc}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-3 mb-5">
+          <SearchDropdown
+            className="w-52"
+            value={activeZemlja ?? ""}
+            onChange={(v) => setActiveZemlja(v || null)}
+            options={nocOptions}
+            placeholder={`${labels.country}: ${labels.all}`}
+            emptyLabel={labels.all}
+            searchPlaceholder={`${labels.country}…`}
+            labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
+          />
           <span className="text-xs text-[var(--muted)] ml-1 font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
             {displayed.length}
           </span>
