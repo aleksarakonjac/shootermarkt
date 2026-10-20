@@ -30,20 +30,20 @@ export function PositionsQualDisplay({ detail, hasDecimals = false, locale = "sr
       >
         <thead>
           <tr className="border-b border-[var(--border)]">
-            <th className="px-3 py-1.5 text-left font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--muted)] text-[0.65rem] w-24">
+            <th className="px-3 py-1.5 text-left font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--muted)] text-xs w-24">
               Stav
             </th>
             {Array.from({ length: maxSeries }).map((_, i) => (
               <th
                 key={i}
-                className="px-3 py-1.5 text-center font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--muted)] text-[0.65rem]"
+                className="px-3 py-1.5 text-center font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--muted)] text-xs"
                 style={{ minWidth: "60px" }}
               >
                 S{i + 1}
               </th>
             ))}
             <th
-              className="px-3 py-1.5 text-center font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--ink)] text-[0.65rem]"
+              className="px-3 py-1.5 text-center font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--ink)] text-xs"
               style={{ minWidth: "72px" }}
             >
               Stav Σ

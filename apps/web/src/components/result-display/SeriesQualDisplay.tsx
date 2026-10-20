@@ -32,7 +32,7 @@ export function SeriesQualDisplay({ detail, hasDecimals = false, inners, total: 
         {groupLabels && (
           <thead>
             <tr>
-              {groupLabels.map((label) => <th key={label} colSpan={2} className="border-r border-[var(--border)] px-1 pb-1 text-center text-[0.6rem] font-semibold text-[var(--subtle)] last:border-r-0">{label}</th>)}
+              {groupLabels.map((label) => <th key={label} colSpan={2} className="border-r border-[var(--border)] px-1 pb-1 text-center text-xs font-semibold text-[var(--subtle)] last:border-r-0">{label}</th>)}
               {showTotal && <th />}
             </tr>
           </thead>
