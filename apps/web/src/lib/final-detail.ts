@@ -141,12 +141,15 @@ export function normalizeFinalDetailsForDisplay<T extends FinalDetailLike | null
       ? { ...d, seriesLabels: d.seriesLabels.map((l) => l.replace(/^H(\d+)$/, "S$1")) }
       : d));
   }
-  // Finala trostava po starim pravilima (serije od 5 hitaca) sačuvana sa novim nazivima kolona → ispravni nazivi.
+  // Finala trostava po starim pravilima (8 serija od 5 hitaca): 3×5 klečeći i 3×5 ležeći se spajaju u po jednu
+  // kolonu, pa je raspored isti kao u novom formatu (Klečeći, Ležeći, Stojeći 1, Stojeći 2, S1…).
   if (isThreePositionEvent(disciplineCode)) {
     const isOldFormat = (d: FinalDetailLike | null) => !!d?.cumulative && d.cumulative.length > 1 && isLegacyThreePositionFirstSum(d.cumulative[0]);
     if (detailsByRank.some(isOldFormat)) {
-      const labels = seriesLabels(disciplineCode, Math.max(...detailsByRank.map((d) => d?.cumulative?.length ?? 0)), true);
-      detailsByRank = detailsByRank.map((d) => (d && d.cumulative ? { ...d, seriesLabels: labels } : d));
+      const merge = <V,>(values: V[]) => values.filter((_, i) => i === 2 || i === 5 || i === 6 || i === 7 || i >= 8 || i === values.length - 1);
+      const merged = detailsByRank.map((d) => (d && isOldFormat(d) ? { ...d, cumulative: merge(d.cumulative!), ...(d.ranks ? { ranks: merge(d.ranks) } : {}) } : d));
+      const labels = seriesLabels(disciplineCode, Math.max(...merged.map((d) => d?.cumulative?.length ?? 0)));
+      detailsByRank = merged.map((d) => (d && d.cumulative ? { ...d, seriesLabels: labels } : d)) as typeof detailsByRank;
     }
   }
   const isLegacySeries = (d: FinalDetailLike | null): d is BulletinFinalDetail =>
@@ -159,4 +162,4 @@ export function normalizeFinalDetailsForDisplay<T extends FinalDetailLike | null
   return detailsByRank.map((d) => (isLegacySeries(d) ? rebuilt[next++] : d));
 }
 
-type FinalDetailLike = { format: string; series?: number[]; cumulative?: number[]; shots?: number[]; scoring?: string; seriesLabels?: string[] };
+type FinalDetailLike = { format: string; series?: number[]; cumulative?: number[]; ranks?: Array<number | null>; shots?: number[]; scoring?: string; seriesLabels?: string[] };

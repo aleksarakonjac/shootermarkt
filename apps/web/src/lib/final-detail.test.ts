@@ -35,10 +35,15 @@ describe("buildSiusFinalDetails", () => {
 
 describe("legacy (pre-12/2025) 3P finals", () => {
   const cumulative = [51.1, 102.8, 154.5, 206.4, 257.4, 309.7, 360.8, 411.6, 421.9, 432.2];
-  it("relabels stored 2025 finals as eight 5-shot series, then single shots", () => {
-    const stored = { format: "bulletin", scoring: "decimal", cumulative, seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "S1", "S2", "S3", "S4", "S5", "S6"] };
+  it("merges stored 2025 finals into kneeling, prone, standing 1-2, then single shots", () => {
+    const ranks = [4, 3, 2, 2, 3, 1, 1, 1, 1, 1];
+    const stored = { format: "bulletin", scoring: "decimal", cumulative, ranks, seriesLabels: [] as string[] };
     const [detail] = normalizeFinalDetailsForDisplay("R3PM", [stored]);
-    expect(detail).toMatchObject({ seriesLabels: ["Klečeći 1", "Klečeći 2", "Klečeći 3", "Ležeći 1", "Ležeći 2", "Ležeći 3", "Stojeći 1", "Stojeći 2", "S1", "S2"] });
+    expect(detail).toMatchObject({
+      cumulative: [154.5, 309.7, 360.8, 411.6, 421.9, 432.2],
+      ranks: [2, 1, 1, 1, 1, 1],
+      seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "S1", "S2"],
+    });
   });
   it("leaves current-format finals alone", () => {
     const current = { format: "bulletin", scoring: "decimal", cumulative: [104.3, 209.2], seriesLabels: ["Klečeći", "Ležeći"] };
