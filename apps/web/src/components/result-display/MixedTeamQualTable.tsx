@@ -42,6 +42,18 @@ function TeamMember({ id, name }: { id: number | null; name: string | null }) {
   return id ? <Link href={`/strelci/${id}`} onClick={(event) => event.stopPropagation()} className="flex min-w-0 items-center gap-1.5 font-medium text-[var(--ink)] transition-colors hover:text-[var(--brand-primary)]">{content}</Link> : <span className="flex min-w-0 items-center gap-1.5 font-medium text-[var(--ink)]">{content}</span>;
 }
 
+/** Finala do 2025: Gold/Bronze Medal Match na poene (do 16–17), ne zbir krugova — ukupno je broj poena meča. */
+export function isMatchFormat(teams: Pick<MixedTeamRow, "finalTotal">[]): boolean {
+  const totals = teams.flatMap((team) => (team.finalTotal != null ? [Number(team.finalTotal)] : []));
+  return totals.length > 0 && totals.every((total) => total <= 30);
+}
+
+/** Zlatni meč igraju 1. i 2. mesto, bronzani 3. i 4. */
+export function matchTeams(teams: MixedTeamRow[], medal: "gold" | "bronze"): MixedTeamRow[] {
+  const places = medal === "gold" ? [1, 2] : [3, 4];
+  return teams.filter((team) => team.finalRank != null && places.includes(team.finalRank));
+}
+
 function sumOrNull(series: number[] | undefined): number | null {
   return series && series.length ? series.reduce((a, b) => a + b, 0) : null;
 }
@@ -61,6 +73,13 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const shooterTotal2 = (team: MixedTeamRow) => isFinal ? sumOrNull(detail2(team)?.series) : (team.shooter2Detail?.total ?? null);
   const fmt = (value: number) => (isFinal || apparatus === "air_rifle" ? value.toFixed(1) : Math.round(value).toString());
   const sorted = teams.filter((team) => !isFinal || total(team) != null || rank(team) != null || remark(team) != null).toSorted((a, b) => (rank(a) ?? Infinity) - (rank(b) ?? Infinity));
+  const isMatch = isFinal && isMatchFormat(sorted);
+  const opponentPoints = (team: MixedTeamRow) => {
+    const place = team.finalRank;
+    if (place == null) return null;
+    const opponent = sorted.find((other) => other.finalRank === (place % 2 ? place + 1 : place - 1));
+    return opponent?.finalTotal != null ? Math.round(Number(opponent.finalTotal)) : null;
+  };
   const remarkCodes = assignRemarkCodes(sorted.map((team) => remarkText(remark(team), stageDetails(team))));
   const remarkLegend: RemarkLegendItem[] = sorted
     .map((team, idx) => (remarkCodes[idx] ? { code: remarkCodes[idx]!, remark: remarkText(remark(team), stageDetails(team))!, label: `${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}` } : null))
@@ -69,7 +88,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const hasSeries = sorted.some((team) => (detail1(team)?.series.length ?? 0) > 0 || (detail2(team)?.series.length ?? 0) > 0);
   const allExpanded = hasSeries && sorted.every((team) => expanded.has(team.id));
   const seriesLen = hasSeries ? Math.max(0, ...sorted.flatMap((team) => [detail1(team)?.series.length ?? 0, detail2(team)?.series.length ?? 0])) : 0;
-  const seriesHeaders = Array.from({ length: seriesLen }, (_, i) => `S${i + 1}`);
+  const seriesHeaders = Array.from({ length: seriesLen }, (_, i) => (isMatch ? `${i + 1}` : `S${i + 1}`));
   const SERIES_COL_W = "64px";
   const mobileColumns = ["28px", "0px", "minmax(56px, 72px)", "minmax(0, 1fr)", "44px", "60px", "20px", hasSeries ? "16px" : ""].filter(Boolean).join(" ");
   // Imena strelaca dobijaju slobodan prostor (ne kolona ukupnog), da serije budu odmah uz NOC/imena.
@@ -120,7 +139,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
             <div className={`${memberCell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}><TeamMember id={team.shooter1Id} name={team.shooter1Name} /></div>
             {hasSeries && seriesHeaders.map((_, i) => { const s1 = detail1(team)?.series; const v = s1?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s1 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}
             <div className={subtotalCell} style={{ gridRow: r1, background: rowBg }}>{shooterTotal1(team) != null ? fmt(shooterTotal1(team)!) : <span className="text-[var(--subtle)]">—</span>}</div>
-            <div className={`${cell} justify-end gap-1 font-[family-name:var(--font-jetbrains-mono)] text-lg font-bold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{total(team) != null ? <>{fmt(Number(total(team)))}{showInners && team.qualInners != null && <span className="text-xs font-normal text-[var(--muted)]">{team.qualInners}<span className="text-[0.6rem]">×</span></span>}</> : <span className="font-normal text-[var(--subtle)]">—</span>}</div>
+            <div className={`${cell} justify-end gap-1 font-[family-name:var(--font-jetbrains-mono)] text-lg font-bold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{total(team) != null ? <>{isMatch ? Math.round(Number(total(team))) : fmt(Number(total(team)))}{isMatch && opponentPoints(team) != null && <span className="text-xs font-normal text-[var(--muted)]">:{opponentPoints(team)}</span>}{showInners && team.qualInners != null && <span className="text-xs font-normal text-[var(--muted)]">{team.qualInners}<span className="text-[0.6rem]">×</span></span>}</> : <span className="font-normal text-[var(--subtle)]">—</span>}</div>
             <div className={`${cell} justify-end pr-4 font-[family-name:var(--font-jetbrains-mono)] text-base font-bold text-[var(--success)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{remark(team) ? <RemarkBadge remark={remark(team)!} code={remarkCodes[index]} details={stageDetails(team)} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className="" /> : <span className="flex items-center gap-1.5">{!isFinal && team.qualified ? "Q" : null}{remarkLabel(null, stageDetails(team), remarkCodes[index]) && <RemarkBadge remark={remarkLabel(null, stageDetails(team), remarkCodes[index])!} code={remarkCodes[index]} details={stageDetails(team)} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className="" />}</span>}</div>
             <div className={`${cell} hidden justify-center !px-0.5 group-hover:bg-[var(--surface-2)] sm:flex`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}><ChevronIcon open={hasSeries && isExpanded} /></div>
             {hasSeries && <div className={`${cell} justify-center group-hover:bg-[var(--surface-2)] sm:hidden`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}><ChevronIcon open={isExpanded} /></div>}

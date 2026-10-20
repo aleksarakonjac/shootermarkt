@@ -197,6 +197,11 @@ function isFinalSubEvent(name: string): boolean {
   return /final/i.test(name);
 }
 
+/** Mešoviti timovi: finale je jedan "Final" (od 2026) ili "Gold/Bronze Medal Match" (do 2025, mečevi na poene). */
+function isMixedFinalSubEvent(name: string): boolean {
+  return isFinalSubEvent(name) || /medal match/i.test(name);
+}
+
 function elimRoundNumber(name: string, fallback: number): number {
   const m = name.match(/(\d+)\s*$/);
   return m ? parseInt(m[1]) : fallback;
@@ -432,8 +437,9 @@ export async function fetchLiveSiusMixedTeamResults(
       }
 
       const done = subEvents.filter((s) => s.state !== "Planned");
-      const qualSubs = done.filter((s) => !isFinalSubEvent(s.name));
-      const finalSub = done.find((s) => isFinalSubEvent(s.name));
+      const qualSubs = done.filter((s) => !isMixedFinalSubEvent(s.name));
+      // Jedno finale, ili dva meča (zlato: 1–2, bronza: 3–4) čiji se redovi spajaju.
+      const finalSubs = done.filter((s) => isMixedFinalSubEvent(s.name));
 
       const data: SiusMixedTeamData = { qual: [], final: [] };
 
@@ -451,11 +457,10 @@ export async function fetchLiveSiusMixedTeamResults(
         data.qual = [...ranked, ...unranked];
       }
 
-      if (finalSub) {
-        try {
-          data.final = await fetchSiusTeamSeries(compUuid, event.runningId, finalSub.runningId, opts);
-        } catch { /* ignore */ }
-      }
+      const finalResults = await Promise.all(
+        finalSubs.map((sub) => fetchSiusTeamSeries(compUuid, event.runningId, sub.runningId, opts).catch(() => []))
+      );
+      data.final = finalResults.flat();
 
       if (data.qual.length > 0 || data.final.length > 0) out.set(event.eventCode, data);
     })

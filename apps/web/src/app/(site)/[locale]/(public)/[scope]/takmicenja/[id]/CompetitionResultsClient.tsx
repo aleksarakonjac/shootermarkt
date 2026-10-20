@@ -17,6 +17,8 @@ import {
 } from "@/components/result-display/CompetitionFinalTable";
 import {
   MixedTeamQualTable,
+  isMatchFormat,
+  matchTeams,
   type MixedTeamRow,
 } from "@/components/result-display/MixedTeamQualTable";
 import { startNavigationProgress, finishNavigationProgress } from "@/components/NavigationProgress";
@@ -66,7 +68,19 @@ export type MixedTeamGroup = {
   teams: MixedTeamRow[];
 };
 
-type Stage = "elim" | "qual" | "final";
+type Stage = "elim" | "qual" | "final" | "gold" | "bronze";
+
+const MATCH_LABELS: Record<string, Record<"gold" | "bronze", string>> = {
+  sr: { gold: "Zlatni meč", bronze: "Bronzani meč" },
+  en: { gold: "Gold Medal Match", bronze: "Bronze Medal Match" },
+};
+
+/** Mešoviti timovi: jedno finale, ili (do 2025) zasebni zlatni i bronzani meč. */
+function mixedFinalStages(teams: MixedTeamRow[]): Array<"final" | "gold" | "bronze"> {
+  if (!teams.some((t) => t.finalRank != null || t.finalTotal != null)) return [];
+  if (!isMatchFormat(teams)) return ["final"];
+  return (["gold", "bronze"] as const).filter((medal) => matchTeams(teams, medal).length > 0);
+}
 
 type Selection =
   | { kind: "individual"; disciplineCode: string; category: AgeCategory; stage: Stage; elimRound?: number }
@@ -145,7 +159,7 @@ export function CompetitionResultsClient({ groups, mixedGroups, competitionId, l
     const params = new URLSearchParams(search);
     const disciplineCode = params.get("disc");
     const stage = params.get("stage");
-    if (!disciplineCode || (stage !== "elim" && stage !== "qual" && stage !== "final")) return null;
+    if (!disciplineCode || (stage !== "elim" && stage !== "qual" && stage !== "final" && stage !== "gold" && stage !== "bronze")) return null;
 
     const round = Number(params.get("round"));
     const elimRound = stage === "elim" && Number.isInteger(round) && round > 0 ? round : undefined;
@@ -284,7 +298,7 @@ function CompetitionOverview({
   mixedGroups: MixedTeamGroup[];
   locale: string;
   onSelectIndividual: (code: string, category: AgeCategory, stage: Stage, elimRound?: number) => void;
-  onSelectMixed: (code: string, stage: "qual" | "final") => void;
+  onSelectMixed: (code: string, stage: "qual" | "final" | "gold" | "bronze") => void;
 }) {
   return (
     <div className="flex flex-col gap-5">
@@ -387,7 +401,7 @@ function CompetitionOverview({
               </div>
               <ChevronRight size={14} className="shrink-0 text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
             </button>
-            {g.teams.some((t) => t.finalRank != null || t.finalTotal != null) && <button onClick={() => onSelectMixed(g.code, "final")} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"><div className="flex items-center gap-2.5 min-w-0"><PhaseBadge label="F" accent /><span className="text-sm font-semibold text-[var(--ink)]">{(PHASE_LABELS[locale] ?? PHASE_LABELS.en).final}</span><span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">{g.teams.filter((t) => t.finalRank != null || t.finalTotal != null).length}</span></div><ChevronRight size={14} className="shrink-0 text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" /></button>}
+            {mixedFinalStages(g.teams).map((stage) => <button key={stage} onClick={() => onSelectMixed(g.code, stage)} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"><div className="flex items-center gap-2.5 min-w-0"><PhaseBadge label={stage === "final" ? "F" : stage === "gold" ? "G" : "B"} accent /><span className="text-sm font-semibold text-[var(--ink)]">{stage === "final" ? (PHASE_LABELS[locale] ?? PHASE_LABELS.en).final : (MATCH_LABELS[locale] ?? MATCH_LABELS.en)[stage]}</span><span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">{stage === "final" ? g.teams.filter((t) => t.finalRank != null || t.finalTotal != null).length : matchTeams(g.teams, stage).length}</span></div><ChevronRight size={14} className="shrink-0 text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" /></button>)}
           </div>
         </div>
       ))}
@@ -574,7 +588,9 @@ function CompetitionDetail({
 
   if (selection.kind === "mixed") {
     const mixedGroup = mixedGroups.find((g) => g.code === selection.disciplineCode);
-    const hasFinal = mixedGroup?.teams.some((t) => t.finalRank != null || t.finalTotal != null) ?? false;
+    const finalStages = mixedGroup ? mixedFinalStages(mixedGroup.teams) : [];
+    const mixedStage = selection.stage;
+    const stageTeams = mixedGroup ? (mixedStage === "gold" || mixedStage === "bronze" ? matchTeams(mixedGroup.teams, mixedStage) : mixedGroup.teams) : [];
     const showMixedMedals = shouldShowFinalMedals(finalSlots.find((slot) => slot.disciplineCode === selection.disciplineCode), [], now);
 
     return (
@@ -604,20 +620,20 @@ function CompetitionDetail({
           </div>
         </div>
 
-        {hasFinal && (
-          <div className="flex items-center gap-0.5 mb-5 p-1 bg-[var(--surface)] rounded-lg w-fit border border-[var(--border)]">
-            {(["qual", "final"] as const).map((s) => (
+        {finalStages.length > 0 && (
+          <div className="flex items-center gap-0.5 mb-5 p-1 bg-[var(--surface)] rounded-lg w-fit border border-[var(--border)] max-w-full overflow-x-auto">
+            {(["qual", ...finalStages] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => onStageChange(s)}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors duration-150 ${
+                className={`flex shrink-0 items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors duration-150 ${
                   selection.stage === s ? "bg-[var(--bg)] text-[var(--ink)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--ink)]"
                 }`}
               >
                 {s === "qual" ? (
                   <><PhaseBadge label="Q" active={selection.stage === "qual"} />{(PHASE_LABELS[locale] ?? PHASE_LABELS.en).qual}</>
                 ) : (
-                  <><PhaseBadge label="F" accent={selection.stage === "final"} />{(PHASE_LABELS[locale] ?? PHASE_LABELS.en).final}</>
+                  <><PhaseBadge label={s === "final" ? "F" : s === "gold" ? "G" : "B"} accent={selection.stage === s} />{s === "final" ? (PHASE_LABELS[locale] ?? PHASE_LABELS.en).final : (MATCH_LABELS[locale] ?? MATCH_LABELS.en)[s]}</>
                 )}
               </button>
             ))}
@@ -626,7 +642,7 @@ function CompetitionDetail({
 
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={selection.stage} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.22 } }} exit={{ opacity: 0, transition: { duration: 0.16 } }}>
-            <MixedTeamQualTable teams={mixedGroup?.teams ?? []} apparatus={mixedGroup?.apparatus ?? null} stage={selection.stage === "final" ? "final" : "qual"} showMedals={showMixedMedals} />
+            <MixedTeamQualTable teams={stageTeams} apparatus={mixedGroup?.apparatus ?? null} stage={selection.stage === "qual" ? "qual" : "final"} showMedals={showMixedMedals} />
           </motion.div>
         </AnimatePresence>
       </div>

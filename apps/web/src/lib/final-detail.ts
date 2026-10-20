@@ -7,7 +7,8 @@ import { deriveFinalRankProgression } from "@shootermarkt/db/pdf-import-types";
  * poslednja kolona je zbir do tog hica). Pojedinačni hici se (još) ne prikazuju.
  *
  * Serije finala:
- * - trostav: klečeći 10, ležeći 10, stojeći 5 + 5, pa pojedinačni stojeći hici (S1, S2…);
+ * - trostav (pravila od 12/2025): klečeći 10, ležeći 10, stojeći 5 + 5, pa pojedinačni stojeći hici (S1, S2…);
+ * - trostav (do 11/2025): 8 serija od po 5 hitaca (klečeći 3, ležeći 3, stojeći 2), pa pojedinačni hici;
  * - vazdušno: 5 + 5, pa serije od po 2 hica (11–12, 13–14…), posle svake ispada poslednji.
  * SIUS daje zbir po seriji u tom redosledu. Kad su poznati pojedinačni hici (ISSF HTML,
  * ili SIUS ako vrati hice), grupišu se po istom pravilu, pa kolone uvek imaju iste nazive.
@@ -27,17 +28,27 @@ type SeriesPlan = {
   then: number;
 };
 
-function seriesPlan(disciplineCode: string): SeriesPlan | null {
-  if (isThreePositionEvent(disciplineCode)) {
-    return { phase: [{ shots: 10, label: "Klečeći" }, { shots: 10, label: "Ležeći" }, { shots: 5, label: "Stojeći 1" }, { shots: 5, label: "Stojeći 2" }], then: 1 };
-  }
+const THREE_POSITION_PLAN: SeriesPlan = { phase: [{ shots: 10, label: "Klečeći" }, { shots: 10, label: "Ležeći" }, { shots: 5, label: "Stojeći 1" }, { shots: 5, label: "Stojeći 2" }], then: 1 };
+// Stara pravila (do 11/2025): sve serije od po 5 hitaca.
+const LEGACY_THREE_POSITION_PLAN: SeriesPlan = {
+  phase: ["Klečeći 1", "Klečeći 2", "Klečeći 3", "Ležeći 1", "Ležeći 2", "Ležeći 3", "Stojeći 1", "Stojeći 2"].map((label) => ({ shots: 5, label })),
+  then: 1,
+};
+
+/** Prva serija po starim pravilima ima 5 hitaca (~51), po novim 10 (~103); format se čita iz samih zbirova. */
+export function isLegacyThreePositionFirstSum(firstSum: number | undefined): boolean {
+  return firstSum != null && firstSum < 80;
+}
+
+function seriesPlan(disciplineCode: string, legacy = false): SeriesPlan | null {
+  if (isThreePositionEvent(disciplineCode)) return legacy ? LEGACY_THREE_POSITION_PLAN : THREE_POSITION_PLAN;
   if (isAirEvent(disciplineCode)) return { phase: [{ shots: 5, label: "S1" }, { shots: 5, label: "S2" }], then: 2 };
   return null;
 }
 
 /** Naziv i-te kolone: serija prve faze, pa pojedinačni hitac (S1…) ili par hitaca po rednom broju (11–12…). */
-function seriesLabels(disciplineCode: string, count: number): string[] | undefined {
-  const plan = seriesPlan(disciplineCode);
+function seriesLabels(disciplineCode: string, count: number, legacy = false): string[] | undefined {
+  const plan = seriesPlan(disciplineCode, legacy);
   if (!plan) return undefined;
   const phaseShots = plan.phase.reduce((sum, series) => sum + series.shots, 0);
   return Array.from({ length: count }, (_, i) => {
@@ -73,9 +84,9 @@ function cumulativeDetails(cumulatives: number[][], seriesLabels?: string[]): Bu
   }));
 }
 
-function labelled(disciplineCode: string, cumulatives: number[][]) {
+function labelled(disciplineCode: string, cumulatives: number[][], legacy = false) {
   const longest = Math.max(0, ...cumulatives.map((c) => c.length));
-  return cumulativeDetails(cumulatives, seriesLabels(disciplineCode, longest));
+  return cumulativeDetails(cumulatives, seriesLabels(disciplineCode, longest, legacy));
 }
 
 /**
@@ -92,7 +103,9 @@ export function buildSiusFinalDetails(disciplineCode: string, finalists: Array<{
     let running = 0;
     return f.series.map((value) => (running = round1(running + value)));
   });
-  return labelled(disciplineCode, cumulatives);
+  // Zbirovi serija: stara trostav finala počinju serijom od 5 hitaca.
+  const legacy = !areShots && isThreePositionEvent(disciplineCode) && cumulatives.some((c) => c.length > 1 && isLegacyThreePositionFirstSum(c[0]));
+  return labelled(disciplineCode, cumulatives, legacy);
 }
 
 /**
@@ -127,6 +140,14 @@ export function normalizeFinalDetailsForDisplay<T extends FinalDetailLike | null
     detailsByRank = detailsByRank.map((d) => (d && d.seriesLabels?.some((l) => /^H\d+$/.test(l))
       ? { ...d, seriesLabels: d.seriesLabels.map((l) => l.replace(/^H(\d+)$/, "S$1")) }
       : d));
+  }
+  // Finala trostava po starim pravilima (serije od 5 hitaca) sačuvana sa novim nazivima kolona → ispravni nazivi.
+  if (isThreePositionEvent(disciplineCode)) {
+    const isOldFormat = (d: FinalDetailLike | null) => !!d?.cumulative && d.cumulative.length > 1 && isLegacyThreePositionFirstSum(d.cumulative[0]);
+    if (detailsByRank.some(isOldFormat)) {
+      const labels = seriesLabels(disciplineCode, Math.max(...detailsByRank.map((d) => d?.cumulative?.length ?? 0)), true);
+      detailsByRank = detailsByRank.map((d) => (d && d.cumulative ? { ...d, seriesLabels: labels } : d));
+    }
   }
   const isLegacySeries = (d: FinalDetailLike | null): d is BulletinFinalDetail =>
     d?.format === "bulletin" && !!d.series?.length && !d.cumulative?.length && !d.shots?.length && d.scoring !== "hit_count";

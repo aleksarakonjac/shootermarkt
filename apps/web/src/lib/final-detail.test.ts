@@ -33,6 +33,23 @@ describe("buildSiusFinalDetails", () => {
   });
 });
 
+describe("legacy (pre-12/2025) 3P finals", () => {
+  const cumulative = [51.1, 102.8, 154.5, 206.4, 257.4, 309.7, 360.8, 411.6, 421.9, 432.2];
+  it("relabels stored 2025 finals as eight 5-shot series, then single shots", () => {
+    const stored = { format: "bulletin", scoring: "decimal", cumulative, seriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2", "S1", "S2", "S3", "S4", "S5", "S6"] };
+    const [detail] = normalizeFinalDetailsForDisplay("R3PM", [stored]);
+    expect(detail).toMatchObject({ seriesLabels: ["Klečeći 1", "Klečeći 2", "Klečeći 3", "Ležeći 1", "Ležeći 2", "Ležeći 3", "Stojeći 1", "Stojeći 2", "S1", "S2"] });
+  });
+  it("leaves current-format finals alone", () => {
+    const current = { format: "bulletin", scoring: "decimal", cumulative: [104.3, 209.2], seriesLabels: ["Klečeći", "Ležeći"] };
+    expect(normalizeFinalDetailsForDisplay("R3PM", [current])[0]).toBe(current);
+  });
+  it("SIUS series sums starting with a 5-shot series use the legacy labels", () => {
+    const [detail] = buildSiusFinalDetails("R3PM", [{ series: [51.1, 51.7, 51.7] }]);
+    expect(detail.seriesLabels).toEqual(["Klečeći 1", "Klečeći 2", "Klečeći 3"]);
+  });
+});
+
 const shots = (count: number, value: number) => Array.from({ length: count }, () => value);
 
 describe("buildIssfFinalDetails", () => {
