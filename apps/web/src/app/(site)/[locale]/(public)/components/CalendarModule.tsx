@@ -297,7 +297,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
                 {selected === dateStr && selectedHere.length > 0 && (
                   <div
                     id={`calendar-events-${dateStr}`}
-                    className={`absolute z-50 w-52 rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white ${tooltipH} ${tooltipX}`}
+                    className={`absolute z-50 w-52 rounded-lg bg-[oklch(0.22_0.012_28)] p-2.5 text-xs text-white ${tooltipH} ${tooltipX}`}
                   >
                     <CalendarDayEvents comps={selectedHere.map((c) => ({ ...c, endDate: c.endDate ?? null }))} locale={locale} />
                   </div>

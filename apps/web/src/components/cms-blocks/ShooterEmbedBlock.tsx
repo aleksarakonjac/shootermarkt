@@ -69,10 +69,8 @@ export async function ShooterEmbedBlock({ shooterId }: { shooterId: number }) {
             {shooter.firstName} {shooter.lastName}
           </h3>
           <p className="text-sm text-[var(--muted)] truncate mt-0.5">
-            {shooter.clubName ?? (en ? "No club" : "Bez kluba")}
             {shooter.disciplineCode && (
               <span className="text-[var(--subtle)]">
-                {" · "}
                 {DISC_LABEL[shooter.disciplineCode]?.[en ? "en" : "sr"] ?? shooter.disciplineCode}
               </span>
             )}

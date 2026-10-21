@@ -76,6 +76,7 @@ export default async function ShooterPage({ params }: Props) {
         competitionLocation: competitions.location,
         competitionCountry: countries.name,
         competitionCountryCode2: countries.code2,
+        competitionCountryNoc: countries.nocCode,
         competitionLevel: competitions.level,
         competitionEventType: competitions.eventType,
         qualRemark: results.qualRemark,
@@ -154,6 +155,9 @@ export default async function ShooterPage({ params }: Props) {
       discipline: r.disciplineCode,
       competitionId: r.competitionId,
       competitionName: r.competitionName,
+      location: r.competitionLocation,
+      countryCode2: r.competitionCountryCode2,
+      nocCode: r.competitionCountryNoc,
       level: r.competitionLevel,
       eventType: r.competitionEventType,
       category: r.category,
@@ -320,12 +324,6 @@ export default async function ShooterPage({ params }: Props) {
                 <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{locale === "en" ? "Category" : "Kategorija"}:</dt>
                   <dd className="min-w-0 text-[var(--ink)]">{CATEGORY_LABEL[currentCategory]}</dd>
-                </div>
-              )}
-              {shooter.club && (
-                <div className="flex min-w-0 items-baseline gap-1 text-sm">
-                  <dt className="text-[var(--subtle)] shrink-0">{tProfile("club")}:</dt>
-                  <dd className="min-w-0 truncate text-[var(--ink)]">{shooter.club.name}</dd>
                 </div>
               )}
             </dl>

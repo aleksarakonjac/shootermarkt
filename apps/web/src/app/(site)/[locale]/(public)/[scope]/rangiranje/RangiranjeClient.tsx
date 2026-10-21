@@ -220,17 +220,22 @@ export function RangiranjeClient({
   );
 
   const nocOptions = useMemo(
-    () =>
-      allNocs.map((noc) => {
+    () => {
+      const regionNames = locale === "en" ? new Intl.DisplayNames("en", { type: "region" }) : null;
+      return allNocs.map((noc) => {
         const a2 = nocAlpha2(noc);
+        const entry = NOC_LIST.find((n) => n.noc === noc);
+        // NOC_LIST ima samo srpska imena; za en uzimamo ime iz Intl (AIN i sl. nemaju region kod).
+        const enName = a2 && a2.length === 2 ? regionNames?.of(a2) : undefined;
         return {
           value: noc,
           label: noc,
-          sublabel: NOC_LIST.find((n) => n.noc === noc)?.name,
+          sublabel: locale === "en" ? (enName ?? (noc === "AIN" ? "Individual Neutral Athletes" : entry?.name)) : entry?.name,
           prefix: a2 ? <span className={`fi fi-${a2.toLowerCase()}`} style={{ fontSize: "0.95em", borderRadius: 2 }} /> : undefined,
         };
-      }),
-    [allNocs]
+      });
+    },
+    [allNocs, locale]
   );
 
   const allRanked = useMemo(() => {
@@ -461,7 +466,6 @@ export function RangiranjeClient({
                 <th scope="col" className={`${TH} text-right w-12`}>#</th>
                 <th scope="col" className={`${TH} text-left`}>{labels.shooter}</th>
                 <th scope="col" className={`${TH} text-left hidden md:table-cell`}>{labels.country}</th>
-                <th scope="col" className={`${TH} text-left hidden lg:table-cell`}>{labels.club}</th>
                 <th scope="col" className={`${TH} text-right`}>
                   {activeView === "forma" ? <FormaScoreMark size="sm" /> : activeView === "improved"
                     ? labels.improvedCol
@@ -526,11 +530,6 @@ export function RangiranjeClient({
                     {/* Zemlja */}
                     <td className="px-4 py-3 hidden md:table-cell">
                       <FlagChip noc={s.nationality} />
-                    </td>
-
-                    {/* Klub */}
-                    <td className="px-4 py-3 text-[var(--muted)] hidden lg:table-cell">
-                      {s.clubName ?? <span className="text-[var(--subtle)]">—</span>}
                     </td>
 
                     {/* Primary metric */}

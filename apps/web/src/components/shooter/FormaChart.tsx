@@ -13,6 +13,9 @@ export type ChartPoint = {
   discipline: string;
   competitionId: number;
   competitionName: string;
+  location?: string | null;
+  countryCode2?: string | null;
+  nocCode?: string | null;
   level?: CompetitionLevel | null;
   eventType?: CompetitionEventType | null;
   category?: ResultCategory | null;
@@ -351,7 +354,7 @@ export function FormaChart({
   const hovForma = hoverIdx !== null ? values.forma[hoverIdx] : null;
   const compactTooltip = vpW < 640;
   const TIP_W = compactTooltip ? 184 : 220;
-  const TIP_H = compactTooltip ? 155 : 132;
+  const TIP_H = compactTooltip ? 185 : 160;
   const tipX = tooltipPos ? Math.min(vpW - TIP_W - 8, Math.max(8, tooltipPos.x + 16 + TIP_W > vpW ? tooltipPos.x - TIP_W - 16 : tooltipPos.x + 16)) : 0;
   const tipY = tooltipPos ? Math.min(window.innerHeight - TIP_H - 8, Math.max(8, tooltipPos.y - TIP_H / 2)) : 0;
 
@@ -386,6 +389,17 @@ export function FormaChart({
                 {t.legendScore} {hovPt.score % 1 === 0 ? hovPt.score : hovPt.score.toFixed(1)}
               </span>
             </div>
+            {(hovPt.location || hovPt.nocCode) && (
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1" style={{ marginTop: 4, color: "var(--muted)", fontSize: "0.7rem", lineHeight: 1.3 }}>
+                {hovPt.location && <span>{hovPt.location}</span>}
+                {hovPt.nocCode && (
+                  <span className="inline-flex items-center gap-1 rounded px-1.5" style={{ background: "var(--surface-2)", height: 18 }}>
+                    {hovPt.countryCode2 && <span className={`fi fi-${hovPt.countryCode2.toLowerCase()}`} style={{ fontSize: 10, borderRadius: 2 }} aria-hidden="true" />}
+                    <span style={{ fontFamily: "var(--font-jetbrains-mono,monospace)", fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", color: "var(--ink)" }}>{hovPt.nocCode}</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

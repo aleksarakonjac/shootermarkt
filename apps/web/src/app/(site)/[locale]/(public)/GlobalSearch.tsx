@@ -737,11 +737,6 @@ export function GlobalSearch() {
                           <p className="text-sm font-semibold text-[var(--ink)] truncate">
                             {s.lastName} {s.firstName}
                           </p>
-                          {s.clubName && (
-                            <p className="text-xs text-[var(--muted)] truncate">
-                              {s.clubName}
-                            </p>
-                          )}
                         </div>
                         {active && <ArrowIcon />}
                       </Link>

@@ -17,14 +17,21 @@ interface ShooterFormRow {
   shooterId: number;
   firstName: string;
   lastName: string;
-  clubName: string | null;
   nationality: string | null;
+  countryCode2: string | null;
   formaScore: number;
   trend: "up" | "down" | "stable";
   peak: number | null;
   entriesCount: number;
   recentScores: number[];
 }
+
+const Affil = ({ r }: { r: ShooterFormRow }) => r.nationality ? (
+  <span className="inline-flex shrink-0 items-center gap-1">
+    {r.countryCode2 && <span className={`fi fi-${r.countryCode2.toLowerCase()}`} style={{ fontSize: 11 }} aria-hidden="true" />}
+    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold text-[var(--muted)]">{r.nationality}</span>
+  </span>
+) : null;
 
 interface TopFormaClientProps {
   initialData: {
@@ -132,7 +139,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
       <div className="relative flex flex-nowrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--brand-primary)] px-4 py-1.5">
         <h3 className="flex min-h-8 shrink-0 items-center gap-1.5 leading-none font-[family-name:var(--font-barlow-condensed)] text-base font-bold uppercase tracking-wider text-white sm:text-lg">
           <span>Top</span>
-          <span className="inline-flex h-6 items-center gap-1 rounded bg-white/95 px-1.5">
+          <span className="inline-flex h-6 items-center gap-1 rounded bg-white/95 px-1.5" style={{ "--ink": "oklch(0.22 0.012 28)" } as React.CSSProperties}>
             <FormaScoreMark size="md" />
             <FormaScoreInfo locale={locale} buttonMarginTop={0} />
           </span>
@@ -191,6 +198,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
             <TransitionLink transitionName="shooter-name" href={scopedHref(`/strelci/${r.shooterId}`)} className="min-w-0 flex-1 truncate font-semibold text-[var(--ink)] hover:underline">
               {r.lastName} {r.firstName}
             </TransitionLink>
+            <Affil r={r} />
             <Sparkline scores={r.recentScores.slice(0, 5)} width={44} height={18} strokeWidth={1.5} draw={switched && i < 3} />
             <span className="flex items-center gap-1 font-[family-name:var(--font-jetbrains-mono)] text-base font-semibold text-[var(--ink)]">
               <RollingNumber value={r.formaScore} animate={switched && i < 3} />
@@ -206,7 +214,6 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
               <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
                 <th scope="col" className="w-10 px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-[var(--muted)]">#</th>
                 <th scope="col" className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted)]">{locale === "en" ? "Shooter" : "Strelac"}</th>
-                <th scope="col" className="px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted)]">{locale === "en" ? "Club" : "Klub"}</th>
                 <th scope="col" className="px-3 py-2.5 text-right"><FormaScoreMark size="sm" /></th>
                 <th scope="col" className="px-3 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Peak</th>
               </tr>
@@ -222,16 +229,16 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
                     {i + 1}
                   </td>
                   <td className="px-3 py-2.5">
-                    <TransitionLink
-                      transitionName="shooter-name"
-                      href={scopedHref(`/strelci/${r.shooterId}`)}
-                      className="font-semibold text-[var(--ink)] hover:underline block truncate max-w-[150px] sm:max-w-none"
-                    >
-                      {r.lastName} {r.firstName}
-                    </TransitionLink>
-                  </td>
-                  <td className="px-3 py-2.5 text-[var(--muted)] text-xs truncate max-w-[120px] sm:max-w-none">
-                    {r.clubName ?? "—"}
+                    <div className="flex items-center gap-2">
+                      <TransitionLink
+                        transitionName="shooter-name"
+                        href={scopedHref(`/strelci/${r.shooterId}`)}
+                        className="font-semibold text-[var(--ink)] hover:underline block truncate max-w-[150px] sm:max-w-none"
+                      >
+                        {r.lastName} {r.firstName}
+                      </TransitionLink>
+                      <Affil r={r} />
+                    </div>
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-end gap-2">

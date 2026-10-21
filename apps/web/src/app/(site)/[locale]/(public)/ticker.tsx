@@ -378,7 +378,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, loc
               </span>
             </span>
             {item.countryCode2 && (
-              <span className="inline-flex items-center gap-1.5 rounded px-1.5 leading-none" style={{ background: "white", height: 20 }}>
+              <span className="inline-flex items-center gap-1.5 rounded px-1.5 leading-none" style={{ background: "var(--bg)", height: 20 }}>
                 <span className={`fi fi-${item.countryCode2.toLowerCase()}`} style={{ fontSize: 11, borderRadius: 2 }} />
                 {item.nocCode && (
                   <span className="font-bold" style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 11, lineHeight: 1, fontWeight: 800, color: "var(--ink)", letterSpacing: "0.06em" }}>

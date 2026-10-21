@@ -125,6 +125,33 @@ export function getTickerScheduleStatus(
   return state.lastCompleted ? "REVIEW" : "NEUTRAL";
 }
 
+type ScheduleSlotLike = { discCode: string; disciplineId: number; stage: string; category: string; startTime: Date; endTime: Date | null };
+
+async function slotsFromResults(
+  competition: { date: string; dateEnd: string | null },
+  individualRows: Array<{ disciplineId: number; category: string; qualRank: number | null; elimRank: number | null; finalRank: number | null }>,
+  mixedRows: Array<{ disciplineId: number; qualRank: number | null; finalRank: number | null }>,
+): Promise<ScheduleSlotLike[]> {
+  const codes = new Map((await db.select({ id: disciplines.id, code: disciplines.code }).from(disciplines)).map((d) => [d.id, d.code]));
+  const startTime = new Date(`${competition.date}T00:00:00Z`);
+  const endTime = new Date(`${competition.dateEnd ?? competition.date}T23:59:59Z`);
+  const found = new Map<string, ScheduleSlotLike>();
+  const add = (disciplineId: number, category: string, stage: string) => {
+    const discCode = codes.get(disciplineId);
+    if (discCode) found.set(`${disciplineId}|${category}|${stage}`, { discCode, disciplineId, stage, category, startTime, endTime });
+  };
+  for (const r of individualRows) {
+    if (r.qualRank != null) add(r.disciplineId, r.category, "qual");
+    if (r.elimRank != null) add(r.disciplineId, r.category, "elimination");
+    if (r.finalRank != null) add(r.disciplineId, r.category, "final");
+  }
+  for (const r of mixedRows) {
+    if (r.qualRank != null) add(r.disciplineId, "senior", "qual");
+    if (r.finalRank != null) add(r.disciplineId, "senior", "final");
+  }
+  return [...found.values()];
+}
+
 function tickerStagePriority(stage: string) {
   if (stage === "final") return 0;
   if (stage.startsWith("qual")) return 1;
@@ -301,7 +328,7 @@ export async function getHomepageMain(scope: Scope) {
   const [candidateComps, cacheRows, upcoming] = await Promise.all([
     // Šira lista kandidata; konačni izbor 3 po prioritetu radi selectHomepageFocusCompetitions.
     db.select().from(competitions).where(and(sql`${competitions.date} <= ${today}`, sql`(EXISTS (SELECT 1 FROM ${results} WHERE ${results.competitionId} = ${competitions.id}) OR EXISTS (SELECT 1 FROM ${mixedTeamResults} WHERE ${mixedTeamResults.competitionId} = ${competitions.id}))`, competitionScope)).orderBy(desc(competitions.date)).limit(40),
-    db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(clubs, eq(shooters.clubId, clubs.id)).where(and(eq(shooters.verified, true), nationalityFilter, rankedFormaCacheFilter())),
+    db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality, countryCode2: countries.code2 }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(and(eq(shooters.verified, true), nationalityFilter, rankedFormaCacheFilter())),
     db.select().from(competitions).where(and(sql`${competitions.date} >= ${today} AND ${competitions.date} < ${upcomingDeadline}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
   ]);
   const showSrbHighlight = scope === 'srb';
@@ -326,8 +353,11 @@ export async function getHomepageMain(scope: Scope) {
     // times (e.g. SPW: precizna + brza paljba are separate time slots but share
     // one combined qual ranking) — collapse to one slot per (discipline,
     // category, stage-kind) so the same phase isn't rendered twice.
+    // Takmičenje bez rasporeda (npr. rezultati uvezeni bez competition_schedule) se vodi po
+    // unetim rezultatima: jedna faza po (disciplina, kategorija, kvalifikacije/elim/finale).
+    const effectiveSlots = slots.length ? slots : await slotsFromResults(competition, individualRows, mixedRows);
     const dedupedSlots = [...new Map(
-      slots.map((s) => [`${s.disciplineId}|${s.category}|${s.stage.startsWith("qual") ? "qual" : s.stage}`, s])
+      effectiveSlots.map((s) => [`${s.disciplineId}|${s.category}|${s.stage.startsWith("qual") ? "qual" : s.stage}`, s])
     ).values()];
     const rawPhases = dedupedSlots.flatMap((slot) => {
       const isLive = isTickerSlotLive(slot, new Date());
@@ -422,7 +452,7 @@ export async function getHomepageMain(scope: Scope) {
       .orderBy(desc(competitions.date))
     : [];
   const scores = groupTopFormaScores(scoreRows);
-  const map = (row: (typeof cacheRows)[number]) => ({ shooterId: row.shooterId, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName, nationality: row.nationality, formaScore: Number(row.forma), trend: row.trend ?? "stable", peak: row.peakCareer == null ? null : Number(row.peakCareer), entriesCount: row.sampleSize, recentScores: scores.get(`${row.shooterId}:${row.discCode}`) ?? [] });
+  const map = (row: (typeof cacheRows)[number]) => ({ shooterId: row.shooterId, firstName: row.firstName, lastName: row.lastName, nationality: row.nationality, countryCode2: row.countryCode2, formaScore: Number(row.forma), trend: row.trend ?? "stable", peak: row.peakCareer == null ? null : Number(row.peakCareer), entriesCount: row.sampleSize, recentScores: scores.get(`${row.shooterId}:${row.discCode}`) ?? [] });
   return { recent, upcoming, topForma: { ARM: topByDisc.ARM.map(map), ARW: topByDisc.ARW.map(map), APM: topByDisc.APM.map(map), APW: topByDisc.APW.map(map) } };
 }
 

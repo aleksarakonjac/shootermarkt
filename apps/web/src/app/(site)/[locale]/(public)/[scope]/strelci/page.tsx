@@ -81,11 +81,6 @@ function FormaLeaderRow({
         <div className="font-semibold text-sm text-[var(--ink)] group-hover:text-[var(--brand-primary)] transition-colors truncate leading-snug">
           {s.lastName} {s.firstName}
         </div>
-        {s.clubName && (
-          <div className="text-[0.7rem] text-[var(--muted)] truncate leading-none mt-0.5">
-            {s.clubName}
-          </div>
-        )}
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold text-[var(--ink)] tabular-nums text-sm">
@@ -623,14 +618,6 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                           )}
                           </div>
                         </div>
-                        {s.clubName && (
-                          <div className="mt-1 hidden max-w-[200px] truncate text-xs leading-none text-[var(--muted)] sm:block">
-                            {s.clubName}
-                            {s.clubCity && (
-                              <span className="text-[var(--subtle)] ml-1">{s.clubCity}</span>
-                            )}
-                          </div>
-                        )}
                         </div>
                       </td>
 

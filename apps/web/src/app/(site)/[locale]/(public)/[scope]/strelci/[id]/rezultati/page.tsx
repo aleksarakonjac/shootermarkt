@@ -54,7 +54,7 @@ export default async function ShooterResultsPage({ params }: Props) {
       {shooter.avatarUrl ? <Image src={shooter.avatarUrl} alt="" width={48} height={48} className="h-12 w-12 rounded-xl object-cover ring-1 ring-[var(--border)]" /> : <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--surface-2)] font-[family-name:var(--font-barlow-condensed)] text-lg font-bold text-[var(--muted)]">{shooter.firstName[0]}{shooter.lastName[0]}</div>}
       <div className="min-w-0">
         <h1 className="truncate font-[family-name:var(--font-barlow-condensed)] text-2xl font-extrabold uppercase leading-none tracking-tight text-[var(--ink)] sm:text-3xl">{shooterName}</h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">{tProfile("resultsHistory")}{shooter.club?.name ? ` · ${shooter.club.name}` : ""}</p>
+        <p className="mt-1 text-sm text-[var(--muted)]">{tProfile("resultsHistory")}</p>
       </div>
     </div>
 
