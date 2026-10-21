@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { createPortal } from "react-dom";
 import { useParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { LEVEL_DOT_COLOR } from "@/lib/competition-utils";
@@ -65,6 +66,56 @@ function CompetitionDots({ comps, onBrand = false }: { comps: Competition[]; onB
   return <span className={`absolute bottom-1.5 flex ${onBrand ? "gap-1" : "gap-0.5"}`} aria-hidden="true">
     {dots.map((c) => <span key={c.id} className="h-1 w-1 rounded-full" style={{ background: getLevelColor(c.level), boxShadow: onBrand ? "0 0 0 1px #fff" : undefined }} />)}
   </span>;
+}
+
+// Prozor dana je u portalu (position: fixed) da ga ne seče overflow kalendara ni sekcije ispod:
+// otvara se ispod ćelije, a ako dole nema mesta, iznad; uvek ostaje unutar viewporta.
+function DayTooltip({ id, children }: { id: string; children: React.ReactNode }) {
+  const markerRef = useRef<HTMLSpanElement>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const anchor = markerRef.current?.parentElement;
+    const tip = tipRef.current;
+    if (!anchor || !tip) return;
+    const place = () => {
+      const a = anchor.getBoundingClientRect();
+      const w = tip.offsetWidth;
+      const h = tip.offsetHeight;
+      const margin = 8;
+      let top = a.bottom;
+      if (top + h > window.innerHeight - margin && a.top - h >= margin) top = a.top - h;
+      top = Math.max(margin, Math.min(top, window.innerHeight - h - margin));
+      const left = Math.max(margin, Math.min(a.left + a.width / 2 - w / 2, window.innerWidth - w - margin));
+      setPos({ left, top });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [id]);
+
+  return (
+    <>
+      <span ref={markerRef} hidden />
+      {createPortal(
+        // Providni p-1 premošćuje razmak do ćelije da hover ne pukne na putu do prozora.
+        <div
+          ref={tipRef}
+          id={id}
+          className="fixed z-50 w-60 p-1 sm:w-80"
+          style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? "visible" : "hidden" }}
+        >
+          <div className="max-h-[70vh] overflow-y-auto rounded-lg bg-[oklch(0.22_0.012_28)] p-3 text-xs text-white shadow-lg">{children}</div>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
 }
 
 export function CalendarModule({ competitions }: CalendarModuleProps) {
@@ -231,8 +282,6 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
 
             // Span position + tooltip placement
             const col = idx % 7;
-            const tooltipH = "top-full mt-2";
-            const tooltipX = col <= 1 ? "left-0" : col >= 5 ? "right-0" : "left-1/2 -translate-x-1/2";
             // Round only where the highlighted run really ends — a neighbouring
             // day with any competition (even a different one) keeps it joined.
             const dayKey = (d: number) => `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -295,12 +344,9 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
 
                 {/* Tooltip */}
                 {selected === dateStr && selectedHere.length > 0 && (
-                  <div
-                    id={`calendar-events-${dateStr}`}
-                    className={`absolute z-50 w-52 rounded-lg bg-[oklch(0.22_0.012_28)] p-2.5 text-xs text-white ${tooltipH} ${tooltipX}`}
-                  >
+                  <DayTooltip id={`calendar-events-${dateStr}`}>
                     <CalendarDayEvents comps={selectedHere.map((c) => ({ ...c, endDate: c.endDate ?? null }))} locale={locale} />
-                  </div>
+                  </DayTooltip>
                 )}
               </div>
             );
