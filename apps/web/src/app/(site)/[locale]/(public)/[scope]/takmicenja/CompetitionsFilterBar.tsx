@@ -164,9 +164,11 @@ export function CompetitionsFilterBar({
 
   return (
     <div className="mb-8 space-y-3">
+      {/* Desktop (lg+): pretraga, filteri, broj i reset u jednom redu; ispod toga mobilni raspored */}
+      <div className="space-y-3 lg:flex lg:items-center lg:gap-3 lg:space-y-0">
       {/* Pretraga + broj rezultata + reset */}
-      <div className="flex items-center gap-3">
-        <div className="relative max-w-xs flex-1">
+      <div className="flex items-center gap-3 lg:contents">
+        <div className="relative max-w-xs flex-1 lg:order-1 lg:w-64 lg:flex-none">
           <svg
             width="14" height="14" viewBox="0 0 14 14"
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"
@@ -183,14 +185,14 @@ export function CompetitionsFilterBar({
             className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] py-1.5 pl-8 pr-3 text-base text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none sm:text-sm"
           />
         </div>
-        <span className="ml-auto shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">
+        <span className="ml-auto shrink-0 lg:order-3 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">
           {totalCount}
         </span>
         {hasFilters && (
           <button
             type="button"
             onClick={() => { startNavigationProgress(scopedHref("/takmicenja")); router.push(scopedHref("/takmicenja"), { scroll: false }); }}
-            className="min-h-11 shrink-0 px-1 text-xs text-[var(--muted)] transition-colors hover:text-[var(--brand-primary)] sm:min-h-0"
+            className="min-h-11 shrink-0 px-1 text-xs lg:order-4 text-[var(--muted)] transition-colors hover:text-[var(--brand-primary)] sm:min-h-0"
           >
             {t("list.reset")}
           </button>
@@ -198,7 +200,7 @@ export function CompetitionsFilterBar({
       </div>
 
       {/* Tri jasne ose: godina (jedan izbor), nivo i disciplina (višestruki izbor) */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 lg:order-2">
         <FilterMenu label={t("list.filterYear")} value={currentYear === "all" ? t("list.allYears") : currentYear} count={currentYear !== String(new Date().getFullYear()) ? 1 : 0}>
           {[{ y: "all", label: t("list.allYears") }, ...availableYears.map((y) => ({ y, label: y }))].map(({ y, label }) => (
             <button
@@ -237,6 +239,7 @@ export function CompetitionsFilterBar({
             );
           })}
         </FilterMenu>
+      </div>
       </div>
 
       {/* Aktivni filteri kao uklonjivi čipovi */}

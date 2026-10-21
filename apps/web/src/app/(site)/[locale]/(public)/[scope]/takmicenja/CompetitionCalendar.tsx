@@ -398,7 +398,7 @@ export function CompetitionCalendar({ competitions }: Props) {
         <div
           role="dialog"
           aria-label={formatPeekDay(peek.key, locale)}
-          className="cal-peek absolute z-50 max-h-[60vh] overflow-y-auto overscroll-contain rounded-lg bg-[var(--ink)] p-2.5 text-xs text-white shadow-lg"
+          className="cal-peek absolute z-50 max-h-[60vh] overflow-y-auto overscroll-contain rounded-lg bg-[oklch(0.22_0.012_28)] p-2.5 text-xs text-white shadow-lg"
           style={{ left: peek.left, top: peek.top, width: peek.width }}
           onPointerEnter={(e) => { if (e.pointerType === "mouse") window.clearTimeout(closeTimer.current); }}
           onPointerLeave={(e) => { if (e.pointerType === "mouse") closePeekSoon(); }}

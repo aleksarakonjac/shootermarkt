@@ -505,18 +505,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
           <div className="min-w-0 flex-1">
             {/* Badges row */}
             <div className="flex items-center gap-2 flex-wrap mb-2.5">
-              {hero.isLive && (
-                <span
-                  className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5"
-                  style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--brand-primary)", background: "white", height: 20, border: "1px solid var(--border)" }}
-                >
-                  <span
-                    className="rounded-full shrink-0"
-                    style={{ width: 5, height: 5, background: "var(--brand-primary)", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }}
-                  />
-                  {locale === "en" ? "Live" : "U toku"}
-                </span>
-              )}
+              {hero.isLive && <StatusPill status="live" locale={locale} />}
               <span
                 className="inline-flex items-center px-2 py-0.5 rounded text-[0.65rem] font-bold uppercase tracking-wide font-[family-name:var(--font-barlow-condensed)]"
                 style={LEVEL_STYLE[hero.level] ?? FALLBACK_BADGE}
