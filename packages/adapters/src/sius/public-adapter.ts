@@ -33,6 +33,17 @@ export interface FetchOpts { includeUnranked?: boolean; shooterGroup?: string }
 export const isJuniorEventCode = (code: string) => /^[A-Z0-9]+J$/.test(code);
 const groupFor = (code: string) => (isJuniorEventCode(code) ? "Junior" : "Regulars");
 
+/** Juniori su u grupi "Junior" ili (npr. EP U18 Tallinn) u "Regulars" — probaj redom dok SIUS ne vrati redove. */
+async function pubSeries<T>(query: string, group: string): Promise<T> {
+  const groups = group === "Junior" ? ["Junior", "Regulars"] : [group];
+  let raw!: T;
+  for (const g of groups) {
+    raw = await pub<T>(`/series?${query}&shooterGroup=${g}`);
+    if (!Array.isArray(raw) || raw.length > 0) break;
+  }
+  return raw;
+}
+
 export interface SiusLiveResult extends SiusExtraRemarks {
   /** null = SIUS gave no rank (DSQ/DNS rows). Such rows carry a status remark and total 0. */
   rank: number | null;
@@ -135,11 +146,12 @@ export async function fetchSiusSeries(
   subEventUuid: string,
   opts: FetchOpts = {}
 ): Promise<SiusLiveResult[]> {
-  const raw = await pub<RawSeries | RawSeries[]>(
-    `/series?runningCompetitionId=${compUuid}` +
+  const raw = await pubSeries<RawSeries | RawSeries[]>(
+    `runningCompetitionId=${compUuid}` +
       `&runningCompetitionEventId=${eventUuid}` +
       `&subEventId=${subEventUuid}` +
-      `&shooterGroup=${opts.shooterGroup ?? "Regulars"}&teamKind=Individual`
+      `&teamKind=Individual`,
+    opts.shooterGroup ?? "Regulars"
   );
 
   const data: RawSeries = Array.isArray(raw) ? (raw[0] ?? {}) : raw;
@@ -375,11 +387,12 @@ async function fetchSiusTeamSeries(
   subEventUuid: string,
   opts: FetchOpts = {}
 ): Promise<SiusTeamResult[]> {
-  const raw = await pub<RawTeamSeries | RawTeamSeries[]>(
-    `/series?runningCompetitionId=${compUuid}` +
+  const raw = await pubSeries<RawTeamSeries | RawTeamSeries[]>(
+    `runningCompetitionId=${compUuid}` +
       `&runningCompetitionEventId=${eventUuid}` +
       `&subEventId=${subEventUuid}` +
-      `&shooterGroup=${opts.shooterGroup ?? "Regulars"}&teamKind=TeamOfIndividuals`
+      `&teamKind=TeamOfIndividuals`,
+    opts.shooterGroup ?? "Regulars"
   );
 
   const data: RawTeamSeries = Array.isArray(raw) ? (raw[0] ?? {}) : raw;

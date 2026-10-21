@@ -1,6 +1,9 @@
 import { commitImportReview } from "@/lib/import-commit";
 import { commitMixedTeamsDirect } from "@/lib/import-commit-mixed";
 import { buildSiusImport, mergeSiusFinals } from "@/lib/sius-import";
+import { db } from "@shootermarkt/db";
+import { competitions } from "@shootermarkt/db/schema";
+import { eq } from "drizzle-orm";
 
 export interface SiusImportSummary {
   rows: number;
@@ -30,6 +33,11 @@ export async function importSiusCompetition(competitionId: number, siusId: strin
 export async function importSiusCompetition(competitionId: number, siusId: string, opts?: { commit?: false }): Promise<SiusImportSummary>;
 export async function importSiusCompetition(competitionId: number, siusId: string, { commit = false }: { commit?: boolean } = {}) {
   const data = await buildSiusImport(siusId);
+  // SIUS kod "…J" je junior; na prvenstvima označenim U18 u nazivu to je mlađi junior.
+  const [comp] = await db.select({ name: competitions.name }).from(competitions).where(eq(competitions.id, competitionId));
+  if (/\bU-?18\b/i.test(comp?.name ?? "")) {
+    for (const x of [...data.rows, ...data.finalEntries]) if (x.category === "junior") x.category = "mladji_junior";
+  }
   const rows = mergeSiusFinals(data.rows, data.finalEntries);
   const perDiscipline: Record<string, number> = {};
   for (const r of rows) perDiscipline[r.disciplineCode] = (perDiscipline[r.disciplineCode] ?? 0) + 1;
