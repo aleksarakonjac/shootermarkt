@@ -161,9 +161,11 @@ export function computeForma(entries: FormaEntry[], opts: FormaOptions = {}): Fo
     momentum: 0, peak: null, peakProximity: null, consistency: 0,
     sampleSize: 0, lowConfidence: true,
   };
-  if (entries.length === 0) return empty;
+  // 0 / negativan skor = nema rezultata (DNS, nepotpun import) — nije nastup.
+  const valid = entries.filter((e) => e.score > 0);
+  if (valid.length === 0) return empty;
 
-  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...valid].sort((a, b) => a.date.localeCompare(b.date));
   const peakAll = Math.max(...sorted.map((e) => e.score));
 
   // (Izmena 1) Efektivni prozor: odbaci nastupe starije od MAX_AGE_DAYS od poslednjeg,

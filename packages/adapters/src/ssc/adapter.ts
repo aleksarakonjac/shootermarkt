@@ -168,7 +168,7 @@ export async function buildReviewRows(competitionId: string): Promise<ReviewRow[
         disciplineCode: disc as ReviewRow["disciplineCode"],
         category: "senior",
         qualRank: r.rank ?? undefined,
-        qualTotal: r.totalScore ?? 0,
+        qualTotal: r.totalScore ?? null,
         qualInners: r.inners ?? null,
         qualSeries: r.seriesScores ?? [],
         qualified: r.qualified ?? undefined,

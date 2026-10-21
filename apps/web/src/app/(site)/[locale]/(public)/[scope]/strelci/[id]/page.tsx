@@ -141,7 +141,7 @@ export default async function ShooterPage({ params }: Props) {
 
   // ── Chart data ───────────────────────────────────────────────────────────────
   const chartPoints: ChartPoint[] = shooterResults
-    .filter((r) => r.qualTotal != null)
+    .filter((r) => r.qualTotal != null && parseFloat(r.qualTotal) > 0)
     .map((r) => ({
       date: r.competitionDate,
       score: parseFloat(r.qualTotal!),
@@ -156,7 +156,7 @@ export default async function ShooterPage({ params }: Props) {
   const chartDisciplines = (() => {
     const seen = new Map<string, number>();
     for (const r of shooterResults) {
-      if (r.qualTotal != null && !seen.has(r.disciplineCode)) {
+      if (r.qualTotal != null && parseFloat(r.qualTotal) > 0 && !seen.has(r.disciplineCode)) {
         seen.set(r.disciplineCode, parseFloat(r.maxQualScore));
       }
     }

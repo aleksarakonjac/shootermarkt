@@ -150,9 +150,11 @@ export async function fetchSiusSeries(
     const athlete = row.AthletesSeries?.[0];
     if (!athlete) return [];
 
-    const total = athlete.TotalScore ?? 0;
+    // Stariji SIUS format (2025) nema TotalScore/NumberOfInnerTen — rezultat je samo string "632.8" / "577-18x".
+    const fromResult = parseTeamValue(athlete.Result ?? row.Result?.Value ?? "");
+    const total = athlete.TotalScore ?? fromResult.total;
     const inners =
-      typeof athlete.NumberOfInnerTen === "number" ? athlete.NumberOfInnerTen : null;
+      typeof athlete.NumberOfInnerTen === "number" ? athlete.NumberOfInnerTen : fromResult.inners;
 
     const series = parseSeriesTotals(athlete.Series ?? []);
 
@@ -552,6 +554,7 @@ interface RawAthleteSeries {
   AthleteIdentifier?: { Identifier?: string };
   TotalScore?: number;
   NumberOfInnerTen?: number;
+  Result?: string;
   Series?: Array<Array<{ Order: number; Value: string }>>;
 }
 

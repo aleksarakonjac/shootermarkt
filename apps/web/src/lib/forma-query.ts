@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { results, competitions, disciplines, shooterFormaCache } from "@shootermarkt/db/schema";
 import { RANKING_MIN_SAMPLE, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
@@ -47,8 +47,8 @@ export async function getFormaEntriesByDiscipline(
     .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
     .where(
       shooterIds && shooterIds.length > 0
-        ? and(inArray(results.shooterId, shooterIds), isNotNull(results.qualTotal))
-        : isNotNull(results.qualTotal)
+        ? and(inArray(results.shooterId, shooterIds), gt(results.qualTotal, "0"))
+        : gt(results.qualTotal, "0")
     );
 
   const groups = new Map<string, FormaEntryGroup>();
