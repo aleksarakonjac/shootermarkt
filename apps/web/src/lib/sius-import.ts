@@ -1,6 +1,6 @@
 // Čiste funkcije žive u sius-merge.ts (client-safe, bez DB-a) — ovde re-export za postojeće pozivaoce
 export { mergeSiusFinals, type SiusFinalEntry } from "@/lib/sius-merge";
-import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, MIXED_TEAM_CODES } from "@shootermarkt/adapters/sius/public-adapter";
+import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, isJuniorEventCode, MIXED_TEAM_CODES } from "@shootermarkt/adapters/sius/public-adapter";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
 import type { ReviewRow } from "@shootermarkt/db/pdf-import-types";
@@ -10,15 +10,25 @@ import { matchShooter } from "@shootermarkt/db/name-match";
 
 const SUPPORTED_CODES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW"] as const;
 
+/** SIUS juniorski događaji imaju sufiks J (ARMJ, APMTJ…): osnovna disciplina + kategorija junior (U21). */
+function splitEventCode(eventCode: string): { code: string; category: ReviewRow["category"] } {
+  // Evropska U16/U18 prvenstva: 10ARU18W → ARW, mlađi junior (U18) / kadet (U16).
+  const youth = eventCode.match(/^10(AR|AP)(U16|U18)([MW])$/);
+  if (youth) return { code: `${youth[1]}${youth[3]}`, category: youth[2] === "U18" ? "mladji_junior" : "kadet" };
+  return isJuniorEventCode(eventCode) ? { code: eventCode.slice(0, -1), category: "junior" } : { code: eventCode, category: "senior" };
+}
+const YOUTH_CODES = ["AR", "AP"].flatMap((d) => ["U16", "U18"].flatMap((u) => ["M", "W"].map((g) => `10${d}${u}${g}`)));
+const withJunior = (codes: readonly string[]) => [...codes, ...codes.map((c) => `${c}J`), ...YOUTH_CODES];
+
 export class SiusImportError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
 }
 
 /** Fetches SIUS public results for a competition UUID and shapes them as review rows (no DB writes). */
 export async function buildSiusImport(siusId: string, disciplineCodes?: string[]) {
-  const requested = disciplineCodes ?? [...SUPPORTED_CODES, ...MIXED_TEAM_CODES];
-  const codes = requested.filter((c) => (SUPPORTED_CODES as readonly string[]).includes(c));
-  const mixedCodes = requested.filter((c) => MIXED_TEAM_CODES.has(c));
+  const requested = withJunior(disciplineCodes ?? [...SUPPORTED_CODES, ...MIXED_TEAM_CODES]);
+  const codes = requested.filter((c) => (SUPPORTED_CODES as readonly string[]).includes(splitEventCode(c).code));
+  const mixedCodes = requested.filter((c) => MIXED_TEAM_CODES.has(splitEventCode(c).code));
 
   const allShooters = await db
     .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality })
@@ -50,7 +60,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   const finalEntries: SiusFinalEntry[] = [];
   const errors: string[] = [];
 
-  for (const [disciplineCode, data] of siusData) {
+  for (const [eventCode, data] of siusData) {
+    const { code: disciplineCode, category } = splitEventCode(eventCode);
     const code = disciplineCode as ReviewRow["disciplineCode"];
 
     if (data.qual.length === 0 && data.elim.length === 0) {
@@ -71,7 +82,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         lastName: r.lastName,
         teamNoc: r.nation,
         disciplineCode: code,
-        category: "senior",
+        category,
         // Unranked (DSQ/DNS) rows have no real score — null, not 0, so they never count as a result.
         qualTotal: r.rank === null ? null : r.total,
         qualInners: r.rank === null ? null : r.inners,
@@ -107,7 +118,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
             lastName: e.lastName,
             teamNoc: e.nation,
             disciplineCode: code,
-            category: "senior",
+            category,
             qualTotal: null,
             qualInners: null,
             qualRank: undefined,
@@ -144,6 +155,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
     for (const f of data.final) {
       finalEntries.push({
         disciplineCode,
+        category,
         rank: f.rank,
         remark: f.remark,
         penalty: f.penalty,
@@ -161,8 +173,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   }
 
   const teamEntries: MixedTeamEntry[] = [];
-  for (const [disciplineCodeRaw, data] of mixedData) {
-    const disciplineCode = disciplineCodeRaw as MixedTeamEntry["disciplineCode"];
+  for (const [eventCode, data] of mixedData) {
+    const disciplineCode = splitEventCode(eventCode).code as MixedTeamEntry["disciplineCode"];
     if (data.qual.length === 0 && data.final.length === 0) {
       errors.push(`${disciplineCode}: no results`);
       continue;

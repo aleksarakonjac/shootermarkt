@@ -27,7 +27,11 @@ export interface SiusExtraRemarks {
 }
 
 /** `includeUnranked`: also return DSQ/DNS rows that SIUS leaves without a rank (live cron leaves them out). */
-export interface FetchOpts { includeUnranked?: boolean }
+export interface FetchOpts { includeUnranked?: boolean; shooterGroup?: string }
+
+/** Juniorski događaji (ARMJ, APMTJ…) imaju strelce u SIUS grupi "Junior"; ostali u "Regulars". */
+export const isJuniorEventCode = (code: string) => /^[A-Z0-9]+J$/.test(code);
+const groupFor = (code: string) => (isJuniorEventCode(code) ? "Junior" : "Regulars");
 
 export interface SiusLiveResult extends SiusExtraRemarks {
   /** null = SIUS gave no rank (DSQ/DNS rows). Such rows carry a status remark and total 0. */
@@ -135,7 +139,7 @@ export async function fetchSiusSeries(
     `/series?runningCompetitionId=${compUuid}` +
       `&runningCompetitionEventId=${eventUuid}` +
       `&subEventId=${subEventUuid}` +
-      `&shooterGroup=Regulars&teamKind=Individual`
+      `&shooterGroup=${opts.shooterGroup ?? "Regulars"}&teamKind=Individual`
   );
 
   const data: RawSeries = Array.isArray(raw) ? (raw[0] ?? {}) : raw;
@@ -232,6 +236,7 @@ export async function fetchLiveSiusResults(
         return;
       }
 
+      const evOpts = { ...opts, shooterGroup: groupFor(event.eventCode) };
       const done = subEvents.filter((s) => s.state !== "Planned");
       // Qual: visible only (avoid hidden aggregated/combined sub-events)
       const qualSubs = done.filter((s) => !s.hidden && !isElimSubEvent(s.name) && !isFinalSubEvent(s.name));
@@ -244,7 +249,7 @@ export async function fetchLiveSiusResults(
       // Fetch ALL qual sub-events in parallel and merge (R3P has multiple relays)
       const qualResults = await Promise.all(
         qualSubs.map((sub) =>
-          fetchSiusSeries(compUuid, event.runningId, sub.runningId, opts).catch(() => [])
+          fetchSiusSeries(compUuid, event.runningId, sub.runningId, evOpts).catch(() => [])
         )
       );
       data.qual.push(...qualResults.flat());
@@ -260,7 +265,7 @@ export async function fetchLiveSiusResults(
       // Elimination rounds (one per sub-event, ordered by round number), fetched in parallel
       const elimResults = await Promise.all(
         elimSubs.map((sub, i) =>
-          fetchSiusSeries(compUuid, event.runningId, sub.runningId, opts)
+          fetchSiusSeries(compUuid, event.runningId, sub.runningId, evOpts)
             .then((r) => ({ round: elimRoundNumber(sub.name, i + 1), results: r }))
             .catch(() => ({ round: elimRoundNumber(sub.name, i + 1), results: [] as SiusLiveResult[] }))
         )
@@ -272,7 +277,7 @@ export async function fetchLiveSiusResults(
       // Final sub-event
       if (finalSub) {
         try {
-          data.final = await fetchSiusSeries(compUuid, event.runningId, finalSub.runningId, opts);
+          data.final = await fetchSiusSeries(compUuid, event.runningId, finalSub.runningId, evOpts);
         } catch { /* ignore */ }
       }
 
@@ -354,7 +359,8 @@ function parseTeamRemark(extensions: Array<{ Key: string; Value: string }>): {
   const byKey = Object.fromEntries(extensions.map((e) => [e.Key, e.Value]));
   const statusRemark = byKey.StatusRemark ?? byKey.ShooterGroupRemark ?? null;
   return {
-    qualified: byKey.QualificationRemark === "Q",
+    // Do 2025: "QG"/"QB" = plasman u meč za zlato/bronzu; od 2026 samo "Q".
+    qualified: /^Q[GB]?$/.test(byKey.QualificationRemark ?? ""),
     remark: byKey.StatusRemark ?? byKey.PenaltyRemark ?? byKey.ShooterGroupRemark ?? null,
     statusRemark,
     penalty: byKey.PenaltyRemark ?? null,
@@ -373,7 +379,7 @@ async function fetchSiusTeamSeries(
     `/series?runningCompetitionId=${compUuid}` +
       `&runningCompetitionEventId=${eventUuid}` +
       `&subEventId=${subEventUuid}` +
-      `&shooterGroup=Regulars&teamKind=TeamOfIndividuals`
+      `&shooterGroup=${opts.shooterGroup ?? "Regulars"}&teamKind=TeamOfIndividuals`
   );
 
   const data: RawTeamSeries = Array.isArray(raw) ? (raw[0] ?? {}) : raw;
@@ -438,6 +444,7 @@ export async function fetchLiveSiusMixedTeamResults(
         return;
       }
 
+      const evOpts = { ...opts, shooterGroup: groupFor(event.eventCode) };
       const done = subEvents.filter((s) => s.state !== "Planned");
       const qualSubs = done.filter((s) => !isMixedFinalSubEvent(s.name));
       // Jedno finale, ili dva meča (zlato: 1–2, bronza: 3–4) čiji se redovi spajaju.
@@ -447,7 +454,7 @@ export async function fetchLiveSiusMixedTeamResults(
 
       const qualResults = await Promise.all(
         qualSubs.map((sub) =>
-          fetchSiusTeamSeries(compUuid, event.runningId, sub.runningId, opts).catch(() => [])
+          fetchSiusTeamSeries(compUuid, event.runningId, sub.runningId, evOpts).catch(() => [])
         )
       );
       data.qual.push(...qualResults.flat());
@@ -460,7 +467,7 @@ export async function fetchLiveSiusMixedTeamResults(
       }
 
       const finalResults = await Promise.all(
-        finalSubs.map((sub) => fetchSiusTeamSeries(compUuid, event.runningId, sub.runningId, opts).catch(() => []))
+        finalSubs.map((sub) => fetchSiusTeamSeries(compUuid, event.runningId, sub.runningId, evOpts).catch(() => []))
       );
       data.final = finalResults.flat();
 
