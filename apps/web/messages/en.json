@@ -252,6 +252,7 @@
     "live": "LIVE",
     "upcoming": "Upcoming",
     "next": "Next",
+    "inProgress": "In progress",
     "results": "Results",
     "all": "All",
     "home": "Home",
@@ -326,6 +327,7 @@
     "legend": {
       "world": "World",
       "continental": "Continental",
+      "international": "International",
       "national": "National",
       "other": "Other"
     },

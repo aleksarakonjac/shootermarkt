@@ -252,6 +252,7 @@
     "live": "LIVE",
     "upcoming": "Uskoro",
     "next": "Sledeće",
+    "inProgress": "U toku",
     "results": "Rezultati",
     "all": "Sve",
     "home": "Početna",
@@ -326,6 +327,7 @@
     "legend": {
       "world": "Svetsko",
       "continental": "Kontinentalno",
+      "international": "Međunarodno",
       "national": "Državno",
       "other": "Ostalo"
     },

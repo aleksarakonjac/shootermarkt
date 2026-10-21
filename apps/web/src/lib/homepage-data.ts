@@ -318,10 +318,10 @@ export async function getHomepageMain(scope: Scope) {
   const recent =await Promise.all(recentComps.map(async (competition) => {
     const [slots, individualRows, mixedRows] = await Promise.all([
       db.select({ discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(eq(competitionSchedule.competitionId, competition.id)),
-      db.select({ shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRound: results.elimRound, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(eq(results.competitionId, competition.id)),
+      db.select({ shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRound: results.elimRound, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, qualRemark: results.qualRemark, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(eq(results.competitionId, competition.id)),
       db.select({ disciplineId: mixedTeamResults.disciplineId, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(eq(mixedTeamResults.competitionId, competition.id)),
     ]);
-    type Entry = { id: string; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; rank: number; total: number; round: number | null };
+    type Entry = { id: string; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; rank: number; total: number; round: number | null; rpo?: boolean };
     // A discipline/category can have multiple "qual" schedule rows at different
     // times (e.g. SPW: precizna + brza paljba are separate time slots but share
     // one combined qual ranking) — collapse to one slot per (discipline,
@@ -337,7 +337,7 @@ export async function getHomepageMain(scope: Scope) {
         const rank = stageKind === "elimination" ? row.elimRank : stageKind === "final" ? row.finalRank : row.qualRank;
         const total = stageKind === "elimination" ? row.elimTotal : stageKind === "final" ? row.finalTotal : row.qualTotal;
         const nationality = displayNoc(row.nationality);
-        return rank != null && total != null ? [{ id: `shooter:${row.shooterId}`, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality, countryCode2: nationality === "AIN" ? "AIN" : row.countryCode2 ?? null, rank, total: Number(total), round: stageKind === "elimination" ? row.elimRound : null }] : [];
+        return rank != null && total != null ? [{ id: `shooter:${row.shooterId}`, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality, countryCode2: nationality === "AIN" ? "AIN" : row.countryCode2 ?? null, rank, total: Number(total), round: stageKind === "elimination" ? row.elimRound : null, rpo: stageKind === "qual" && row.qualRemark === "RPO" }] : [];
       });
       const mixed = stageKind === "elimination" ? [] : mixedRows.flatMap((row): Entry[] => {
         if (row.disciplineId !== slot.disciplineId) return [];
@@ -404,7 +404,7 @@ export async function getHomepageMain(scope: Scope) {
         elimRound: phase.elimRound,
         category: phase.category,
         isLive: phase.isLive,
-        qualTop3: phase.top3.map(({ firstName, lastName, clubName, nationality, countryCode2, total, rank }) => ({ firstName, lastName, clubName, nationality, countryCode2, qualTotal: total, qualRank: rank, finalTotal: null, finalRank: null })),
+        qualTop3: phase.top3.map(({ firstName, lastName, clubName, nationality, countryCode2, total, rank, rpo }) => ({ firstName, lastName, clubName, nationality, countryCode2, qualTotal: total, qualRank: rank, rpo, finalTotal: null, finalRank: null })),
         srbHighlights: phase.srbHighlights.map(({ firstName, lastName, clubName, total, rank }) => ({ firstName, lastName, clubName, qualRank: rank, qualTotal: total, finalRank: null, finalTotal: null })),
       })),
       };

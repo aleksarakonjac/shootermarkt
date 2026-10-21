@@ -16,7 +16,7 @@ import { MainSkeleton, TickerSkeleton } from "./homepage-skeleton";
 import { MIXED_TEAM_CODES } from "@shootermarkt/db/pdf-import-types";
 import type { HomepageMainData } from "@/lib/homepage-data";
 
-type ResultPlace = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
+type ResultPlace = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null; rpo?: boolean };
 
 function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveToggleSpace = false, collapsed = false, href, toggle }: { entries: ResultPlace[]; score: (entry: ResultPlace) => number | null; decimals: number; prefix?: ReactNode; renderAff: (entry: ResultPlace) => ReactNode; reserveToggleSpace?: boolean; collapsed?: boolean; href: string; toggle?: ReactNode }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -31,7 +31,7 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
     const value = score(entry);
     return <span key={index} className="inline-flex items-center gap-1 whitespace-nowrap">
       <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums"}>{index + 1}.</span>
-      <span className={lead ? "text-sm font-semibold text-[var(--ink)]" : "text-xs text-[var(--muted)]"}>{entry.firstName ? `${entry.lastName} ${entry.firstName.charAt(0)}.` : entry.lastName}</span>
+      <span className={lead ? "text-sm font-semibold text-[var(--ink)]" : "text-xs text-[var(--muted)]"}>{entry.firstName ? `${entry.lastName} ${entry.firstName.charAt(0)}.` : entry.lastName}{entry.rpo && <span title="RPO" aria-label="RPO">*</span>}</span>
       {renderAff(entry)}
       {value != null && <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums"}>{value.toFixed(decimals)}</span>}
     </span>;
@@ -263,7 +263,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
     return `${day}.${month}.${year}.-${endDay}.${endMonth}.${endYear}.`;
   };
 
-  type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null };
+  type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null; rpo?: boolean };
   type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
   type Phase = { stage: string; elimRound?: number | null; category: string; isLive: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
   type DiscResult = { discCode: string; isLive: boolean; isJunior: boolean; phases: Phase[] };

@@ -530,6 +530,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
           {[
             { label: t("legend.world"),       color: LEVEL_DOT_COLOR["world"] },
             { label: t("legend.continental"), color: LEVEL_DOT_COLOR["continental"] },
+            { label: t("legend.international"), color: LEVEL_DOT_COLOR["international"] },
             { label: t("legend.national"),    color: LEVEL_DOT_COLOR["national"] },
             { label: t("legend.other"),       color: LEVEL_DOT_COLOR["regional"] },
           ].map((l) => (
