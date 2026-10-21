@@ -1,0 +1,200 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { LEVEL_LABEL } from "@/lib/competition-utils";
+import { formatDateRangeSr } from "@/lib/date-utils";
+import { AGE_CATEGORIES, EVENT_TYPES } from "../sync/sync-row-editor";
+import { TAG_OPTIONS } from "../takmicenja-filters";
+
+export type BulkMatch = { disciplineId: number; code: string; category: string; count: number };
+export type BulkRow = {
+  id: number;
+  name: string;
+  date: string;
+  level: string;
+  eventType: string;
+  tags: string[];
+  matches: BulkMatch[];
+};
+
+type CompDraft = { level?: string; eventType?: string; tags?: string };
+const matchKey = (compId: number, m: BulkMatch) => `${compId}|${m.disciplineId}|${m.category}`;
+const parseTags = (s: string) => [...new Set(s.split(",").map((t) => t.trim()).filter(Boolean))];
+
+const selectCls = "w-full rounded border bg-[var(--bg)] px-1.5 py-1 text-xs text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)]";
+const changedCls = "border-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]";
+
+export function BulkEditor({ rows }: { rows: BulkRow[] }) {
+  const router = useRouter();
+  const [comps, setComps] = useState<Record<number, CompDraft>>({});
+  const [matches, setMatches] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Samo stvarne razlike u odnosu na bazu
+  const compChanges = rows.flatMap((r) => {
+    const d = comps[r.id];
+    if (!d) return [];
+    const change: { id: number; level?: string; eventType?: string; tags?: string[] } = { id: r.id };
+    if (d.level !== undefined && d.level !== r.level) change.level = d.level;
+    if (d.eventType !== undefined && d.eventType !== r.eventType) change.eventType = d.eventType;
+    if (d.tags !== undefined && parseTags(d.tags).join(",") !== r.tags.join(",")) change.tags = parseTags(d.tags);
+    return Object.keys(change).length > 1 ? [change] : [];
+  });
+  const matchChanges = rows.flatMap((r) =>
+    r.matches.flatMap((m) => {
+      const to = matches[matchKey(r.id, m)];
+      return to && to !== m.category ? [{ competitionId: r.id, disciplineId: m.disciplineId, from: m.category, to }] : [];
+    })
+  );
+  const dirty = compChanges.length + matchChanges.length;
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  const setComp = (id: number, patch: CompDraft) => setComps((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+
+  async function save() {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/competitions/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ competitions: compChanges, matches: matchChanges }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage({ ok: false, text: json.error ?? `Greška ${res.status}` });
+        return;
+      }
+      setComps({});
+      setMatches({});
+      setMessage({ ok: true, text: `Sačuvano ${json.updated} izmena; forma je preračunata.` });
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (rows.length === 0) {
+    return <div className="rounded-xl border border-[var(--border)] py-16 text-center text-sm text-[var(--muted)]">Nema takmičenja za ovaj filter.</div>;
+  }
+
+  return (
+    <>
+      <datalist id="bulk-tag-options">
+        {TAG_OPTIONS.map((t) => <option key={t.value} value={t.value} />)}
+      </datalist>
+      <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+        <table className="w-full min-w-[960px] text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] bg-[var(--surface)] text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
+              <th className="px-3 py-2.5">Takmičenje</th>
+              <th className="w-36 px-3 py-2.5">Nivo</th>
+              <th className="w-40 px-3 py-2.5">Tip</th>
+              <th className="w-44 px-3 py-2.5">Tagovi</th>
+              <th className="px-3 py-2.5">Mečevi · kategorija</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border)]">
+            {rows.map((r) => {
+              const d = comps[r.id] ?? {};
+              const level = d.level ?? r.level;
+              const eventType = d.eventType ?? r.eventType;
+              const tags = d.tags ?? r.tags.join(", ");
+              return (
+                <tr key={r.id} className="align-top">
+                  <td className="px-3 py-2.5">
+                    <a href={`/admin/takmicenja/${r.id}/edit`} className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)]">{r.name}</a>
+                    <div className="mt-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] text-[var(--subtle)]">{formatDateRangeSr(r.date, null)} · #{r.id}</div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <select aria-label={`Nivo: ${r.name}`} value={level} onChange={(e) => setComp(r.id, { level: e.target.value })} className={`${selectCls} ${level !== r.level ? changedCls : "border-[var(--border)]"}`}>
+                      {Object.entries(LEVEL_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <select aria-label={`Tip: ${r.name}`} value={eventType} onChange={(e) => setComp(r.id, { eventType: e.target.value })} className={`${selectCls} ${eventType !== r.eventType ? changedCls : "border-[var(--border)]"}`}>
+                      {EVENT_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <input
+                      aria-label={`Tagovi: ${r.name}`}
+                      list="bulk-tag-options"
+                      value={tags}
+                      onChange={(e) => setComp(r.id, { tags: e.target.value })}
+                      placeholder="npr. issf, 10m"
+                      className={`${selectCls} ${parseTags(tags).join(",") !== r.tags.join(",") ? changedCls : "border-[var(--border)]"}`}
+                    />
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {r.matches.length === 0 ? (
+                      <span className="text-xs text-[var(--subtle)]">bez rezultata</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {r.matches.map((m) => {
+                          const key = matchKey(r.id, m);
+                          const value = matches[key] ?? m.category;
+                          return (
+                            <label key={key} className="flex items-center gap-1 rounded border border-[var(--border)] bg-[var(--surface)] py-0.5 pl-1.5 pr-0.5 text-[0.7rem]">
+                              <span className="font-semibold text-[var(--ink)]">{m.code}</span>
+                              <span className="text-[var(--subtle)]">{m.count}</span>
+                              <select
+                                aria-label={`Kategorija ${m.code} (${m.count} rezultata): ${r.name}`}
+                                value={value}
+                                onChange={(e) => setMatches((prev) => ({ ...prev, [key]: e.target.value }))}
+                                className={`rounded border bg-[var(--bg)] px-1 py-0.5 text-[0.7rem] ${value !== m.category ? changedCls : "border-[var(--border)]"}`}
+                              >
+                                {AGE_CATEGORIES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              </select>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3 shadow-lg">
+        <span className="text-sm text-[var(--muted)]">
+          {dirty ? `Izmena za čuvanje: ${dirty}` : "Nema izmena"}
+        </span>
+        {message && (
+          <span role="status" className="text-sm font-medium" style={{ color: message.ok ? "var(--success)" : "var(--brand-primary)" }}>
+            {message.text}
+          </span>
+        )}
+        <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            onClick={() => { setComps({}); setMatches({}); setMessage(null); }}
+            disabled={!dirty || saving}
+            className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] disabled:opacity-40"
+          >
+            Poništi
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={!dirty || saving}
+            className="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)] disabled:opacity-40"
+          >
+            {saving ? "Čuvam…" : "Sačuvaj"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}

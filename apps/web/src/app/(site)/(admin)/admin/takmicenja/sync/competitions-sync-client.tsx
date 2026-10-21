@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { formatDateRangeSr } from "@/lib/date-utils";
+import { eventTypeFromName } from "@/lib/competition-filters";
 import { SyncRowEditor, type Country, type Draft, type SiusSuggestion } from "./sync-row-editor";
 
 interface SyncEvent {
@@ -133,7 +134,7 @@ function toDraft(e: SyncEvent): Draft {
     locationEn: "",
     countryId: e.countryId == null ? "" : String(e.countryId),
     level: e.detectedLevel ?? "",
-    eventType: "other",
+    eventType: eventTypeFromName(e.name),
     ageCategory: "open",
     focusPriority: "",
     organizer: e.source.toUpperCase(),

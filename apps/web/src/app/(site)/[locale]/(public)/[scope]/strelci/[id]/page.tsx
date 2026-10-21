@@ -19,6 +19,7 @@ import type { Scope } from "@/lib/scope";
 import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 import { ArrowRight } from "lucide-react";
 import { ShooterAvatarLightbox } from "@/components/shooter/ShooterAvatarLightbox";
+import { INVALID_REMARKS } from "@/lib/forma-query";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
 
@@ -76,6 +77,8 @@ export default async function ShooterPage({ params }: Props) {
         competitionCountry: countries.name,
         competitionCountryCode2: countries.code2,
         competitionLevel: competitions.level,
+        competitionEventType: competitions.eventType,
+        qualRemark: results.qualRemark,
         disciplineCode: disciplines.code,
         disciplineId: disciplines.id,
         maxQualScore: disciplines.maxQualScore,
@@ -140,8 +143,11 @@ export default async function ShooterPage({ params }: Props) {
   const currentCategory = birthYear ? computeAgeCategoryFromBirthYear(birthYear) : null;
 
   // ── Chart data ───────────────────────────────────────────────────────────────
+  // Isti filter kao forma (forma-query): bez nula i DNF/DNS/DSQ — tačke odgovaraju liniji forme.
+  const isFormaResult = (r: (typeof shooterResults)[number]) =>
+    r.qualTotal != null && parseFloat(r.qualTotal) > 0 && !INVALID_REMARKS.includes(r.qualRemark ?? "");
   const chartPoints: ChartPoint[] = shooterResults
-    .filter((r) => r.qualTotal != null && parseFloat(r.qualTotal) > 0)
+    .filter(isFormaResult)
     .map((r) => ({
       date: r.competitionDate,
       score: parseFloat(r.qualTotal!),
@@ -149,6 +155,7 @@ export default async function ShooterPage({ params }: Props) {
       competitionId: r.competitionId,
       competitionName: r.competitionName,
       level: r.competitionLevel,
+      eventType: r.competitionEventType,
       category: r.category,
     }));
 
@@ -156,7 +163,7 @@ export default async function ShooterPage({ params }: Props) {
   const chartDisciplines = (() => {
     const seen = new Map<string, number>();
     for (const r of shooterResults) {
-      if (r.qualTotal != null && parseFloat(r.qualTotal) > 0 && !seen.has(r.disciplineCode)) {
+      if (isFormaResult(r) && !seen.has(r.disciplineCode)) {
         seen.set(r.disciplineCode, parseFloat(r.maxQualScore));
       }
     }
@@ -182,6 +189,7 @@ export default async function ShooterPage({ params }: Props) {
   );
 
   const showChart = chartPoints.length >= 2;
+  const today = new Date().toISOString().slice(0, 10);
 
   // ── Career stats per discipline — from cache ──────────────────────────────────
   const DISC_NAMES: Record<string, { sr: string; en: string }> = {
@@ -386,6 +394,7 @@ export default async function ShooterPage({ params }: Props) {
                 formaScores={formaScores}
                 locale={locale}
                 noDataLabel={tProfile("noChartData")}
+                today={today}
               />
             ))}
           </div>
@@ -398,6 +407,7 @@ export default async function ShooterPage({ params }: Props) {
               formaScores={formaScores}
               locale={locale}
               noDataLabel={tProfile("noChartData")}
+                today={today}
             />
           </div>
         </div>

@@ -5,7 +5,7 @@ import { db } from "@shootermarkt/db";
 import { competitions, countries } from "@shootermarkt/db/schema";
 import { detectCompetitionLevel, isRiflePistolCompetition } from "@shootermarkt/adapters/issf/competition-level";
 import { fetchIssfEvents } from "@/lib/calendar/adapters";
-import { groupsFromName } from "@/lib/competition-filters";
+import { eventTypeFromName, groupsFromName } from "@/lib/competition-filters";
 
 // ISSF tipovi: 1 Svetski kup, 2 Finale SK, 3 Svetsko prvenstvo, 5 Evropsko prvenstvo
 const TYPE_IDS = new Set([1, 2, 3, 5]);
@@ -52,6 +52,7 @@ async function main() {
       location: e.location,
       countryId: countryIds.get(e.country?.trim().toLowerCase() ?? "") ?? null,
       level,
+      eventType: eventTypeFromName(e.name),
       organizer: "ISSF",
       externalId: `issf:${e.externalId}`,
       issfId: e.externalId!,

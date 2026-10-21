@@ -115,59 +115,26 @@ results (
 
 ## Forma Score Algoritam
 
-Jedinstveni izvor: `src/lib/forma.ts` (`computeForma`, `rollingForma`).
+Jedinstveni izvor: `src/lib/forma.ts` (`computeForma`, `rollingForma`). Detalji: `docs/forma-score.md`,
+odluke: `docs/forma-v2.md`.
 
-**Forma NIJE prosek prošlih rezultata.** Forma je **prognoza sledećeg nastupa** —
-weighted linear regression (težinski trend) projektovana jedan tipičan razmak unapred:
+**Forma = težinski nivo** skorašnjih nastupa (v2). Trend NE ulazi u broj — backtest je pokazao da
+projekcija trenda povećava grešku; trend se prikazuje samo kao strelica ↑ ↓ →.
 
-```
-level  = težinski nivo na dan poslednjeg nastupa
-trend  = nagib iz robusnih bucket-ova (novija vs starija polovina)
-forma  = level + trend·stepDays   (stepDays = tipičan razmak, ceiling-kompresovan)
-```
+Težina nastupa = time-decay (poluvreme 180 dana, max 365 dana) × nivo takmičenja (`level` +
+`event_type`) × kategorija meča (`results.category`) × prigušenje lošeg outliera (samo naniže).
 
-Tri signala u težini svakog nastupa:
-1. **time-decay** — exp opadanje po STVARNOM datumu (poluvreme 150 dana)
-2. **level-weight** — jače takmičenje = pouzdaniji signal:
-   `olympic > world > continental > international ≈ national > regional > club`
-   (international i national namerno ≈ — jako državno vs slab međunarodni nije uporedivo)
-3. nagib se shrink-uje po težini bucket-a (ne veruj trendu koji drži zanemarljiva težina)
+Ulaz se čisti: skor ≤ 0 i DNF/DNS/DSQ ne ulaze; isti skor istog dana (isti meč na više lista)
+broji se jednom. Forma zato nikad ne prelazi lični peak ni max discipline.
 
-**Ceiling kompresija** — rast blizu realnog max discipline je teži, pa se uzlazna
-projekcija priguši ka plafonu (silazna se NE dira). Realni max (`REALISTIC_MAX`):
-ARM/ARW 637.9 (WR; teorijski 654.0 nedostižan), APM 594, APW 591.
+Stabilnost NE ulazi u broj — zasebne metrike `reliability`, `consistency`, `trend`, `momentum`,
+`peak`, `peakProximity`, `sampleSize`.
 
-Zbog projekcije trenda:
-- uzlazna serija → forma IZNAD poslednjeg (pogled unapred)
-- silazna → ISPOD; stabilan → ≈ nivo
-- outlier / usamljen stari nastup → prigušen (decay + shrink)
+**Rangiranje:** forma DESC, ≥5 nastupa (`RANKING_MIN_SAMPLE`), nastup u poslednjih 365 dana,
+tiebreak peak → sampleSize.
 
-Forma ostaje **na skali rezultata** (624.3 ARM, 577 APM) → opipljivo predviđanje.
-
-**Stabilnost NE ulazi u forma broj.** Izlazi kao zasebne metrike koje govore
-KOLIKO da veruješ prognozi, ne menjaju je:
-
-| Metrika | Značenje |
-|---|---|
-| `forma` | prognozirani sledeći rezultat |
-| `level` | trenutni nivo bez projekcije |
-| `reliability` | ± raspon prognoze (težinski std oko trenda) |
-| `trend` | ↑ ↓ → |
-| `momentum` | ubrzava li se poboljšanje (novija vs starija polovina) |
-| `peak` | najbolji rezultat ikad |
-| `peakProximity` | forma / peak ∈ (0,1] |
-| `consistency` | 0–1 skor stabilnosti |
-| `sampleSize` | broj nastupa u obračunu |
-
-Prozor: poslednjih 20 nastupa (stvarni limit = time-decay + max 300 dana starosti).
-Ulaz: `FormaEntry[]` (`score`, `date`, opciono `level`),
-bilo koji redosled (sortira se interno). Za ceiling proslediti `{ code }`.
-
-**Rangiranje** (`rangiranje/page.tsx`, homepage top-forma, club leaderboard):
-- primarni ključ = **forma** (prognoza), sort DESC
-- **kvalifikacija ≥5 nastupa** (`RANKING_MIN_SAMPLE`) — nepouzdane prognoze ispadaju
-- tiebreak: peak → sampleSize
-- konzistentnost/reliability = zasebne kolone, nikad u broju
+**Svaka izmena parametara forme mora proći backtest:** `pnpm --filter @shootermarkt/web db:backtest-forma`
+(MAE mora da ostane ≤ prethodnog; nijedna prognoza iznad peak-a/max-a).
 
 ---
 

@@ -43,7 +43,7 @@ export interface SiusSuggestion {
 
 export type Country = { id: number; name: string; code2: string | null };
 
-const EVENT_TYPES = [
+export const EVENT_TYPES = [
   { value: "championship", label: "Prvenstvo" },
   { value: "world_cup", label: "Svetski kup" },
   { value: "champions_league", label: "Champions League" },
@@ -54,7 +54,7 @@ const EVENT_TYPES = [
   { value: "other", label: "Ostalo" },
 ];
 
-const AGE_CATEGORIES = [
+export const AGE_CATEGORIES = [
   { value: "open", label: "Open" },
   { value: "senior", label: "Senior" },
   { value: "mladji_senior", label: "Mlađi senior" },

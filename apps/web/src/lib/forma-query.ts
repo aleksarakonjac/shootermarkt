@@ -1,12 +1,16 @@
-import { and, eq, gt, gte, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { results, competitions, disciplines, shooterFormaCache } from "@shootermarkt/db/schema";
-import { RANKING_MIN_SAMPLE, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
+import { RANKING_MIN_SAMPLE, type CompetitionEventType, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
+
+/** qual_remark oznake koje znače da rezultat nije ispucan do kraja. */
+export const INVALID_REMARKS = ["DNF", "DNS", "DSQ"];
 
 export type RawFormaEntry = {
   qualTotal: number;
   date: string;
   level: CompetitionLevel | null;
+  eventType: CompetitionEventType;
   category: ResultCategory;
 };
 
@@ -16,11 +20,23 @@ export type FormaEntryGroup = {
   entries: RawFormaEntry[];
 };
 
-/** Cache rows eligible for the public forma ranking. */
+/** Koliko dana bez nastupa u disciplini strelac sme da bude da bi ostao u rang listi. */
+export const RANKING_ACTIVE_DAYS = 365;
+
+/** Cache rows eligible for the public forma ranking: dovoljno nastupa i aktivan u disciplini. */
 export function rankedFormaCacheFilter() {
   return and(
     isNotNull(shooterFormaCache.forma),
     gte(shooterFormaCache.sampleSize, RANKING_MIN_SAMPLE),
+    sql`exists (
+      select 1 from ${results}
+      join ${competitions} on ${competitions.id} = ${results.competitionId}
+      join ${disciplines} on ${disciplines.id} = ${results.disciplineId}
+      where ${results.shooterId} = ${shooterFormaCache.shooterId}
+        and ${disciplines.code}::text = ${shooterFormaCache.disciplineCode}
+        and ${results.qualTotal} > 0
+        and ${competitions.date} >= to_char(current_date - ${RANKING_ACTIVE_DAYS}::int, 'YYYY-MM-DD')
+    )`,
   );
 }
 
@@ -39,6 +55,7 @@ export async function getFormaEntriesByDiscipline(
       qualTotal: results.qualTotal,
       date: competitions.date,
       level: competitions.level,
+      eventType: competitions.eventType,
       category: results.category,
       disciplineCode: disciplines.code,
     })
@@ -46,9 +63,12 @@ export async function getFormaEntriesByDiscipline(
     .innerJoin(competitions, eq(results.competitionId, competitions.id))
     .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
     .where(
-      shooterIds && shooterIds.length > 0
-        ? and(inArray(results.shooterId, shooterIds), gt(results.qualTotal, "0"))
-        : gt(results.qualTotal, "0")
+      and(
+        shooterIds && shooterIds.length > 0 ? inArray(results.shooterId, shooterIds) : undefined,
+        gt(results.qualTotal, "0"),
+        // DNF/DNS/DSQ: delimičan ili nepostojeći skor — nije nastup za formu
+        or(isNull(results.qualRemark), notInArray(results.qualRemark, INVALID_REMARKS)),
+      )
     );
 
   const groups = new Map<string, FormaEntryGroup>();
@@ -61,6 +81,7 @@ export async function getFormaEntriesByDiscipline(
       qualTotal: Number(r.qualTotal),
       date: r.date,
       level: r.level as CompetitionLevel | null,
+      eventType: r.eventType,
       category: r.category as ResultCategory,
     });
   }

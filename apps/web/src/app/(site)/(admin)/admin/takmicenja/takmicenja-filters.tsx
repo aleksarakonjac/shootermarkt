@@ -27,7 +27,7 @@ const LEVEL_OPTIONS_WITH_PREFIX = LEVEL_OPTIONS.map((o) => ({
   ),
 }));
 
-const TAG_OPTIONS = [
+export const TAG_OPTIONS = [
   { value: "issf", label: "ISSF" },
   { value: "sss",  label: "SSS" },
   { value: "esc",  label: "ESC" },

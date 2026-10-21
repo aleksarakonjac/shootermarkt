@@ -2,9 +2,8 @@
 
 import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { Link } from "@/i18n/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { rollingForma, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
-import { FormaScoreMark } from "./FormaScoreMark";
+import { motion } from "framer-motion";
+import { rollingForma, type CompetitionEventType, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 import { FormaScoreInfo } from "./FormaScoreHeading";
 import { DisciplineSelector, DISCIPLINE_COLOR } from "./DisciplineSelector";
 
@@ -15,6 +14,7 @@ export type ChartPoint = {
   competitionId: number;
   competitionName: string;
   level?: CompetitionLevel | null;
+  eventType?: CompetitionEventType | null;
   category?: ResultCategory | null;
 };
 
@@ -79,9 +79,12 @@ const H = 180;
 const ML = 48, MR = 28, MT = 12, MB = 28;
 const CH = H - MT - MB;
 
-function buildWindow(data: ChartPoint[], yValues: number[], CW: number, maxScore: number) {
-  if (yValues.length === 0) return null;
-  const hi = Math.max(...yValues), lo = Math.min(...yValues);
+type WindowValues = { forma: number[]; score: number[]; reliability: number[] };
+
+function buildWindow(data: ChartPoint[], v: WindowValues, CW: number, maxScore: number) {
+  if (v.forma.length === 0) return null;
+  const hi = Math.max(...v.score, ...v.forma.map((f, i) => f + v.reliability[i]));
+  const lo = Math.min(...v.score, ...v.forma.map((f, i) => f - v.reliability[i]));
   const pad = Math.max((hi - lo) / 3, 1);
   const yMin = Math.max(0, lo - pad);
   const naturalYMax = hi + pad;
@@ -89,7 +92,8 @@ function buildWindow(data: ChartPoint[], yValues: number[], CW: number, maxScore
   const yRange = Math.max(yMax - yMin, 1);
   const sy = (s: number) => MT + CH - ((s - yMin) / yRange) * CH;
   const sx = (i: number) => data.length <= 1 ? ML + CW / 2 : ML + (i / (data.length - 1)) * CW;
-  const pts: [number, number][] = yValues.map((v, i) => [sx(i), sy(v)]);
+  const pts: [number, number][] = v.forma.map((f, i) => [sx(i), sy(f)]);
+  const dots: [number, number][] = v.score.map((s, i) => [sx(i), sy(s)]);
 
   function smoothCurve(pts: [number, number][], tension = 0.35): string {
     if (pts.length < 2) return "";
@@ -108,15 +112,19 @@ function buildWindow(data: ChartPoint[], yValues: number[], CW: number, maxScore
   }
 
   const line = smoothCurve(pts);
-  const bottom = MT + CH;
-  const area = line ? `${line} L ${pts[pts.length-1][0].toFixed(1)},${bottom} L ${pts[0][0].toFixed(1)},${bottom} Z` : "";
+  // ± pojas pouzdanosti: gornja ivica napred, donja unazad
+  const upper = v.forma.map((f, i): [number, number] => [sx(i), sy(Math.min(f + v.reliability[i], yMax))]);
+  const lower = v.forma.map((f, i): [number, number] => [sx(i), sy(Math.max(f - v.reliability[i], yMin))]).reverse();
+  const band = pts.length > 1
+    ? `${smoothCurve(upper)} L ${lower[0][0].toFixed(1)},${lower[0][1].toFixed(1)} ${smoothCurve(lower).replace(/^M [^C]*/, "")} Z`
+    : "";
 
   const range = yMax - yMin;
   const step = range < 10 ? 1 : range < 20 ? 2 : 5;
   const yTicks: number[] = [];
   for (let y = Math.ceil(yMin / step) * step; y <= yMax; y += step) yTicks.push(y);
 
-  return { pts, line, area, sy, sx, yTicks };
+  return { pts, dots, line, band, sy, sx, yTicks };
 }
 
 // ── SVG window layer ──────────────────────────────────────────────────────────
@@ -136,7 +144,7 @@ interface LayerProps {
 }
 
 function ChartLayer({ data, built, chartWidth, color, locale, showLabels, hoverIdx, onHover, xInitial, xAnimate, onAnimationComplete }: LayerProps) {
-  const { pts, line, area, sx } = built;
+  const { pts, dots, line, band, sx } = built;
   const maxLabels = Math.max(2, Math.floor(chartWidth / 96));
   const every = Math.max(1, Math.ceil((data.length - 1) / (maxLabels - 1)));
 
@@ -147,9 +155,12 @@ function ChartLayer({ data, built, chartWidth, color, locale, showLabels, hoverI
       transition={{ duration: SLIDE_DUR, ease: SLIDE_EASE }}
       onAnimationComplete={onAnimationComplete}
     >
-      {area && <motion.path initial={false} animate={{ d: area }} transition={{ duration: MORPH_DUR, ease: "easeInOut" }} fill={color} fillOpacity={0.1} stroke="none" />}
+      {band && <motion.path initial={false} animate={{ d: band }} transition={{ duration: MORPH_DUR, ease: "easeInOut" }} fill={color} fillOpacity={0.1} stroke="none" />}
       {line && <motion.path initial={false} animate={{ d: line }} transition={{ duration: MORPH_DUR, ease: "easeInOut" }} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
-      {pts.map(([cx, cy], i) => (
+      {hoverIdx !== null && pts[hoverIdx] && (
+        <circle cx={pts[hoverIdx][0]} cy={pts[hoverIdx][1]} r="4" fill={color} stroke="var(--bg)" strokeWidth="1.5" />
+      )}
+      {dots.map(([cx, cy], i) => (
         <motion.circle
           key={i}
           initial={false}
@@ -191,6 +202,8 @@ interface FormaChartProps {
   locale?: string;
   noDataLabel?: string;
   competitionUrlBase?: string;
+  /** Današnji datum (YYYY-MM-DD) sa servera — za "poslednji nastup pre X mes." */
+  today?: string;
 }
 
 export function FormaChart({
@@ -200,17 +213,15 @@ export function FormaChart({
   locale = "sr",
   noDataLabel = "Nema dovoljno podataka",
   competitionUrlBase = "/takmicenja",
+  today,
 }: FormaChartProps) {
   const available = disciplines.filter(d => points.some(p => p.discipline === d.code));
   const [disc, setDisc] = useState(available[0]?.code ?? "");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
-  const prefersReducedMotion = useReducedMotion();
   const vpW = useSyncExternalStore(subscribeToViewportWidth, getViewportWidth, getServerViewportWidth);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgW, setSvgW] = useState(0);
-
-  const [mode, setMode] = useState<"forma" | "nastup">("forma");
 
   const allData = points
     .filter(p => p.discipline === disc)
@@ -219,7 +230,7 @@ export function FormaChart({
   const [windowOffset, setWindowOffset] = useState(0);
 
   // Prev window kept alive during slide-out
-  const [prevSlice, setPrevSlice] = useState<{ data: ChartPoint[]; yValues: number[]; xExit: number } | null>(null);
+  const [prevSlice, setPrevSlice] = useState<{ data: ChartPoint[]; values: WindowValues; xExit: number } | null>(null);
   const [navDir, setNavDir] = useState<"left" | "right" | null>(null);
   const isAnimating = prevSlice !== null;
 
@@ -249,9 +260,9 @@ export function FormaChart({
       ? "Unreliable estimate — fewer than 5 starts"
       : "Procena nepouzdana — manje od 5 nastupa",
     lowConfidenceBadge: en ? "low data" : "malo podataka",
-    actualPerformances: en
-      ? "Actual qualification results by appearance"
-      : "Ostvareni kvalifikacioni rezultati po nastupima",
+    legendScore: en ? "Result" : "Nastup",
+    legendForma: "FORMAScore",
+    lastStart: (months: number) => en ? `Last start ${months} months ago` : `Poslednji nastup pre ${months} mes.`,
     metricsTitle: en ? "What do these metrics mean?" : "Šta znače ove metrike?",
     metricsDescription: en
       ? "Level is the estimated current level without projecting the trend. Peak shows how close FORMAScore is to the best result, while stability shows how consistent performances are."
@@ -268,15 +279,22 @@ export function FormaChart({
   const canGoBack = windowStart > 0;
   const canGoForward = windowEnd < allData.length;
 
-  const allFormaValues = rollingForma(
-    allData.map(p => ({ score: p.score, date: p.date, level: p.level, category: p.category })),
+  const rolling = rollingForma(
+    allData.map(p => ({ score: p.score, date: p.date, level: p.level, eventType: p.eventType, category: p.category })),
     { code: disc }
   );
-  const allDisplayValues = mode === "forma" ? allFormaValues : allData.map(p => p.score);
-  const yValues = allDisplayValues.slice(windowStart, windowEnd);
+  const sliceValues = (start: number, end: number): WindowValues => ({
+    forma: rolling.slice(start, end).map(r => r.forma),
+    score: allData.slice(start, end).map(p => p.score),
+    reliability: rolling.slice(start, end).map(r => r.reliability),
+  });
+  const values = sliceValues(windowStart, windowEnd);
 
-  const built = buildWindow(data, yValues, CW, maxScore);
-  const prevBuilt = prevSlice ? buildWindow(prevSlice.data, prevSlice.yValues, CW, maxScore) : null;
+  const built = buildWindow(data, values, CW, maxScore);
+  const prevBuilt = prevSlice ? buildWindow(prevSlice.data, prevSlice.values, CW, maxScore) : null;
+
+  const lastDate = allData.at(-1)?.date;
+  const monthsSinceLast = lastDate && today ? Math.floor((Date.parse(today + "T00:00:00Z") - Date.parse(lastDate + "T00:00:00Z")) / (30.44 * 86_400_000)) : 0;
 
   function navigate(dir: "left" | "right") {
     if (isAnimating) return;
@@ -289,10 +307,9 @@ export function FormaChart({
     // Snapshot current slice before updating windowEnd
     const snapStart = Math.max(0, windowEnd - WINDOW);
     const currentData = allData.slice(snapStart, windowEnd);
-    const currentYValues = allDisplayValues.slice(snapStart, windowEnd);
     const xExit = dir === "right" ? CW : -CW;
 
-    setPrevSlice({ data: currentData, yValues: currentYValues, xExit });
+    setPrevSlice({ data: currentData, values: sliceValues(snapStart, windowEnd), xExit });
     setNavDir(dir);
     setHoverIdx(null);
     setTooltipPos(null);
@@ -306,13 +323,6 @@ export function FormaChart({
     setTooltipPos(null);
     setPrevSlice(null);
     setNavDir(null);
-  }
-
-  function selectMode(nextMode: "forma" | "nastup") {
-    if (nextMode === mode || isAnimating) return;
-    setHoverIdx(null);
-    setTooltipPos(null);
-    setMode(nextMode);
   }
 
   function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
@@ -338,10 +348,10 @@ export function FormaChart({
   }
 
   const hovPt = hoverIdx !== null ? data[hoverIdx] : null;
-  const hovForma = hoverIdx !== null ? yValues[hoverIdx] : null;
+  const hovForma = hoverIdx !== null ? values.forma[hoverIdx] : null;
   const compactTooltip = vpW < 640;
   const TIP_W = compactTooltip ? 184 : 220;
-  const TIP_H = compactTooltip ? (mode === "forma" ? 155 : 135) : (mode === "forma" ? 132 : 115);
+  const TIP_H = compactTooltip ? 155 : 132;
   const tipX = tooltipPos ? Math.min(vpW - TIP_W - 8, Math.max(8, tooltipPos.x + 16 + TIP_W > vpW ? tooltipPos.x - TIP_W - 16 : tooltipPos.x + 16)) : 0;
   const tipY = tooltipPos ? Math.min(window.innerHeight - TIP_H - 8, Math.max(8, tooltipPos.y - TIP_H / 2)) : 0;
 
@@ -368,15 +378,13 @@ export function FormaChart({
               >
                 {hovPt.competitionName}
               </Link>
-              {mode === "forma" && (
-                <span
-                  title={locale === "en" ? "Qualification result" : "Kvalifikacioni rezultat"}
-                  className={compactTooltip ? "mt-1 block" : "shrink-0"}
-                  style={{ color: "var(--muted)", fontFamily: "var(--font-jetbrains-mono,monospace)", fontSize: "0.75rem", fontWeight: 700, lineHeight: 1.4 }}
-                >
-                  {hovPt.score % 1 === 0 ? hovPt.score : hovPt.score.toFixed(1)}
-                </span>
-              )}
+              <span
+                title={locale === "en" ? "Qualification result" : "Kvalifikacioni rezultat"}
+                className={compactTooltip ? "mt-1 block" : "shrink-0"}
+                style={{ color: "var(--muted)", fontFamily: "var(--font-jetbrains-mono,monospace)", fontSize: "0.75rem", fontWeight: 700, lineHeight: 1.4 }}
+              >
+                {t.legendScore} {hovPt.score % 1 === 0 ? hovPt.score : hovPt.score.toFixed(1)}
+              </span>
             </div>
           </div>
         </div>
@@ -399,30 +407,16 @@ export function FormaChart({
             )}
           </div>
 
-          {/* Mode toggle */}
-          <div className="flex items-center gap-0.5 rounded-lg bg-[var(--surface-2)] p-0.5 border border-[var(--border)] shrink-0">
-            {(["forma", "nastup"] as const).map(m => (
-              <button
-                key={m}
-                onClick={() => selectMode(m)}
-                className="relative px-2 py-0.5 text-xs font-semibold transition-colors font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide sm:px-2.5"
-                style={mode === m
-                  ? { color: "var(--ink)" }
-                  : { background: "transparent", color: "var(--muted)" }
-                }
-              >
-                {mode === m && (
-                  <motion.span
-                    layoutId="forma-chart-mode"
-                    className="absolute inset-0 rounded bg-[var(--bg)] shadow-sm"
-                    transition={{ type: "spring", stiffness: 500, damping: 36 }}
-                  />
-                )}
-                <span className="relative z-10">
-                  {m === "forma" ? <FormaScoreMark size="sm" /> : locale === "en" ? "Results" : "Nastupi"}
-                </span>
-              </button>
-            ))}
+          {/* Legenda: tačka = nastup, linija = forma */}
+          <div className="flex shrink-0 items-center gap-2.5 text-[0.7rem] font-semibold text-[var(--muted)]" aria-hidden="true">
+            <span className="flex items-center gap-1">
+              <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.5" fill="var(--bg)" stroke={color} strokeWidth="2" /></svg>
+              {t.legendScore}
+            </span>
+            <span className="flex items-center gap-1">
+              <svg width="14" height="10" viewBox="0 0 14 10"><line x1="1" y1="5" x2="13" y2="5" stroke={color} strokeWidth="2.5" strokeLinecap="round" /></svg>
+              {t.legendForma}
+            </span>
           </div>
 
           {forma && (
@@ -522,19 +516,9 @@ export function FormaChart({
           )}
         </div>
 
-        <AnimatePresence initial={false}>
-          {mode === "nastup" && (
-            <motion.p
-              initial={prefersReducedMotion ? false : { height: 0, opacity: 0, y: -8 }}
-              animate={{ height: 40, opacity: 1, y: 0 }}
-              exit={prefersReducedMotion ? undefined : { height: 0, opacity: 0, y: -6 }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.32, ease: [0.42, 0, 0.58, 1] }}
-              className="flex items-center overflow-hidden px-4 text-xs text-[var(--muted)]"
-            >
-              {t.actualPerformances}
-            </motion.p>
-          )}
-        </AnimatePresence>
+        {monthsSinceLast >= 6 && (
+          <p className="px-4 pb-2 text-xs text-[var(--muted)]">{t.lastStart(monthsSinceLast)}</p>
+        )}
 
         {/* Metric strip */}
         {forma && (
@@ -610,8 +594,7 @@ export function FormaChart({
                     if (isAnimating) return;
                     const snapStart = Math.max(0, windowEnd - WINDOW);
                     const currentData = allData.slice(snapStart, windowEnd);
-                    const currentYValues = allDisplayValues.slice(snapStart, windowEnd);
-                    setPrevSlice({ data: currentData, yValues: currentYValues, xExit: -CW });
+                    setPrevSlice({ data: currentData, values: sliceValues(snapStart, windowEnd), xExit: -CW });
                     setNavDir("left");
                     setHoverIdx(null);
                     setTooltipPos(null);

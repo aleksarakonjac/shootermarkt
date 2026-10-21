@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { clubs, competitions, disciplines, results, shooters } from "@shootermarkt/db/schema";
 import { recomputeFormaCache } from "@/lib/forma-cache";
-import { groupsFromName } from "@/lib/competition-filters";
+import { eventTypeFromName, groupsFromName } from "@/lib/competition-filters";
 import { refreshDisciplineGroups } from "@/lib/discipline-groups";
 import { matchShooter } from "@shootermarkt/db/name-match";
 import { DISCIPLINE_META, type CommitPayload } from "@shootermarkt/db/pdf-import-types";
@@ -49,7 +49,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
     } else {
       const [created] = await db.insert(competitions).values({
         name: comp.name, date: comp.date, dateEnd: comp.dateEnd ?? null,
-        location: comp.location, level: comp.level, eventType: comp.eventType ?? "other",
+        location: comp.location, level: comp.level, eventType: comp.eventType && comp.eventType !== "other" ? comp.eventType : eventTypeFromName(comp.name),
         organizer: comp.organizer ?? null, tags: competitionTags,
         disciplineGroups: groupsFromName(comp.name),
       }).returning({ id: competitions.id });

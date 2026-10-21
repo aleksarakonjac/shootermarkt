@@ -2,6 +2,7 @@ import { db } from "@shootermarkt/db";
 import { competitions, disciplines, mixedTeamResults } from "@shootermarkt/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
+import { eventTypeFromName } from "@/lib/competition-filters";
 import type { CompetitionLevel, EventType, StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 export class MixedCommitError extends Error {
@@ -69,7 +70,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
           date: comp.date,
           location: comp.location,
           level: comp.level,
-          eventType: comp.eventType ?? "other",
+          eventType: comp.eventType && comp.eventType !== "other" ? comp.eventType : eventTypeFromName(comp.name),
         })
         .returning({ id: competitions.id });
       competitionId = ins.id;

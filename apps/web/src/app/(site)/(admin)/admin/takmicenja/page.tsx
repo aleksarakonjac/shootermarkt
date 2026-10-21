@@ -213,6 +213,12 @@ export default async function AdminTakmicenjaPage({
         <div className="flex flex-wrap gap-2">
           <BatchTranslateButton />
           <Link
+            href="/admin/takmicenja/bulk"
+            className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
+          >
+            Bulk izmena
+          </Link>
+          <Link
             href="/admin/takmicenja/sync"
             className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
           >

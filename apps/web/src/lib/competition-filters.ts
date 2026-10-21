@@ -1,3 +1,4 @@
+import type { CompetitionEventType } from "@/lib/forma";
 /**
  * Model filtera na /takmicenja: dve ose sa višestrukim izborom.
  *  - nivo       -> kolona competitions.level (grupisano za prikaz)
@@ -77,6 +78,20 @@ export function groupsFromName(name: string): DisciplineGroup[] {
   if (/(\b10\s?m\b|vazdu[sš]n|air\s+(rifle|pistol))/i.test(name)) groups.push("air");
   if (/(\bMK\b|malokalibar|\b(25|50)\s?m\b|small.?bore|3\s?-?position|rapid.?fire|free\s+pistol|sport\s+pistol)/i.test(name)) groups.push("smallbore");
   return groups;
+}
+
+/**
+ * Tip takmičenja iz naziva (prvo poklapanje pobeđuje). Ulazi u težinu forme
+ * (level + event_type), pa novo takmičenje ne sme ostati "other" ako naziv kaže više.
+ */
+export function eventTypeFromName(name: string): CompetitionEventType {
+  if (/champions\s+league/i.test(name)) return "champions_league";
+  if (/\bleague\b|\bliga\b/i.test(name)) return "league_round";
+  if (/grand\s+prix|\bGP\b/i.test(name)) return "grand_prix";
+  if (/world\s+cup|svetski\s+kup/i.test(name)) return "world_cup";
+  if (/championship|prvenstv|olympic\s+qualification/i.test(name)) return "championship";
+  if (/\bcup\b|\bkup|trofej|\bopen\b/i.test(name)) return "cup";
+  return "other";
 }
 
 export function mergeGroups(...lists: ReadonlyArray<readonly DisciplineGroup[]>): DisciplineGroup[] {
