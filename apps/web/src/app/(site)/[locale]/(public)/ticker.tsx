@@ -82,7 +82,7 @@ export function Ticker({
       className="w-full"
       style={{ borderTop: "2px solid var(--brand-primary)", borderBottom: "1px solid var(--border)" }}
     >
-      {cycleItems.length > 0 && <UpperBar items={cycleItems} live={t("live")} upcoming={t("upcoming")} nextLabel={t("next")} review={t("results")} locale={locale} />}
+      {cycleItems.length > 0 && <UpperBar items={cycleItems} live={t("live")} upcoming={t("upcoming")} nextLabel={t("next")} review={t("results")} inProgress={t("inProgress")} locale={locale} />}
       {marqueeItems.length > 0 && <UpcomingBar items={marqueeItems} upcoming={t("upcoming")} locale={locale} />}
     </div>
   );
@@ -147,11 +147,11 @@ function LiveDetail({ item, onCurrentChange }: { item: TickerItem; onCurrentChan
 
 // ── Upper bar (cycles through live + uskoro + custom) ────────────────────────
 
-function UpperBar({ items, live, upcoming, nextLabel, review, locale }: { items: TickerItem[]; live: string; upcoming: string; nextLabel: string; review: string; locale: string }) {
+function UpperBar({ items, live, upcoming, nextLabel, review, inProgress, locale }: { items: TickerItem[]; live: string; upcoming: string; nextLabel: string; review: string; inProgress: string; locale: string }) {
   return (
     <>
-      <div className="sm:hidden"><MobileUpperBar items={items} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} /></div>
-      <div className="hidden sm:block"><DesktopUpperBar items={items} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} locale={locale} /></div>
+      <div className="sm:hidden"><MobileUpperBar items={items} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} inProgress={inProgress} /></div>
+      <div className="hidden sm:block"><DesktopUpperBar items={items} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} inProgress={inProgress} locale={locale} /></div>
     </>
   );
 }
@@ -162,7 +162,7 @@ type MobileTickerSegment = {
   href?: string;
 };
 
-function MobileUpperBar({ items, live, upcoming, nextLabel, review }: { items: TickerItem[]; live: string; upcoming: string; nextLabel: string; review: string }) {
+function MobileUpperBar({ items, live, upcoming, nextLabel, review, inProgress }: { items: TickerItem[]; live: string; upcoming: string; nextLabel: string; review: string; inProgress: string }) {
   const scopedHref = useScopedHref();
   const segments = useMemo<MobileTickerSegment[]>(() => items.flatMap((item) => {
     const details = item.status !== "USKORO" || item.detailItems?.length
@@ -220,6 +220,7 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review }: { items: T
   const isUpcoming = segment.item.status === "USKORO";
   const isNext = segment.item.status === "NEXT";
   const isReview = segment.item.status === "REVIEW";
+  const isNeutral = segment.item.status === "NEUTRAL";
   const scrollStyle = travelPx > 0
     ? {
         "--ticker-mobile-distance": `-${travelPx}px`,
@@ -246,6 +247,7 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review }: { items: T
           {isUpcoming && <MobileStatusBadge label={upcoming.toUpperCase()} />}
           {isNext && <MobileStatusBadge label={nextLabel.toUpperCase()} neutral />}
           {isReview && <MobileStatusBadge label={review.toUpperCase()} review />}
+          {isNeutral && <MobileStatusBadge label={inProgress.toUpperCase()} neutral />}
           {segment.item.status === "CUSTOM" && segment.item.label && <MobileStatusBadge label={segment.item.label} />}
         </div>
         <div className="flex min-w-0 flex-1 items-center gap-2" style={{ opacity: visible ? 1 : 0, transition: "opacity 0.22s ease" }}>
@@ -271,7 +273,7 @@ function MobileStatusBadge({ label, live = false, neutral = false, review = fals
   );
 }
 
-function DesktopUpperBar({ items, live, upcoming, nextLabel, review, locale }: { items: TickerItem[]; live: string; upcoming: string; nextLabel: string; review: string; locale: string }) {
+function DesktopUpperBar({ items, live, upcoming, nextLabel, review, inProgress, locale }: { items: TickerItem[]; live: string; upcoming: string; nextLabel: string; review: string; inProgress: string; locale: string }) {
   const [idx, setIdx]         = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -289,13 +291,13 @@ function DesktopUpperBar({ items, live, upcoming, nextLabel, review, locale }: {
   return (
     <div style={{ height: 32, background: "var(--brand-primary)", overflow: "hidden" }} role="status" aria-label={`Ticker: ${item.name}`}>
       <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.32s ease", height: 32 }}>
-        <LiveBarInner item={item} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} locale={locale} />
+        <LiveBarInner item={item} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} inProgress={inProgress} locale={locale} />
       </div>
     </div>
   );
 }
 
-function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { item: TickerItem; live: string; upcoming: string; nextLabel: string; review: string; locale: string }) {
+function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, locale }: { item: TickerItem; live: string; upcoming: string; nextLabel: string; review: string; inProgress: string; locale: string }) {
   const scopedHref = useScopedHref();
   const [currentDetail, setCurrentDetail] = useState<TickerDetailItem>();
   const status = currentDetail?.status ?? item.status;
@@ -303,6 +305,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
   const isUskoro = status === "USKORO";
   const isNext = status === "NEXT";
   const isReview = status === "REVIEW";
+  const isNeutral = status === "NEUTRAL";
 
   const inner = (
     <div className="mx-auto max-w-7xl pl-2 pr-4 h-full flex items-center gap-3 min-w-0">
@@ -337,6 +340,12 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
       {isReview && (
         <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--brand-accent)", background: "white", height: 20 }}>
           {review.toUpperCase()}
+        </span>
+      )}
+
+      {isNeutral && (
+        <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "rgba(255,255,255,0.85)", background: "rgba(255,255,255,0.14)", height: 20 }}>
+          {inProgress.toUpperCase()}
         </span>
       )}
 
@@ -383,7 +392,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
       })()}
 
       {/* Name + detail */}
-      <span className="flex items-center gap-2 flex-1 min-w-0">
+      <span className="flex items-center gap-2 min-w-0">
         <span className="font-semibold text-xs leading-4 truncate min-w-0" style={{ color: "white" }}>
           {item.name}
         </span>
@@ -399,7 +408,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, locale }: { ite
 
       {/* Date + location */}
       {(item.location || item.endDate) && (
-        <span className="hidden md:flex items-center gap-1.5 shrink-0 ml-auto pl-3">
+        <span className="hidden md:flex items-center gap-1.5 shrink-0 pl-3">
           {item.location && (
             <span style={{ fontSize: 11, lineHeight: 1, color: "rgba(255,255,255,0.95)", fontWeight: 600 }}>{item.location}</span>
           )}
