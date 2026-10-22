@@ -17,6 +17,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import type { ReviewRow, RemarkDetails } from "./pdf-import-types";
+import { foldNameSql } from "./name-match";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType() {
@@ -343,6 +344,12 @@ export const shooters = pgTable(
     index("shooters_club_id_idx").on(t.clubId),
     index("shooters_country_id_idx").on(t.countryId),
     index("shooters_nationality_idx").on(t.nationality),
+    // Pretraga (ILIKE '%term%' / 'term%') — pg_trgm GIN; vidi previousLastNameLike za treću granu OR-a.
+    index("shooters_first_name_trgm_idx").using("gin", t.firstName.op("gin_trgm_ops")),
+    index("shooters_last_name_trgm_idx").using("gin", t.lastName.op("gin_trgm_ops")),
+    index("shooters_previous_last_names_idx").on(t.previousLastNames).where(sql`${t.previousLastNames} IS NOT NULL`),
+    // Predfiltriranje kandidata za name-match (takmičenje: mixed team bez shooter id-a).
+    index("shooters_last_name_fold_idx").on(foldNameSql(t.lastName)),
   ]
 );
 

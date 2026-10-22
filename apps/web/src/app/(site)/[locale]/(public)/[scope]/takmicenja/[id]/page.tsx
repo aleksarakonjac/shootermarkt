@@ -10,7 +10,7 @@ import {
   mixedTeamResults,
   competitionSchedule,
 } from "@shootermarkt/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ScopedLink } from "../../../components/ScopedLink";
@@ -26,7 +26,7 @@ import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
 import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 import { ScheduleSection, type ScheduleSlot } from "./ScheduleSection";
-import { matchShooter } from "@shootermarkt/db/name-match";
+import { foldName, foldNameSql, matchShooter } from "@shootermarkt/db/name-match";
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
@@ -51,132 +51,131 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CompetitionPage({ params }: Props) {
-  const locale = await getLocale();
-  const t = await getTranslations("competition");
-  const tCommon = await getTranslations("common");
-
-  const { id } = await params;
+  const [locale, t, tCommon, { id }] = await Promise.all([
+    getLocale(),
+    getTranslations("competition"),
+    getTranslations("common"),
+    params,
+  ]);
   const compId = parseInt(id);
   if (isNaN(compId)) notFound();
 
-  const comp = await db.query.competitions.findFirst({
-    where: eq(competitions.id, compId),
-    with: { country: true },
-  });
+  // Svi upiti zavise samo od compId — idu paralelno umesto jedan za drugim.
+  const [comp, compResults, mixedResults, scheduleRows] = await Promise.all([
+    db.query.competitions.findFirst({
+      where: eq(competitions.id, compId),
+      with: { country: true },
+    }),
+
+    // Fetch all results for this competition
+    db
+      .select({
+        id: results.id,
+        shooterId: results.shooterId,
+        firstName: shooters.firstName,
+        lastName: shooters.lastName,
+        birthYear: shooters.birthYear,
+        nationality: shooters.nationality,
+        avatarUrl: shooters.avatarUrl,
+        clubId: results.clubId,
+        clubName: clubs.name,
+        clubNocCode: clubs.nocCode,
+        disciplineCode: disciplines.code,
+        disciplineId: disciplines.id,
+        disciplineName: disciplines.name,
+        apparatus: disciplines.apparatus,
+        category: results.category,
+        elimRound: results.elimRound,
+        elimTotal: results.elimTotal,
+        elimRank: results.elimRank,
+        elimDetail: results.elimDetail,
+        elimRemark: results.elimRemark,
+        qualTotal: results.qualTotal,
+        qualRank: results.qualRank,
+        qualInners: results.qualInners,
+        qualified: results.qualified,
+        qualDetail: results.qualDetail,
+        qualRemark: results.qualRemark,
+        finalTotal: results.finalTotal,
+        finalRank: results.finalRank,
+        finalDetail: results.finalDetail,
+        finalRemark: results.finalRemark,
+        remarkDetails: results.remarkDetails,
+      })
+      .from(results)
+      .innerJoin(shooters, eq(results.shooterId, shooters.id))
+      .leftJoin(clubs, eq(results.clubId, clubs.id))
+      .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
+      .where(eq(results.competitionId, compId))
+      .orderBy(asc(results.qualRank)),
+
+    // Mixed team results
+    db
+      .select({
+        id: mixedTeamResults.id,
+        disciplineCode: disciplines.code,
+        disciplineName: disciplines.name,
+        apparatus: disciplines.apparatus,
+        category: mixedTeamResults.category,
+        nocCode: mixedTeamResults.nocCode,
+        teamNumber: mixedTeamResults.teamNumber,
+        shooter1Id: mixedTeamResults.shooter1Id,
+        shooter2Id: mixedTeamResults.shooter2Id,
+        shooter1Name: mixedTeamResults.shooter1Name,
+        shooter2Name: mixedTeamResults.shooter2Name,
+        shooter1Detail: mixedTeamResults.shooter1Detail,
+        shooter2Detail: mixedTeamResults.shooter2Detail,
+        qualRank: mixedTeamResults.qualRank,
+        qualTotal: mixedTeamResults.qualTotal,
+        qualInners: mixedTeamResults.qualInners,
+        qualRemark: mixedTeamResults.qualRemark,
+        qualified: mixedTeamResults.qualified,
+        finalRank: mixedTeamResults.finalRank,
+        finalTotal: mixedTeamResults.finalTotal,
+        finalRemark: mixedTeamResults.finalRemark,
+        remarkDetails: mixedTeamResults.remarkDetails,
+        shooter1FinalDetail: mixedTeamResults.shooter1FinalDetail,
+        shooter2FinalDetail: mixedTeamResults.shooter2FinalDetail,
+      })
+      .from(mixedTeamResults)
+      .innerJoin(disciplines, eq(mixedTeamResults.disciplineId, disciplines.id))
+      .where(eq(mixedTeamResults.competitionId, compId))
+      .orderBy(asc(mixedTeamResults.qualRank)),
+
+    // Fetch schedule slots
+    db
+      .select({
+        id: competitionSchedule.id,
+        disciplineCode: disciplines.code,
+        stage: competitionSchedule.stage,
+        category: competitionSchedule.category,
+        startTime: competitionSchedule.startTime,
+        endTime: competitionSchedule.endTime,
+      })
+      .from(competitionSchedule)
+      .innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id))
+      .where(eq(competitionSchedule.competitionId, compId))
+      .orderBy(asc(competitionSchedule.startTime)),
+  ]);
   if (!comp) notFound();
-
-  // Fetch all results for this competition
-  const compResults = await db
-    .select({
-      id: results.id,
-      shooterId: results.shooterId,
-      firstName: shooters.firstName,
-      lastName: shooters.lastName,
-      birthYear: shooters.birthYear,
-      nationality: shooters.nationality,
-      avatarUrl: shooters.avatarUrl,
-      clubId: results.clubId,
-      clubName: clubs.name,
-      clubNocCode: clubs.nocCode,
-      disciplineCode: disciplines.code,
-      disciplineId: disciplines.id,
-      disciplineName: disciplines.name,
-      apparatus: disciplines.apparatus,
-      category: results.category,
-      elimRound: results.elimRound,
-      elimTotal: results.elimTotal,
-      elimRank: results.elimRank,
-      elimDetail: results.elimDetail,
-      elimRemark: results.elimRemark,
-      qualTotal: results.qualTotal,
-      qualRank: results.qualRank,
-      qualInners: results.qualInners,
-      qualified: results.qualified,
-      qualDetail: results.qualDetail,
-      qualRemark: results.qualRemark,
-      finalTotal: results.finalTotal,
-      finalRank: results.finalRank,
-      finalDetail: results.finalDetail,
-      finalRemark: results.finalRemark,
-      remarkDetails: results.remarkDetails,
-    })
-    .from(results)
-    .innerJoin(shooters, eq(results.shooterId, shooters.id))
-    .leftJoin(clubs, eq(results.clubId, clubs.id))
-    .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
-    .where(eq(results.competitionId, compId))
-    .orderBy(asc(results.qualRank));
-
-  // Mixed team results
-  const mixedResults = await db
-    .select({
-      id: mixedTeamResults.id,
-      disciplineCode: disciplines.code,
-      disciplineName: disciplines.name,
-      apparatus: disciplines.apparatus,
-      category: mixedTeamResults.category,
-      nocCode: mixedTeamResults.nocCode,
-      teamNumber: mixedTeamResults.teamNumber,
-      shooter1Id: mixedTeamResults.shooter1Id,
-      shooter2Id: mixedTeamResults.shooter2Id,
-      shooter1Name: mixedTeamResults.shooter1Name,
-      shooter2Name: mixedTeamResults.shooter2Name,
-      shooter1Detail: mixedTeamResults.shooter1Detail,
-      shooter2Detail: mixedTeamResults.shooter2Detail,
-      qualRank: mixedTeamResults.qualRank,
-      qualTotal: mixedTeamResults.qualTotal,
-      qualInners: mixedTeamResults.qualInners,
-      qualRemark: mixedTeamResults.qualRemark,
-      qualified: mixedTeamResults.qualified,
-      finalRank: mixedTeamResults.finalRank,
-      finalTotal: mixedTeamResults.finalTotal,
-      finalRemark: mixedTeamResults.finalRemark,
-      remarkDetails: mixedTeamResults.remarkDetails,
-      shooter1FinalDetail: mixedTeamResults.shooter1FinalDetail,
-      shooter2FinalDetail: mixedTeamResults.shooter2FinalDetail,
-    })
-    .from(mixedTeamResults)
-    .innerJoin(disciplines, eq(mixedTeamResults.disciplineId, disciplines.id))
-    .where(eq(mixedTeamResults.competitionId, compId))
-    .orderBy(asc(mixedTeamResults.qualRank));
 
   // SIUS import often can't match international athletes to an ISSF id at commit time —
   // fall back to a name+nation match against our shooters table so the profile link still works.
-  const needsShooterMatch = mixedResults.some(
-    (r) => (!r.shooter1Id && r.shooter1Name) || (!r.shooter2Id && r.shooter2Name)
-  );
-  if (needsShooterMatch) {
-    const allShootersLite = await db
+  const unmatched = mixedResults.flatMap((r) => [
+    ...(!r.shooter1Id && r.shooter1Name ? [{ r, slot: 1 as const, ...splitDisplayName(r.shooter1Name) }] : []),
+    ...(!r.shooter2Id && r.shooter2Name ? [{ r, slot: 2 as const, ...splitDisplayName(r.shooter2Name) }] : []),
+  ]);
+  if (unmatched.length) {
+    // Samo kandidati sa istim fold-prezimenom (exact match to ionako zahteva), ne cela tabela.
+    const candidates = await db
       .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality })
-      .from(shooters);
-    for (const r of mixedResults) {
-      if (!r.shooter1Id && r.shooter1Name) {
-        const { firstName, lastName } = splitDisplayName(r.shooter1Name);
-        const match = matchShooter(firstName, lastName, r.nocCode, allShootersLite);
-        if (match.kind === "exact") r.shooter1Id = match.id;
-      }
-      if (!r.shooter2Id && r.shooter2Name) {
-        const { firstName, lastName } = splitDisplayName(r.shooter2Name);
-        const match = matchShooter(firstName, lastName, r.nocCode, allShootersLite);
-        if (match.kind === "exact") r.shooter2Id = match.id;
-      }
+      .from(shooters)
+      .where(inArray(foldNameSql(shooters.lastName), [...new Set(unmatched.map((u) => foldName(u.lastName)))]));
+    for (const { r, slot, firstName, lastName } of unmatched) {
+      const match = matchShooter(firstName, lastName, r.nocCode, candidates);
+      if (match.kind === "exact") r[slot === 1 ? "shooter1Id" : "shooter2Id"] = match.id;
     }
   }
-
-  // Fetch schedule slots
-  const scheduleRows = await db
-    .select({
-      id: competitionSchedule.id,
-      disciplineCode: disciplines.code,
-      stage: competitionSchedule.stage,
-      category: competitionSchedule.category,
-      startTime: competitionSchedule.startTime,
-      endTime: competitionSchedule.endTime,
-    })
-    .from(competitionSchedule)
-    .innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id))
-    .where(eq(competitionSchedule.competitionId, compId))
-    .orderBy(asc(competitionSchedule.startTime));
 
   const scheduleSlots: ScheduleSlot[] = scheduleRows.map((r) => ({
     id: r.id,

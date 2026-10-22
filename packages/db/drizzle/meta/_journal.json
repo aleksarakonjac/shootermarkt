@@ -267,6 +267,13 @@
       "when": 1792678711783,
       "tag": "0037_certain_weapon_omega",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792701491741,
+      "tag": "0038_narrow_energizer",
+      "breakpoints": true
     }
   ]
 }

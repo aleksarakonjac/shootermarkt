@@ -5,6 +5,8 @@ import * as schema from "./schema";
 const connectionString = process.env.DATABASE_URL!;
 const connectionOptions = {
   prepare: false,
+  // fetch_types ostaje uključen: bez njega postgres.js ne serijalizuje nizove (text[]/varchar[] kolone,
+  // = ANY($1)) — "malformed array literal". Cena je jedan pg_type upit po novoj konekciji.
   max: 5,
   idle_timeout: 20,
   connect_timeout: 15,

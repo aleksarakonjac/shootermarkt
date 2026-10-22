@@ -1,3 +1,5 @@
+import { sql, type SQL, type SQLWrapper } from "drizzle-orm";
+
 /**
  * Poklapanje imena srpskih strelaca preko različitih zapisa istog imena.
  *
@@ -18,6 +20,14 @@ export function foldName(s: string): string {
     .replace(/đ/g, "d")             // đ (U+0111) → d; ne dekomponuje se kroz NFD
     .replace(/dj/g, "d")                 // "dj" (transliteracija đ) → d
     .replace(/[^a-z]/g, "");             // ostavi samo slova
+}
+
+/**
+ * Isti ključ kao foldName, izračunat u Postgres-u — za predfiltriranje kandidata u bazi
+ * umesto učitavanja cele tabele. Mora ostati u skladu sa foldName (proveriti nad svim strelcima pri izmeni).
+ */
+export function foldNameSql(column: SQLWrapper): SQL<string> {
+  return sql<string>`regexp_replace(replace(translate(lower(regexp_replace(normalize(${column}, NFD), '[̀-ͯ]', '', 'g')), 'Đđ', 'dd'), 'dj', 'd'), '[^a-z]', '', 'g')`;
 }
 
 /** Kanonski ključ celog imena (prezime + ime), redosled-nezavisan po delovima. */

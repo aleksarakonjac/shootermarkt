@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { unstable_catchError, type ErrorInfo } from "next/error";
 import { NewsSection } from "../components/NewsSection";
 import { useParams } from "next/navigation";
 import { Ticker } from "../ticker";
@@ -160,6 +161,11 @@ function useHomepageData<T>(path: string, refreshMs?: number, initialData?: T) {
 
   return { data, state, retry, refresh };
 }
+
+// Greška pri SSR-u jednog bloka ostaje u tom bloku; ostatak strane (sidebar, ticker) se prikazuje.
+export const HomepageBlockBoundary = unstable_catchError(
+  ({ silent = false }: { silent?: boolean }, { unstable_retry }: ErrorInfo) => silent ? null : <HomepageError retry={unstable_retry} />,
+);
 
 function HomepageError({ retry, compact = false }: { retry: () => void; compact?: boolean }) {
   const common = useTranslations("common");

@@ -1,9 +1,13 @@
 import { sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { foldName } from "@shootermarkt/db/name-match";
 
-/** SQL uslov: neko od ranijih prezimena odgovara ILIKE obrascu. */
+/**
+ * SQL uslov: neko od ranijih prezimena odgovara ILIKE obrascu.
+ * `is not null` omogućava planeru da koristi parcijalni indeks (shooters_previous_last_names_idx),
+ * pa OR sa ime/prezime trigram indeksima ide kroz BitmapOr umesto seq scan-a.
+ */
 export function previousLastNameLike(column: AnyColumn, pattern: string): SQL {
-  return sql`exists (select 1 from unnest(${column}) as p where p ilike ${pattern})`;
+  return sql`(${column} is not null and exists (select 1 from unnest(${column}) as p where p ilike ${pattern}))`;
 }
 
 /**

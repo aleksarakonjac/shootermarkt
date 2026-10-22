@@ -6,7 +6,7 @@ import { type Scope } from "@/lib/scope";
 import { getHomepageMain, type HomepageMainData } from "@/lib/homepage-data";
 import { Suspense } from "react";
 import { QuickH2HClient } from "./quick-h2h-client";
-import { HomepageMainClient, HomepageTickerClient } from "./homepage-client-blocks";
+import { HomepageBlockBoundary, HomepageMainClient, HomepageTickerClient } from "./homepage-client-blocks";
 import { HomepageDataStatusProvider, HomepageRetryNotice } from "./homepage-data-status";
 import { MainSkeleton } from "./homepage-skeleton";
 import "./homepage.css";
@@ -40,8 +40,8 @@ export default async function HomePage({ params }: { params: Promise<{ scope: Sc
     <div className="mx-auto max-w-7xl px-4 pt-5 pb-8 sm:px-6 lg:px-8">
       <HomepageRetryNotice />
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <main className="lg:col-span-2"><Suspense fallback={<HomepageMainLoading />}><HomepageMain data={homepageData} /></Suspense></main>
-        <aside className="flex flex-col gap-8"><Suspense fallback={null}><HomepageSidebarNews data={homepageData} /></Suspense><CalendarModule /><QuickH2HClient /></aside>
+        <main className="lg:col-span-2"><HomepageBlockBoundary><Suspense fallback={<HomepageMainLoading />}><HomepageMain data={homepageData} /></Suspense></HomepageBlockBoundary></main>
+        <aside className="flex flex-col gap-8"><HomepageBlockBoundary silent><Suspense fallback={null}><HomepageSidebarNews data={homepageData} /></Suspense></HomepageBlockBoundary><CalendarModule /><QuickH2HClient /></aside>
       </div>
     </div>
   </HomepageDataStatusProvider>;
