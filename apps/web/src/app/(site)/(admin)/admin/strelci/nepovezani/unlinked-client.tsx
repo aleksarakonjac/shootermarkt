@@ -13,6 +13,8 @@ export type UnlinkedRow = {
   gender: string | null;
   birthYear: number | null;
   reviewed: boolean;
+  verified: boolean;
+  clubId: number | null;
   resultCount: number;
   lastDate: string | null;
 };
@@ -64,7 +66,7 @@ function toAction(rowId: number, st: RowState): ResolveAction | null {
   return null;
 }
 
-export function UnlinkedClient({ rows }: { rows: UnlinkedRow[] }) {
+export function UnlinkedClient({ rows, clubs }: { rows: UnlinkedRow[]; clubs: { id: number; name: string }[] }) {
   const router = useRouter();
   const [state, setState] = useState<Record<number, RowState>>(() =>
     Object.fromEntries(rows.map((r) => [r.id, { choice: "skip", manual: "", safe: false }]))
@@ -160,13 +162,14 @@ export function UnlinkedClient({ rows }: { rows: UnlinkedRow[] }) {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-        <table className="w-full min-w-[980px] text-sm">
+        <table className="w-full min-w-[1300px] text-sm">
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface)] text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
               <th className="w-10 px-3 py-2.5" />
               <th className="px-3 py-2.5">Strelac</th>
               <th className="w-48 px-3 py-2.5">ISSF kandidati</th>
               <th className="w-72 px-3 py-2.5">Odluka</th>
+              <th className="w-80 px-3 py-2.5">Profil</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
@@ -220,6 +223,7 @@ export function UnlinkedClient({ rows }: { rows: UnlinkedRow[] }) {
                       />
                     )}
                   </td>
+                  <td className={cell}><ProfileCell row={r} clubs={clubs} /></td>
                 </tr>
               );
             })}
@@ -240,5 +244,57 @@ export function UnlinkedClient({ rows }: { rows: UnlinkedRow[] }) {
         </button>
       </div>
     </>
+  );
+}
+
+/** Klub / pol / godište + verifikacija; piše samo ta polja (PATCH /quick), nezavisno od ISSF odluke. */
+function ProfileCell({ row, clubs }: { row: UnlinkedRow; clubs: { id: number; name: string }[] }) {
+  const [clubId, setClubId] = useState(row.clubId ? String(row.clubId) : "");
+  const [gender, setGender] = useState(row.gender ?? "");
+  const [birthYear, setBirthYear] = useState(row.birthYear ? String(row.birthYear) : "");
+  const [verified, setVerified] = useState(row.verified);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function save(verify: boolean) {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/admin/shooters/${row.id}/quick`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clubId: clubId ? Number(clubId) : null, gender: gender || null, birthYear: birthYear ? Number(birthYear) : null, ...(verify ? { verified: true } : {}) }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return setMsg(json.error ?? "Greška");
+      if (verify) setVerified(true);
+      setMsg(verify ? "Verifikovan" : "Sačuvano");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <select aria-label="Klub" className={selectCls} value={clubId} onChange={(e) => setClubId(e.target.value)}>
+        <option value="">— klub —</option>
+        {clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      <div className="flex gap-1.5">
+        <select aria-label="Pol" className={selectCls} value={gender} onChange={(e) => setGender(e.target.value)}>
+          <option value="">— pol —</option>
+          <option value="M">Muški</option>
+          <option value="F">Ženski</option>
+        </select>
+        <input aria-label="Godište" className={selectCls} value={birthYear} onChange={(e) => setBirthYear(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="godište" />
+      </div>
+      <div className="flex items-center gap-2">
+        <button type="button" disabled={busy} onClick={() => save(false)} className="text-xs font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] disabled:opacity-40">Sačuvaj</button>
+        {verified
+          ? <span className="text-xs text-[var(--muted)]">verifikovan ✓</span>
+          : <button type="button" disabled={busy} onClick={() => save(true)} className="rounded bg-[var(--brand-primary)] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[var(--brand-primary-hover)] disabled:opacity-40">Verifikuj</button>}
+        {msg && <span role="status" className="text-xs text-[var(--muted)]">{msg}</span>}
+      </div>
+    </div>
   );
 }

@@ -1,22 +1,13 @@
 import { db } from "@shootermarkt/db";
-import { competitions, competitionSchedule, mixedTeamResults, results, shooters } from "@shootermarkt/db/schema";
-import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { competitions, competitionSchedule, results, shooters } from "@shootermarkt/db/schema";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { formatDateRangeSr } from "@/lib/date-utils";
 import { LEVEL_LABEL, LEVEL_STYLE } from "@/lib/competition-utils";
+import { endDate, isoDay, missingSourceWhere, unresolvedWhere } from "@/lib/admin-todo";
 
 export const metadata: Metadata = { title: "Admin — Pregled" };
-
-const DAY = 86_400_000;
-const isoDay = (offsetDays: number) => new Date(Date.now() + offsetDays * DAY).toISOString().slice(0, 10);
-const ISSF_LEVELS = ["international", "continental", "world", "olympic"] as const;
-
-// Correlated subqueries: column refs are written table-qualified — drizzle renders bare ${col} unqualified in a
-// single-table select, which would bind both sides to the subquery's own table.
-const hasResults = sql<boolean>`(exists (select 1 from ${results} where ${results}.competition_id = "competitions"."id")
-  or exists (select 1 from ${mixedTeamResults} where ${mixedTeamResults}.competition_id = "competitions"."id"))`;
-const endDate = sql`coalesce(${competitions.dateEnd}, ${competitions.date})`;
 
 export default async function AdminDashboardPage() {
   const today = isoDay(0);
@@ -45,25 +36,19 @@ export default async function AdminDashboardPage() {
     db
       .select({ id: competitions.id, name: competitions.name, date: competitions.date, dateEnd: competitions.dateEnd, level: competitions.level })
       .from(competitions)
-      .where(and(gte(endDate, isoDay(-60)), lte(endDate, isoDay(-1)), sql`not ${hasResults}`))
+      .where(unresolvedWhere())
       .orderBy(desc(competitions.date)),
     // International events in the next 30 days that can't get live results (no SIUS UUID, no ISSF id).
     db
       .select({ id: competitions.id })
       .from(competitions)
-      .where(and(
-        gte(endDate, today),
-        lte(competitions.date, isoDay(30)),
-        inArray(competitions.level, [...ISSF_LEVELS]),
-        isNull(competitions.siusId),
-        isNull(competitions.issfId),
-      )),
+      .where(missingSourceWhere()),
   ]);
 
   const todo = [
-    { count: unresolved.length, label: "Završena takmičenja bez rezultata", hint: "Poslednjih 60 dana", href: "/admin/rezultati/period", action: "Uvezi rezultate" },
-    { count: missingSius.length, label: "Međunarodna takmičenja bez izvora za live rezultate", hint: "Narednih 30 dana, bez SIUS UUID-a i ISSF ID-a", href: "/admin/takmicenja/sync", action: "Poveži" },
-    { count: unverified, label: "Strelci čekaju verifikaciju", hint: "Profili koje su strelci sami napravili", href: "/admin/strelci?verified=0", action: "Pregledaj" },
+    { count: unresolved.length, label: "Završena takmičenja bez rezultata", hint: "Poslednjih 60 dana", href: "/admin/na-redu/bez-rezultata", action: "Reši" },
+    { count: missingSius.length, label: "Međunarodna takmičenja bez izvora za live rezultate", hint: "Narednih 30 dana, bez SIUS UUID-a i ISSF ID-a", href: "/admin/na-redu/bez-izvora", action: "Poveži" },
+    { count: unverified, label: "Strelci čekaju verifikaciju", hint: "Profili koje su strelci sami napravili", href: "/admin/strelci/nepovezani?verified=0", action: "Pregledaj" },
   ].filter((item) => item.count > 0);
 
   return (

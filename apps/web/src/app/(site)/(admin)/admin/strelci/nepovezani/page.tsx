@@ -1,6 +1,6 @@
 import { db } from "@shootermarkt/db";
-import { competitions, results, shooters } from "@shootermarkt/db/schema";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { clubs, competitions, results, shooters } from "@shootermarkt/db/schema";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { UnlinkedClient, type UnlinkedRow } from "./unlinked-client";
@@ -15,19 +15,22 @@ export default async function UnlinkedShootersPage({ searchParams }: { searchPar
   const nat = sp.nat?.trim().toUpperCase() ?? "";
   const reviewed = sp.reviewed === "1";
   const noResults = sp.noresults === "1";
+  const onlyUnverified = sp.verified === "0";
 
-  const resultCount = sql<number>`(select count(*)::int from ${results} where ${results.shooterId} = ${shooters.id})`;
-  const lastDate = sql<string | null>`(select max(${competitions.date}) from ${results} join ${competitions} on ${competitions.id} = ${results.competitionId} where ${results.shooterId} = ${shooters.id})`;
+  // Table-qualified literals: drizzle renders bare ${col} unqualified in a single-table select, so "id" would be ambiguous inside the subqueries.
+  const resultCount = sql<number>`(select count(*)::int from ${results} where ${results}.shooter_id = "shooters"."id")`;
+  const lastDate = sql<string | null>`(select max(c.date) from ${results} r join ${competitions} c on c.id = r.competition_id where r.shooter_id = "shooters"."id")`;
 
   const where = and(
-    isNull(shooters.issfId),
-    reviewed ? undefined : isNull(shooters.issfReviewedAt),
-    noResults ? undefined : sql`exists (select 1 from ${results} where ${results.shooterId} = ${shooters.id})`,
+    // Neverifikovani: svi sa verified=false (broj mora da se poklapa sa karticom na dashboardu), bez ISSF/rezultat filtera.
+    onlyUnverified ? eq(shooters.verified, false) : isNull(shooters.issfId),
+    onlyUnverified || reviewed ? undefined : isNull(shooters.issfReviewedAt),
+    onlyUnverified || noResults ? undefined : sql`exists (select 1 from ${results} where ${results.shooterId} = ${shooters.id})`,
     nat ? eq(shooters.nationality, nat) : undefined,
     ...q.split(/\s+/).filter(Boolean).map((w) => sql`(${shooters.firstName} ilike ${`%${w}%`} or ${shooters.lastName} ilike ${`%${w}%`})`),
   );
 
-  const [rows, [{ total }]] = await Promise.all([
+  const [rows, [{ total }], clubRows] = await Promise.all([
     db.select({
       id: shooters.id,
       firstName: shooters.firstName,
@@ -36,10 +39,13 @@ export default async function UnlinkedShootersPage({ searchParams }: { searchPar
       gender: shooters.gender,
       birthYear: shooters.birthYear,
       reviewed: sql<boolean>`${shooters.issfReviewedAt} is not null`,
+      verified: shooters.verified,
+      clubId: shooters.clubId,
       resultCount,
       lastDate,
     }).from(shooters).where(where).orderBy(desc(resultCount), shooters.lastName).limit(LIMIT),
     db.select({ total: sql<number>`count(*)::int` }).from(shooters).where(where),
+    db.select({ id: clubs.id, name: clubs.name }).from(clubs).orderBy(asc(clubs.name)),
   ]);
 
   const data: UnlinkedRow[] = rows.map((r) => ({ ...r, lastDate: r.lastDate ?? null }));
@@ -56,18 +62,19 @@ export default async function UnlinkedShootersPage({ searchParams }: { searchPar
             Nepovezani strelci
           </h1>
           <p className="mt-0.5 text-sm text-[var(--muted)]">
-            Strelci bez ISSF ID-a ({total}{total > LIMIT ? `, prikazano ${LIMIT}` : ""}). Pretraži ISSF, pa za svakog odluči: poveži sa ISSF profilom, spoji u postojećeg strelca (promena prezimena, drugačiji zapis imena) ili ostavi bez profila.
+            {onlyUnverified ? "Neverifikovani strelci" : "Strelci bez ISSF ID-a"} ({total}{total > LIMIT ? `, prikazano ${LIMIT}` : ""}). Pretraži ISSF, pa za svakog odluči: poveži sa ISSF profilom, spoji u postojećeg strelca (promena prezimena, drugačiji zapis imena) ili ostavi bez profila. Uz to dopuni klub, pol i godište i verifikuj.
           </p>
         </div>
         <form className="flex flex-wrap items-center gap-2 text-sm">
           <input name="q" defaultValue={q} placeholder="Ime / prezime…" className="rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2" />
           <input name="nat" defaultValue={nat} placeholder="NOC" maxLength={3} className="w-20 rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 uppercase" />
+          <label className="flex items-center gap-1.5 text-[var(--muted)]"><input type="checkbox" name="verified" value="0" defaultChecked={onlyUnverified} /> samo neverifikovani</label>
           <label className="flex items-center gap-1.5 text-[var(--muted)]"><input type="checkbox" name="noresults" value="1" defaultChecked={noResults} /> i bez rezultata</label>
           <label className="flex items-center gap-1.5 text-[var(--muted)]"><input type="checkbox" name="reviewed" value="1" defaultChecked={reviewed} /> i pregledani</label>
           <button className="rounded-md border border-[var(--border-strong)] px-3 py-2 font-semibold text-[var(--ink)] hover:bg-[var(--surface)]">Filtriraj</button>
         </form>
       </div>
-      <UnlinkedClient rows={data} />
+      <UnlinkedClient rows={data} clubs={clubRows} />
     </div>
   );
 }
