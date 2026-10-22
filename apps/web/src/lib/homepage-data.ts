@@ -286,6 +286,7 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
         label: override.label ?? (locale === "en" ? "RELATED" : "VEZANO"),
         text: override.customSlides?.[0]?.text ?? override.label ?? "",
         href: override.href ?? undefined,
+        badge: true as const,
       }))
       .filter((item) => item.text);
     return { ...competition, name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name), detailItems: [...detailItems, ...linkedItems], forceStatus: null as "LIVE" | "USKORO" | null, tickerStatus };

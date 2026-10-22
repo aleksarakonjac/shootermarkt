@@ -6,7 +6,7 @@ import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import { useTranslations, useLocale } from "next-intl";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 
-export interface TickerDetailItem { label?: string; text: string; href?: string; status?: "REVIEW"; }
+export interface TickerDetailItem { label?: string; text: string; href?: string; status?: "REVIEW"; badge?: boolean; }
 
 export interface TickerItem {
   id: number;
@@ -140,7 +140,12 @@ function LiveDetail({ item, onCurrentChange }: { item: TickerItem; onCurrentChan
       className="shrink-0 flex items-center gap-1.5"
       style={{ opacity: visible ? 1 : 0, transition: "opacity 0.3s ease", minWidth: 80 }}
     >
-      {current.label && (
+      {current.label && current.badge && (
+        <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none" style={{ fontSize: 12, letterSpacing: "0.06em", color: "var(--brand-primary)", background: "white", height: 20 }}>
+          {current.label}
+        </span>
+      )}
+      {current.label && !current.badge && (
         <span className="font-extrabold uppercase" style={{ fontSize: 10, lineHeight: 1, letterSpacing: "0.08em", color: "rgba(255,255,255,0.5)" }}>
           {current.label}
         </span>
@@ -179,8 +184,8 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review, inProgress }
     return [
       { item, text: item.name, href: item.href },
       ...details.map((detail) => ({
-        item: { ...item, status: detail.status ?? item.status },
-        text: detail.label ? `${detail.label} · ${detail.text}` : detail.text,
+        item: detail.badge && detail.label ? { ...item, status: "CUSTOM" as const, label: detail.label } : { ...item, status: detail.status ?? item.status },
+        text: detail.label && !detail.badge ? `${detail.label} · ${detail.text}` : detail.text,
         href: detail.href ?? item.href,
       })),
     ];
