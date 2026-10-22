@@ -3,6 +3,8 @@ import { competitions, competitionScheduleChanges, disciplines } from "@shooterm
 import { desc, eq, isNull } from "drizzle-orm";
 import type { Metadata } from "next";
 import { AckButton } from "./ack-button";
+import { SyncNowButton } from "./sync-now-button";
+import { TimezoneForm } from "./timezone-form";
 
 export const metadata: Metadata = { title: "Admin · Izmene satnice" };
 export const dynamic = "force-dynamic";
@@ -17,7 +19,7 @@ const range = (a: Date | null, b: Date | null, tz: string) => (a ? `${fmt(a, tz)
 
 export default async function ScheduleChangesPage() {
   const rows = await db
-    .select({ c: competitionScheduleChanges, name: competitions.name, tz: competitions.timezone, disc: disciplines.code })
+    .select({ c: competitionScheduleChanges, name: competitions.name, location: competitions.location, tz: competitions.timezone, disc: disciplines.code })
     .from(competitionScheduleChanges)
     .innerJoin(competitions, eq(competitionScheduleChanges.competitionId, competitions.id))
     .leftJoin(disciplines, eq(competitionScheduleChanges.disciplineId, disciplines.id))
@@ -35,6 +37,7 @@ export default async function ScheduleChangesPage() {
           ISSF je promenio satnicu koju smo već imali; nova verzija je upisana. Vremena su po zoni takmičenja.
         </p>
       </div>
+      <SyncNowButton />
       {byComp.size === 0 && <p className="text-sm text-[var(--muted)]">Nema neproverenih izmena.</p>}
       <div className="space-y-6">
         {[...byComp.entries()].map(([compId, list]) => (
@@ -44,11 +47,11 @@ export default async function ScheduleChangesPage() {
               <AckButton competitionId={compId} />
             </div>
             <ul className="space-y-1.5 text-sm">
-              {list.map(({ c, tz, disc }) => (
+              {list.map(({ c, tz, disc, location }) => (
                 <li key={c.id} className="flex flex-wrap gap-x-3">
                   <span className="w-44 font-medium">{KIND[c.kind] ?? c.kind}</span>
                   {c.kind === "tz_missing" ? (
-                    <span className="text-[var(--muted)]">Postavi timezone takmičenja, pa satnica može da se uvuče.</span>
+                    <TimezoneForm competitionId={compId} location={location} />
                   ) : (
                     <>
                       <span className="w-14">{disc}</span>

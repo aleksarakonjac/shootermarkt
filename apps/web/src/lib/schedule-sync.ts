@@ -124,3 +124,11 @@ export async function syncUpcomingSchedules(aheadDays = 14, behindDays = 1): Pro
   }
   return results;
 }
+
+export async function syncCompetitionById(id: number): Promise<SyncResult | null> {
+  const [r] = await db
+    .select({ id: competitions.id, issfId: competitions.issfId, date: competitions.date, location: competitions.location, timezone: competitions.timezone, noc: countries.nocCode })
+    .from(competitions).leftJoin(countries, eq(competitions.countryId, countries.id))
+    .where(eq(competitions.id, id));
+  return r?.issfId ? syncCompetitionSchedule({ ...r, issfId: r.issfId }) : null;
+}
