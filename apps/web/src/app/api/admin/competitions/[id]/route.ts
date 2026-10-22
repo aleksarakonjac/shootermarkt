@@ -6,8 +6,9 @@ import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { parseFocusPriorityInput } from "@/lib/competition-priority";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
-export async function PATCH(
+async function handlePATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -61,7 +62,7 @@ export async function PATCH(
   return NextResponse.json({ id: updated.id });
 }
 
-export async function DELETE(
+async function handleDELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -84,3 +85,6 @@ export async function DELETE(
 
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = revalidatesPublicSite(handlePATCH);
+export const DELETE = revalidatesPublicSite(handleDELETE);

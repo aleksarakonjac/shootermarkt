@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { commitMixedTeamEntries, MixedCommitError, type MixedCommitInput } from "@/lib/import-commit-mixed";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -14,3 +15,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Mixed-team commit failed" }, { status: 500 });
   }
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

@@ -12,6 +12,7 @@ import { nameSimilarity } from "@/lib/name-similarity";
 import { FOCUS_PRIORITY_MAX, FOCUS_PRIORITY_MIN } from "@/lib/competition-priority";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 const SOURCE_DEFAULT_LEVEL: Record<CalendarSource, CompetitionLevel | null> = {
   sss:  "national",
@@ -287,7 +288,7 @@ function validate(e: CommitEvent): string | null {
   return null;
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -409,3 +410,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ inserted: insertedCount, linked: linkedCount, skipped: events.length - insertedCount - linkedCount });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

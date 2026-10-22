@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queuePdfImportJob } from "@/lib/pdf-import/jobs";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -42,3 +43,5 @@ export async function POST(req: NextRequest) {
     }, { status: 502 });
   }
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

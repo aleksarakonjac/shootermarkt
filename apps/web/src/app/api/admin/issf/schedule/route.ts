@@ -7,6 +7,7 @@ type DisciplineCode = typeof disciplineCodeEnum.enumValues[number];
 import { fetchScheduleFromHtml, type ISSFScheduleEntry } from "@shootermarkt/adapters/issf/adapter";
 import { venueLocalToUtc } from "@/lib/timezone";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 // GET /api/admin/issf/schedule?issfId=3574&year=2026
 export async function GET(req: NextRequest) {
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/admin/issf/schedule
 // Body: { dbCompetitionId: number, entries: ISSFScheduleEntry[] }
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -71,3 +72,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ imported: inserted.length, skipped: toInsert.length - inserted.length });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

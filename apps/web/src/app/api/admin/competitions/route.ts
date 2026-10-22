@@ -5,6 +5,7 @@ import { desc } from "drizzle-orm";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { parseFocusPriorityInput } from "@/lib/competition-priority";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 export async function GET(_req: NextRequest) {
   const denied = await requireAdmin();
@@ -18,7 +19,7 @@ export async function GET(_req: NextRequest) {
   return NextResponse.json(data);
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -63,3 +64,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ id: comp.id, name: comp.name });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

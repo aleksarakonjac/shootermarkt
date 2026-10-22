@@ -3,9 +3,10 @@ import { db } from "@shootermarkt/db";
 import { competitions } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 /** Partial update of live-result sources only (the full PATCH overwrites every field). */
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -30,3 +31,5 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = revalidatesPublicSite(handlePATCH);

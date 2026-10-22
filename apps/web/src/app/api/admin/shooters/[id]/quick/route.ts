@@ -3,9 +3,10 @@ import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 /** Partial update (club, gender, birth year, verified) — the full PATCH overwrites every field. */
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -35,3 +36,5 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!updated) return NextResponse.json({ error: "Nije pronađeno" }, { status: 404 });
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = revalidatesPublicSite(handlePATCH);

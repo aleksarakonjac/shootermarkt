@@ -3,9 +3,10 @@ import { db } from "@shootermarkt/db";
 import { competitionScheduleChanges } from "@shootermarkt/db/schema";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 // POST { ids?: number[], competitionId?: number } — marks changes as seen.
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
   const { ids, competitionId } = await req.json() as { ids?: number[]; competitionId?: number };
@@ -16,3 +17,5 @@ export async function POST(req: NextRequest) {
     .where(and(where, isNull(competitionScheduleChanges.acknowledgedAt)));
   return NextResponse.json({ ok: true });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

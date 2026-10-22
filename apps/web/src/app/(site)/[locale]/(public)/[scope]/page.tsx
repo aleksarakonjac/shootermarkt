@@ -2,6 +2,7 @@ import { CalendarModule } from "../components/CalendarModule";
 import { SidebarCompetitionNews } from "../components/SidebarCompetitionNews";
 import { buildAlternates } from "@/i18n/alternates";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { type Scope } from "@/lib/scope";
 import { getHomepageMain, type HomepageMainData } from "@/lib/homepage-data";
 import { Suspense } from "react";
@@ -13,8 +14,8 @@ import "./homepage.css";
 
 export const revalidate = 300;
 
-export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }) {
-  const { scope } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; scope: Scope }> }) {
+  const { scope } = await pageParams(params);
   const [t, locale] = await Promise.all([getTranslations("home.metadata"), getLocale()]);
   return { title: t("title"), description: t("description"), alternates: buildAlternates(locale, scope, "/") };
 }
@@ -32,8 +33,8 @@ function HomepageMainLoading() {
   return <MainSkeleton />;
 }
 
-export default async function HomePage({ params }: { params: Promise<{ scope: Scope }> }) {
-  const { scope } = await params;
+export default async function HomePage({ params }: { params: Promise<{ locale: string; scope: Scope }> }) {
+  const { scope } = await pageParams(params);
   const homepageData = getHomepageMain(scope);
   return <HomepageDataStatusProvider>
     <HomepageTickerClient />

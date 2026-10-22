@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { buildAlternates } from "@/i18n/alternates";
 import { KontaktForm } from "./KontaktForm";
 import type { Scope } from "@/lib/scope";
 import { ScopedLink } from "../../components/ScopedLink";
 
-export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
-  const { scope } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await pageParams(params);
   const [t, locale] = await Promise.all([getTranslations("contact.metadata"), getLocale()]);
   return {
     title: t("title"),
@@ -39,7 +40,8 @@ function MailLink({
   );
 }
 
-export default async function KontaktPage() {
+export default async function KontaktPage({ params }: { params: Promise<{ locale: string }> }) {
+  await pageParams(params);
   const t = await getTranslations("contact");
 
   const items = [

@@ -5,8 +5,9 @@ import { shooters } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import { uploadAvatarFromUrl } from "@shootermarkt/db/upload-avatar";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -60,3 +61,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ shooter: inserted, created: true });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

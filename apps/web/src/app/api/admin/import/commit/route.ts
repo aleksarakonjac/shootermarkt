@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { CommitValidationError, commitImportReview } from "@/lib/import-commit";
 import type { CommitPayload } from "@shootermarkt/db/pdf-import-types";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -17,3 +18,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Commit failed" }, { status: 500 });
   }
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

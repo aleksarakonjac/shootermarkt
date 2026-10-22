@@ -4,11 +4,12 @@ import { competitions } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { detectLang, translateText } from "@/lib/competition-translate";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 type Patch = { nameSr?: string; nameEn?: string; locationSr?: string; locationEn?: string };
 
 /** Popunjava prazne prevode (naziv + lokacija) jednog takmičenja; postojeće ne dira. */
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -38,7 +39,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 }
 
 /** Ručna izmena prevoda. */
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -55,3 +56,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!updated) return NextResponse.json({ error: "Nije pronađeno" }, { status: 404 });
   return NextResponse.json({ id: updated.id });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);
+export const PATCH = revalidatesPublicSite(handlePATCH);

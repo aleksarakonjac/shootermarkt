@@ -116,7 +116,6 @@ function useHomepageData<T>(path: string, refreshMs?: number, initialData?: T) {
   const [data, setData] = useState<T | null>(initialData ?? null);
   const [state, setState] = useState<"loading" | "ready" | "error">(initialData ? "ready" : "loading");
   const [attempt, setAttempt] = useState(0);
-  const hasInitialData = useRef(initialData != null);
   const hasData = useRef(initialData != null);
   const autoRetried = useRef<string | null>(null);
   const { clearFailure, reportFailure } = useHomepageDataStatus();
@@ -127,11 +126,9 @@ function useHomepageData<T>(path: string, refreshMs?: number, initialData?: T) {
   // Osvežavanje u pozadini: sadržaj ostaje na ekranu, pa novi rezultat može da se istakne.
   const refresh = useCallback(() => setAttempt((value) => value + 1), []);
 
+  // Fetch ide i kad postoji initialData: početna je ISR, pa snimak iz HTML-a može biti star
+  // (live rezultati). Snimak se prikaže odmah, a sveži podaci ga zamene u pozadini.
   useEffect(() => {
-    if (hasInitialData.current) {
-      hasInitialData.current = false;
-      return;
-    }
     const controller = new AbortController();
     clearFailure(path);
     // v = 5-sekundni bucket: svi posetioci dele isti CDN odgovor, a osvežavanje ne dobija 60 s star keš.

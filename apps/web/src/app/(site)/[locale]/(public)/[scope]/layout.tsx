@@ -1,6 +1,10 @@
 import { notFound } from 'next/navigation';
 import { VALID_SCOPES, type Scope } from '@/lib/scope';
 
+export function generateStaticParams() {
+  return VALID_SCOPES.map((scope) => ({ scope }));
+}
+
 export default async function ScopeLayout({
   children,
   params,

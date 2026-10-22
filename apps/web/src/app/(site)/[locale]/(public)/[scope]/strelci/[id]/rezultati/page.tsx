@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
 import { buildAlternates } from "@/i18n/alternates";
@@ -12,25 +13,31 @@ import { getShooterResultsPage } from "@/lib/shooter-results";
 import { ShooterResultsArchive } from "@/components/result-display/ShooterResultsArchive";
 import { ScopedLink } from "../../../../components/ScopedLink";
 
-type Props = { params: Promise<{ id: string; scope: Scope }> };
+type Props = { params: Promise<{ locale: string; id: string; scope: Scope }> };
 
 // Jedan upit po renderu: generateMetadata i stranica dele rezultat (React cache traje jedan request).
 const getShooter = cache((id: number) => db.query.shooters.findFirst({ where: eq(shooters.id, id), with: { club: true } }));
 
+// Prazan niz: ništa se ne prerenderuje u build-u, svaka stranica se renderuje na prvi zahtev
+// i kešira (ISR, revalidate gore). Bez ovoga Next ovaj dinamički segment renderuje na svaki zahtev.
+export function generateStaticParams() {
+  return [];
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id, scope } = await params;
+  const { id, scope } = await pageParams(params);
   const [shooter, locale] = await Promise.all([
     /^\d{1,9}$/.test(id) ? getShooter(Number(id)) : undefined,
     getLocale(),
   ]);
   const alternates = buildAlternates(locale, scope, `/strelci/${id}/rezultati`);
   const resultsTitle = locale === "en" ? "Results" : "Rezultati";
-  if (!shooter) return { title: resultsTitle, alternates };
+  if (!shooter) return { title: resultsTitle, alternates, robots: { index: false } };
   return { title: `${shooter.lastName} ${shooter.firstName} — ${resultsTitle}`, alternates };
 }
 
 export default async function ShooterResultsPage({ params }: Props) {
-  const { id } = await params;
+  const { id } = await pageParams(params);
   const shooterId = Number(id);
   if (!/^\d{1,9}$/.test(id)) notFound();
 

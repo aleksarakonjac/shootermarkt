@@ -2,18 +2,19 @@ export const revalidate = 300;
 
 import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { buildAlternates } from "@/i18n/alternates";
 import { type Scope } from "@/lib/scope";
 import { ScopedLink } from "../../components/ScopedLink";
 import { H2HClient, type H2HClientLabels } from "./H2HClient";
 
 type Props = {
-  params: Promise<{ scope: Scope }>;
+  params: Promise<{ locale: string; scope: Scope }>;
   searchParams: Promise<{ a?: string; b?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { scope } = await params;
+  const { scope } = await pageParams(params);
   const locale = await getLocale();
   return {
     title: locale === "en" ? "Direct Comparison" : "Direktno poređenje",
@@ -21,7 +22,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function HeadToHeadPage({ params: _params, searchParams }: Props) {
+export default async function HeadToHeadPage({ params, searchParams }: Props) {
+  await pageParams(params);
   const { a, b } = await searchParams;
   const locale = await getLocale();
   const t = await getTranslations("ranking");

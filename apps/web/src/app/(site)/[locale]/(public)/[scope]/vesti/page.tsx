@@ -7,6 +7,7 @@ import {
   getTopShootersByDiscipline,
 } from "@/lib/cms/get-vesti-sidebar";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { buildAlternates } from "@/i18n/alternates";
 import { getLevelLabel } from "@/lib/competition-utils";
 import type { Scope } from "@/lib/scope";
@@ -15,8 +16,8 @@ import { trendLabel, trendColor } from "@/lib/forma";
 
 export const revalidate = 300;
 
-export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
-  const { scope } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await pageParams(params);
   const [t, locale] = await Promise.all([getTranslations("news"), getLocale()]);
   return { title: t("title"), alternates: buildAlternates(locale, scope, "/vesti") };
 }
@@ -63,10 +64,12 @@ function getCategoryColor(cat: string | null) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 type Props = {
+  params: Promise<{ locale: string }>;
   searchParams: Promise<{ kategorija?: string }>;
 };
 
-export default async function VestiPage({ searchParams }: Props) {
+export default async function VestiPage({ params, searchParams }: Props) {
+  await pageParams(params);
   const sp = await searchParams;
   const activeCategory = sp.kategorija ?? "";
   const locale = await getLocale();

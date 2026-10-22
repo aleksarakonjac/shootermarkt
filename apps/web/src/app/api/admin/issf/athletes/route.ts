@@ -5,6 +5,7 @@ import { shooters } from "@shootermarkt/db/schema";
 import { inArray, eq } from "drizzle-orm";
 import { uploadAvatarFromUrl } from "@shootermarkt/db/upload-avatar";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 export async function GET(req: NextRequest) {
   const denied = await requireAdmin();
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
   );
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -103,3 +104,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ inserted: inserted.length, skipped: selected.length - inserted.length });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

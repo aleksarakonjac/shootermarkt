@@ -15,13 +15,14 @@ import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { StrelciFilterBar } from "./StrelciFilterBar";
 import { StrelciTableTransition } from "./StrelciTableTransition";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@shootermarkt/db/pdf-import-types";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Metadata } from "next";
 import { type Scope } from "@/lib/scope";
 
-export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
-  const { scope } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await pageParams(params);
   const [t, locale] = await Promise.all([getTranslations("shooters"), getLocale()]);
   return {
     title: t("title"),
@@ -149,7 +150,7 @@ function DiscPanel({ code, label, show, t, className = "" }: { code: string; lab
 }
 
 type Props = {
-  params: Promise<{ scope: Scope }>;
+  params: Promise<{ locale: string; scope: Scope }>;
   searchParams: Promise<{
     q?: string;
     zemlja?: string;
@@ -224,7 +225,7 @@ const getShooterFacets = unstable_cache(async (thisYear: string) => {
 }, ["strelci-facets"], { revalidate: 900 });
 
 export default async function StrelciPage({ params, searchParams }: Props) {
-  const { scope } = await params;
+  const { scope } = await pageParams(params);
   const locale       = await getLocale();
   const t            = await getTranslations("shooters");
   const tProfile     = await getTranslations("shooters.profile");

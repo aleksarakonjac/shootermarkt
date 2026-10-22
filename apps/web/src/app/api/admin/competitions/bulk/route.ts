@@ -5,6 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { parseFocusPriorityInput } from "@/lib/competition-priority";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 type Level = (typeof competitionLevelEnum.enumValues)[number];
 type EventType = (typeof eventTypeEnum.enumValues)[number];
@@ -22,7 +23,7 @@ const isId = (v: unknown): v is number => Number.isInteger(v) && (v as number) >
  * po meču. Sve u jednoj transakciji; posle upisa se preračunava forma pogođenih strelaca
  * (level, event_type i kategorija ulaze u težinu forme).
  */
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -104,3 +105,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ updated: compChanges.length + matchChanges.length });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

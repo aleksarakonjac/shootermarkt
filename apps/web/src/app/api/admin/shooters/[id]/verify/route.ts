@@ -3,8 +3,9 @@ import { shooters } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
-export async function POST(
+async function handlePOST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -25,3 +26,5 @@ export async function POST(
 
   return NextResponse.json({ ok: true });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

@@ -23,6 +23,7 @@ import {
   type DisciplineGroup,
 } from "./CompetitionResultsClient";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
 import { RelatedNewsSection } from "@/components/RelatedNewsSection";
@@ -30,21 +31,27 @@ import { ScheduleSection, type ScheduleSlot } from "./ScheduleSection";
 import { foldName, foldNameSql, matchShooter } from "@shootermarkt/db/name-match";
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 
-type Props = { params: Promise<{ id: string; scope: Scope }> };
+type Props = { params: Promise<{ locale: string; id: string; scope: Scope }> };
 
 // ── Metadata ─────────────────────────────────────────────────────────────────
 
 // Jedan upit po renderu: generateMetadata i stranica dele rezultat (React cache traje jedan request).
 const getCompetition = cache((id: number) => db.query.competitions.findFirst({ where: eq(competitions.id, id), with: { country: true } }));
 
+// Prazan niz: ništa se ne prerenderuje u build-u, svaka stranica se renderuje na prvi zahtev
+// i kešira (ISR, revalidate gore). Bez ovoga Next ovaj dinamički segment renderuje na svaki zahtev.
+export function generateStaticParams() {
+  return [];
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id, scope } = await pageParams(params);
   const locale = await getLocale();
-  const { id, scope } = await params;
   const comp = /^\d{1,9}$/.test(id) ? await getCompetition(parseInt(id)) : undefined;
   const alternates = buildAlternates(locale, scope, `/takmicenja/${id}`);
   if (!comp) {
     const t = await getTranslations("competition");
-    return { title: t("detail.notFound"), alternates };
+    return { title: t("detail.notFound"), alternates, robots: { index: false } };
   }
   const name = locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name);
   return { title: name, alternates };
@@ -53,11 +60,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CompetitionPage({ params }: Props) {
-  const [locale, t, tCommon, { id }] = await Promise.all([
+  const { id } = await pageParams(params);
+  const [locale, t, tCommon] = await Promise.all([
     getLocale(),
     getTranslations("competition"),
     getTranslations("common"),
-    params,
   ]);
   const compId = parseInt(id);
   if (!/^\d{1,9}$/.test(id)) notFound();

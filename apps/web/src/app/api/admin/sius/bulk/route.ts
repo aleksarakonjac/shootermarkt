@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { importSiusCompetition } from "@/lib/sius-bulk";
 import { SiusImportError } from "@/lib/sius-import";
 import { matchSiusCompetition, type SiusMatch } from "@/lib/sius-match";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 // One import commits a whole competition (hundreds of rows) — give it room.
 export const maxDuration = 300;
@@ -76,7 +77,7 @@ type Action =
   | { action: "link"; competitionId: number; siusId: string };
 
 /** preview: what SIUS has for one competition · import: write it · link: store a SIUS UUID on a competition. */
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -104,3 +105,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Uvoz nije uspeo" }, { status: 500 });
   }
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

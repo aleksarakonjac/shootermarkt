@@ -3,6 +3,15 @@ import { BlocksFeature, lexicalEditor } from "@payloadcms/richtext-lexical";
 import { CompetitionEmbedBlock } from "../blocks/CompetitionEmbedBlock";
 import { ShooterEmbedBlock } from "../blocks/ShooterEmbedBlock";
 import { GalleryBlock } from "../blocks/GalleryBlock";
+import { revalidatePublicSite } from "@/lib/revalidate-public";
+
+// Vesti se prikazuju i na početnoj i na stranicama takmičenja, pa se briše keš celog sajta.
+// Van Next zahteva (skripte, seed) revalidatePath baca grešku, a tamo nema ni keša za brisanje.
+const revalidateSite = () => {
+  try {
+    revalidatePublicSite();
+  } catch {}
+};
 
 export const Articles: CollectionConfig = {
   slug: "articles",
@@ -152,5 +161,7 @@ export const Articles: CollectionConfig = {
         return data;
       },
     ],
+    afterChange: [revalidateSite],
+    afterDelete: [revalidateSite],
   },
 };

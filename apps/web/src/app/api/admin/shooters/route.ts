@@ -4,6 +4,7 @@ import { shooters, clubs } from "@shootermarkt/db/schema";
 import { eq, ilike, or, and } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { matchedPreviousLastName, previousLastNameLike } from "@/lib/previous-last-name";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 export async function GET(req: NextRequest) {
   const denied = await requireAdmin();
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
   );
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -78,3 +79,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ id: shooter.id });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

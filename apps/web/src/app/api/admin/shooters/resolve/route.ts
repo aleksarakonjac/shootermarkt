@@ -6,6 +6,7 @@ import { applyIssfProfile, IssfConflictError } from "@shootermarkt/adapters/issf
 import { requireAdmin } from "@/lib/admin-auth";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { mergeShooters, MergeError } from "@/lib/merge-shooters";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 export type ResolveAction =
   | { shooterId: number; kind: "link"; issfId: string }
@@ -31,7 +32,7 @@ function parse(raw: unknown): ResolveAction | null {
  * ne zaustavlja ostale. link: upiše issfId i dopuni prazna polja; merge: spoji u
  * postojećeg strelca (staro prezime → alias); dismiss: označi kao pregledanog.
  */
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -68,3 +69,5 @@ export async function POST(req: NextRequest) {
   if (mergedInto.size) await recomputeFormaCache([...mergedInto]);
   return NextResponse.json({ results: out });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

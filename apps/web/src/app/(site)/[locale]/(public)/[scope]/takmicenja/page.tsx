@@ -15,12 +15,13 @@ import { CompetitionCalendar, type CalendarComp } from "./CompetitionCalendar";
 import { levelsForGroups, parseDisciplineParam, parseLevelParam, ISSF_LEVEL_GROUP_KEYS } from "@/lib/competition-filters";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { formatShortDateRange as formatDate } from "@/lib/date-utils";
 import { buildAlternates } from "@/i18n/alternates";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
 
-export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
-  const { scope } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await pageParams(params);
   const [t, locale] = await Promise.all([getTranslations("competition"), getLocale()]);
   return {
     title: t("list.title"),
@@ -302,12 +303,12 @@ function FoldedMonth({ mk, comps, locale, fullName }: { mk: string; comps: CompI
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  params: Promise<{ scope: Scope }>;
+  params: Promise<{ locale: string; scope: Scope }>;
   searchParams: Promise<{ year?: string; level?: string; disc?: string; q?: string; tag?: string; view?: string; focus?: string; location?: string }>;
 }
 
 export default async function TakmicenjaPage({ params, searchParams }: Props) {
-  const { scope } = await params;
+  const { scope } = await pageParams(params);
   const { year, level, disc, q, tag, view, location } = await searchParams;
 
   // Stari link ?view=cal: kalendar je sada deo istog ekrana.

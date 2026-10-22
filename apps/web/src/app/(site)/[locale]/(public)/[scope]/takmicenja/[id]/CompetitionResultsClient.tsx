@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef, useTransition } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useTransition, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
@@ -149,11 +149,23 @@ function eliminationRoundLabel(round: number, locale: string): string {
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
-export function CompetitionResultsClient({ groups, mixedGroups, competitionId, locale, competitionLevel, finalSlots = [] }: Props) {
+// useSearchParams na ISR stranici traži Suspense. Fallback je isti prikaz bez izbora iz URL-a,
+// pa tabela ostaje u statičkom HTML-u; izbor iz URL-a se primeni posle hidratacije.
+export function CompetitionResultsClient(props: Props) {
+  return (
+    <Suspense fallback={<CompetitionResultsView {...props} search="" />}>
+      <CompetitionResultsWithSearch {...props} />
+    </Suspense>
+  );
+}
+
+function CompetitionResultsWithSearch(props: Props) {
+  return <CompetitionResultsView {...props} search={useSearchParams().toString()} />;
+}
+
+function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, competitionLevel, finalSlots = [], search }: Props & { search: string }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const search = searchParams.toString();
   const detailRef = useRef<HTMLDivElement>(null);
 
   const urlSelection = useMemo<Selection | null>(() => {

@@ -15,6 +15,7 @@ import { CareerStats, type CareerStat } from "@/components/shooter/CareerStats";
 import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@shootermarkt/db/pdf-import-types";
 import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
 import { RelatedNewsSection } from "@/components/RelatedNewsSection";
@@ -22,13 +23,19 @@ import { ArrowRight } from "lucide-react";
 import { ShooterAvatarLightbox } from "@/components/shooter/ShooterAvatarLightbox";
 import { INVALID_REMARKS } from "@/lib/forma-query";
 
-type Props = { params: Promise<{ id: string; scope: Scope }> };
+type Props = { params: Promise<{ locale: string; id: string; scope: Scope }> };
 
 // Jedan upit po renderu: generateMetadata i stranica dele rezultat (React cache traje jedan request).
 const getShooter = cache((id: number) => db.query.shooters.findFirst({ where: eq(shooters.id, id), with: { club: true } }));
 
+// Prazan niz: ništa se ne prerenderuje u build-u, svaka stranica se renderuje na prvi zahtev
+// i kešira (ISR, revalidate gore). Bez ovoga Next ovaj dinamički segment renderuje na svaki zahtev.
+export function generateStaticParams() {
+  return [];
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id, scope } = await params;
+  const { id, scope } = await pageParams(params);
   const [shooter, locale] = await Promise.all([
     // Nenumerički id (npr. /strelci/abc) ide pravo na "nije pronađen" umesto greške u upitu.
     /^\d{1,9}$/.test(id) ? getShooter(parseInt(id)) : undefined,
@@ -37,17 +44,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const alternates = buildAlternates(locale, scope, `/strelci/${id}`);
   if (!shooter) {
     const t = await getTranslations("shooters.profile");
-    return { title: t("notFound"), alternates };
+    // Status ostaje 200 (loading.tsx počne streaming pre notFound()), pa noindex sprečava soft-404 u pretrazi.
+    return { title: t("notFound"), alternates, robots: { index: false } };
   }
   return { title: `${shooter.lastName} ${shooter.firstName}`, alternates };
 }
 
 export default async function ShooterPage({ params }: Props) {
+  const { id } = await pageParams(params);
   const locale = await getLocale();
   const t = await getTranslations("shooters");
   const tProfile = await getTranslations("shooters.profile");
 
-  const { id } = await params;
   const shooterId = parseInt(id);
   if (!/^\d{1,9}$/.test(id)) notFound();
 

@@ -9,6 +9,7 @@ import { matchShooter } from "@shootermarkt/db/name-match";
 import { buildIssfFinalDetails, buildSiusFinalDetails } from "@/lib/final-detail";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { stageRemarks } from "@/lib/sius-merge";
+import { revalidateCompetitionPages } from "@/lib/revalidate-public";
 
 // Same per-stage jsonb merge as the manual/CLI import (lib/import-commit.ts): one stage never wipes another.
 const mergeRemarks = (col: typeof results.remarkDetails | typeof mixedTeamResults.remarkDetails) =>
@@ -94,6 +95,9 @@ export async function GET(req: NextRequest) {
   );
 
   totalUpserted = counts.reduce((a, b) => a + b, 0);
+  // Samo takmičenja koja su dobila redove: cron radi svakog minuta, pa ceo sajt ostaje u kešu.
+  const touched = [...byComp.keys()].filter((_, i) => counts[i] > 0);
+  if (touched.length) revalidateCompetitionPages(touched);
 
   return NextResponse.json({ ok: true, active: activeSlots.length, upserted: totalUpserted });
 }

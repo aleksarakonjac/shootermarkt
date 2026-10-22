@@ -136,11 +136,15 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
   const [monthCache, setMonthCache] = useState<Record<string, Competition[]>>(() => competitions ? { [initialMonthKey]: competitions } : {});
   const [monthState, setMonthState] = useState<Record<string, "loading" | "ready" | "error">>(() => competitions ? { [initialMonthKey]: "ready" } : {});
   const autoRetriedMonths = useRef(new Set<string>());
+  // Zahtevi u letu: kad prvi odgovor promeni monthCache, effect se ponovo pokrene pre nego što
+  // stignu ostali, pa bi bez ovoga isti meseci bili traženi ponovo.
+  const inFlightMonths = useRef(new Set<string>());
   const { clearFailure, reportFailure } = useHomepageDataStatus();
 
   const loadMonth = useCallback(async (year: number, month: number) => {
     const key = `${year}-${month}`;
-    if (Object.hasOwn(monthCache, key)) return;
+    if (Object.hasOwn(monthCache, key) || inFlightMonths.current.has(key)) return;
+    inFlightMonths.current.add(key);
     const isCurrentMonth = key === `${viewYear}-${viewMonth}`;
     if (isCurrentMonth) clearFailure("calendar");
     setMonthState((states) => ({ ...states, [key]: "loading" }));
@@ -158,6 +162,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
       setMonthState((states) => ({ ...states, [key]: "error" }));
     } finally {
       clearTimeout(timeout);
+      inFlightMonths.current.delete(key);
     }
   }, [clearFailure, locale, monthCache, scope, viewMonth, viewYear]);
 

@@ -3,8 +3,9 @@ import { db } from "@shootermarkt/db";
 import { shooters, results } from "@shootermarkt/db/schema";
 import { requireAdmin } from "@/lib/admin-auth";
 import { eq } from "drizzle-orm";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
-export async function PATCH(
+async function handlePATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -40,7 +41,7 @@ export async function PATCH(
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(
+async function handleDELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -60,3 +61,6 @@ export async function DELETE(
   await db.delete(shooters).where(eq(shooters.id, shooterId));
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = revalidatesPublicSite(handlePATCH);
+export const DELETE = revalidatesPublicSite(handleDELETE);

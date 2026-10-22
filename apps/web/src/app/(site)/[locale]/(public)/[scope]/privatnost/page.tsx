@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { ScopedLink } from "../../components/ScopedLink";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
 
-export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
-  const { scope } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await pageParams(params);
   const [t, locale] = await Promise.all([getTranslations("privacy.metadata"), getLocale()]);
   return {
     title: t("title"),
@@ -73,7 +74,8 @@ function Ul({ items }: { items: (string | React.ReactNode)[] }) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function PrivatnostPage() {
+export default async function PrivatnostPage({ params }: { params: Promise<{ locale: string }> }) {
+  await pageParams(params);
   const locale = await getLocale();
   const t = await getTranslations("privacy");
 

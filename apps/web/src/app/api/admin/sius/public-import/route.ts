@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildSiusImport, SiusImportError } from "@/lib/sius-import";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 export type { SiusFinalEntry } from "@/lib/sius-import";
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -20,3 +21,5 @@ export async function POST(req: NextRequest) {
     throw e;
   }
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

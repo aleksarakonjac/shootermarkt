@@ -9,13 +9,14 @@ import type { Metadata } from "next";
 import { type CompetitionLevel, type Trend } from "@/lib/forma";
 import { type AgeCategory, CATEGORY_RANK } from "@shootermarkt/db/pdf-import-types";
 import { getLocale, getTranslations } from "next-intl/server";
+import { pageParams } from "@/i18n/page-params";
 import { buildAlternates } from "@/i18n/alternates";
 import { type Scope } from "@/lib/scope";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { RangiranjeClient, type RangiranjeShooter, type RangiranjeLabels } from "./RangiranjeClient";
 
-export async function generateMetadata({ params }: { params: Promise<{ scope: Scope }> }): Promise<Metadata> {
-  const { scope } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; scope: Scope }> }): Promise<Metadata> {
+  const { scope } = await pageParams(params);
   const [t, locale] = await Promise.all([getTranslations("ranking"), getLocale()]);
   return {
     title: t("title"),
@@ -33,12 +34,12 @@ const TABS: { code: DiscCode; label: string; labelEn: string }[] = [
 ];
 
 type Props = {
-  params: Promise<{ scope: Scope }>;
+  params: Promise<{ locale: string; scope: Scope }>;
   searchParams: Promise<{ disciplina?: string }>;
 };
 
 export default async function RangiranjeePage({ params, searchParams }: Props) {
-  const { scope } = await params;
+  const { scope } = await pageParams(params);
   const locale = await getLocale();
   const [t, tCommon] = await Promise.all([
     getTranslations("ranking"),

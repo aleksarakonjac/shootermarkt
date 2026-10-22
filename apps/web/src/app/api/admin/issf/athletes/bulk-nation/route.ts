@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { importIssfNation } from "@shootermarkt/adapters/issf/import-nation";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 function hasScriptSecret(req: NextRequest) {
   const secret = process.env.IMPORT_SECRET;
@@ -11,7 +12,7 @@ function cancelled() {
   return NextResponse.json({ cancelled: true }, { status: 499 });
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   if (!hasScriptSecret(req)) {
     const denied = await requireAdmin();
     if (denied) return denied;
@@ -28,3 +29,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Uvoz nacije nije uspeo" }, { status: 500 });
   }
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

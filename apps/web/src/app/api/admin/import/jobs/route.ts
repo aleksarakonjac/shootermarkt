@@ -7,6 +7,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import type { CompetitionLevel, EventType } from "@shootermarkt/db/pdf-import-types";
 import { requireAdmin } from "@/lib/admin-auth";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 async function resolveCompetitionId(formData: FormData) {
   const existingId = Number(formData.get("competitionId"));
@@ -63,7 +64,7 @@ export async function GET() {
   return NextResponse.json({ jobs });
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -85,3 +86,5 @@ export async function POST(req: NextRequest) {
     });
   return NextResponse.json(job, { status: 202 });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

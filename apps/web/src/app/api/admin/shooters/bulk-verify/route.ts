@@ -4,8 +4,9 @@ import { shooters } from "@shootermarkt/db/schema";
 import { requireAdmin } from "@/lib/admin-auth";
 import { and, inArray, eq } from "drizzle-orm";
 import { buildShootersWhere, type ShooterFilterParams } from "@/lib/admin-shooters-filter";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -32,3 +33,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ verified: ids.length });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

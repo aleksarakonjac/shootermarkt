@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { db } from "@shootermarkt/db";
 import { clubs } from "@shootermarkt/db/schema";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -17,3 +18,5 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(club);
 }
+
+export const POST = revalidatesPublicSite(handlePOST);

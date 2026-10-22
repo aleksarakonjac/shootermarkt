@@ -4,11 +4,12 @@ import { competitions, competitionScheduleChanges } from "@shootermarkt/db/schem
 import { and, eq, isNull } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { syncCompetitionById } from "@/lib/schedule-sync";
+import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 export const maxDuration = 30;
 
 // POST { competitionId, timezone, location? } — sets the venue timezone (and location), then pulls the schedule right away.
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
   const { competitionId, timezone, location } = await req.json() as { competitionId: number; timezone: string; location?: string };
@@ -23,3 +24,5 @@ export async function POST(req: NextRequest) {
     .where(and(eq(competitionScheduleChanges.competitionId, competitionId), eq(competitionScheduleChanges.kind, "tz_missing"), isNull(competitionScheduleChanges.acknowledgedAt)));
   return NextResponse.json({ result: await syncCompetitionById(competitionId) });
 }
+
+export const POST = revalidatesPublicSite(handlePOST);
