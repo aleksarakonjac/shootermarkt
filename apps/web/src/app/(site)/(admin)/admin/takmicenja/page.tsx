@@ -7,7 +7,6 @@ import { Pagination } from "../components/Pagination";
 import { TakmicenjaFilters } from "./takmicenja-filters";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { formatDateRangeSr } from "@/lib/date-utils";
-import { BatchTranslateButton } from "./batch-translate-button";
 import { defaultFocusPriority } from "@/lib/competition-priority";
 import { effectiveFocusPrioritySql } from "@/lib/competition-priority-sql";
 
@@ -211,7 +210,12 @@ export default async function AdminTakmicenjaPage({
           <p className="text-sm text-[var(--muted)] mt-0.5">prikazano {data.length} od {total}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <BatchTranslateButton />
+          <Link
+            href={`/admin/takmicenja/prevodi?year=${year || currentYear}`}
+            className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
+          >
+            Prevedi sve →
+          </Link>
           <Link
             href="/admin/takmicenja/bulk"
             className="rounded-md border border-[var(--border-strong)] px-4 py-2 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
