@@ -4,12 +4,13 @@ import { ageCategoryEnum, competitionLevelEnum, competitions, eventTypeEnum, res
 import { and, eq, inArray } from "drizzle-orm";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { requireAdmin } from "@/lib/admin-auth";
+import { parseFocusPriorityInput } from "@/lib/competition-priority";
 
 type Level = (typeof competitionLevelEnum.enumValues)[number];
 type EventType = (typeof eventTypeEnum.enumValues)[number];
 type Category = (typeof ageCategoryEnum.enumValues)[number];
 
-export type BulkCompetitionChange = { id: number; level?: Level; eventType?: EventType; tags?: string[] };
+export type BulkCompetitionChange = { id: number; level?: Level; eventType?: EventType; tags?: string[]; focusPriority?: number | null };
 /** Svi rezultati meča (takmičenje × disciplina × kategorija) prelaze u novu kategoriju. */
 export type BulkMatchChange = { competitionId: number; disciplineId: number; from: Category; to: Category };
 
@@ -38,8 +39,15 @@ export async function POST(req: NextRequest) {
     if (c.tags !== undefined && !(Array.isArray(c.tags) && c.tags.every((t) => typeof t === "string" && t.trim() && t.length <= 20))) {
       return NextResponse.json({ error: `[${c.id}] tag mora imati 1–20 znakova` }, { status: 400 });
     }
+    let focusPriority: number | null | undefined;
+    if (c.focusPriority !== undefined) {
+      const parsed = parseFocusPriorityInput(c.focusPriority);
+      if (!parsed.ok) return NextResponse.json({ error: `[${c.id}] prioritet mora biti ceo broj 0–20 ili prazan` }, { status: 400 });
+      focusPriority = parsed.value;
+    }
     compChanges.push({
       id: c.id,
+      focusPriority,
       level: c.level as Level | undefined,
       eventType: c.eventType as EventType | undefined,
       tags: (c.tags as string[] | undefined)?.map((t) => t.trim()),
@@ -64,6 +72,7 @@ export async function POST(req: NextRequest) {
           ...(c.level ? { level: c.level } : {}),
           ...(c.eventType ? { eventType: c.eventType } : {}),
           ...(c.tags ? { tags: c.tags } : {}),
+          ...(c.focusPriority !== undefined ? { focusPriority: c.focusPriority } : {}),
         };
         if (Object.keys(set).length) await tx.update(competitions).set(set).where(eq(competitions.id, c.id));
       }
@@ -83,9 +92,15 @@ export async function POST(req: NextRequest) {
     throw e;
   }
 
-  const touched = [...new Set([...compChanges.map((c) => c.id), ...matchChanges.map((m) => m.competitionId)])];
-  const shooterRows = await db.selectDistinct({ shooterId: results.shooterId }).from(results).where(inArray(results.competitionId, touched));
-  await recomputeFormaCache(shooterRows.map((r) => r.shooterId));
+  // Prioritet i tagovi ne ulaze u težinu forme — preračun samo kad se menja nivo, tip ili kategorija
+  const touched = [...new Set([
+    ...compChanges.filter((c) => c.level || c.eventType).map((c) => c.id),
+    ...matchChanges.map((m) => m.competitionId),
+  ])];
+  const shooterRows = touched.length
+    ? await db.selectDistinct({ shooterId: results.shooterId }).from(results).where(inArray(results.competitionId, touched))
+    : [];
+  if (touched.length) await recomputeFormaCache(shooterRows.map((r) => r.shooterId));
 
   return NextResponse.json({ updated: compChanges.length + matchChanges.length });
 }

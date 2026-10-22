@@ -3,6 +3,7 @@ import { db } from "@shootermarkt/db";
 import { shooters, clubs } from "@shootermarkt/db/schema";
 import { eq, ilike, or, and } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
+import { matchedPreviousLastName, previousLastNameLike } from "@/lib/previous-last-name";
 
 export async function GET(req: NextRequest) {
   const denied = await requireAdmin();
@@ -14,6 +15,7 @@ export async function GET(req: NextRequest) {
       id: shooters.id,
       firstName: shooters.firstName,
       lastName: shooters.lastName,
+      previousLastNames: shooters.previousLastNames,
       nationality: shooters.nationality,
       gender: shooters.gender,
       birthYear: shooters.birthYear,
@@ -30,14 +32,19 @@ export async function GET(req: NextRequest) {
               .split(/\s+/)
               .filter(Boolean)
               .map((word) =>
-                or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`))
+                or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`), previousLastNameLike(shooters.previousLastNames, `%${word}%`))
               )
           )
         : undefined
     )
     .orderBy(shooters.lastName);
 
-  return NextResponse.json(data);
+  return NextResponse.json(
+    data.map(({ previousLastNames, ...s }) => ({
+      ...s,
+      matchedLastName: q ? matchedPreviousLastName(q, s.firstName, s.lastName, previousLastNames) : null,
+    }))
+  );
 }
 
 export async function POST(req: NextRequest) {

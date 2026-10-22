@@ -16,7 +16,7 @@ export async function PATCH(
   if (isNaN(shooterId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const body = await req.json();
-  const { firstName, lastName, nationality, gender, birthYear, birthDate, clubId } = body;
+  const { firstName, lastName, nationality, gender, birthYear, birthDate, clubId, previousLastNames } = body;
 
   if (!firstName?.trim() || !lastName?.trim()) {
     return NextResponse.json({ error: "Ime i prezime su obavezni" }, { status: 400 });
@@ -25,6 +25,9 @@ export async function PATCH(
   await db.update(shooters).set({
     firstName: firstName.trim(),
     lastName: lastName.trim(),
+    previousLastNames: Array.isArray(previousLastNames)
+      ? previousLastNames.map((n: string) => n.trim()).filter(Boolean)
+      : null,
     nationality: nationality?.trim() || null,
     gender: gender || null,
     birthYear: birthDate

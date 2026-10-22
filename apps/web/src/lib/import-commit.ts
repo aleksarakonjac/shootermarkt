@@ -60,6 +60,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
   const disciplineMap = Object.fromEntries((await db.select().from(disciplines)).map((d) => [d.code, d.id]));
   const allShooters = await db.select({
     id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName,
+    previousLastNames: shooters.previousLastNames,
     nationality: shooters.nationality, clubId: shooters.clubId,
     birthYear: shooters.birthYear, apparatus: shooters.apparatus,
   }).from(shooters);
@@ -107,6 +108,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
           shooterId = created.id;
           allShooters.push({
             id: created.id, firstName: row.firstName, lastName: row.lastName,
+            previousLastNames: null,
             nationality: row.teamNoc || null, clubId: clubId ?? null,
             birthYear: row.birthYear ?? null, apparatus: row.apparatus ?? meta?.apparatus ?? null,
           });

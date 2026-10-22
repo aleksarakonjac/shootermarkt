@@ -36,6 +36,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/strelci",      label: "Svi strelci" },
       { href: "/admin/strelci/issf", label: "ISSF uvoz i osvežavanje" },
+      { href: "/admin/strelci/nepovezani", label: "Nepovezani strelci" },
     ],
   },
   {

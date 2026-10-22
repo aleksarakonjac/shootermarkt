@@ -32,9 +32,32 @@ export function issfAscii(s: string): string {
   return s.replace(/[đĐ]/g, (c) => (c === "đ" ? "d" : "D")).normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 }
 
+/** Reči imena ("Al-Harbi" → al, harbi), svedene na fold ključ. */
+export function nameTokens(...parts: string[]): string[] {
+  return parts.join(" ").split(/[\s\-'’.]+/).map(foldName).filter(Boolean);
+}
+
+/**
+ * Višečlana imena (npr. bliski istok): izvor "Mohammed Al-Harbi", ISSF "MOHAMMED ALI" / "AL HARBI".
+ * Podela na ime/prezime se razlikuje, pa se porede reči celog imena bez obzira na redosled.
+ * exact = isti skup reči (ili isto ime spojeno bez razmaka); close = sve reči kraćeg imena
+ * su u dužem, a bar dve reči se poklapaju.
+ */
+function rankTokens(first: string, last: string, c: Pick<ISSFAthlete, "firstName" | "familyName">): IssfMatch | null {
+  const a = nameTokens(first, last);
+  const b = nameTokens(c.firstName ?? "", c.familyName ?? "");
+  if (a.length < 2 || b.length < 2) return null;
+  const setA = new Set(a), setB = new Set(b);
+  const shared = [...setA].filter((t) => setB.has(t)).length;
+  if (shared === setA.size && shared === setB.size) return "exact";
+  if (a.join("") === b.join("") || [...a].sort().join("") === [...b].sort().join("")) return "exact";
+  if (shared >= 2 && (shared === setA.size || shared === setB.size)) return "close";
+  return null;
+}
+
 export function rankMatch(first: string, last: string, c: Pick<ISSFAthlete, "firstName" | "familyName">): IssfMatch {
   const lastEq = foldName(last) === foldName(c.familyName ?? "");
-  if (!lastEq) return "weak";
+  if (!lastEq) return rankTokens(first, last, c) ?? "weak";
   const fa = foldName(first), fb = foldName(c.firstName ?? "");
   if (fa === fb) return "exact";
   return editDistance(fa, fb) <= 2 || fa.startsWith(fb) || fb.startsWith(fa) ? "close" : "weak";
@@ -52,6 +75,12 @@ export async function lookupIssfAthletes(first: string, last: string, noc?: stri
     ...(nocQ ? lastVariants.map((l) => `${nocQ} ${l}`) : []),
     ...lastVariants.map((l) => `${l} ${issfAscii(first)}`.trim()),
   ];
+  // Višečlana imena: ISSF može imati drugačiju podelu ime/prezime — traži i po najdužoj reči
+  const tokens = nameTokens(issfAscii(first), lastAscii);
+  if (tokens.length > 2) {
+    const longest = [...tokens].sort((x, y) => y.length - x.length)[0];
+    queries.push(...(nocQ ? [`${nocQ} ${longest}`] : []), longest);
+  }
 
   const found = new Map<string, ISSFAthlete>();
   for (const q of queries) {

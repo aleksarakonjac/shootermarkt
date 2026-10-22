@@ -12,6 +12,7 @@ export interface ShooterRow {
   id: number;
   firstName: string;
   lastName: string;
+  matchedLastName?: string | null;
   nationality: string | null;
   countryName: string | null;
   verified: boolean;
@@ -268,7 +269,7 @@ export function StrelciClient({ data, page, total, unverifiedTotal, pageSize }: 
                   <ShooterThumbnail shooter={s} />
                   <div className="min-w-0 flex-1">
                     <a href={`/admin/strelci/${s.id}`} className="block py-0.5 text-sm font-semibold leading-snug text-[var(--ink)]">
-                      {s.lastName} {s.firstName}
+                      {s.lastName}{s.matchedLastName ? ` (${s.matchedLastName})` : ""} {s.firstName}
                       {s.createdBySelf && (
                         <span className="ml-2 rounded px-1.5 py-0.5 text-[0.65rem] font-semibold" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}>self</span>
                       )}
@@ -349,7 +350,7 @@ export function StrelciClient({ data, page, total, unverifiedTotal, pageSize }: 
                   </td>
                   <td className="px-4 py-3 font-medium text-[var(--ink)]">
                     <a href={`/admin/strelci/${s.id}`} className="hover:text-[var(--brand-primary)] transition-colors">
-                      {s.lastName} {s.firstName}
+                      {s.lastName}{s.matchedLastName ? ` (${s.matchedLastName})` : ""} {s.firstName}
                     </a>
                     {s.createdBySelf && (
                       <span className="ml-2 text-[0.65rem] font-semibold px-1.5 py-0.5 rounded" style={{ background: "var(--brand-primary-light)", color: "var(--brand-primary)" }}>

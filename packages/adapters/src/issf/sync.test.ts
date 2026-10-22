@@ -25,6 +25,13 @@ describe("rankMatch", () => {
     expect(rankMatch("Ana", "Petrović", issf("Ana Marija", "PETROVIC"))).toBe("close");
   });
 
+  it("multi-word names split differently between source and ISSF", () => {
+    expect(rankMatch("Mohammed", "Al-Harbi", issf("Mohammed Al", "Harbi"))).toBe("exact");
+    expect(rankMatch("Mohammed", "Al Harbi", issf("Mohammed", "Alharbi"))).toBe("exact");
+    expect(rankMatch("Mohammed", "Al-Harbi", issf("Mohammed Ali", "Al Harbi"))).toBe("close");
+    expect(rankMatch("Mohammed", "Al-Harbi", issf("Ahmed", "Al Mutairi"))).toBe("weak");
+  });
+
   it("weak when last name differs or first name is someone else", () => {
     expect(rankMatch("Aleksa", "Rakonjac", issf("Aleksa", "RAKIC"))).toBe("weak");
     expect(rankMatch("Aleksa", "Rakonjac", issf("Radomir", "RAKONJAC"))).toBe("weak");

@@ -15,10 +15,14 @@ export type BulkRow = {
   level: string;
   eventType: string;
   tags: string[];
+  focusPriority: number | null;
+  /** Podrazumevani prioritet kad je override prazan */
+  autoPriority: number;
   matches: BulkMatch[];
 };
 
-type CompDraft = { level?: string; eventType?: string; tags?: string };
+type CompDraft = { level?: string; eventType?: string; tags?: string; priority?: string };
+const priorityText = (p: number | null) => (p == null ? "" : String(p));
 const matchKey = (compId: number, m: BulkMatch) => `${compId}|${m.disciplineId}|${m.category}`;
 const parseTags = (s: string) => [...new Set(s.split(",").map((t) => t.trim()).filter(Boolean))];
 
@@ -29,6 +33,8 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
   const router = useRouter();
   const [comps, setComps] = useState<Record<number, CompDraft>>({});
   const [matches, setMatches] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkPriority, setBulkPriority] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -36,10 +42,13 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
   const compChanges = rows.flatMap((r) => {
     const d = comps[r.id];
     if (!d) return [];
-    const change: { id: number; level?: string; eventType?: string; tags?: string[] } = { id: r.id };
+    const change: { id: number; level?: string; eventType?: string; tags?: string[]; focusPriority?: number | null } = { id: r.id };
     if (d.level !== undefined && d.level !== r.level) change.level = d.level;
     if (d.eventType !== undefined && d.eventType !== r.eventType) change.eventType = d.eventType;
     if (d.tags !== undefined && parseTags(d.tags).join(",") !== r.tags.join(",")) change.tags = parseTags(d.tags);
+    if (d.priority !== undefined && d.priority.trim() !== priorityText(r.focusPriority)) {
+      change.focusPriority = d.priority.trim() === "" ? null : Number(d.priority);
+    }
     return Object.keys(change).length > 1 ? [change] : [];
   });
   const matchChanges = rows.flatMap((r) =>
@@ -56,6 +65,12 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+
+  const toggle = (id: number) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const applyBulkPriority = (value: string) => {
+    for (const id of selected) setComps((prev) => ({ ...prev, [id]: { ...prev[id], priority: value } }));
+  };
+  const bulkPriorityValid = /^\d{1,2}$/.test(bulkPriority.trim()) && Number(bulkPriority) <= 20;
 
   const setComp = (id: number, patch: CompDraft) => setComps((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
 
@@ -75,7 +90,7 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
       }
       setComps({});
       setMatches({});
-      setMessage({ ok: true, text: `Sačuvano ${json.updated} izmena; forma je preračunata.` });
+      setMessage({ ok: true, text: `Sačuvano ${json.updated} izmena.` });
       router.refresh();
     } finally {
       setSaving(false);
@@ -91,11 +106,42 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
       <datalist id="bulk-tag-options">
         {TAG_OPTIONS.map((t) => <option key={t.value} value={t.value} />)}
       </datalist>
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
+        <span className="text-[var(--muted)]">Izabrano: {selected.size}</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={20}
+          step={1}
+          aria-label="Prioritet za izabrana takmičenja"
+          value={bulkPriority}
+          onChange={(e) => setBulkPriority(e.target.value)}
+          placeholder="Prioritet 0–20"
+          className="w-36 rounded border border-[var(--border)] bg-[var(--bg)] px-2 py-1 text-sm"
+        />
+        <button type="button" disabled={!selected.size || !bulkPriorityValid} onClick={() => applyBulkPriority(String(Number(bulkPriority)))} className="rounded-md border border-[var(--border-strong)] px-3 py-1 font-semibold text-[var(--ink)] hover:bg-[var(--bg)] disabled:opacity-40">
+          Postavi izabranima
+        </button>
+        <button type="button" disabled={!selected.size} onClick={() => applyBulkPriority("")} className="rounded-md border border-[var(--border-strong)] px-3 py-1 font-semibold text-[var(--ink)] hover:bg-[var(--bg)] disabled:opacity-40">
+          Vrati na auto
+        </button>
+        <span className="text-xs text-[var(--subtle)]">Manji broj = važnije (0 je vrh). Izmene se upisuju tek na „Sačuvaj“.</span>
+      </div>
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
-        <table className="w-full min-w-[960px] text-sm">
+        <table className="w-full min-w-[1100px] text-sm">
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--surface)] text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
+              <th className="w-8 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  aria-label="Izaberi sve prikazane"
+                  checked={selected.size === rows.length}
+                  onChange={(e) => setSelected(e.target.checked ? new Set(rows.map((r) => r.id)) : new Set())}
+                />
+              </th>
               <th className="px-3 py-2.5">Takmičenje</th>
+              <th className="w-24 px-3 py-2.5">Prioritet</th>
               <th className="w-36 px-3 py-2.5">Nivo</th>
               <th className="w-40 px-3 py-2.5">Tip</th>
               <th className="w-44 px-3 py-2.5">Tagovi</th>
@@ -108,11 +154,29 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
               const level = d.level ?? r.level;
               const eventType = d.eventType ?? r.eventType;
               const tags = d.tags ?? r.tags.join(", ");
+              const priority = d.priority ?? priorityText(r.focusPriority);
               return (
                 <tr key={r.id} className="align-top">
                   <td className="px-3 py-2.5">
+                    <input type="checkbox" aria-label={`Izaberi: ${r.name}`} checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
+                  </td>
+                  <td className="px-3 py-2.5">
                     <a href={`/admin/takmicenja/${r.id}/edit`} className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)]">{r.name}</a>
                     <div className="mt-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] text-[var(--subtle)]">{formatDateRangeSr(r.date, null)} · #{r.id}</div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={20}
+                      step={1}
+                      aria-label={`Prioritet: ${r.name}`}
+                      value={priority}
+                      onChange={(e) => setComp(r.id, { priority: e.target.value })}
+                      placeholder={`Auto (${r.autoPriority})`}
+                      className={`${selectCls} ${priority.trim() !== priorityText(r.focusPriority) ? changedCls : "border-[var(--border)]"}`}
+                    />
                   </td>
                   <td className="px-3 py-2.5">
                     <select aria-label={`Nivo: ${r.name}`} value={level} onChange={(e) => setComp(r.id, { level: e.target.value })} className={`${selectCls} ${level !== r.level ? changedCls : "border-[var(--border)]"}`}>

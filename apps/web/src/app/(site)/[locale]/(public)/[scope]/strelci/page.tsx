@@ -9,6 +9,7 @@ import { eq, asc, ilike, or, and, isNotNull, inArray, sql, desc, gte } from "dri
 import type { SQL } from "drizzle-orm";
 import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
+import { matchedPreviousLastName, previousLastNameLike } from "@/lib/previous-last-name";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { StrelciFilterBar } from "./StrelciFilterBar";
 import { StrelciTableTransition } from "./StrelciTableTransition";
@@ -193,7 +194,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
             .split(/\s+/)
             .filter(Boolean)
             .map((word) =>
-              or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`))
+              or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`), previousLastNameLike(shooters.previousLastNames, `%${word}%`))
             )
         )
       : undefined,
@@ -219,6 +220,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
         id:          shooters.id,
         firstName:   shooters.firstName,
         lastName:    shooters.lastName,
+        previousLastNames: shooters.previousLastNames,
         birthYear:   shooters.birthYear,
         gender:      shooters.gender,
         verified:    shooters.verified,
@@ -330,7 +332,11 @@ export default async function StrelciPage({ params, searchParams }: Props) {
     }
   }
 
-  const enrichedData = data.map((s) => ({ ...s, resultCount: pageCacheMap.get(s.id) ?? 0 }));
+  const enrichedData = data.map((s) => ({
+    ...s,
+    resultCount: pageCacheMap.get(s.id) ?? 0,
+    prevMatch: activeQ ? matchedPreviousLastName(activeQ, s.firstName, s.lastName, s.previousLastNames) : null,
+  }));
 
   // Forma leaders — cache already ordered by (disc, forma desc), slice top 3 per disc
   const top3ByDisc: Record<string, FormaEntry[]> = { ARM: [], ARW: [], APM: [], APW: [] };
@@ -591,7 +597,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                             href={`/strelci/${s.id}`}
                             className="block min-w-0 font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors leading-tight"
                           >
-                            <span className="block truncate sm:hidden">{s.lastName}</span>
+                            <span className="block truncate sm:hidden">{s.lastName}{s.prevMatch ? ` (${s.prevMatch})` : ""}</span>
                             <span className="flex min-w-0 items-center gap-1 sm:hidden">
                               <span className="truncate">{s.firstName}</span>
                               {s.nationality && (
@@ -601,7 +607,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                                 </span>
                               )}
                             </span>
-                            <span className="hidden truncate sm:block">{s.lastName} {s.firstName}</span>
+                            <span className="hidden truncate sm:block">{s.lastName}{s.prevMatch ? ` (${s.prevMatch})` : ""} {s.firstName}</span>
                           </ScopedLink>
                           {s.nationality && (
                             <span className="hidden shrink-0 items-center gap-1 sm:inline-flex sm:self-center">

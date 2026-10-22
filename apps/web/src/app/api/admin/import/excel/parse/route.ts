@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   const [allClubs, allShooters] = await Promise.all([
     db.select().from(clubs),
-    db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality }).from(shooters),
+    db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality }).from(shooters),
   ]);
 
   const rows = parsed.rows.map((row) => {

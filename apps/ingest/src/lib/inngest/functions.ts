@@ -277,7 +277,7 @@ export const processIssfDirectImport = inngest.createFunction(
     }
 
     const allShooters = await db
-      .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality })
+      .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality })
       .from(shooters);
 
     const rows: ReviewRow[] = [];

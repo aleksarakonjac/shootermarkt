@@ -46,6 +46,7 @@ export type MatchCandidate = {
   id: number;
   firstName: string;
   lastName: string;
+  previousLastNames?: string[] | null;
   nationality?: string | null;
 };
 
@@ -56,7 +57,7 @@ export type MatchResult =
 
 /**
  * Nađi poklapanje za strelca iz biltena među postojećima.
- * - exact:      isti fold-ključ + kompatibilna nacija → auto-poveži
+ * - exact:      isti fold-ključ (trenutno ili ranije prezime) + kompatibilna nacija → auto-poveži
  * - suggestion: isto prezime (fold), ime blizu (edit ≤ 2) → admin potvrđuje
  * - none:       novi strelac
  */
@@ -71,16 +72,17 @@ export function matchShooter(
   const nocOk = (c: MatchCandidate) =>
     !c.nationality || !noc || c.nationality === noc || noc === "SRB" || noc === "AIN";
 
+  const lastMatches = (c: MatchCandidate) =>
+    foldName(c.lastName) === fLast || !!c.previousLastNames?.some((p) => foldName(p) === fLast);
+
   // 1. Exact fold-ključ
-  const exact = existing.find(
-    (c) => foldName(c.lastName) === fLast && foldName(c.firstName) === fFirst && nocOk(c)
-  );
+  const exact = existing.find((c) => lastMatches(c) && foldName(c.firstName) === fFirst && nocOk(c));
   if (exact) return { kind: "exact", id: exact.id };
 
   // 2. Fuzzy: isto prezime, ime blizu
   let best: { c: MatchCandidate; d: number } | null = null;
   for (const c of existing) {
-    if (foldName(c.lastName) !== fLast || !nocOk(c)) continue;
+    if (!lastMatches(c) || !nocOk(c)) continue;
     const d = editDistance(fFirst, foldName(c.firstName));
     if (d <= 2 && (!best || d < best.d)) best = { c, d };
   }

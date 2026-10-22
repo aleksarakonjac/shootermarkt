@@ -4,6 +4,7 @@ import { eq, and, isNotNull, sql, asc, desc } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildShootersWhere } from "@/lib/admin-shooters-filter";
+import { matchedPreviousLastName } from "@/lib/previous-last-name";
 import { StrelciClient } from "./strelci-client";
 import { StrelciFilters } from "./strelci-filters";
 
@@ -43,6 +44,7 @@ export default async function AdminStrelciPage({
         id: shooters.id,
         firstName: shooters.firstName,
         lastName: shooters.lastName,
+        previousLastNames: shooters.previousLastNames,
         nationality: shooters.nationality,
         countryName: countries.name,
         verified: shooters.verified,
@@ -119,7 +121,10 @@ export default async function AdminStrelciPage({
       </div>
 
       <StrelciClient
-        data={data}
+        data={data.map(({ previousLastNames, ...s }) => ({
+          ...s,
+          matchedLastName: sp.q ? matchedPreviousLastName(sp.q, s.firstName, s.lastName, previousLastNames) : null,
+        }))}
         page={page}
         total={total}
         unverifiedTotal={unverifiedTotal}

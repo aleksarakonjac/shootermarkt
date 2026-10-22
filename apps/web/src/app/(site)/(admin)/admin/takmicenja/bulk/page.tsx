@@ -4,6 +4,7 @@ import { and, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { BulkEditor, type BulkRow } from "./bulk-editor";
+import { defaultFocusPriority } from "@/lib/competition-priority";
 
 export const metadata: Metadata = { title: "Admin · Takmičenja · Bulk izmena" };
 
@@ -23,6 +24,8 @@ export default async function BulkTakmicenjaPage({ searchParams }: { searchParam
       level: competitions.level,
       eventType: competitions.eventType,
       tags: competitions.tags,
+      ageCategory: competitions.ageCategory,
+      focusPriority: competitions.focusPriority,
     })
     .from(competitions)
     .where(and(
@@ -48,12 +51,14 @@ export default async function BulkTakmicenjaPage({ searchParams }: { searchParam
         .orderBy(disciplines.code, results.category)
     : [];
 
-  const rows: BulkRow[] = comps.map((c) => ({
-    ...c,
-    matches: matchRows
-      .filter((m) => m.competitionId === c.id)
-      .map(({ disciplineId, code, category, count }) => ({ disciplineId, code, category, count })),
-  }));
+  const rows: BulkRow[] = comps.map(({ ageCategory, ...c }) => {
+    const compMatches = matchRows.filter((m) => m.competitionId === c.id);
+    return {
+      ...c,
+      autoPriority: defaultFocusPriority({ name: c.name, level: c.level, eventType: c.eventType, ageCategory }, compMatches.map((m) => m.category)),
+      matches: compMatches.map(({ disciplineId, code, category, count }) => ({ disciplineId, code, category, count })),
+    };
+  });
 
   return (
     <div>
@@ -67,7 +72,7 @@ export default async function BulkTakmicenjaPage({ searchParams }: { searchParam
             Bulk izmena
           </h1>
           <p className="mt-0.5 text-sm text-[var(--muted)]">
-            Nivo, tip i tagovi po takmičenju; kategorija po meču. Izmene se čuvaju zajedno, a forma se preračunava.
+            Nivo, tip, tagovi i prioritet po takmičenju (možeš izabrati više redova i postaviti prioritet odjednom); kategorija po meču. Izmene se čuvaju zajedno, a forma se preračunava.
           </p>
         </div>
         <form className="flex flex-wrap items-center gap-2 text-sm">

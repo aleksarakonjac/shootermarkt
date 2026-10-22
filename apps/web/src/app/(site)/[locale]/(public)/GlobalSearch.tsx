@@ -312,6 +312,7 @@ export type SearchShooter = {
   id: number;
   firstName: string;
   lastName: string;
+  matchedLastName?: string | null;
   clubName: string | null;
   avatarUrl: string | null;
 };
@@ -735,7 +736,7 @@ export function GlobalSearch() {
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-[var(--ink)] truncate">
-                            {s.lastName} {s.firstName}
+                            {s.lastName}{s.matchedLastName ? ` (${s.matchedLastName})` : ""} {s.firstName}
                           </p>
                         </div>
                         {active && <ArrowIcon />}

@@ -1,0 +1,1 @@
+ALTER TABLE "shooters" ADD COLUMN "issf_reviewed_at" timestamp;

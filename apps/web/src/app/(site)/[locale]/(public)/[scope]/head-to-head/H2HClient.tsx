@@ -159,7 +159,7 @@ function ShooterInlineSearch({
                   >
                     {sa2 && <span className={`fi fi-${sa2.toLowerCase()} shrink-0`} style={{ width: "14px", height: "10px", borderRadius: "2px", display: "inline-block" }} aria-hidden="true" />}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-[var(--ink)]">{s.lastName} {s.firstName}</span>
+                      <span className="block truncate font-medium text-[var(--ink)]">{s.lastName}{s.matchedLastName ? ` (${s.matchedLastName})` : ""} {s.firstName}</span>
                     </span>
                   </li>
                 );

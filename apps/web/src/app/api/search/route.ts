@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, ilike, inArray, or } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { clubs, competitions, shooters } from "@shootermarkt/db/schema";
+import { matchedPreviousLastName, previousLastNameLike } from "@/lib/previous-last-name";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { buildCompetitionScopeFilter, DEFAULT_SCOPE, type Scope, VALID_SCOPES } from "@/lib/scope";
 
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
   const shooterMatches = terms.map((term) => or(
     ilike(shooters.firstName, `${term}%`),
     ilike(shooters.lastName, `${term}%`),
+    previousLastNameLike(shooters.previousLastNames, `${term}%`),
   ));
   const competitionMatches = terms.map((term) => or(
     ilike(competitions.name, `${term}%`),
@@ -30,7 +32,7 @@ export async function GET(request: NextRequest) {
   ));
 
   const shooterQuery = db
-    .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, avatarUrl: shooters.avatarUrl })
+    .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, clubName: clubs.name, avatarUrl: shooters.avatarUrl })
     .from(shooters)
     .leftJoin(clubs, eq(shooters.clubId, clubs.id))
     .where(and(eq(shooters.verified, true), inArray(shooters.apparatus, [...MVP_APPARATUS]), ...shooterMatches))
@@ -50,7 +52,10 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    shooters: shooterRows,
+    shooters: shooterRows.map(({ previousLastNames, ...s }) => ({
+      ...s,
+      matchedLastName: matchedPreviousLastName(q, s.firstName, s.lastName, previousLastNames),
+    })),
     competitions: competitionRows.map((competition) => ({
       id: competition.id,
       name: locale === "en" ? (competition.nameEn ?? competition.name) : (competition.nameSr ?? competition.name),

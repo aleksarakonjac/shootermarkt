@@ -8,7 +8,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
   const [bilten, allClubs, allShooters] = await Promise.all([
     parsePdfWithGemini(pdfBuffer),
     db.select().from(clubs),
-    db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality, clubId: shooters.clubId }).from(shooters),
+    db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality, clubId: shooters.clubId }).from(shooters),
   ]);
   const rows: ReviewRow[] = [];
   const skippedDisciplines = new Set<string>();

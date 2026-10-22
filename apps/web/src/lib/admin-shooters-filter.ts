@@ -1,5 +1,6 @@
 import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { shooters } from "@shootermarkt/db/schema";
+import { previousLastNameLike } from "./previous-last-name";
 
 /** Filter params shared by the admin shooters list and its bulk actions. */
 export type ShooterFilterParams = Partial<Record<"q" | "nat" | "gender" | "apparatus" | "verified", string>>;
@@ -11,7 +12,7 @@ export function buildShootersWhere(sp: ShooterFilterParams) {
   const apparatus = sp.apparatus?.trim() ?? "";
   return and(
     q
-      ? and(...q.split(/\s+/).filter(Boolean).map((word) => or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`))))
+      ? and(...q.split(/\s+/).filter(Boolean).map((word) => or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`), previousLastNameLike(shooters.previousLastNames, `%${word}%`))))
       : undefined,
     nat ? eq(shooters.nationality, nat) : undefined,
     gender ? eq(shooters.gender, gender) : undefined,

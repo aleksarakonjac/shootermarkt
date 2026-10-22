@@ -312,6 +312,8 @@ export const shooters = pgTable(
     id: serial("id").primaryKey(),
     firstName: varchar("first_name", { length: 100 }).notNull(),
     lastName: varchar("last_name", { length: 100 }).notNull(),
+    // Ranija prezimena (npr. devojačko) — matchShooter ih tretira kao isto lice
+    previousLastNames: text("previous_last_names").array(),
     birthYear: smallint("birth_year"),
     birthDate: date("birth_date"),
     apparatus: varchar("apparatus", { length: 10 }),
@@ -329,6 +331,8 @@ export const shooters = pgTable(
     siusAthleteId: varchar("sius_athlete_id", { length: 50 }).unique(),
     // Last ISSF refresh attempt (profile fill or name auto-link); NULL = never
     issfSyncedAt: timestamp("issf_synced_at"),
+    // Admin pregledao nepovezanog strelca i odlučio da ostane bez ISSF profila; NULL = nije pregledan
+    issfReviewedAt: timestamp("issf_reviewed_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [

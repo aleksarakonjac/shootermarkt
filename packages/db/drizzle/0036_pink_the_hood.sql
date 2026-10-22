@@ -1,0 +1,1 @@
+ALTER TABLE "shooters" ADD COLUMN "previous_last_names" text[];

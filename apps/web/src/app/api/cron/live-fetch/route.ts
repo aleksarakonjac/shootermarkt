@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
       id: shooters.id,
       firstName: shooters.firstName,
       lastName: shooters.lastName,
+      previousLastNames: shooters.previousLastNames,
       nationality: shooters.nationality,
       issfId: shooters.issfId,
     })
@@ -100,7 +101,7 @@ export async function GET(req: NextRequest) {
 async function processCompetition(
   competitionId: number,
   slots: Array<{ competitionId: number; disciplineId: number; stage: string; category: AgeCategory; issfId: string | null; siusId: string | null; disciplineCode: string }>,
-  allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>,
+  allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; nationality: string | null; issfId: string | null }>,
   shooterByIssfId: Map<string, number>
 ): Promise<number> {
   const { siusId, issfId } = slots[0];
@@ -306,7 +307,7 @@ async function processMixedTeamSlots(
   siusId: string | null,
   issfId: string | null,
   mixedSlots: Array<{ disciplineId: number; stage: string; disciplineCode: string; category: AgeCategory }>,
-  allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>,
+  allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; nationality: string | null; issfId: string | null }>,
   shooterByIssfId: Map<string, number>
 ): Promise<number> {
   // SIUS vodi juniorski mixed team kao poseban događaj (APMTJ); druge mlađe kategorije za mixed ne postoje.
@@ -425,7 +426,7 @@ async function processMixedTeamSlots(
 
 async function resolveOrCreateShooter(
   r: { firstName: string; lastName: string; nation?: string; siusAthleteId?: string | null },
-  allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>
+  allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; nationality: string | null; issfId: string | null }>
 ): Promise<number | null> {
   const match = matchShooter(r.firstName, r.lastName, r.nation ?? null, allShooters);
   if (match.kind === "exact") return match.id;
@@ -459,7 +460,7 @@ async function fetchMixedTeamFromIssf(
   issfCompId: number,
   slots: Array<{ disciplineCode: string; stage: string; disciplineId: number; category: AgeCategory }>,
   competitionId: number,
-  allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>,
+  allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; nationality: string | null; issfId: string | null }>,
   shooterByIssfId: Map<string, number>,
   rows: Array<typeof mixedTeamResults.$inferInsert>
 ) {
@@ -568,7 +569,7 @@ async function fetchFromIssf(
   issfCompId: number,
   slots: Array<{ disciplineCode: string; stage: string; disciplineId: number; category: AgeCategory }>,
   competitionId: number,
-  allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>,
+  allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; nationality: string | null; issfId: string | null }>,
   shooterByIssfId: Map<string, number>,
   rows: Array<typeof results.$inferInsert>
 ) {

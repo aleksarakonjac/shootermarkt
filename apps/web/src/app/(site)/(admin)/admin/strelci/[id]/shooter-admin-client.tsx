@@ -14,6 +14,7 @@ interface ShooterData {
   id: number;
   firstName: string;
   lastName: string;
+  previousLastNames: string[];
   nationality: string;
   countryName: string | null;
   gender: string;
@@ -85,6 +86,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
   const [form, setForm] = useState({
     firstName: shooter.firstName,
     lastName: shooter.lastName,
+    previousLastNames: shooter.previousLastNames.join(", "),
     nationality: shooter.nationality,
     gender: shooter.gender,
     birthDate: shooter.birthDate ?? "",
@@ -95,6 +97,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
   const dirty =
     form.firstName !== shooter.firstName ||
     form.lastName !== shooter.lastName ||
+    form.previousLastNames !== shooter.previousLastNames.join(", ") ||
     form.nationality !== shooter.nationality ||
     form.gender !== shooter.gender ||
     form.birthDate !== (shooter.birthDate ?? "") ||
@@ -131,6 +134,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
         body: JSON.stringify({
           firstName: form.firstName,
           lastName: form.lastName,
+          previousLastNames: form.previousLastNames.split(",").map((n) => n.trim()).filter(Boolean),
           nationality: form.nationality || null,
           gender: form.gender || null,
           birthDate: form.birthDate || null,
@@ -362,6 +366,15 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
             />
           </div>
           <div>
+            <label className="block text-xs font-semibold text-[var(--ink)] mb-1.5">Ranija prezimena</label>
+            <input
+              value={form.previousLastNames}
+              onChange={field("previousLastNames")}
+              placeholder="npr. Havran (odvojeno zarezom)"
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-1 focus:ring-[var(--brand-primary)] transition-colors"
+            />
+          </div>
+          <div>
             <label className="block text-xs font-semibold text-[var(--ink)] mb-1.5">Pol</label>
             <GenderDropdown value={form.gender} onChange={(v) => setField("gender", v)} />
           </div>
@@ -414,6 +427,7 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
               onClick={() => setForm({
                 firstName: shooter.firstName,
                 lastName: shooter.lastName,
+                previousLastNames: shooter.previousLastNames.join(", "),
                 nationality: shooter.nationality,
                 gender: shooter.gender,
                 birthDate: shooter.birthDate ?? "",
