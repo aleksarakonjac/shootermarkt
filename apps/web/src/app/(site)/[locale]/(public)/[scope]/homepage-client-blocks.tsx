@@ -29,11 +29,11 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
   const place = (entry: ResultPlace, index: number) => {
     const lead = index === 0;
     const value = score(entry);
-    return <span key={index} className="inline-flex items-center gap-1 whitespace-nowrap">
-      <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--muted)] tabular-nums"}>{index + 1}.</span>
-      <span className={lead ? "text-sm font-semibold text-[var(--ink)]" : "text-[13px] text-[var(--muted)]"}>{entry.firstName ? `${entry.lastName} ${entry.firstName.charAt(0)}.` : entry.lastName}{entry.rpo && <span title="RPO" aria-label="RPO">*</span>}</span>
+    return <span key={index} className={`inline-flex items-center gap-1 whitespace-nowrap ${lead ? "min-w-0" : ""}`}>
+      <span className={lead ? "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[13px] sm:text-sm font-bold text-[var(--ink)] tabular-nums" : "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs sm:text-sm font-semibold text-[var(--muted)] tabular-nums"}>{index + 1}.</span>
+      <span className={lead ? "min-w-0 truncate text-[13px] sm:text-sm font-semibold text-[var(--ink)]" : "text-xs sm:text-[13px] text-[var(--muted)]"}>{entry.firstName ? `${entry.lastName} ${entry.firstName.charAt(0)}.` : entry.lastName}{entry.rpo && <span title="RPO" aria-label="RPO">*</span>}</span>
       {renderAff(entry)}
-      {value != null && <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--muted)] tabular-nums"}>{value.toFixed(decimals)}</span>}
+      {value != null && <span className={lead ? "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[13px] sm:text-sm font-bold text-[var(--ink)] tabular-nums" : "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs sm:text-sm font-semibold text-[var(--muted)] tabular-nums"}>{value.toFixed(decimals)}</span>}
     </span>;
   };
 
@@ -63,13 +63,13 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
   const secondRow = singleRow ? [] : useFallback ? entries.slice(2) : entries.slice(1);
   return <div ref={containerRef} className="relative overflow-clip">
     <div className="flex items-center">
-      <ScopedLink href={href} className={`flex min-w-0 items-center gap-x-3 gap-y-1 no-underline hover:opacity-80 transition-opacity ${singleRow ? "flex-nowrap" : "flex-wrap"}`}>{prefix}{firstRow.map(place)}</ScopedLink>
+      <ScopedLink href={href} className="flex min-w-0 flex-nowrap items-center gap-x-2 sm:gap-x-3 no-underline hover:opacity-80 transition-opacity">{prefix}{firstRow.map(place)}</ScopedLink>
       {toggle}
     </div>
     {secondRow.length > 0 && (
       <div className={`grid transition-[grid-template-rows] duration-200 ease-[var(--ease-out)] motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
         <div className={`overflow-hidden ${collapsed ? "[contain:inline-size]" : ""}`}>
-          <ScopedLink href={href} tabIndex={collapsed ? -1 : undefined} className={`mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 no-underline hover:opacity-80 transition-opacity duration-150 motion-reduce:transition-none ${collapsed ? "opacity-0" : "opacity-100 delay-75"}`}>
+          <ScopedLink href={href} tabIndex={collapsed ? -1 : undefined} className={`mt-1 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 no-underline hover:opacity-80 transition-opacity duration-150 motion-reduce:transition-none ${collapsed ? "opacity-0" : "opacity-100 delay-75"}`}>
             {secondRow.map((entry, index) => place(entry, useFallback ? index + 2 : index + 1))}
           </ScopedLink>
         </div>
@@ -301,7 +301,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
       return (
         <span className="shrink-0 flex items-center gap-0.5">
           {e.countryCode2 && <span className={`fi fi-${e.countryCode2.toLowerCase()}`} style={{ fontSize: 11 }} aria-hidden="true" />}
-          <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--muted)]">{e.nationality}</span>
+          <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] sm:text-xs font-bold text-[var(--muted)]">{e.nationality}</span>
         </span>
       );
     };
@@ -456,11 +456,16 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   <span className="hidden sm:block shrink-0 text-[11px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={rowLevelStyle}>
                     {rowLevelLabel}
                   </span>
-                  <span className="min-w-0 text-sm font-semibold text-[var(--ink)] truncate">
-                    {name}
+                  {/* Mobilni: naziv u prvom redu, mesto + datum u drugom; sm+: sve u jednom redu. */}
+                  <span className="flex flex-1 min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                    <span className="min-w-0 text-sm font-semibold text-[var(--ink)] truncate">
+                      {name}
+                    </span>
+                    <span className="flex min-w-0 items-center gap-3 sm:contents">
+                      <CompetitionPlace location={item.location} countryCode2={item.countryCode2} nocCode={item.nocCode} className="min-w-0 shrink sm:max-w-[16rem]" />
+                      <span className="ml-auto shrink-0 whitespace-nowrap text-xs font-semibold tabular-nums text-[var(--muted)]">{formatCompetitionDate(item.date, item.dateEnd)}</span>
+                    </span>
                   </span>
-                  <CompetitionPlace location={item.location} countryCode2={item.countryCode2} nocCode={item.nocCode} className="min-w-0 shrink max-w-[45%] sm:max-w-[16rem]" />
-                  <span className="ml-auto shrink-0 whitespace-nowrap text-xs font-semibold tabular-nums text-[var(--muted)]">{formatCompetitionDate(item.date, item.dateEnd)}</span>
                   <svg
                     width="12" height="12" viewBox="0 0 12 12"
                     className={`shrink-0 text-[var(--muted)] transition-transform duration-200 ease-[var(--ease-out)] motion-reduce:transition-none ${isExpanded ? "rotate-180" : ""}`}
