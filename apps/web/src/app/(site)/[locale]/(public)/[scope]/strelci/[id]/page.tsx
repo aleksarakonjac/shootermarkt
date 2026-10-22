@@ -26,7 +26,8 @@ type Props = { params: Promise<{ id: string; scope: Scope }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id, scope } = await params;
   const [shooter, locale] = await Promise.all([
-    db.query.shooters.findFirst({ where: eq(shooters.id, parseInt(id)) }),
+    // Nenumerički id (npr. /strelci/abc) ide pravo na "nije pronađen" umesto greške u upitu.
+    /^\d{1,9}$/.test(id) ? db.query.shooters.findFirst({ where: eq(shooters.id, parseInt(id)) }) : undefined,
     getLocale(),
   ]);
   const alternates = buildAlternates(locale, scope, `/strelci/${id}`);
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const t = await getTranslations("shooters.profile");
     return { title: t("notFound"), alternates };
   }
-  return { title: `${shooter.lastName} ${shooter.firstName} — Shootermarkt`, alternates };
+  return { title: `${shooter.lastName} ${shooter.firstName}`, alternates };
 }
 
 export default async function ShooterPage({ params }: Props) {
@@ -44,7 +45,7 @@ export default async function ShooterPage({ params }: Props) {
 
   const { id } = await params;
   const shooterId = parseInt(id);
-  if (isNaN(shooterId)) notFound();
+  if (!/^\d{1,9}$/.test(id)) notFound();
 
   const shooter = await db.query.shooters.findFirst({
     where: eq(shooters.id, shooterId),

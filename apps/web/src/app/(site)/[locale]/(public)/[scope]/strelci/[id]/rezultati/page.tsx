@@ -16,19 +16,19 @@ type Props = { params: Promise<{ id: string; scope: Scope }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id, scope } = await params;
   const [shooter, locale] = await Promise.all([
-    db.query.shooters.findFirst({ where: eq(shooters.id, Number(id)) }),
+    /^\d{1,9}$/.test(id) ? db.query.shooters.findFirst({ where: eq(shooters.id, Number(id)) }) : undefined,
     getLocale(),
   ]);
   const alternates = buildAlternates(locale, scope, `/strelci/${id}/rezultati`);
   const resultsTitle = locale === "en" ? "Results" : "Rezultati";
   if (!shooter) return { title: resultsTitle, alternates };
-  return { title: `${shooter.lastName} ${shooter.firstName} — ${resultsTitle} | Shootermarkt`, alternates };
+  return { title: `${shooter.lastName} ${shooter.firstName} — ${resultsTitle}`, alternates };
 }
 
 export default async function ShooterResultsPage({ params }: Props) {
   const { id } = await params;
   const shooterId = Number(id);
-  if (!Number.isInteger(shooterId) || shooterId < 1) notFound();
+  if (!/^\d{1,9}$/.test(id)) notFound();
 
   const [shooter, initialPage, locale, t, tProfile] = await Promise.all([
     db.query.shooters.findFirst({ where: eq(shooters.id, shooterId), with: { club: true } }),

@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { scope } = await params;
   const locale = await getLocale();
   return {
-    title: (locale === "en" ? "Direct Comparison" : "Direktno poređenje") + " — Shootermarkt",
+    title: locale === "en" ? "Direct Comparison" : "Direktno poređenje",
     alternates: buildAlternates(locale, scope, "/head-to-head"),
   };
 }

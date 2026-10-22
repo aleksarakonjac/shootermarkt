@@ -9,7 +9,7 @@ type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const s = await db.query.shooters.findFirst({ where: eq(shooters.id, parseInt(id)) });
+  const s = /^\d{1,9}$/.test(id) ? await db.query.shooters.findFirst({ where: eq(shooters.id, parseInt(id)) }) : undefined;
   if (!s) return { title: "Strelac nije pronađen" };
   return { title: `Admin · ${s.lastName} ${s.firstName}` };
 }
@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function AdminShooterPage({ params }: Props) {
   const { id } = await params;
   const shooterId = parseInt(id);
-  if (isNaN(shooterId)) notFound();
+  if (!/^\d{1,9}$/.test(id)) notFound();
 
   const [shooter, allClubs, shooterResults] = await Promise.all([
     db

@@ -36,9 +36,9 @@ type Props = { params: Promise<{ id: string; scope: Scope }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const locale = await getLocale();
   const { id, scope } = await params;
-  const comp = await db.query.competitions.findFirst({
+  const comp = /^\d{1,9}$/.test(id) ? await db.query.competitions.findFirst({
     where: eq(competitions.id, parseInt(id)),
-  });
+  }) : undefined;
   const alternates = buildAlternates(locale, scope, `/takmicenja/${id}`);
   if (!comp) {
     const t = await getTranslations("competition");
@@ -58,7 +58,7 @@ export default async function CompetitionPage({ params }: Props) {
     params,
   ]);
   const compId = parseInt(id);
-  if (isNaN(compId)) notFound();
+  if (!/^\d{1,9}$/.test(id)) notFound();
 
   // Svi upiti zavise samo od compId — idu paralelno umesto jedan za drugim.
   const [comp, compResults, mixedResults, scheduleRows] = await Promise.all([
