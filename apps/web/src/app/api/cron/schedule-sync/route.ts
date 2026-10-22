@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { syncUpcomingSchedules } from "@/lib/schedule-sync";
 
@@ -5,8 +6,10 @@ export const maxDuration = 60;
 
 // Daily (cron-job.org): pulls ISSF schedules for competitions starting within 14 days or in progress.
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
-  if (!secret || secret !== process.env.CRON_SECRET) {
+  const expected = process.env.CRON_SECRET;
+  const secret = req.headers.get("x-cron-secret");
+  // Header only (a secret in the URL ends up in logs); constant-time compare.
+  if (!expected || !secret || secret.length !== expected.length || !timingSafeEqual(Buffer.from(secret), Buffer.from(expected))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const results = await syncUpcomingSchedules();
