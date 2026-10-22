@@ -35,6 +35,13 @@ export const USKORO_LEAD_DAYS: Record<string, number> = {
   olympic:       5,
 };
 
+// ── Rotation timing (ms) ─────────────────────────────────────────────────────
+// Svaka pojedinačna rotacija (detalj unutar takmičenja ili prelaz na drugo takmičenje)
+// traje isto. Takmičenje ostaje na traci dok se ne pokažu svi njegovi detalji.
+const TICKER_STEP_MS = 7000;
+const tickerItemDwellMs = (item: TickerItem) =>
+  Math.max(1, item.detailItems?.length || (item.detailText ? 1 : 0)) * TICKER_STEP_MS;
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 // Competitions starting this soon get pulled into the live cycle instead of waiting in the marquee.
@@ -118,7 +125,7 @@ function LiveDetail({ item, onCurrentChange }: { item: TickerItem; onCurrentChan
     const interval = setInterval(() => {
       setVisible(false);
       setTimeout(() => { setIdx((i) => (i + 1) % items.length); setVisible(true); }, 350);
-    }, 4000);
+    }, TICKER_STEP_MS);
     return () => clearInterval(interval);
   }, [items.length]);
 
@@ -186,7 +193,7 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review, inProgress }
   const textRef = useRef<HTMLSpanElement>(null);
   const segment = segments[Math.min(idx, segments.length - 1)];
   const travelDuration = Math.max(2200, Math.ceil(travelPx / 0.02));
-  const segmentDuration = travelPx > 0 ? travelDuration * 2 + 1200 : 4000;
+  const segmentDuration = travelPx > 0 ? Math.max(TICKER_STEP_MS, travelDuration * 2 + 1200) : TICKER_STEP_MS;
 
   const badgeKeyFor = (s: MobileTickerSegment) =>
     s.item.status === "CUSTOM" ? s.item.label ?? null : s.item.status;
@@ -244,8 +251,8 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review, inProgress }
       <div className="mx-auto flex h-full max-w-7xl items-center gap-2 pl-2 pr-4">
         <div className="flex items-center gap-2 shrink-0" style={{ opacity: badgeVisible ? 1 : 0, transition: "opacity 0.22s ease" }}>
           {isLive && <MobileStatusBadge label={live} live />}
-          {isUpcoming && <MobileStatusBadge label={upcoming.toUpperCase()} />}
-          {isNext && <MobileStatusBadge label={nextLabel.toUpperCase()} next />}
+          {isUpcoming && <MobileStatusBadge label={upcoming.toUpperCase()} next />}
+          {isNext && <MobileStatusBadge label={nextLabel.toUpperCase()} />}
           {isReview && <MobileStatusBadge label={review.toUpperCase()} review />}
           {isNeutral && <MobileStatusBadge label={inProgress.toUpperCase()} neutral />}
           {segment.item.status === "CUSTOM" && segment.item.label && <MobileStatusBadge label={segment.item.label} />}
@@ -278,21 +285,23 @@ function DesktopUpperBar({ items, live, upcoming, nextLabel, review, inProgress,
   const [idx, setIdx]         = useState(0);
   const [visible, setVisible] = useState(true);
 
+  const item = items[Math.min(idx, items.length - 1)];
+  const dwellMs = tickerItemDwellMs(item);
+
   useEffect(() => {
     if (items.length <= 1) return;
-    const interval = setInterval(() => {
+    let swap: ReturnType<typeof setTimeout>;
+    const timer = setTimeout(() => {
       setVisible(false);
-      setTimeout(() => { setIdx((i) => (i + 1) % items.length); setVisible(true); }, 320);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [items.length]);
-
-  const item = items[Math.min(idx, items.length - 1)];
+      swap = setTimeout(() => { setIdx((i) => (i + 1) % items.length); setVisible(true); }, 320);
+    }, dwellMs);
+    return () => { clearTimeout(timer); clearTimeout(swap); };
+  }, [items.length, idx, dwellMs]);
 
   return (
     <div style={{ height: 32, background: "var(--brand-primary)", overflow: "hidden" }} role="status" aria-label={`Ticker: ${item.name}`}>
       <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.32s ease", height: 32 }}>
-        <LiveBarInner item={item} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} inProgress={inProgress} locale={locale} />
+        <LiveBarInner key={item.id} item={item} live={live} upcoming={upcoming} nextLabel={nextLabel} review={review} inProgress={inProgress} locale={locale} />
       </div>
     </div>
   );
@@ -328,8 +337,9 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, loc
       {isUskoro && (
         <span
           className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none"
-          style={{ fontSize: 11, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}
+          style={{ fontSize: 11, letterSpacing: "0.08em", color: "white", background: "rgba(255,255,255,0.24)", height: 20 }}
         >
+          <span className="rounded-full shrink-0" style={{ width: 5, height: 5, background: "white", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />
           {upcoming.toUpperCase()}
         </span>
       )}
@@ -347,8 +357,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, loc
       )}
 
       {isNext && (
-        <span className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "white", background: "rgba(255,255,255,0.24)", height: 20 }}>
-          <span className="rounded-full shrink-0" style={{ width: 5, height: 5, background: "white", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />
+        <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}>
           {nextLabel.toUpperCase()}
         </span>
       )}
@@ -511,8 +520,9 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
         {/* Static label */}
         <span
           className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none"
-          style={{ fontSize: 11, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}
+          style={{ fontSize: 11, letterSpacing: "0.08em", color: "white", background: "rgba(255,255,255,0.24)", height: 20 }}
         >
+          <span className="rounded-full shrink-0" style={{ width: 5, height: 5, background: "white", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />
           {upcoming.toUpperCase()}
         </span>
         <span className="hidden shrink-0 sm:block" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />

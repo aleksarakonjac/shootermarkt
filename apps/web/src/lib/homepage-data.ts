@@ -262,13 +262,15 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
   const live = liveRows.map((competition) => {
     const competitionSlots = slots.filter((slot) => slot.competitionId === competition.id);
     const state = getTickerScheduleState(competitionSlots, now);
-    const tickerStatus = getTickerScheduleStatus(state, now);
+    const scheduleStatus = getTickerScheduleStatus(state, now);
     const activePhase = state.active && `${state.active.discCode} · ${tickerStageLabel(state.active.stage, locale)}`;
     const completedSlots = selectTickerCompletedSlots(
       competitionSlots.filter((slot) => { const end = getTickerSlotEnd(slot); return end != null && end < now; }).sort((a, b) => (getTickerSlotEnd(b)?.getTime() ?? 0) - (getTickerSlotEnd(a)?.getTime() ?? 0)),
       (slot) => topThree(slot) != null,
       (slot) => slot.discCode,
     ).slice(0, 3);
+    // REVIEW ("Rezultati") samo ako ima šta da se pokaže; završena faza bez unetih rezultata je i dalje "U toku".
+    const tickerStatus = scheduleStatus === "REVIEW" && completedSlots.length === 0 ? "NEUTRAL" : scheduleStatus;
     const nextPhase = state.next && `${state.next.discCode} · ${tickerStageLabel(state.next.stage, locale)} · ${formatTickerNextTime(state.next.startTime, now, locale)} (${tickerCountdown(state.next.startTime, now, locale)})`;
     const activeTopThree = topThree(state.active);
     const detailItems = state.active
