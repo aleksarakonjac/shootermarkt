@@ -174,7 +174,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
 
   const teamEntries: MixedTeamEntry[] = [];
   for (const [eventCode, data] of mixedData) {
-    const disciplineCode = splitEventCode(eventCode).code as MixedTeamEntry["disciplineCode"];
+    const { code, category } = splitEventCode(eventCode);
+    const disciplineCode = code as MixedTeamEntry["disciplineCode"];
     if (data.qual.length === 0 && data.final.length === 0) {
       errors.push(`${disciplineCode}: no results`);
       continue;
@@ -195,6 +196,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         nocCode: r.nocCode,
         teamNumber: nextTeamNumber(r.nocCode),
         disciplineCode,
+        category,
         qualRank: r.rank,
         qualTotal: r.rank === null ? null : r.total,
         inners: r.inners,
@@ -235,6 +237,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
           nocCode: r.nocCode,
           teamNumber: nextTeamNumber(r.nocCode),
           disciplineCode,
+          category,
           qualRank: null,
           qualTotal: null,
           inners: null,

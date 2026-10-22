@@ -558,6 +558,8 @@ export const mixedTeamResults = pgTable(
     id: serial("id").primaryKey(),
     competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
     disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
+    // senior and junior mixed team are separate events of the same discipline
+    category: ageCategoryEnum("category").notNull().default("senior"),
     nocCode: varchar("noc_code", { length: 3 }).notNull(),
     // A nation can enter 2 teams (e.g. "China 1", "China 2") — distinguishes them.
     teamNumber: smallint("team_number").notNull().default(1),
@@ -591,7 +593,7 @@ export const mixedTeamResults = pgTable(
   },
   (t) => [
     index("mixed_team_results_comp_idx").on(t.competitionId),
-    uniqueIndex("mixed_team_results_comp_disc_noc_unique").on(t.competitionId, t.disciplineId, t.nocCode, t.teamNumber),
+    uniqueIndex("mixed_team_results_comp_disc_cat_noc_unique").on(t.competitionId, t.disciplineId, t.category, t.nocCode, t.teamNumber),
   ]
 );
 

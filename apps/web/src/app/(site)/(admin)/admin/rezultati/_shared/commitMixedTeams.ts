@@ -7,16 +7,16 @@ export async function commitMixedTeams(competitionId: number, entries: MixedTeam
   let inserted = 0;
   let skipped = 0;
   const errors: string[] = [];
-  const byDiscipline = new Map<string, MixedTeamEntry[]>();
+  const byEvent = new Map<string, MixedTeamEntry[]>();
   for (const entry of entries) {
-    const group = byDiscipline.get(entry.disciplineCode) ?? [];
-    group.push(entry);
-    byDiscipline.set(entry.disciplineCode, group);
+    const key = `${entry.disciplineCode}|${entry.category ?? "senior"}`;
+    byEvent.set(key, [...(byEvent.get(key) ?? []), entry]);
   }
-  for (const [discipline, rows] of byDiscipline) {
+  for (const rows of byEvent.values()) {
+    const discipline = rows[0].disciplineCode, category = rows[0].category ?? "senior";
     const qualification = await fetch("/api/admin/import/commit-mixed", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ competitionId, discipline, isFinals: false, entries: rows.map((e) => ({
+      body: JSON.stringify({ competitionId, discipline, category, isFinals: false, entries: rows.map((e) => ({
         skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber, qualRank: e.qualRank, qualTotal: e.qualTotal, qualInners: e.inners, qualRemark: e.qualRemark, qualified: e.qualified, extras: e.qualExtras,
         m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mInners: e.mInners, mTotal: e.mTotal,
         f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
@@ -29,7 +29,7 @@ export async function commitMixedTeams(competitionId: number, entries: MixedTeam
     if (!finalists.length) continue;
     const finals = await fetch("/api/admin/import/commit-mixed", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ competitionId, discipline, isFinals: true, entries: finalists.map((e) => ({ nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark, mFinalSeries: e.mFinalSeries, fFinalSeries: e.fFinalSeries, extras: e.finalExtras })) }),
+      body: JSON.stringify({ competitionId, discipline, category, isFinals: true, entries: finalists.map((e) => ({ nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark, mFinalSeries: e.mFinalSeries, fFinalSeries: e.fFinalSeries, extras: e.finalExtras })) }),
     });
     const finalData = await finals.json() as CommitResult & { error?: string };
     if (!finals.ok) errors.push(finalData.error ?? `${discipline}: finals commit error`);

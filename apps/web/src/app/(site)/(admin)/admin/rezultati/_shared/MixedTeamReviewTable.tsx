@@ -1,4 +1,5 @@
 import { DISCIPLINE_META, type DisciplineCode, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
+import type { AgeCategory } from "@shootermarkt/db/schema";
 import { NocFlag } from "./ReviewTable";
 
 export interface MixedTeamEntry {
@@ -6,6 +7,8 @@ export interface MixedTeamEntry {
   nocCode: string;
   teamNumber: number;
   disciplineCode: DisciplineCode;
+  /** Izostavljeno = senior. */
+  category?: AgeCategory;
   qualRank: number | null;
   qualTotal: number | null;
   inners: number | null;
@@ -31,6 +34,9 @@ export interface MixedTeamEntry {
   mFinalSeries?: number[];
   fFinalSeries?: number[];
 }
+
+const eventKey = (e: MixedTeamEntry) => `${e.disciplineCode}|${e.category ?? "senior"}`;
+const isJunior = (e: MixedTeamEntry) => (e.category ?? "senior") !== "senior";
 
 const stickyHeader = "sticky z-20 bg-[var(--surface)]";
 const stickyCell = "sticky z-10 bg-[var(--bg)]";
@@ -60,21 +66,23 @@ export function MixedTeamQualTable({
   entries: MixedTeamEntry[];
   onToggleSkip: (index: number) => void;
 }) {
-  const byDiscipline = Array.from(new Set(entries.map((e) => e.disciplineCode)));
+  const byEvent = Array.from(new Set(entries.map(eventKey)));
   const seriesCount = 3;
 
   return (
     <div className="space-y-5">
-      {byDiscipline.map((discipline) => {
-        const discEntries = entries.flatMap((e, index) => (e.disciplineCode === discipline ? [{ e, index }] : []));
+      {byEvent.map((key) => {
+        const discEntries = entries.flatMap((e, index) => (eventKey(e) === key ? [{ e, index }] : []));
+        const discipline = discEntries[0].e.disciplineCode;
+        const junior = isJunior(discEntries[0].e);
         const hasInners = discipline === "APMT";
         const nocCounts = new Map<string, number>();
         for (const { e } of discEntries) nocCounts.set(e.nocCode, (nocCounts.get(e.nocCode) ?? 0) + 1);
 
         return (
-          <section key={discipline} className="overflow-hidden rounded-lg border border-[var(--border)]">
+          <section key={key} className="overflow-hidden rounded-lg border border-[var(--border)]">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
-              <h3 className="text-sm font-semibold text-[var(--ink)]">{DISCIPLINE_META[discipline]?.label ?? discipline}</h3>
+              <h3 className="text-sm font-semibold text-[var(--ink)]">{DISCIPLINE_META[discipline]?.label ?? discipline}{junior && " · JUN"}</h3>
               <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{discEntries.length} kvalifikacija</span>
             </div>
             <div className="overflow-x-auto border-t border-[var(--border)]">
@@ -137,21 +145,23 @@ export function MixedTeamFinalsTable({
   const finalists = entries.flatMap((e, index) => (e.finalRank != null ? [{ e, index }] : []));
   if (finalists.length === 0) return null;
 
-  const byDiscipline = Array.from(new Set(finalists.map(({ e }) => e.disciplineCode)));
+  const byEvent = Array.from(new Set(finalists.map(({ e }) => eventKey(e))));
 
   return (
     <div className="space-y-5">
-      {byDiscipline.map((discipline) => {
-        const discFinalists = [...finalists.filter(({ e }) => e.disciplineCode === discipline)]
+      {byEvent.map((key) => {
+        const discFinalists = [...finalists.filter(({ e }) => eventKey(e) === key)]
           .sort((a, b) => (a.e.finalRank ?? 99) - (b.e.finalRank ?? 99));
+        const discipline = discFinalists[0].e.disciplineCode;
+        const junior = isJunior(discFinalists[0].e);
         const seriesCount = Math.max(0, ...discFinalists.flatMap(({ e }) => [e.mFinalSeries?.length ?? 0, e.fFinalSeries?.length ?? 0]));
         const nocCounts = new Map<string, number>();
         for (const { e } of discFinalists) nocCounts.set(e.nocCode, (nocCounts.get(e.nocCode) ?? 0) + 1);
 
         return (
-          <section key={discipline} className="overflow-hidden rounded-lg border border-[var(--border)]">
+          <section key={key} className="overflow-hidden rounded-lg border border-[var(--border)]">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
-              <h3 className="text-sm font-semibold text-[var(--ink)]">{DISCIPLINE_META[discipline]?.label ?? discipline} · Finale</h3>
+              <h3 className="text-sm font-semibold text-[var(--ink)]">{DISCIPLINE_META[discipline]?.label ?? discipline}{junior && " · JUN"} · Finale</h3>
               <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{discFinalists.length} timova</span>
             </div>
             <div className="overflow-x-auto border-t border-[var(--border)]">

@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     nocCode: string;
     teamNumber: number;
     disciplineCode: string;
+    category: "senior" | "junior";
     qualRank: number | null;
     qualTotal: number | null;
     inners: number | null;
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
   const allEntries: MixedEntry[] = [];
   const errors: string[] = [];
 
-  for (const { disciplineCode, qualPhase, finalPhase } of mixedEvents) {
+  for (const { disciplineCode, category, qualPhase, finalPhase } of mixedEvents) {
     // Same nation can enter 2 teams — key by nocCode + a running per-nation
     // counter (assigned in the order teams appear in the qual table), not
     // just nocCode, or the 2nd team silently overwrites the 1st.
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
             nocCode: r.nocCode,
             teamNumber,
             disciplineCode,
+            category,
             qualRank: r.rank,
             qualTotal: r.total,
             inners: r.inners,
@@ -121,6 +123,7 @@ export async function POST(req: NextRequest) {
               nocCode: r.nocCode,
               teamNumber,
               disciplineCode,
+              category,
               qualRank: null,
               qualTotal: null,
               inners: null,

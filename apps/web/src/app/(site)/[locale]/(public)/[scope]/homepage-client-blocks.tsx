@@ -183,6 +183,13 @@ export function HomepageTickerClient() {
 }
 
 type PhaseKeyInput = { stage: string; elimRound?: number | null; category: string };
+/** Oznake starosnih kategorija na In focus karticama (en, sr); senior je bez oznake. */
+const CATEGORY_BADGE: Record<string, [string, string] | null> = {
+  senior: null, open: null,
+  junior: ["JUNIOR", "JUNIORI"], mladji_junior: ["U-18", "MLAĐI JUNIORI"], kadet: ["U-16", "KADETI"],
+  mladji_senior: ["U-23", "MLAĐI SENIORI"], pionir: ["PIONEER", "PIONIRI"], master: ["MASTER", "MASTERI"],
+};
+
 function phaseRowKey(competitionId: number, discCode: string, isJunior: boolean, phase: PhaseKeyInput) {
   return `${competitionId}:${discCode}:${isJunior}:${phase.stage}:${phase.elimRound ?? ""}:${phase.category}`;
 }
@@ -266,7 +273,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
   type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null; rpo?: boolean };
   type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
   type Phase = { stage: string; elimRound?: number | null; category: string; isLive: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
-  type DiscResult = { discCode: string; isLive: boolean; isJunior: boolean; phases: Phase[] };
+  type DiscResult = { discCode: string; isLive: boolean; isJunior: boolean; category: string; phases: Phase[] };
 
   function renderDiscResults(discResults: DiscResult[], level: string, competitionId: number) {
     if (discResults.length === 0) return <p className="mt-4 text-sm italic text-[var(--muted)]">{t("noWinner")}</p>;
@@ -290,10 +297,11 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
           if (shownPhases.length === 0) return null;
           const isAP = disc.discCode.startsWith("AP");
           const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-barlow-condensed)] text-[15px] font-bold uppercase tracking-[0.04em] text-[var(--muted)]">{DISC_FULL_NAMES[disc.discCode]?.[locale === "en" ? "en" : "sr"] ?? disc.discCode}</span>;
-          const junBadge = disc.isJunior ? <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>JUN</span> : null;
+          const categoryLabel = CATEGORY_BADGE[disc.category]?.[locale === "en" ? 0 : 1] ?? null;
+          const junBadge = categoryLabel ? <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>{categoryLabel}</span> : null;
           const liveBadge = disc.isLive ? <LiveBadge className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">LIVE</LiveBadge> : null;
           return (
-            <div key={`${disc.discCode}:${disc.isJunior}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
+            <div key={`${disc.discCode}:${disc.category}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
               {/* Naziv discipline vodi na prvu prikazanu fazu (finale ako postoji, inače kvalifikacije). */}
               <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="flex w-fit items-center gap-1 no-underline hover:opacity-80 transition-opacity">{discBadge}{junBadge}</ScopedLink>
               {shownPhases.map((phase) => {

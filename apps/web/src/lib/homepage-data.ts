@@ -130,7 +130,7 @@ type ScheduleSlotLike = { discCode: string; disciplineId: number; stage: string;
 async function slotsFromResults(
   competition: { date: string; dateEnd: string | null },
   individualRows: Array<{ disciplineId: number; category: string; qualRank: number | null; elimRank: number | null; finalRank: number | null }>,
-  mixedRows: Array<{ disciplineId: number; qualRank: number | null; finalRank: number | null }>,
+  mixedRows: Array<{ disciplineId: number; category: string; qualRank: number | null; finalRank: number | null }>,
 ): Promise<ScheduleSlotLike[]> {
   const codes = new Map((await db.select({ id: disciplines.id, code: disciplines.code }).from(disciplines)).map((d) => [d.id, d.code]));
   const startTime = new Date(`${competition.date}T00:00:00Z`);
@@ -146,8 +146,8 @@ async function slotsFromResults(
     if (r.finalRank != null) add(r.disciplineId, r.category, "final");
   }
   for (const r of mixedRows) {
-    if (r.qualRank != null) add(r.disciplineId, "senior", "qual");
-    if (r.finalRank != null) add(r.disciplineId, "senior", "final");
+    if (r.qualRank != null) add(r.disciplineId, r.category, "qual");
+    if (r.finalRank != null) add(r.disciplineId, r.category, "final");
   }
   return [...found.values()];
 }
@@ -346,7 +346,7 @@ export async function getHomepageMain(scope: Scope) {
     const [slots, individualRows, mixedRows] = await Promise.all([
       db.select({ discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(eq(competitionSchedule.competitionId, competition.id)),
       db.select({ shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRound: results.elimRound, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, qualRemark: results.qualRemark, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(eq(results.competitionId, competition.id)),
-      db.select({ disciplineId: mixedTeamResults.disciplineId, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(eq(mixedTeamResults.competitionId, competition.id)),
+      db.select({ disciplineId: mixedTeamResults.disciplineId, category: mixedTeamResults.category, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(eq(mixedTeamResults.competitionId, competition.id)),
     ]);
     type Entry = { id: string; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; rank: number; total: number; round: number | null; rpo?: boolean };
     // A discipline/category can have multiple "qual" schedule rows at different
@@ -370,7 +370,7 @@ export async function getHomepageMain(scope: Scope) {
         return rank != null && total != null ? [{ id: `shooter:${row.shooterId}`, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality, countryCode2: nationality === "AIN" ? "AIN" : row.countryCode2 ?? null, rank, total: Number(total), round: stageKind === "elimination" ? row.elimRound : null, rpo: stageKind === "qual" && row.qualRemark === "RPO" }] : [];
       });
       const mixed = stageKind === "elimination" ? [] : mixedRows.flatMap((row): Entry[] => {
-        if (row.disciplineId !== slot.disciplineId) return [];
+        if (row.disciplineId !== slot.disciplineId || row.category !== slot.category) return [];
         const rank = stageKind === "final" ? row.finalRank : row.qualRank;
         const total = stageKind === "final" ? row.finalTotal : row.qualTotal;
         const names = [row.shooter1Name, row.shooter2Name]
@@ -398,12 +398,12 @@ export async function getHomepageMain(scope: Scope) {
       });
     });
 
-    // One discipline (senior vs junior counted separately) is one homepage
+    // One discipline (each age category counted separately) is one homepage
     // item — qual/elimination/final all stack inside it instead of each
     // phase competing separately for one of the top-4 slots.
     const phaseGroups = new Map<string, typeof rawPhases>();
     for (const phase of rawPhases) {
-      const key = `${phase.discCode}|${phase.isJunior}`;
+      const key = `${phase.discCode}|${phase.category}`;
       phaseGroups.set(key, [...(phaseGroups.get(key) ?? []), phase]);
     }
     const groups = [...phaseGroups.values()].map((phases) => {
@@ -414,6 +414,7 @@ export async function getHomepageMain(scope: Scope) {
         discCode: representative.discCode,
         stage: representative.stage,
         isJunior: representative.isJunior,
+        category: representative.category,
         isLive: phases.some((p) => p.isLive),
         hasSrb: phases.some((p) => p.hasSrb),
         startTime: representative.startTime,
@@ -428,6 +429,7 @@ export async function getHomepageMain(scope: Scope) {
       return {
       discCode: group.discCode,
       isJunior: group.isJunior,
+      category: group.category,
       isLive: group.isLive,
       phases: visiblePhases.map((phase) => ({
         stage: phase.stage,

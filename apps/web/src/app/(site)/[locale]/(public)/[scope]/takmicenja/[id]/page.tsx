@@ -114,6 +114,7 @@ export default async function CompetitionPage({ params }: Props) {
       disciplineCode: disciplines.code,
       disciplineName: disciplines.name,
       apparatus: disciplines.apparatus,
+      category: mixedTeamResults.category,
       nocCode: mixedTeamResults.nocCode,
       teamNumber: mixedTeamResults.teamNumber,
       shooter1Id: mixedTeamResults.shooter1Id,
@@ -188,15 +189,16 @@ export default async function CompetitionPage({ params }: Props) {
 
   // Group mixed team results by discipline code
   const mixedGroupOrder: string[] = [];
-  const mixedGroupMap = new Map<string, { code: string; name: string; apparatus: string | null; teams: typeof mixedResults }>();
+  const mixedGroupMap = new Map<string, { code: string; category: typeof mixedResults[number]["category"]; name: string; apparatus: string | null; teams: typeof mixedResults }>();
   for (const r of mixedResults) {
-    if (!mixedGroupMap.has(r.disciplineCode)) {
-      mixedGroupOrder.push(r.disciplineCode);
-      mixedGroupMap.set(r.disciplineCode, { code: r.disciplineCode, name: r.disciplineName, apparatus: r.apparatus, teams: [] });
+    const key = `${r.disciplineCode}|${r.category}`;
+    if (!mixedGroupMap.has(key)) {
+      mixedGroupOrder.push(key);
+      mixedGroupMap.set(key, { code: r.disciplineCode, category: r.category, name: r.disciplineName, apparatus: r.apparatus, teams: [] });
     }
-    mixedGroupMap.get(r.disciplineCode)!.teams.push(r);
+    mixedGroupMap.get(key)!.teams.push(r);
   }
-  const mixedGroups = mixedGroupOrder.map((code) => mixedGroupMap.get(code)!);
+  const mixedGroups = mixedGroupOrder.map((key) => mixedGroupMap.get(key)!);
 
   // Group by discipline, then by age category, preserving order of first appearance
   const disciplineOrder: string[] = [];

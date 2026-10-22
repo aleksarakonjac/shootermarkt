@@ -743,6 +743,7 @@ export function extractMixedTeamEvents(
   groups: ISSFResultGroup[]
 ): Array<{
   disciplineCode: MixedTeamDisciplineCode;
+  category: "senior" | "junior";
   qualPhase: ISSFResultPhase | null;
   finalPhase: ISSFResultPhase | null;
 }> {
@@ -761,7 +762,7 @@ export function extractMixedTeamEvents(
       const qualPhase  = phases.find((p) => /qual/i.test(p.title)) ?? null;
       const finalPhase = phases.find((p) => /final/i.test(p.title)) ?? null;
 
-      out.push({ disciplineCode: dc, qualPhase, finalPhase });
+      out.push({ disciplineCode: dc, category: event.isJunior ? "junior" as const : "senior" as const, qualPhase, finalPhase });
     }
   }
   return out;

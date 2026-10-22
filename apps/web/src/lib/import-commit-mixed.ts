@@ -42,6 +42,8 @@ const mergeRemarkDetails = sql`coalesce(${mixedTeamResults.remarkDetails} || exc
 
 export interface MixedCommitInput {
   discipline: string;
+  /** Senior i junior mixed team su odvojeni događaji iste discipline. */
+  category?: typeof mixedTeamResults.$inferInsert["category"];
   isFinals: boolean;
   entries: MixedCommitEntry[];
   competitionId?: number;
@@ -51,6 +53,7 @@ export interface MixedCommitInput {
 /** Upserts mixed-team qualification or finals rows for one discipline. */
 export async function commitMixedTeamEntries(input: MixedCommitInput) {
   const { discipline: code, isFinals, entries } = input;
+  const category = input.category ?? "senior";
   if (!code || !Array.isArray(entries)) throw new MixedCommitError("Invalid payload", 400);
 
   // Resolve or create competition
@@ -97,6 +100,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
           .values({
             competitionId,
             disciplineId: disc.id,
+            category,
             nocCode: e.nocCode,
             teamNumber: e.teamNumber ?? 1,
             finalRank: e.finalRank ?? null,
@@ -108,7 +112,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
             source: "manual",
           })
           .onConflictDoUpdate({
-            target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
+            target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
             set: {
               finalRank: e.finalRank ?? null,
               finalTotal: e.finalTotal != null ? String(e.finalTotal) : null,
@@ -124,6 +128,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
           .values({
             competitionId,
             disciplineId: disc.id,
+            category,
             nocCode: e.nocCode,
             teamNumber: e.teamNumber ?? 1,
             shooter1Name: `${e.m_lastName} ${e.m_firstName}`.trim() || null,
@@ -139,7 +144,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
             source: "manual",
           })
           .onConflictDoUpdate({
-            target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
+            target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
             set: {
               shooter1Name: `${e.m_lastName} ${e.m_firstName}`.trim() || null,
               shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
@@ -168,11 +173,15 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
 export async function commitMixedTeamsDirect(competitionId: number, entries: MixedTeamEntry[]) {
   let inserted = 0, skipped = 0;
   const errors: string[] = [];
-  const byDiscipline = new Map<string, MixedTeamEntry[]>();
-  for (const e of entries) byDiscipline.set(e.disciplineCode, [...(byDiscipline.get(e.disciplineCode) ?? []), e]);
+  const byEvent = new Map<string, MixedTeamEntry[]>();
+  for (const e of entries) {
+    const key = `${e.disciplineCode}|${e.category ?? "senior"}`;
+    byEvent.set(key, [...(byEvent.get(key) ?? []), e]);
+  }
 
-  for (const [discipline, rows] of byDiscipline) {
-    const qual = await commitMixedTeamEntries({ competitionId, discipline, isFinals: false, entries: rows.map((e) => ({
+  for (const rows of byEvent.values()) {
+    const discipline = rows[0].disciplineCode, category = rows[0].category ?? "senior";
+    const qual = await commitMixedTeamEntries({ competitionId, discipline, category, isFinals: false, entries: rows.map((e) => ({
       skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber, qualRank: e.qualRank, qualTotal: e.qualTotal, qualInners: e.inners, qualRemark: e.qualRemark, qualified: e.qualified, extras: e.qualExtras,
       m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mInners: e.mInners, mTotal: e.mTotal,
       f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
@@ -181,7 +190,7 @@ export async function commitMixedTeamsDirect(competitionId: number, entries: Mix
 
     const finalists = rows.filter((e) => !e.skip && e.finalRank != null);
     if (!finalists.length) continue;
-    const fin = await commitMixedTeamEntries({ competitionId, discipline, isFinals: true, entries: finalists.map((e) => ({
+    const fin = await commitMixedTeamEntries({ competitionId, discipline, category, isFinals: true, entries: finalists.map((e) => ({
       nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark, mFinalSeries: e.mFinalSeries, fFinalSeries: e.fFinalSeries, extras: e.finalExtras,
     })) });
     errors.push(...fin.errors);

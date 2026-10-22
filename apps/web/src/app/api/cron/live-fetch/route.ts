@@ -305,11 +305,14 @@ async function processMixedTeamSlots(
   competitionId: number,
   siusId: string | null,
   issfId: string | null,
-  mixedSlots: Array<{ disciplineId: number; stage: string; disciplineCode: string }>,
+  mixedSlots: Array<{ disciplineId: number; stage: string; disciplineCode: string; category: AgeCategory }>,
   allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>,
   shooterByIssfId: Map<string, number>
 ): Promise<number> {
-  const disciplineCodes = [...new Set(mixedSlots.map((s) => s.disciplineCode))];
+  // SIUS vodi juniorski mixed team kao poseban događaj (APMTJ); druge mlađe kategorije za mixed ne postoje.
+  const siusEventCode = (s: { disciplineCode: string; category: AgeCategory }) => (s.category === "junior" ? `${s.disciplineCode}J` : s.disciplineCode);
+  const siusSlots = mixedSlots.filter((s) => s.category === "senior" || s.category === "junior");
+  const disciplineCodes = [...new Set(siusSlots.map(siusEventCode))];
   const rows: Array<typeof mixedTeamResults.$inferInsert> = [];
   const teamNumbersByDiscipline = new Map<string, Map<string, number>>();
   const nocCountsByDiscipline = new Map<string, Map<string, number>>();
@@ -323,14 +326,15 @@ async function processMixedTeamSlots(
       siusData = new Map();
     }
 
-    for (const slot of mixedSlots) {
-      const eventData = siusData.get(slot.disciplineCode);
+    for (const slot of siusSlots) {
+      const eventCode = siusEventCode(slot);
+      const eventData = siusData.get(eventCode);
       if (!eventData) continue;
 
-      const teamNumbers = teamNumbersByDiscipline.get(slot.disciplineCode) ?? new Map<string, number>();
-      teamNumbersByDiscipline.set(slot.disciplineCode, teamNumbers);
-      const nocCounts = nocCountsByDiscipline.get(slot.disciplineCode) ?? new Map<string, number>();
-      nocCountsByDiscipline.set(slot.disciplineCode, nocCounts);
+      const teamNumbers = teamNumbersByDiscipline.get(eventCode) ?? new Map<string, number>();
+      teamNumbersByDiscipline.set(eventCode, teamNumbers);
+      const nocCounts = nocCountsByDiscipline.get(eventCode) ?? new Map<string, number>();
+      nocCountsByDiscipline.set(eventCode, nocCounts);
       const teamNumberFor = (r: SiusTeamResult) => {
         const identity = mixedTeamIdentity(r.athletes);
         const existing = teamNumbers.get(identity);
@@ -348,6 +352,7 @@ async function processMixedTeamSlots(
         rows.push({
           competitionId,
           disciplineId: slot.disciplineId,
+          category: slot.category,
           nocCode: r.nocCode,
           teamNumber: teamNumberFor(r),
           shooter1Id,
@@ -380,7 +385,7 @@ async function processMixedTeamSlots(
   // slot in one run — merge instead of letting the batch insert collide.
   const merged = new Map<string, typeof mixedTeamResults.$inferInsert>();
   for (const r of rows) {
-    const key = `${r.competitionId}|${r.disciplineId}|${r.nocCode}|${r.teamNumber}`;
+    const key = `${r.competitionId}|${r.disciplineId}|${r.category}|${r.nocCode}|${r.teamNumber}`;
     const prev = merged.get(key);
     merged.set(key, { ...prev, ...r, remarkDetails: prev?.remarkDetails || r.remarkDetails ? { ...prev?.remarkDetails, ...r.remarkDetails } : undefined });
   }
@@ -391,7 +396,7 @@ async function processMixedTeamSlots(
     .insert(mixedTeamResults)
     .values(dedupedRows)
     .onConflictDoUpdate({
-      target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
+      target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
       set: {
         shooter1Id: sql`coalesce(excluded.shooter1_id, ${mixedTeamResults.shooter1Id})`,
         shooter2Id: sql`coalesce(excluded.shooter2_id, ${mixedTeamResults.shooter2Id})`,
@@ -452,7 +457,7 @@ async function resolveOrCreateShooter(
 
 async function fetchMixedTeamFromIssf(
   issfCompId: number,
-  slots: Array<{ disciplineCode: string; stage: string; disciplineId: number }>,
+  slots: Array<{ disciplineCode: string; stage: string; disciplineId: number; category: AgeCategory }>,
   competitionId: number,
   allShooters: Array<{ id: number; firstName: string; lastName: string; nationality: string | null; issfId: string | null }>,
   shooterByIssfId: Map<string, number>,
@@ -475,7 +480,7 @@ async function fetchMixedTeamFromIssf(
   };
 
   for (const slot of slots) {
-    const event = mixedEvents.find((e) => e.disciplineCode === slot.disciplineCode);
+    const event = mixedEvents.find((e) => e.disciplineCode === slot.disciplineCode && e.category === slot.category);
     if (!event) continue;
 
     // Same nation can enter 2 teams — number them in table order, and match
@@ -496,6 +501,7 @@ async function fetchMixedTeamFromIssf(
         teamRows.push({
           competitionId,
           disciplineId: slot.disciplineId,
+          category: slot.category,
           nocCode: r.nocCode,
           teamNumber,
           mIssfId: r.mIssfId,
@@ -535,6 +541,7 @@ async function fetchMixedTeamFromIssf(
           teamRows.push({
             competitionId,
             disciplineId: slot.disciplineId,
+            category: slot.category,
             nocCode: r.nocCode,
             teamNumber,
             mIssfId: r.mIssfId,
