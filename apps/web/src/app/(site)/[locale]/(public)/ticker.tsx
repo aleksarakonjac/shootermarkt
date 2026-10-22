@@ -245,7 +245,7 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review, inProgress }
         <div className="flex items-center gap-2 shrink-0" style={{ opacity: badgeVisible ? 1 : 0, transition: "opacity 0.22s ease" }}>
           {isLive && <MobileStatusBadge label={live} live />}
           {isUpcoming && <MobileStatusBadge label={upcoming.toUpperCase()} />}
-          {isNext && <MobileStatusBadge label={nextLabel.toUpperCase()} neutral />}
+          {isNext && <MobileStatusBadge label={nextLabel.toUpperCase()} next />}
           {isReview && <MobileStatusBadge label={review.toUpperCase()} review />}
           {isNeutral && <MobileStatusBadge label={inProgress.toUpperCase()} neutral />}
           {segment.item.status === "CUSTOM" && segment.item.label && <MobileStatusBadge label={segment.item.label} />}
@@ -264,10 +264,11 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review, inProgress }
 }
 
 // pb-[2px] na bedževima: Plus Jakarta Sans sa leading-none spušta velika slova ~1px ispod sredine kutije.
-function MobileStatusBadge({ label, live = false, neutral = false, review = false }: { label: string; live?: boolean; neutral?: boolean; review?: boolean }) {
+function MobileStatusBadge({ label, live = false, neutral = false, review = false, next = false }: { label: string; live?: boolean; neutral?: boolean; review?: boolean; next?: boolean }) {
   return (
-    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded px-1.5 pb-[2px] font-extrabold select-none leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: live ? "var(--brand-primary)" : review ? "var(--brand-accent)" : neutral ? "rgba(255,255,255,0.85)" : "#92400e", background: live || review ? "white" : neutral ? "rgba(255,255,255,0.14)" : "#fefce8" }}>
+    <span className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded px-1.5 pb-[2px] font-extrabold select-none leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: live ? "var(--brand-primary)" : review ? "var(--brand-accent)" : next ? "white" : neutral ? "rgba(255,255,255,0.85)" : "#92400e", background: live || review ? "white" : next ? "rgba(255,255,255,0.24)" : neutral ? "rgba(255,255,255,0.14)" : "#fefce8" }}>
       {live && <span className="shrink-0 rounded-full" style={{ width: 5, height: 5, background: "var(--brand-primary)", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />}
+      {next && <span className="shrink-0 rounded-full" style={{ width: 5, height: 5, background: "white", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />}
       {label}
     </span>
   );
@@ -329,10 +330,6 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, loc
           className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none"
           style={{ fontSize: 11, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}
         >
-          <span
-            className="rounded-full shrink-0"
-            style={{ width: 5, height: 5, background: "#f59e0b", display: "inline-block", animation: "ticker-pulse 2s ease-in-out infinite" }}
-          />
           {upcoming.toUpperCase()}
         </span>
       )}
@@ -350,7 +347,8 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, loc
       )}
 
       {isNext && (
-        <span className="inline-flex items-center shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "rgba(255,255,255,0.85)", background: "rgba(255,255,255,0.14)", height: 20 }}>
+        <span className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none" style={{ fontSize: 11, letterSpacing: "0.08em", color: "white", background: "rgba(255,255,255,0.24)", height: 20 }}>
+          <span className="rounded-full shrink-0" style={{ width: 5, height: 5, background: "white", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />
           {nextLabel.toUpperCase()}
         </span>
       )}
@@ -515,10 +513,6 @@ function UpcomingBar({ items, upcoming, locale }: { items: TickerItem[]; upcomin
           className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none"
           style={{ fontSize: 11, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}
         >
-          <span
-            className="rounded-full shrink-0"
-            style={{ width: 5, height: 5, background: "#f59e0b", display: "inline-block", animation: "ticker-pulse 2s ease-in-out infinite" }}
-          />
           {upcoming.toUpperCase()}
         </span>
         <span className="hidden shrink-0 sm:block" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)" }} aria-hidden="true" />
