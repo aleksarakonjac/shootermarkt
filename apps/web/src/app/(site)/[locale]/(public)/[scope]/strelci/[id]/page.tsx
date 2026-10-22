@@ -4,6 +4,7 @@ import { db } from "@shootermarkt/db";
 import { shooters, results, competitions, countries, disciplines, shooterFormaCache } from "@shootermarkt/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import type { Metadata } from "next";
 import { ScopedLink } from "../../../components/ScopedLink";
 import { ResultsHistoryTable } from "@/components/result-display/ResultsHistoryTable";
@@ -23,11 +24,14 @@ import { INVALID_REMARKS } from "@/lib/forma-query";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
 
+// Jedan upit po renderu: generateMetadata i stranica dele rezultat (React cache traje jedan request).
+const getShooter = cache((id: number) => db.query.shooters.findFirst({ where: eq(shooters.id, id), with: { club: true } }));
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id, scope } = await params;
   const [shooter, locale] = await Promise.all([
     // Nenumerički id (npr. /strelci/abc) ide pravo na "nije pronađen" umesto greške u upitu.
-    /^\d{1,9}$/.test(id) ? db.query.shooters.findFirst({ where: eq(shooters.id, parseInt(id)) }) : undefined,
+    /^\d{1,9}$/.test(id) ? getShooter(parseInt(id)) : undefined,
     getLocale(),
   ]);
   const alternates = buildAlternates(locale, scope, `/strelci/${id}`);
@@ -47,13 +51,8 @@ export default async function ShooterPage({ params }: Props) {
   const shooterId = parseInt(id);
   if (!/^\d{1,9}$/.test(id)) notFound();
 
-  const shooter = await db.query.shooters.findFirst({
-    where: eq(shooters.id, shooterId),
-    with: { club: true },
-  });
-  if (!shooter) notFound();
-
-  const [shooterResults, cacheRows] = await Promise.all([
+  const [shooter, shooterResults, cacheRows] = await Promise.all([
+    getShooter(shooterId),
     db
       .select({
         id: results.id,
@@ -115,6 +114,7 @@ export default async function ShooterPage({ params }: Props) {
       .from(shooterFormaCache)
       .where(eq(shooterFormaCache.shooterId, shooterId)),
   ]);
+  if (!shooter) notFound();
 
   const initials = `${shooter.firstName[0]}${shooter.lastName[0]}`;
 

@@ -1,6 +1,7 @@
 export const revalidate = 300;
 
 import { Suspense, type CSSProperties } from "react";
+import { unstable_cache } from "next/cache";
 import { ScopedLink } from "../../components/ScopedLink";
 import Image from "next/image";
 import { db } from "@shootermarkt/db";
@@ -161,6 +162,67 @@ type Props = {
   }>;
 };
 
+// Liste za filtere, statistike i lideri ne zavise od filtera — isti su za svaki zahtev, pa se keširaju.
+const getShooterFacets = unstable_cache(async (thisYear: string) => {
+  const [nocRows, birthYearRows, statsActiveRows, statsApparatus, [{ totalAll }], leaderCacheRows] = await Promise.all([
+    db
+      .selectDistinct({ noc: shooters.nationality })
+      .from(shooters)
+      .where(isNotNull(shooters.nationality))
+      .orderBy(asc(shooters.nationality)),
+
+    db
+      .selectDistinct({ birthYear: shooters.birthYear })
+      .from(shooters)
+      .where(and(inArray(shooters.apparatus, [...MVP_APPARATUS]), isNotNull(shooters.birthYear)))
+      .orderBy(desc(shooters.birthYear)),
+
+    // Active this year = at least 1 result in current year
+    db
+      .selectDistinct({ id: results.shooterId })
+      .from(results)
+      .innerJoin(competitions, eq(results.competitionId, competitions.id))
+      .innerJoin(shooters, eq(results.shooterId, shooters.id))
+      .where(and(
+        gte(competitions.date, `${thisYear}-01-01`),
+        inArray(shooters.apparatus, [...MVP_APPARATUS]),
+      )),
+
+    // Breakdown by apparatus (global, unfiltered)
+    db
+      .select({ apparatus: shooters.apparatus, count: sql<number>`COUNT(*)::int` })
+      .from(shooters)
+      .where(inArray(shooters.apparatus, [...MVP_APPARATUS]))
+      .groupBy(shooters.apparatus),
+
+    // Total shooters in MVP scope (unfiltered)
+    db
+      .select({ totalAll: sql<number>`COUNT(*)::int` })
+      .from(shooters)
+      .where(inArray(shooters.apparatus, [...MVP_APPARATUS])),
+    db
+      .select({
+        shooterId:      shooterFormaCache.shooterId,
+        disciplineCode: shooterFormaCache.disciplineCode,
+        forma:          shooterFormaCache.forma,
+        trend:          shooterFormaCache.trend,
+        firstName:      shooters.firstName,
+        lastName:       shooters.lastName,
+        avatarUrl:      shooters.avatarUrl,
+        clubName:       clubs.name,
+      })
+      .from(shooterFormaCache)
+      .innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id))
+      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
+      .where(and(
+        inArray(shooterFormaCache.disciplineCode, ["ARM", "ARW", "APM", "APW"]),
+        rankedFormaCacheFilter(),
+      ))
+      .orderBy(asc(shooterFormaCache.disciplineCode), desc(shooterFormaCache.forma)),
+  ]);
+  return { nocRows, birthYearRows, statsActiveRows, statsApparatus, totalAll, leaderCacheRows };
+}, ["strelci-facets"], { revalidate: 900 });
+
 export default async function StrelciPage({ params, searchParams }: Props) {
   const { scope } = await params;
   const locale       = await getLocale();
@@ -207,11 +269,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
   const [
     data,
     [{ totalCount }],
-    nocRows,
-    birthYearRows,
-    statsActiveRows,
-    statsApparatus,
-    [{ totalAll }],
+    { nocRows, birthYearRows, statsActiveRows, statsApparatus, totalAll, leaderCacheRows },
   ] = await Promise.all([
     db
       .select({
@@ -247,80 +305,23 @@ export default async function StrelciPage({ params, searchParams }: Props) {
       .from(shooters)
       .where(where),
 
-    db
-      .selectDistinct({ noc: shooters.nationality })
-      .from(shooters)
-      .where(isNotNull(shooters.nationality))
-      .orderBy(asc(shooters.nationality)),
-
-    db
-      .selectDistinct({ birthYear: shooters.birthYear })
-      .from(shooters)
-      .where(and(inArray(shooters.apparatus, [...MVP_APPARATUS]), isNotNull(shooters.birthYear)))
-      .orderBy(desc(shooters.birthYear)),
-
-    // Active this year = at least 1 result in current year
-    db
-      .selectDistinct({ id: results.shooterId })
-      .from(results)
-      .innerJoin(competitions, eq(results.competitionId, competitions.id))
-      .innerJoin(shooters, eq(results.shooterId, shooters.id))
-      .where(and(
-        gte(competitions.date, `${thisYear}-01-01`),
-        inArray(shooters.apparatus, [...MVP_APPARATUS]),
-      )),
-
-    // Breakdown by apparatus (global, unfiltered)
-    db
-      .select({ apparatus: shooters.apparatus, count: sql<number>`COUNT(*)::int` })
-      .from(shooters)
-      .where(inArray(shooters.apparatus, [...MVP_APPARATUS]))
-      .groupBy(shooters.apparatus),
-
-    // Total shooters in MVP scope (unfiltered)
-    db
-      .select({ totalAll: sql<number>`COUNT(*)::int` })
-      .from(shooters)
-      .where(inArray(shooters.apparatus, [...MVP_APPARATUS])),
-
+    getShooterFacets(thisYear),
   ]);
 
   const shooterIds = data.map((s) => s.id);
   // Build disc-code map so we can match each shooter to their cache entry
   const shooterDiscMap = new Map(data.map((s) => [s.id, getDiscCode(s.apparatus, s.gender)]));
 
-  const [pageCacheRows, leaderCacheRows] = await Promise.all([
-    shooterIds.length > 0
-      ? db
-          .select({
-            shooterId:      shooterFormaCache.shooterId,
-            disciplineCode: shooterFormaCache.disciplineCode,
-            sampleSize:     shooterFormaCache.sampleSize,
-          })
-          .from(shooterFormaCache)
-          .where(inArray(shooterFormaCache.shooterId, shooterIds))
-      : Promise.resolve([] as { shooterId: number; disciplineCode: string; forma: string | null; trend: string | null; sampleSize: number }[]),
-
-    db
-      .select({
-        shooterId:      shooterFormaCache.shooterId,
-        disciplineCode: shooterFormaCache.disciplineCode,
-        forma:          shooterFormaCache.forma,
-        trend:          shooterFormaCache.trend,
-        firstName:      shooters.firstName,
-        lastName:       shooters.lastName,
-        avatarUrl:      shooters.avatarUrl,
-        clubName:       clubs.name,
-      })
-      .from(shooterFormaCache)
-      .innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id))
-      .leftJoin(clubs, eq(shooters.clubId, clubs.id))
-      .where(and(
-        inArray(shooterFormaCache.disciplineCode, ["ARM", "ARW", "APM", "APW"]),
-        rankedFormaCacheFilter(),
-      ))
-      .orderBy(asc(shooterFormaCache.disciplineCode), desc(shooterFormaCache.forma)),
-  ]);
+  const pageCacheRows = shooterIds.length > 0
+    ? await db
+        .select({
+          shooterId:      shooterFormaCache.shooterId,
+          disciplineCode: shooterFormaCache.disciplineCode,
+          sampleSize:     shooterFormaCache.sampleSize,
+        })
+        .from(shooterFormaCache)
+        .where(inArray(shooterFormaCache.shooterId, shooterIds))
+    : [];
 
   // Map page shooters to their cached forma (matching by discipline code)
   const pageCacheMap = new Map<number, number>();

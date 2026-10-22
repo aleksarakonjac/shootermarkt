@@ -12,6 +12,7 @@ import {
 } from "@shootermarkt/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import type { Metadata } from "next";
 import { ScopedLink } from "../../../components/ScopedLink";
 import type { EventType } from "@shootermarkt/db/pdf-import-types";
@@ -33,12 +34,13 @@ type Props = { params: Promise<{ id: string; scope: Scope }> };
 
 // ── Metadata ─────────────────────────────────────────────────────────────────
 
+// Jedan upit po renderu: generateMetadata i stranica dele rezultat (React cache traje jedan request).
+const getCompetition = cache((id: number) => db.query.competitions.findFirst({ where: eq(competitions.id, id), with: { country: true } }));
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const locale = await getLocale();
   const { id, scope } = await params;
-  const comp = /^\d{1,9}$/.test(id) ? await db.query.competitions.findFirst({
-    where: eq(competitions.id, parseInt(id)),
-  }) : undefined;
+  const comp = /^\d{1,9}$/.test(id) ? await getCompetition(parseInt(id)) : undefined;
   const alternates = buildAlternates(locale, scope, `/takmicenja/${id}`);
   if (!comp) {
     const t = await getTranslations("competition");
@@ -62,10 +64,7 @@ export default async function CompetitionPage({ params }: Props) {
 
   // Svi upiti zavise samo od compId — idu paralelno umesto jedan za drugim.
   const [comp, compResults, mixedResults, scheduleRows] = await Promise.all([
-    db.query.competitions.findFirst({
-      where: eq(competitions.id, compId),
-      with: { country: true },
-    }),
+    getCompetition(compId),
 
     // Fetch all results for this competition
     db

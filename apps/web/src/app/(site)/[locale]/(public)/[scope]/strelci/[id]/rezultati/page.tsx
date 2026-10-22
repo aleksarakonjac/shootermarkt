@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { getLocale, getTranslations } from "next-intl/server";
 import { db } from "@shootermarkt/db";
@@ -13,10 +14,13 @@ import { ScopedLink } from "../../../../components/ScopedLink";
 
 type Props = { params: Promise<{ id: string; scope: Scope }> };
 
+// Jedan upit po renderu: generateMetadata i stranica dele rezultat (React cache traje jedan request).
+const getShooter = cache((id: number) => db.query.shooters.findFirst({ where: eq(shooters.id, id), with: { club: true } }));
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id, scope } = await params;
   const [shooter, locale] = await Promise.all([
-    /^\d{1,9}$/.test(id) ? db.query.shooters.findFirst({ where: eq(shooters.id, Number(id)) }) : undefined,
+    /^\d{1,9}$/.test(id) ? getShooter(Number(id)) : undefined,
     getLocale(),
   ]);
   const alternates = buildAlternates(locale, scope, `/strelci/${id}/rezultati`);
@@ -31,7 +35,7 @@ export default async function ShooterResultsPage({ params }: Props) {
   if (!/^\d{1,9}$/.test(id)) notFound();
 
   const [shooter, initialPage, locale, t, tProfile] = await Promise.all([
-    db.query.shooters.findFirst({ where: eq(shooters.id, shooterId), with: { club: true } }),
+    getShooter(shooterId),
     getShooterResultsPage(shooterId),
     getLocale(),
     getTranslations("shooters"),
