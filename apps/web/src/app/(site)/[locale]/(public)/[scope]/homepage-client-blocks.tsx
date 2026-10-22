@@ -30,10 +30,10 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
     const lead = index === 0;
     const value = score(entry);
     return <span key={index} className="inline-flex items-center gap-1 whitespace-nowrap">
-      <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums"}>{index + 1}.</span>
-      <span className={lead ? "text-sm font-semibold text-[var(--ink)]" : "text-xs text-[var(--muted)]"}>{entry.firstName ? `${entry.lastName} ${entry.firstName.charAt(0)}.` : entry.lastName}{entry.rpo && <span title="RPO" aria-label="RPO">*</span>}</span>
+      <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--muted)] tabular-nums"}>{index + 1}.</span>
+      <span className={lead ? "text-sm font-semibold text-[var(--ink)]" : "text-[13px] text-[var(--muted)]"}>{entry.firstName ? `${entry.lastName} ${entry.firstName.charAt(0)}.` : entry.lastName}{entry.rpo && <span title="RPO" aria-label="RPO">*</span>}</span>
       {renderAff(entry)}
-      {value != null && <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)] tabular-nums"}>{value.toFixed(decimals)}</span>}
+      {value != null && <span className={lead ? "font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums" : "font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--muted)] tabular-nums"}>{value.toFixed(decimals)}</span>}
     </span>;
   };
 
@@ -190,6 +190,23 @@ const CATEGORY_BADGE: Record<string, [string, string] | null> = {
   mladji_senior: ["U-23", "MLAĐI SENIORI"], pionir: ["PIONEER", "PIONIRI"], master: ["MASTER", "MASTERI"],
 };
 
+/** Lokacija + oznaka države (zastava i NOC) uz naziv takmičenja. */
+function CompetitionPlace({ location, countryCode2, nocCode, className = "", display = false }: { location: string | null; countryCode2: string | null; nocCode: string | null; className?: string; display?: boolean }) {
+  if (!location && !countryCode2) return null;
+  return (
+    <span className={`flex items-center gap-2 text-[var(--ink)] ${display ? "font-[family-name:var(--font-barlow-condensed)] text-base sm:text-xl font-semibold uppercase leading-none" : "text-sm font-semibold"} ${className}`}>
+      <span className={`w-0.5 shrink-0 bg-[var(--brand-primary)] ${display ? "h-5" : "h-4"}`} aria-hidden="true" />
+      {location && <span className="truncate">{location}</span>}
+      {countryCode2 && (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded border border-[var(--border-strong)] bg-[var(--bg)] px-1.5 py-0.5 dark:bg-[var(--surface-2)]">
+          <span className={`fi fi-${countryCode2.toLowerCase()}`} style={{ fontSize: 11, borderRadius: 2 }} aria-hidden="true" />
+          {nocCode && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-extrabold tracking-wide text-[var(--ink)]">{nocCode}</span>}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function phaseRowKey(competitionId: number, discCode: string, isJunior: boolean, phase: PhaseKeyInput) {
   return `${competitionId}:${discCode}:${isJunior}:${phase.stage}:${phase.elimRound ?? ""}:${phase.category}`;
 }
@@ -279,12 +296,12 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
     if (discResults.length === 0) return <p className="mt-4 text-sm italic text-[var(--muted)]">{t("noWinner")}</p>;
     const isIntl = INTL_LEVELS.has(level.toLowerCase());
     const aff = (e: Shooter) => {
-      if (!isIntl && e.clubName) return <span className="shrink-0 hidden sm:block text-[11px] text-[var(--muted)] max-w-[80px] truncate">{e.clubName}</span>;
+      if (!isIntl && e.clubName) return <span className="shrink-0 hidden sm:block text-xs text-[var(--muted)] max-w-[88px] truncate">{e.clubName}</span>;
       if (!e.nationality) return null;
       return (
         <span className="shrink-0 flex items-center gap-0.5">
           {e.countryCode2 && <span className={`fi fi-${e.countryCode2.toLowerCase()}`} style={{ fontSize: 11 }} aria-hidden="true" />}
-          <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold text-[var(--muted)]">{e.nationality}</span>
+          <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--muted)]">{e.nationality}</span>
         </span>
       );
     };
@@ -298,8 +315,8 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
           const isAP = disc.discCode.startsWith("AP");
           const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-barlow-condensed)] text-[15px] font-bold uppercase tracking-[0.04em] text-[var(--muted)]">{DISC_FULL_NAMES[disc.discCode]?.[locale === "en" ? "en" : "sr"] ?? disc.discCode}</span>;
           const categoryLabel = CATEGORY_BADGE[disc.category]?.[locale === "en" ? 0 : 1] ?? null;
-          const junBadge = categoryLabel ? <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>{categoryLabel}</span> : null;
-          const liveBadge = disc.isLive ? <LiveBadge className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">LIVE</LiveBadge> : null;
+          const junBadge = categoryLabel ? <span className="shrink-0 text-[11px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>{categoryLabel}</span> : null;
+          const liveBadge = disc.isLive ? <LiveBadge className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white">LIVE</LiveBadge> : null;
           return (
             <div key={`${disc.discCode}:${disc.category}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
               {/* Naziv discipline vodi na prvu prikazanu fazu (finale ako postoji, inače kvalifikacije). */}
@@ -318,7 +335,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                     onClick={() => toggleQual(qualKey)}
                     aria-expanded={qualExpanded}
                     aria-label={qualExpanded ? t("showLessQualificationResults") : t("showMoreQualificationResults", { count: extraQualificationResults })}
-                    className="-my-3 flex min-h-11 shrink-0 items-center px-2 text-[10px] font-semibold text-[var(--brand-primary)] hover:underline"
+                    className="-my-3 flex min-h-11 shrink-0 items-center px-2 text-[11px] font-semibold text-[var(--brand-primary)] hover:underline"
                   >
                     <span className="flex items-center gap-0.5 leading-none">
                     <span>{qualExpanded ? t("showLess") : `+${extraQualificationResults}`}</span>
@@ -397,17 +414,20 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
           <div className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-4 hover:border-[var(--brand-primary)] transition-colors">
             <ScopedLink href={`/takmicenja/${lead.id}`} className="block no-underline">
               <div className="flex items-center gap-2 flex-nowrap">
-                {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
-                <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
+                {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
+                <span className="shrink-0 text-[11px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
                   {leadLevelLabel}
                 </span>
-                <span className="flex-1 min-w-0 truncate text-[13px] font-semibold text-[var(--muted)]">
-                  {formatCompetitionDate(lead.date, lead.dateEnd)}{lead.location ? ` · ${lead.location}` : ""}
+                <span className="flex-1 min-w-0 truncate text-sm font-semibold text-[var(--muted)]">
+                  {formatCompetitionDate(lead.date, lead.dateEnd)}
                 </span>
               </div>
-              <h3 className="mt-1.5 font-[family-name:var(--font-barlow-condensed)] text-xl sm:text-2xl font-extrabold uppercase leading-tight line-clamp-2 group-hover:text-[var(--brand-primary)] transition-colors">
-                {name}
-              </h3>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h3 className="font-[family-name:var(--font-barlow-condensed)] text-xl sm:text-2xl font-extrabold uppercase leading-tight line-clamp-2 group-hover:text-[var(--brand-primary)] transition-colors">
+                  {name}
+                </h3>
+                <CompetitionPlace location={lead.location} countryCode2={lead.countryCode2} nocCode={lead.nocCode} display />
+              </div>
             </ScopedLink>
             {renderDiscResults(lead.discResults, lead.level, lead.id)}
             <ScopedLink href={`/takmicenja/${lead.id}`} className="mt-4 pt-3 border-t border-[var(--border)] text-sm font-semibold text-[var(--brand-primary)] hover:underline flex no-underline">
@@ -432,13 +452,15 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   aria-expanded={isExpanded}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--surface-2)] active:bg-[var(--surface-2)] active:scale-[0.995] motion-reduce:active:scale-100 transition-[background-color,transform] duration-150 ease-[var(--ease-out)]"
                 >
-                  {item.isLive && <span className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
-                  <span className="hidden sm:block shrink-0 text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={rowLevelStyle}>
+                  {item.isLive && <span className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
+                  <span className="hidden sm:block shrink-0 text-[11px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={rowLevelStyle}>
                     {rowLevelLabel}
                   </span>
-                  <span className="flex-1 min-w-0 text-sm font-semibold text-[var(--ink)] truncate">
+                  <span className="min-w-0 text-sm font-semibold text-[var(--ink)] truncate">
                     {name}
                   </span>
+                  <CompetitionPlace location={item.location} countryCode2={item.countryCode2} nocCode={item.nocCode} className="min-w-0 shrink max-w-[45%] sm:max-w-[16rem]" />
+                  <span className="ml-auto shrink-0 whitespace-nowrap text-xs font-semibold tabular-nums text-[var(--muted)]">{formatCompetitionDate(item.date, item.dateEnd)}</span>
                   <svg
                     width="12" height="12" viewBox="0 0 12 12"
                     className={`shrink-0 text-[var(--muted)] transition-transform duration-200 ease-[var(--ease-out)] motion-reduce:transition-none ${isExpanded ? "rotate-180" : ""}`}

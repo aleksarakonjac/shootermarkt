@@ -344,6 +344,9 @@ export async function getHomepageMain(scope: Scope) {
   const categoriesById = new Map<number, Set<string>>();
   for (const row of [...scheduleCategories, ...resultCategories]) categoriesById.set(row.competitionId, (categoriesById.get(row.competitionId) ?? new Set()).add(row.category));
   const recentComps = selectHomepageFocusCompetitions(candidateComps, today, categoriesById);
+  const countryIds = [...new Set(recentComps.map((competition) => competition.countryId).filter((id): id is number => id != null))];
+  const countryRows = countryIds.length ? await db.select({ id: countries.id, code2: countries.code2, nocCode: countries.nocCode }).from(countries).where(inArray(countries.id, countryIds)) : [];
+  const countryById = new Map(countryRows.map((country) => [country.id, country]));
   const recent =await Promise.all(recentComps.map(async (competition) => {
     const [slots, individualRows, mixedRows] = await Promise.all([
       db.select({ discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(eq(competitionSchedule.competitionId, competition.id)),
@@ -443,7 +446,8 @@ export async function getHomepageMain(scope: Scope) {
       })),
       };
     });
-    return { ...competition, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), discResults };
+    const country = competition.countryId != null ? countryById.get(competition.countryId) : undefined;
+    return { ...competition, countryCode2: country?.code2 ?? null, nocCode: country?.nocCode ?? null, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), discResults };
   }));
   const topByDisc = Object.fromEntries(FORMA_DISC_CODES.map((code) => [code, cacheRows.filter((row) => row.discCode === code).sort((a, b) => Number(b.forma) - Number(a.forma)).slice(0, 5)])) as Record<typeof FORMA_DISC_CODES[number], typeof cacheRows>;
   const ids = [...new Set(Object.values(topByDisc).flat().map((row) => row.shooterId))];
