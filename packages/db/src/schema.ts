@@ -699,6 +699,27 @@ export const competitionSchedule = pgTable(
   ]
 );
 
+// Izmene satnice koje je schedule-sync cron našao (ISSF pomerio/dodao/uklonio termin). Admin ih potvrđuje.
+export const competitionScheduleChanges = pgTable(
+  "competition_schedule_changes",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+    // 'changed' | 'added' | 'removed' | 'tz_missing'
+    kind: varchar("kind", { length: 12 }).notNull(),
+    disciplineId: integer("discipline_id").references(() => disciplines.id),
+    stage: varchar("stage", { length: 30 }),
+    category: ageCategoryEnum("category"),
+    beforeStart: timestamp("before_start"),
+    beforeEnd: timestamp("before_end"),
+    afterStart: timestamp("after_start"),
+    afterEnd: timestamp("after_end"),
+    detectedAt: timestamp("detected_at").notNull().defaultNow(),
+    acknowledgedAt: timestamp("acknowledged_at"),
+  },
+  (t) => [index("competition_schedule_changes_open_idx").on(t.acknowledgedAt)]
+);
+
 // ── Ticker Live Overrides ─────────────────────────────────────────────────────
 
 export const tickerLiveOverrides = pgTable(

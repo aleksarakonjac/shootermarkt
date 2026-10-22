@@ -21,6 +21,7 @@ const GROUPS: NavGroup[] = [
       { href: "/admin/takmicenja",      label: "Kalendar" },
       { href: "/admin/takmicenja/sync", label: "Uvoz iz kalendara" },
       { href: "/admin/issf/schedule",   label: "Satnica" },
+      { href: "/admin/issf/schedule/changes", label: "Izmene satnice" },
     ],
   },
   {

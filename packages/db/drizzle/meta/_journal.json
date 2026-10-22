@@ -239,6 +239,13 @@
       "when": 1792243960636,
       "tag": "0033_issf_refresh",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792656003225,
+      "tag": "0034_schedule_changes",
+      "breakpoints": true
     }
   ]
 }
