@@ -41,13 +41,13 @@ export default async function AdminLayout({
         <AdminNav />
         <div className="shrink-0 border-t border-[var(--border)] px-4 py-3">
           <p className="text-[0.65rem] text-[var(--subtle)] truncate mb-1">{user.email}</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 whitespace-nowrap">
             <ThemeToggle />
-            <Link href="/" className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">← Nazad na sajt</Link>
+            <Link href="/" className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">← Sajt</Link>
             <span className="text-[var(--border-strong)]">·</span>
             <form action="/logout" method="post">
               <button type="submit" className="text-xs font-medium text-[var(--brand-primary)] hover:text-[var(--brand-primary-hover)] transition-colors">
-                Odjavi se
+                Logout
               </button>
             </form>
           </div>
