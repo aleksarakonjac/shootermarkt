@@ -5,11 +5,11 @@ import { ScopedLink } from "../../components/ScopedLink";
 import Image from "next/image";
 import { db } from "@shootermarkt/db";
 import { shooters, clubs, results, competitions, shooterFormaCache } from "@shootermarkt/db/schema";
-import { eq, asc, ilike, or, and, isNotNull, inArray, sql, desc, gte } from "drizzle-orm";
+import { eq, asc, and, isNotNull, inArray, sql, desc, gte } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
-import { matchedPreviousLastName, previousLastNameLike } from "@/lib/previous-last-name";
+import { matchedPreviousLastName, shooterNameLike } from "@/lib/previous-last-name";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { StrelciFilterBar } from "./StrelciFilterBar";
 import { StrelciTableTransition } from "./StrelciTableTransition";
@@ -193,9 +193,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
           ...activeQ
             .split(/\s+/)
             .filter(Boolean)
-            .map((word) =>
-              or(ilike(shooters.firstName, `%${word}%`), ilike(shooters.lastName, `%${word}%`), previousLastNameLike(shooters.previousLastNames, `%${word}%`))
-            )
+            .map((word) => shooterNameLike(word, "contains"))
         )
       : undefined,
     activeZemlja ? eq(shooters.nationality, activeZemlja) : undefined,

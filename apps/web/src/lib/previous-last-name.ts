@@ -1,5 +1,6 @@
-import { sql, type AnyColumn, type SQL } from "drizzle-orm";
-import { foldName } from "@shootermarkt/db/name-match";
+import { or, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { shooters } from "@shootermarkt/db/schema";
+import { foldName, foldNameSql } from "@shootermarkt/db/name-match";
 
 /**
  * SQL uslov: neko od ranijih prezimena odgovara ILIKE obrascu.
@@ -8,6 +9,23 @@ import { foldName } from "@shootermarkt/db/name-match";
  */
 export function previousLastNameLike(column: AnyColumn, pattern: string): SQL {
   return sql`(${column} is not null and exists (select 1 from unnest(${column}) as p where p ilike ${pattern}))`;
+}
+
+/**
+ * SQL uslov za pretragu strelca po jednoj reči, bez obzira na dijakritike:
+ * "djokovic", "đoković" i "Dokovic" se svi svode na isti foldName ključ.
+ * Ide kroz trigram indekse nad foldNameSql(first_name/last_name) (migracija 0039).
+ */
+export function shooterNameLike(word: string, mode: "prefix" | "contains"): SQL | undefined {
+  const key = foldName(word);
+  if (!key) return undefined;
+  // Ključ sadrži samo a-z, pa nema LIKE džokera za escape.
+  const pattern = mode === "prefix" ? `${key}%` : `%${key}%`;
+  return or(
+    sql`${foldNameSql(shooters.firstName)} like ${pattern}`,
+    sql`${foldNameSql(shooters.lastName)} like ${pattern}`,
+    sql`(${shooters.previousLastNames} is not null and exists (select 1 from unnest(${shooters.previousLastNames}) as p where ${foldNameSql(sql`p`)} like ${pattern}))`,
+  );
 }
 
 /**

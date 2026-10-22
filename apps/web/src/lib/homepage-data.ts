@@ -127,12 +127,12 @@ export function getTickerScheduleStatus(
 
 type ScheduleSlotLike = { discCode: string; disciplineId: number; stage: string; category: string; startTime: Date; endTime: Date | null };
 
-async function slotsFromResults(
+function slotsFromResults(
   competition: { date: string; dateEnd: string | null },
   individualRows: Array<{ disciplineId: number; category: string; qualRank: number | null; elimRank: number | null; finalRank: number | null }>,
   mixedRows: Array<{ disciplineId: number; category: string; qualRank: number | null; finalRank: number | null }>,
-): Promise<ScheduleSlotLike[]> {
-  const codes = new Map((await db.select({ id: disciplines.id, code: disciplines.code }).from(disciplines)).map((d) => [d.id, d.code]));
+  codes: Map<number, string>,
+): ScheduleSlotLike[] {
   const startTime = new Date(`${competition.date}T00:00:00Z`);
   const endTime = new Date(`${competition.dateEnd ?? competition.date}T23:59:59Z`);
   const found = new Map<string, ScheduleSlotLike>();
@@ -328,32 +328,48 @@ export async function getHomepageMain(scope: Scope) {
   const upcomingDeadline = twoMonthsOut.toISOString().slice(0, 10);
   const competitionScope = buildCompetitionScopeFilter(scope);
   const nationalityFilter = scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined;
-  const [candidateComps, cacheRows, upcoming] = await Promise.all([
+  // Tri talasa upita (ranije ~7): svaki talas je jedan round-trip do baze.
+  const [candidateComps, cacheRows, upcoming, disciplineRows] = await Promise.all([
     // Šira lista kandidata; konačni izbor 3 po prioritetu radi selectHomepageFocusCompetitions.
     db.select().from(competitions).where(and(sql`${competitions.date} <= ${today}`, sql`(EXISTS (SELECT 1 FROM ${results} WHERE ${results.competitionId} = ${competitions.id}) OR EXISTS (SELECT 1 FROM ${mixedTeamResults} WHERE ${mixedTeamResults.competitionId} = ${competitions.id}))`, competitionScope)).orderBy(desc(competitions.date)).limit(40),
     db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality, countryCode2: countries.code2 }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(and(eq(shooters.verified, true), nationalityFilter, rankedFormaCacheFilter())),
     db.select().from(competitions).where(and(sql`${competitions.date} >= ${today} AND ${competitions.date} < ${upcomingDeadline}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
+    db.select({ id: disciplines.id, code: disciplines.code }).from(disciplines),
   ]);
+  const disciplineCodes = new Map(disciplineRows.map((d) => [d.id, d.code]));
   const showSrbHighlight = scope === 'srb';
   const candidateIds = candidateComps.map((competition) => competition.id);
-  const [scheduleCategories, resultCategories] = candidateIds.length
-    ? await Promise.all([
-        db.selectDistinct({ competitionId: competitionSchedule.competitionId, category: competitionSchedule.category }).from(competitionSchedule).where(inArray(competitionSchedule.competitionId, candidateIds)),
-        db.selectDistinct({ competitionId: results.competitionId, category: results.category }).from(results).where(inArray(results.competitionId, candidateIds)),
-      ])
-    : [[], []];
+  const candidateCountryIds = [...new Set(candidateComps.map((competition) => competition.countryId).filter((id): id is number => id != null))];
+  const topByDisc = Object.fromEntries(FORMA_DISC_CODES.map((code) => [code, cacheRows.filter((row) => row.discCode === code).sort((a, b) => Number(b.forma) - Number(a.forma)).slice(0, 5)])) as Record<typeof FORMA_DISC_CODES[number], typeof cacheRows>;
+  const topIds = [...new Set(Object.values(topByDisc).flat().map((row) => row.shooterId))];
+  const [scheduleCategories, resultCategories, countryRows, scoreRows] = await Promise.all([
+    candidateIds.length ? db.selectDistinct({ competitionId: competitionSchedule.competitionId, category: competitionSchedule.category }).from(competitionSchedule).where(inArray(competitionSchedule.competitionId, candidateIds)) : [],
+    candidateIds.length ? db.selectDistinct({ competitionId: results.competitionId, category: results.category }).from(results).where(inArray(results.competitionId, candidateIds)) : [],
+    candidateCountryIds.length ? db.select({ id: countries.id, code2: countries.code2, nocCode: countries.nocCode }).from(countries).where(inArray(countries.id, candidateCountryIds)) : [],
+    topIds.length
+      ? db.select({ shooterId: results.shooterId, discCode: disciplines.code, qualTotal: results.qualTotal })
+        .from(results)
+        .innerJoin(competitions, eq(results.competitionId, competitions.id))
+        .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
+        .where(and(inArray(results.shooterId, topIds), inArray(disciplines.code, [...FORMA_DISC_CODES]), isNotNull(results.qualTotal)))
+        .orderBy(desc(competitions.date))
+      : [],
+  ]);
   const categoriesById = new Map<number, Set<string>>();
   for (const row of [...scheduleCategories, ...resultCategories]) categoriesById.set(row.competitionId, (categoriesById.get(row.competitionId) ?? new Set()).add(row.category));
   const recentComps = selectHomepageFocusCompetitions(candidateComps, today, categoriesById);
-  const countryIds = [...new Set(recentComps.map((competition) => competition.countryId).filter((id): id is number => id != null))];
-  const countryRows = countryIds.length ? await db.select({ id: countries.id, code2: countries.code2, nocCode: countries.nocCode }).from(countries).where(inArray(countries.id, countryIds)) : [];
   const countryById = new Map(countryRows.map((country) => [country.id, country]));
-  const recent =await Promise.all(recentComps.map(async (competition) => {
-    const [slots, individualRows, mixedRows] = await Promise.all([
-      db.select({ discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(eq(competitionSchedule.competitionId, competition.id)),
-      db.select({ shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRound: results.elimRound, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, qualRemark: results.qualRemark, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(eq(results.competitionId, competition.id)),
-      db.select({ disciplineId: mixedTeamResults.disciplineId, category: mixedTeamResults.category, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(eq(mixedTeamResults.competitionId, competition.id)),
-    ]);
+  const recentIds = recentComps.map((competition) => competition.id);
+  // Jedan upit po tabeli za sva izabrana takmičenja (ne 3 po takmičenju — pool ima 5 konekcija).
+  const [allSlots, allIndividualRows, allMixedRows] = recentIds.length ? await Promise.all([
+    db.select({ competitionId: competitionSchedule.competitionId, discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(inArray(competitionSchedule.competitionId, recentIds)).orderBy(asc(competitionSchedule.startTime), asc(competitionSchedule.id)),
+    db.select({ competitionId: results.competitionId, shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRound: results.elimRound, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, qualRemark: results.qualRemark, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(inArray(results.competitionId, recentIds)).orderBy(asc(results.id)),
+    db.select({ competitionId: mixedTeamResults.competitionId, disciplineId: mixedTeamResults.disciplineId, category: mixedTeamResults.category, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(inArray(mixedTeamResults.competitionId, recentIds)).orderBy(asc(mixedTeamResults.id)),
+  ]) : [[], [], []] as const;
+  const recent = recentComps.map((competition) => {
+    const slots = allSlots.filter((row) => row.competitionId === competition.id);
+    const individualRows = allIndividualRows.filter((row) => row.competitionId === competition.id);
+    const mixedRows = allMixedRows.filter((row) => row.competitionId === competition.id);
     type Entry = { id: string; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; rank: number; total: number; round: number | null; rpo?: boolean };
     // A discipline/category can have multiple "qual" schedule rows at different
     // times (e.g. SPW: precizna + brza paljba are separate time slots but share
@@ -361,7 +377,7 @@ export async function getHomepageMain(scope: Scope) {
     // category, stage-kind) so the same phase isn't rendered twice.
     // Takmičenje bez rasporeda (npr. rezultati uvezeni bez competition_schedule) se vodi po
     // unetim rezultatima: jedna faza po (disciplina, kategorija, kvalifikacije/elim/finale).
-    const effectiveSlots = slots.length ? slots : await slotsFromResults(competition, individualRows, mixedRows);
+    const effectiveSlots = slots.length ? slots : slotsFromResults(competition, individualRows, mixedRows, disciplineCodes);
     const dedupedSlots = [...new Map(
       effectiveSlots.map((s) => [`${s.disciplineId}|${s.category}|${s.stage.startsWith("qual") ? "qual" : s.stage}`, s])
     ).values()];
@@ -449,17 +465,7 @@ export async function getHomepageMain(scope: Scope) {
     });
     const country = competition.countryId != null ? countryById.get(competition.countryId) : undefined;
     return { ...competition, countryCode2: country?.code2 ?? null, nocCode: country?.nocCode ?? null, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), discResults };
-  }));
-  const topByDisc = Object.fromEntries(FORMA_DISC_CODES.map((code) => [code, cacheRows.filter((row) => row.discCode === code).sort((a, b) => Number(b.forma) - Number(a.forma)).slice(0, 5)])) as Record<typeof FORMA_DISC_CODES[number], typeof cacheRows>;
-  const ids = [...new Set(Object.values(topByDisc).flat().map((row) => row.shooterId))];
-  const scoreRows = ids.length
-    ? await db.select({ shooterId: results.shooterId, discCode: disciplines.code, qualTotal: results.qualTotal })
-      .from(results)
-      .innerJoin(competitions, eq(results.competitionId, competitions.id))
-      .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
-      .where(and(inArray(results.shooterId, ids), inArray(disciplines.code, [...FORMA_DISC_CODES]), isNotNull(results.qualTotal)))
-      .orderBy(desc(competitions.date))
-    : [];
+  });
   const scores = groupTopFormaScores(scoreRows);
   const map = (row: (typeof cacheRows)[number]) => ({ shooterId: row.shooterId, firstName: row.firstName, lastName: row.lastName, nationality: row.nationality, countryCode2: row.countryCode2, formaScore: Number(row.forma), trend: row.trend ?? "stable", peak: row.peakCareer == null ? null : Number(row.peakCareer), entriesCount: row.sampleSize, recentScores: scores.get(`${row.shooterId}:${row.discCode}`) ?? [] });
   return { recent, upcoming, topForma: { ARM: topByDisc.ARM.map(map), ARW: topByDisc.ARW.map(map), APM: topByDisc.APM.map(map), APW: topByDisc.APW.map(map) } };

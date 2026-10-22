@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, ilike, inArray, or } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { clubs, competitions, shooters } from "@shootermarkt/db/schema";
-import { matchedPreviousLastName, previousLastNameLike } from "@/lib/previous-last-name";
+import { matchedPreviousLastName, shooterNameLike } from "@/lib/previous-last-name";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { buildCompetitionScopeFilter, DEFAULT_SCOPE, type Scope, VALID_SCOPES } from "@/lib/scope";
 
@@ -19,11 +19,7 @@ export async function GET(request: NextRequest) {
   if (q.length < 2) return NextResponse.json({ shooters: [], competitions: [] });
 
   const terms = q.split(/\s+/).filter(Boolean);
-  const shooterMatches = terms.map((term) => or(
-    ilike(shooters.firstName, `${term}%`),
-    ilike(shooters.lastName, `${term}%`),
-    previousLastNameLike(shooters.previousLastNames, `${term}%`),
-  ));
+  const shooterMatches = terms.map((term) => shooterNameLike(term, "prefix"));
   const competitionMatches = terms.map((term) => or(
     ilike(competitions.name, `${term}%`),
     ilike(competitions.nameSr, `${term}%`),
@@ -47,7 +43,8 @@ export async function GET(request: NextRequest) {
     .limit(LIMIT);
 
   const [shooterRows, competitionRows] = await Promise.all([
-    shooterQuery,
+    // Upit bez slova (npr. samo interpunkcija) nema po čemu da traži strelce.
+    shooterMatches.some(Boolean) ? shooterQuery : Promise.resolve([]),
     shootersOnly ? Promise.resolve([]) : competitionQuery,
   ]);
 

@@ -1,0 +1,2 @@
+CREATE INDEX "shooters_first_name_fold_trgm_idx" ON "shooters" USING gin ((regexp_replace(replace(translate(lower(regexp_replace(normalize("first_name", NFD), U&'[\0300-\036F]', '', 'g')), 'Đđ', 'dd'), 'dj', 'd'), '[^a-z]', '', 'g')) gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "shooters_last_name_fold_trgm_idx" ON "shooters" USING gin ((regexp_replace(replace(translate(lower(regexp_replace(normalize("last_name", NFD), U&'[\0300-\036F]', '', 'g')), 'Đđ', 'dd'), 'dj', 'd'), '[^a-z]', '', 'g')) gin_trgm_ops);

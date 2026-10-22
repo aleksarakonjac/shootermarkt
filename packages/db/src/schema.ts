@@ -350,6 +350,9 @@ export const shooters = pgTable(
     index("shooters_previous_last_names_idx").on(t.previousLastNames).where(sql`${t.previousLastNames} IS NOT NULL`),
     // Predfiltriranje kandidata za name-match (takmičenje: mixed team bez shooter id-a).
     index("shooters_last_name_fold_idx").on(foldNameSql(t.lastName)),
+    // Javna pretraga bez dijakritika (shooterNameLike): LIKE nad fold ključem.
+    index("shooters_first_name_fold_trgm_idx").using("gin", sql`(${foldNameSql(t.firstName)}) gin_trgm_ops`),
+    index("shooters_last_name_fold_trgm_idx").using("gin", sql`(${foldNameSql(t.lastName)}) gin_trgm_ops`),
   ]
 );
 

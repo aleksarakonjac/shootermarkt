@@ -38,7 +38,8 @@ export function TickerDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/homepage/ticker?scope=${scope ?? "srb"}&locale=${locale}`, { signal: controller.signal })
+    // v = 5-sekundni bucket: svi posetioci dele isti CDN odgovor, a osvežavanje ne dobija 60 s star keš.
+    fetch(`/api/homepage/ticker?scope=${scope ?? "srb"}&locale=${locale}&v=${Math.floor(Date.now() / 5_000)}`, { signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Ticker request failed")))
       .then((result: TickerApiResponse) => { setData(result); setState("ready"); })
       .catch((error) => {
@@ -54,17 +55,22 @@ export function TickerDataProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(interval);
   }, [retry]);
 
-  // Realtime: odmah osveži kad admin promeni override-e ili raspored.
+  // Realtime: odmah osveži kad admin promeni override-e ili raspored — samo dok je nešto LIVE.
+  // Inače je dovoljno osvežavanje na REFRESH_MS (svaka pretplata drži Supabase Realtime da čita WAL).
+  const hasLive = (data?.live.length ?? 0) > 0;
   useEffect(() => {
+    if (!hasLive) return;
+    let timer: number | undefined;
+    const debouncedRetry = () => { window.clearTimeout(timer); timer = window.setTimeout(retry, 1_500); };
     const supabase = createClient();
     const channel = supabase
       .channel("ticker-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_live_overrides" }, retry)
-      .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, retry)
-      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_custom_upcoming" }, retry)
+      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_live_overrides" }, debouncedRetry)
+      .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, debouncedRetry)
+      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_custom_upcoming" }, debouncedRetry)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [retry]);
+    return () => { window.clearTimeout(timer); supabase.removeChannel(channel); };
+  }, [hasLive, retry]);
 
   const value = useMemo<TickerData>(() => ({
     state,

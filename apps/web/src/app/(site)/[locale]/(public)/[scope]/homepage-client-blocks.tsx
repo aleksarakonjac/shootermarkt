@@ -134,7 +134,8 @@ function useHomepageData<T>(path: string, refreshMs?: number, initialData?: T) {
     }
     const controller = new AbortController();
     clearFailure(path);
-    fetch(`${path}?scope=${scope ?? "srb"}&locale=${locale}`, { signal: controller.signal })
+    // v = 5-sekundni bucket: svi posetioci dele isti CDN odgovor, a osvežavanje ne dobija 60 s star keš.
+    fetch(`${path}?scope=${scope ?? "srb"}&locale=${locale}&v=${Math.floor(Date.now() / 5_000)}`, { signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Homepage request failed")))
       .then((result) => { hasData.current = true; setData(result); setState("ready"); clearFailure(path); })
       .catch((error) => {
@@ -268,16 +269,23 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
     return () => window.clearTimeout(timeout);
   }, [data]);
 
+  // Realtime samo dok je neko takmičenje u toku: svaka pretplata drži Supabase Realtime da čita WAL,
+  // a van takmičenja se rezultati ne menjaju uživo.
+  const hasLive = data?.recent.some((competition) => competition.isLive) ?? false;
   useEffect(() => {
+    if (!hasLive) return;
+    // Import upisuje mnogo redova odjednom — spoji događaje u jedno osvežavanje.
+    let timer: number | undefined;
+    const debouncedRefresh = () => { window.clearTimeout(timer); timer = window.setTimeout(refresh, 1_500); };
     const supabase = createClient();
     const channel = supabase
       .channel("live-results-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "results" }, refresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "mixed_team_results" }, refresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "results" }, debouncedRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "mixed_team_results" }, debouncedRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, debouncedRefresh)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [refresh]);
+    return () => { window.clearTimeout(timer); supabase.removeChannel(channel); };
+  }, [hasLive, refresh]);
 
   if (state === "loading") return <MainSkeleton />;
   if (state === "error" || !data) return <HomepageError retry={retry} />;
