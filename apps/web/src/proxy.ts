@@ -92,6 +92,6 @@ export const config = {
   matcher: [
     "/admin/:path*",
     "/portal/:path*",
-    "/((?!api|admin|cms|login|_next|_vercel|.*\\..*).*)",
+    "/((?!api|admin|login|_next|_vercel|.*\\..*).*)",
   ],
 };
