@@ -11,7 +11,7 @@ type Level = (typeof competitionLevelEnum.enumValues)[number];
 type EventType = (typeof eventTypeEnum.enumValues)[number];
 type Category = (typeof ageCategoryEnum.enumValues)[number];
 
-export type BulkCompetitionChange = { id: number; level?: Level; eventType?: EventType; tags?: string[]; focusPriority?: number | null };
+export type BulkCompetitionChange = { id: number; name?: string; level?: Level; eventType?: EventType; tags?: string[]; focusPriority?: number | null };
 /** Svi rezultati meča (takmičenje × disciplina × kategorija) prelaze u novu kategoriju. */
 export type BulkMatchChange = { competitionId: number; disciplineId: number; from: Category; to: Category };
 
@@ -35,6 +35,7 @@ async function handlePOST(req: NextRequest) {
   for (const raw of comps) {
     const c = raw as Record<string, unknown>;
     if (!isId(c.id)) return NextResponse.json({ error: "Neispravan id takmičenja" }, { status: 400 });
+    if (c.name !== undefined && !(typeof c.name === "string" && c.name.trim() && c.name.length <= 300)) return NextResponse.json({ error: `[${c.id}] ime mora imati 1–300 znakova` }, { status: 400 });
     if (c.level !== undefined && !isIn(competitionLevelEnum.enumValues, c.level)) return NextResponse.json({ error: `[${c.id}] nepoznat nivo` }, { status: 400 });
     if (c.eventType !== undefined && !isIn(eventTypeEnum.enumValues, c.eventType)) return NextResponse.json({ error: `[${c.id}] nepoznat tip` }, { status: 400 });
     if (c.tags !== undefined && !(Array.isArray(c.tags) && c.tags.every((t) => typeof t === "string" && t.trim() && t.length <= 20))) {
@@ -49,6 +50,7 @@ async function handlePOST(req: NextRequest) {
     compChanges.push({
       id: c.id,
       focusPriority,
+      name: (c.name as string | undefined)?.trim(),
       level: c.level as Level | undefined,
       eventType: c.eventType as EventType | undefined,
       tags: (c.tags as string[] | undefined)?.map((t) => t.trim()),
@@ -70,6 +72,7 @@ async function handlePOST(req: NextRequest) {
     await db.transaction(async (tx) => {
       for (const c of compChanges) {
         const set = {
+          ...(c.name ? { name: c.name } : {}),
           ...(c.level ? { level: c.level } : {}),
           ...(c.eventType ? { eventType: c.eventType } : {}),
           ...(c.tags ? { tags: c.tags } : {}),

@@ -21,7 +21,7 @@ export type BulkRow = {
   matches: BulkMatch[];
 };
 
-type CompDraft = { level?: string; eventType?: string; tags?: string; priority?: string };
+type CompDraft = { name?: string; level?: string; eventType?: string; tags?: string; priority?: string };
 const priorityText = (p: number | null) => (p == null ? "" : String(p));
 const matchKey = (compId: number, m: BulkMatch) => `${compId}|${m.disciplineId}|${m.category}`;
 const parseTags = (s: string) => [...new Set(s.split(",").map((t) => t.trim()).filter(Boolean))];
@@ -42,7 +42,8 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
   const compChanges = rows.flatMap((r) => {
     const d = comps[r.id];
     if (!d) return [];
-    const change: { id: number; level?: string; eventType?: string; tags?: string[]; focusPriority?: number | null } = { id: r.id };
+    const change: { id: number; name?: string; level?: string; eventType?: string; tags?: string[]; focusPriority?: number | null } = { id: r.id };
+    if (d.name !== undefined && d.name.trim() && d.name.trim() !== r.name) change.name = d.name.trim();
     if (d.level !== undefined && d.level !== r.level) change.level = d.level;
     if (d.eventType !== undefined && d.eventType !== r.eventType) change.eventType = d.eventType;
     if (d.tags !== undefined && parseTags(d.tags).join(",") !== r.tags.join(",")) change.tags = parseTags(d.tags);
@@ -151,6 +152,7 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
           <tbody className="divide-y divide-[var(--border)]">
             {rows.map((r) => {
               const d = comps[r.id] ?? {};
+              const name = d.name ?? r.name;
               const level = d.level ?? r.level;
               const eventType = d.eventType ?? r.eventType;
               const tags = d.tags ?? r.tags.join(", ");
@@ -161,8 +163,14 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
                     <input type="checkbox" aria-label={`Izaberi: ${r.name}`} checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
                   </td>
                   <td className="px-3 py-2.5">
-                    <a href={`/admin/takmicenja/${r.id}/edit`} className="font-medium text-[var(--ink)] hover:text-[var(--brand-primary)]">{r.name}</a>
-                    <div className="mt-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] text-[var(--subtle)]">{formatDateRangeSr(r.date, null)} · #{r.id}</div>
+                    <input
+                      aria-label={`Ime: ${r.name}`}
+                      value={name}
+                      maxLength={300}
+                      onChange={(e) => setComp(r.id, { name: e.target.value })}
+                      className={`${selectCls} font-medium ${name.trim() !== r.name ? changedCls : "border-[var(--border)]"}`}
+                    />
+                    <div className="mt-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] text-[var(--subtle)]">{formatDateRangeSr(r.date, null)} · #{r.id} · <a href={`/admin/takmicenja/${r.id}/edit`} className="hover:text-[var(--brand-primary)]">uredi</a></div>
                   </td>
                   <td className="px-3 py-2.5">
                     <input
