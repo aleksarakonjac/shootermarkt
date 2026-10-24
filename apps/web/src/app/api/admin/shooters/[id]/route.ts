@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
-import { shooters, results } from "@shootermarkt/db/schema";
+import { shooters, results, clubMemberships, nationalTeamMemberships } from "@shootermarkt/db/schema";
 import { requireAdmin } from "@/lib/admin-auth";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 async function handlePATCH(
@@ -42,7 +42,7 @@ async function handlePATCH(
 }
 
 async function handleDELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const denied = await requireAdmin();
@@ -52,13 +52,19 @@ async function handleDELETE(
   const shooterId = parseInt(id);
   if (isNaN(shooterId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-  // Block delete if shooter has results
-  const [existing] = await db.select({ id: results.id }).from(results).where(eq(results.shooterId, shooterId)).limit(1);
-  if (existing) {
-    return NextResponse.json({ error: "Strelac ima rezultate, ne može se obrisati" }, { status: 409 });
+  // Sa rezultatima se briše samo uz ?force=1 (UI traži potvrdu); inače 409 sa brojem rezultata.
+  const force = new URL(req.url).searchParams.get("force") === "1";
+  const [{ n: resultCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(results).where(eq(results.shooterId, shooterId));
+  if (resultCount > 0 && !force) {
+    return NextResponse.json({ error: `Strelac ima ${resultCount} rezultata`, resultCount }, { status: 409 });
   }
 
-  await db.delete(shooters).where(eq(shooters.id, shooterId));
+  await db.transaction(async (tx) => {
+    await tx.delete(results).where(eq(results.shooterId, shooterId));
+    await tx.delete(clubMemberships).where(eq(clubMemberships.shooterId, shooterId));
+    await tx.delete(nationalTeamMemberships).where(eq(nationalTeamMemberships.shooterId, shooterId));
+    await tx.delete(shooters).where(eq(shooters.id, shooterId)); // mixed team ref -> set null, forma cache -> cascade
+  });
   return NextResponse.json({ ok: true });
 }
 

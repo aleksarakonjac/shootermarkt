@@ -161,8 +161,13 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
   function del() {
     if (!confirm(`Obriši strelca "${shooter.lastName} ${shooter.firstName}"? Ova akcija je nepovratna.`)) return;
     startDeleting(async () => {
-      const res = await fetch(`/api/admin/shooters/${shooter.id}`, { method: "DELETE" });
-      const d = await res.json();
+      let res = await fetch(`/api/admin/shooters/${shooter.id}`, { method: "DELETE" });
+      let d = await res.json();
+      if (res.status === 409 && d.resultCount) {
+        if (!confirm(`Strelac ima ${d.resultCount} rezultata. Brisanjem se trajno brišu i svi njegovi rezultati. Obrisati sve?`)) return;
+        res = await fetch(`/api/admin/shooters/${shooter.id}?force=1`, { method: "DELETE" });
+        d = await res.json();
+      }
       if (!res.ok) {
         setFlash({ type: "err", msg: d.error ?? "Greška" });
       } else {

@@ -267,11 +267,11 @@ function MonthGroup({ mk, comps, idx, locale, fullName }: { mk: string; comps: R
 }
 
 // Sažet prošli mesec: jedan red (mesec, broj, nivoi, pokrivenost rezultatima); <details> ga razvija na licu mesta.
-function FoldedMonth({ mk, comps, locale, fullName }: { mk: string; comps: CompItem[]; locale: string; fullName: string }) {
+function FoldedMonth({ mk, comps, locale, fullName, open }: { mk: string; comps: CompItem[]; locale: string; fullName: string; open: boolean }) {
   const levels = [...new Set(comps.map((c) => c.level))].sort((a, b) => (LEVEL_PRIORITY[a] ?? 9) - (LEVEL_PRIORITY[b] ?? 9));
   const [yr, mo] = mk.split("-");
   return (
-    <details className="season-fold group/fold">
+    <details className="season-fold group/fold" open={open}>
       <summary className="season-fold-summary flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 transition-colors sm:min-h-0 sm:py-2.5 hover:bg-[var(--surface)] [&::-webkit-details-marker]:hidden">
         <span className="season-fold-month shrink-0 text-[0.95rem] font-semibold capitalize text-[var(--ink)] sm:w-[4.5rem] sm:text-sm">
           <span className="sm:hidden">{fullName}</span>
@@ -633,7 +633,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
             {foldedMonths.length > 0 && (
               <div className="season-ledger">
                 {foldedMonths.map((mk) => (
-                  <FoldedMonth key={mk} mk={mk} comps={byMonth.get(mk)!} locale={locale} fullName={tCal(`months.${parseInt(mk.slice(5)) - 1}`)} />
+                  <FoldedMonth key={`${mk}-${activeQ}`} open={Boolean(activeQ)} mk={mk} comps={byMonth.get(mk)!} locale={locale} fullName={tCal(`months.${parseInt(mk.slice(5)) - 1}`)} />
                 ))}
               </div>
             )}

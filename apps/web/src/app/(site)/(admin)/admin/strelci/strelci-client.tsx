@@ -166,8 +166,13 @@ export function StrelciClient({ data, page, total, unverifiedTotal, pageSize }: 
   async function deleteSingle(id: number, name: string) {
     if (!confirm(`Obriši strelca "${name}"?`)) return;
     startVerifying(async () => {
-      const res = await fetch(`/api/admin/shooters/${id}`, { method: "DELETE" });
-      const data = await res.json();
+      let res = await fetch(`/api/admin/shooters/${id}`, { method: "DELETE" });
+      let data = await res.json();
+      if (res.status === 409 && data.resultCount) {
+        if (!confirm(`Strelac "${name}" ima ${data.resultCount} rezultata. Brisanjem strelca trajno se brišu i svi njegovi rezultati. Obrisati sve?`)) return;
+        res = await fetch(`/api/admin/shooters/${id}?force=1`, { method: "DELETE" });
+        data = await res.json();
+      }
       if (!res.ok) {
         setFlash(`Greška: ${data.error}`);
       } else {
