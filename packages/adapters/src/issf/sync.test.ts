@@ -3,7 +3,20 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@shootermarkt/db", () => ({ db: {} }));
 vi.mock("@shootermarkt/db/upload-avatar-raw", () => ({ NoAvatarError: class extends Error {}, uploadAvatarFromUrlRaw: vi.fn() }));
 
-const { issfAscii, rankMatch } = await import("./sync");
+const { issfAscii, rankMatch, renamedAlias } = await import("./sync");
+
+describe("renamedAlias", () => {
+  it("keeps a genuinely new ISSF last name, not a respelling", () => {
+    const s = (firstName: string, lastName: string, previousLastNames: string[] | null = null) => ({ firstName, lastName, previousLastNames });
+    expect(renamedAlias(s("Aleksandra", "Havran"), "STOJADINOVIC")).toBe("STOJADINOVIC");
+    expect(renamedAlias(s("Aleksandra", "Havran", ["STOJADINOVIC"]), "STOJADINOVIC")).toBeNull();
+    expect(renamedAlias(s("Emely", "JÄGGI"), "JAEGGI")).toBeNull();
+    expect(renamedAlias(s("Đorđe", "Đorđević"), "DORDEVIC")).toBeNull();
+    expect(renamedAlias(s("Mohammed", "Al-Harbi"), "AL HARBI")).toBeNull();
+    expect(renamedAlias(s("Prodiashvili", "SALOME"), "PRODIASHVILI")).toBeNull();
+    expect(renamedAlias(s("Aleksandra", "Havran"), "")).toBeNull();
+  });
+});
 
 describe("issfAscii", () => {
   it("strips Serbian diacritics the way ISSF stores names", () => {
@@ -52,6 +65,16 @@ describe("rankMatch", () => {
     expect(rankMatch("Zoltán", "TÖRÖK", issf("Zoltan", "TOROK"))).toBe("exact");
     expect(rankMatch("Hajı", "MUSAYEV", issf("Haji", "MUSAYEV"))).toBe("exact");
     expect(rankMatch("Vanessa", "GLEIßNER", issf("Vanessa Alexandra", "GLEISSNER"))).toBe("close");
+  });
+
+  it("renamed: ISSF found by old last name returns the new one", () => {
+    expect(rankMatch("Aleksandra", "Havran", issf("Aleksandra", "STOJADINOVIC"), true)).toBe("exact");
+    expect(rankMatch("Vivien", "Havran", issf("Vivien Joy", "STOJADINOVIC"), true)).toBe("close");
+    expect(rankMatch("Aleksandra", "Havran", issf("Milica", "STOJADINOVIC"), true)).toBe("weak");
+    // samo kada je kandidat došao iz upita po prezimenu
+    expect(rankMatch("Aleksandra", "Havran", issf("Aleksandra", "STOJADINOVIC"))).toBe("weak");
+    // prezime je u imenu kandidata → ISSF ga je našao po imenu, ne po ranijem prezimenu
+    expect(rankMatch("Aleksandra", "Havran", issf("Aleksandra", "HAVRANEK"), true)).toBe("weak");
   });
 
   it("weak when last name differs or first name is someone else", () => {

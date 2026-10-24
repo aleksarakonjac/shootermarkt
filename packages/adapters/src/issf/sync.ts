@@ -72,9 +72,24 @@ function rankTokens(first: string, last: string, c: Pick<ISSFAthlete, "firstName
   return null;
 }
 
-export function rankMatch(first: string, last: string, c: Pick<ISSFAthlete, "firstName" | "familyName">): IssfMatch {
-  const ranks = asciiVariants(first, last).map((v) => rankAscii(v.first, v.last, c));
+/**
+ * `viaLastName`: ISSF je kandidata vratio na upit po našem prezimenu. Ako tog prezimena
+ * nema u njegovom imenu, ISSF ga je našao po ranijem prezimenu (udaja: pretraga
+ * "HAVRAN Aleksandra" → "Aleksandra STOJADINOVIC") — onda odlučuje samo ime.
+ */
+export function rankMatch(first: string, last: string, c: Pick<ISSFAthlete, "firstName" | "familyName">, viaLastName = false): IssfMatch {
+  const variants = asciiVariants(first, last);
+  const ranks = variants.map((v) => rankAscii(v.first, v.last, c));
+  if (viaLastName) ranks.push(...variants.map((v) => rankRenamed(v.first, v.last, c)));
   return ranks.sort((a, b) => ORDER[a] - ORDER[b])[0];
+}
+
+function rankRenamed(first: string, last: string, c: Pick<ISSFAthlete, "firstName" | "familyName">): IssfMatch {
+  const fLast = foldName(last);
+  if (!fLast || foldName(`${c.firstName ?? ""}${c.familyName ?? ""}`).includes(fLast)) return "weak";
+  const fa = foldName(first), fb = foldName(c.firstName ?? "");
+  if (fa === fb) return "exact";
+  return fa && fb && (fa.startsWith(fb) || fb.startsWith(fa)) ? "close" : "weak";
 }
 
 function rankAscii(first: string, last: string, c: Pick<ISSFAthlete, "firstName" | "familyName">): IssfMatch {
@@ -96,6 +111,7 @@ export async function lookupIssfAthletes(first: string, last: string, noc?: stri
     ...(nocQ ? variants.map((v) => `${nocQ} ${v.last}`) : []),
     ...variants.map((v) => `${v.last} ${v.first}`.trim()),
   ])];
+  const lastNameQueries = queries.length;
   // Višečlana imena: ISSF može imati drugačiju podelu ime/prezime — traži i po najdužoj reči
   const tokens = nameTokens(variants[0].first, variants[0].last);
   if (tokens.length > 2) {
@@ -104,10 +120,19 @@ export async function lookupIssfAthletes(first: string, last: string, noc?: stri
   }
 
   const found = new Map<string, ISSFAthlete>();
-  for (const q of queries) {
+  // Samo pogoci upita sa prezimenom mogu biti "promenjeno prezime" — upit po najdužoj reči
+  // može biti po imenu i vratio bi svakoga sa tim imenom
+  // + ista nacija: ISSF pretraga je labava ("MARIAN Ana" vrati i "Ana Beatriz DA SILVA BRA")
+  const viaLast = new Set<string>();
+  const nocOk = (a: ISSFAthlete) => !nocQ || nocQ === "AIN" || a.nationCode === nocQ;
+  const rank = (a: ISSFAthlete) => rankMatch(first, last, a, viaLast.has(a.issfId) && nocOk(a));
+  for (const [i, q] of queries.entries()) {
     const batch = await searchRaw(q);
-    for (const a of batch) if (a.issfId) found.set(a.issfId, a);
-    if ([...found.values()].some((a) => rankMatch(first, last, a) === "exact")) break;
+    for (const a of batch) if (a.issfId) {
+      found.set(a.issfId, a);
+      if (i < lastNameQueries) viaLast.add(a.issfId);
+    }
+    if ([...found.values()].some((a) => rank(a) === "exact")) break;
   }
   if (!found.size) return [];
 
@@ -124,7 +149,7 @@ export async function lookupIssfAthletes(first: string, last: string, noc?: stri
       gender: a.gender === "Male" ? "M" : a.gender === "Female" ? "F" : null,
       birthYear: a.birthday ? Number(a.birthday.slice(0, 4)) : null,
       portraitUrl: a.portraitUrl ?? null,
-      match: rankMatch(first, last, a),
+      match: rank(a),
       existingShooterId: existingMap.get(a.issfId) ?? null,
     }))
     .filter((c) => c.match !== "weak" || found.size <= 10)
@@ -134,6 +159,18 @@ export async function lookupIssfAthletes(first: string, last: string, noc?: stri
 
 export class IssfConflictError extends Error {
   constructor(public shooterId: number) { super(`ISSF ID već pripada strelcu #${shooterId}`); }
+}
+
+/**
+ * ISSF prezime koje nema nijednu reč zajedničku sa našim imenom (ni u jednoj ASCII varijanti) je
+ * promenjeno prezime — čuva se kao alias da bi matchShooter našao strelca i u rezultatima
+ * pod novim prezimenom. Različit zapis (JÄGGI/JAEGGI, Al-Harbi/AL HARBI) ili zamenjeno
+ * ime/prezime ("Prodiashvili SALOME") nije alias.
+ */
+export function renamedAlias(s: { firstName: string; lastName: string; previousLastNames: string[] | null }, issfFamilyName: string | undefined): string | null {
+  if (!issfFamilyName?.trim()) return null;
+  const ours = new Set([s.firstName, s.lastName, ...(s.previousLastNames ?? [])].flatMap((n) => [...nameTokens(issfAscii(n)), ...nameTokens(issfAscii(n, true))]));
+  return nameTokens(issfFamilyName).some((t) => ours.has(t)) ? null : issfFamilyName.trim();
 }
 
 /**
@@ -162,6 +199,8 @@ export async function applyIssfProfile(shooterId: number, issfId: string): Promi
   if (profile.nationCode && !shooter.nationality) update.nationality = profile.nationCode;
   const apparatus = inferApparatus(profile.events);
   if (apparatus && !shooter.apparatus) update.apparatus = apparatus;
+  const alias = renamedAlias(shooter, profile.familyName);
+  if (alias) update.previousLastNames = [...(shooter.previousLastNames ?? []), alias];
 
   if (!shooter.avatarUrl && profile.portraitUrl) {
     try {
