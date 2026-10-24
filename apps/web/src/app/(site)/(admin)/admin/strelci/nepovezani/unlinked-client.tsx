@@ -40,8 +40,12 @@ const btn = "rounded-md border border-[var(--border-strong)] px-3 py-1.5 text-sm
 
 const MATCH_LABEL = { exact: "tačno", close: "blisko", weak: "slabo" } as const;
 
-/** Preporuka: jedan tačan kandidat, ista nacija i godište se ne sukobljavaju. */
+/**
+ * Preporuka: jedan tačan kandidat, ista nacija i godište se ne sukobljavaju.
+ * ISSF ne vrati nikoga → "ostavi bez ISSF ID", da se red skloni sa liste.
+ */
 function suggest(row: UnlinkedRow, candidates: IssfCandidate[]): { choice: Choice; safe: boolean } {
+  if (candidates.length === 0) return { choice: "dismiss", safe: true };
   const good = candidates.filter((c) => c.match !== "weak");
   const exact = good.filter((c) => c.match === "exact");
   const top = exact.length === 1 ? exact[0] : exact.length === 0 && good.length === 1 ? good[0] : null;
