@@ -18,6 +18,9 @@ function scopeIcon(scope: Scope): React.ReactNode {
   return <span className="fi fi-rs" style={{ fontSize: 15, borderRadius: 2 }} aria-hidden="true" />;
 }
 
+// ISSF prvi u dropdownu (VALID_SCOPES redosled ne diramo — koristi se za rute)
+const MENU_ORDER: readonly Scope[] = ["issf", "srb"];
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -31,6 +34,7 @@ export function RegionSelector({ compact = false, placement = "bottom", small = 
   const t = useTranslations("common");
   const srbName = t("serbia");
   const scopeLabel = (s: Scope) => (s === "issf" ? "ISSF" : srbName);
+  const menuLabel = (s: Scope) => (s === "issf" ? `ISSF / ${t("world")}` : srbName);
   const [open, setOpen]   = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const params = useParams();
@@ -113,7 +117,7 @@ export function RegionSelector({ compact = false, placement = "bottom", small = 
           }`}
       >
         {/* Ravnopravni izbori — hijerarhija kad bude više scope-ova */}
-        {VALID_SCOPES.map((s) => (
+        {MENU_ORDER.map((s) => (
           <button
             key={s}
             onClick={() => select(s)}
@@ -124,7 +128,7 @@ export function RegionSelector({ compact = false, placement = "bottom", small = 
             }`}
           >
             <span className="flex w-8 shrink-0 justify-center">{scopeIcon(s)}</span>
-            <span className="flex-1 text-xs font-medium">{scopeLabel(s)}</span>
+            <span className="flex-1 text-xs font-medium">{menuLabel(s)}</span>
             {scope === s && (
               <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="shrink-0 text-[var(--brand-primary)]" aria-hidden="true">
                 <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
