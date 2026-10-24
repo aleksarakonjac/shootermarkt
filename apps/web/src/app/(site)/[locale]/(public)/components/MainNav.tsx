@@ -81,7 +81,8 @@ export function MainNav() {
   const NAV = buildNav(tNav);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openMobileGroup, setOpenMobileGroup] = useState<string | null>(null);
+  // Statistike otvorene po defaultu — meni je kratak
+  const [openMobileGroup, setOpenMobileGroup] = useState<string | null>("statistike");
   const desktopNavRef = useRef<HTMLDivElement>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
