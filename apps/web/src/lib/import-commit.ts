@@ -96,7 +96,8 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
         if (existing) {
           shooterId = existing.id;
           const patch: Partial<typeof shooters.$inferInsert> = {};
-          if (issfId && !existing.issfId) {
+          // Samo po imenu (matchShooter pušta SRB/AIN/praznu naciju) → issfId tek uz istu naciju
+          if (issfId && !existing.issfId && (existing !== byName || existing.nationality === row.teamNoc)) {
             patch.issfId = issfId;
             existing.issfId = issfId;
             shooterByIssfId.set(issfId, existing);

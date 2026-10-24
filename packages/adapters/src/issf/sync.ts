@@ -23,6 +23,8 @@ export interface IssfCandidate {
   birthYear: number | null;
   portraitUrl: string | null;
   match: IssfMatch;
+  /** Poklapanje samo preko ranijeg prezimena (ime + nacija), bez našeg prezimena kao potvrde */
+  renamed: boolean;
   /** Naš strelac koji već ima ovaj issfId (ako postoji) */
   existingShooterId: number | null;
 }
@@ -150,6 +152,7 @@ export async function lookupIssfAthletes(first: string, last: string, noc?: stri
       birthYear: a.birthday ? Number(a.birthday.slice(0, 4)) : null,
       portraitUrl: a.portraitUrl ?? null,
       match: rank(a),
+      renamed: rank(a) !== rankMatch(first, last, a),
       existingShooterId: existingMap.get(a.issfId) ?? null,
     }))
     .filter((c) => c.match !== "weak" || found.size <= 10)
@@ -225,6 +228,8 @@ export async function autoLinkShooter(s: { id: number; firstName: string; lastNa
   const candidates = await lookupIssfAthletes(s.firstName, s.lastName, s.nationality);
   const exact = candidates.filter((c) =>
     c.match === "exact" &&
+    // Bez nadzora promena prezimena traži i isto godište sa obe strane
+    (!c.renamed || (!!s.birthYear && c.birthYear === s.birthYear)) &&
     !c.existingShooterId &&
     c.nationCode === s.nationality &&
     (!s.birthYear || !c.birthYear || c.birthYear === s.birthYear)
