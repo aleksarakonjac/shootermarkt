@@ -9,6 +9,7 @@ import { NocDropdown } from "@/components/ui/NocDropdown";
 import { GenderDropdown } from "@/components/ui/GenderDropdown";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { IssfLookup } from "@/components/ui/IssfLookup";
+import { MergeShootersModal } from "./MergeShootersModal";
 
 interface ShooterData {
   id: number;
@@ -76,6 +77,8 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
   const [flash, setFlash] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const [clubs, setClubs] = useState(initialClubs);
   const [issfBusy, setIssfBusy] = useState<string | null>(null);
+  const [mergeWith, setMergeWith] = useState<number | null>(null);
+  const [mergeId, setMergeId] = useState("");
 
   useEffect(() => {
     if (!flash || flash.type === "err") return;
@@ -187,7 +190,9 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
       });
       const d = await res.json();
       if (!res.ok) {
-        setFlash({ type: "err", msg: d.shooterId ? `${d.error} — spoji ručno (/admin/strelci/${d.shooterId})` : d.error ?? "Greška" });
+        // ISSF ID već drži drugi profil: to je isto lice, ponudi spajanje
+        if (res.status === 409 && d.shooterId) setMergeWith(d.shooterId);
+        else setFlash({ type: "err", msg: d.error ?? "Greška" });
       } else {
         setFlash({ type: "ok", msg: d.updated.length ? `ISSF: ažurirano ${d.updated.join(", ")}` : "ISSF: nema novih podataka" });
         router.refresh();
@@ -446,6 +451,15 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
         </div>
       </section>
 
+      {mergeWith && (
+        <MergeShootersModal
+          keepId={shooter.id}
+          otherId={mergeWith}
+          onClose={() => setMergeWith(null)}
+          onDone={() => { setMergeWith(null); setFlash({ type: "ok", msg: "Strelci spojeni" }); router.refresh(); }}
+        />
+      )}
+
       {/* ISSF */}
       <section className="mb-10">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-4">ISSF</h2>
@@ -473,6 +487,27 @@ export function ShooterAdminClient({ shooter, clubs: initialClubs, results }: Pr
             />
           </div>
         )}
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-2">Spoji sa drugim profilom</h2>
+        <p className="text-xs text-[var(--muted)] mb-2">Ako je isti strelac unet dvaput (npr. bez ISSF ID-a), unesi ID duplikata. Biraš koja polja i koje rezultate zadržavaš.</p>
+        <div className="flex items-center gap-2">
+          <input
+            inputMode="numeric"
+            value={mergeId}
+            onChange={(e) => setMergeId(e.target.value.replace(/\D/g, ""))}
+            placeholder="ID duplikata"
+            className="w-36 rounded-md border border-[var(--border)] px-3 py-1.5 text-sm"
+          />
+          <button
+            onClick={() => setMergeWith(Number(mergeId))}
+            disabled={anyBusy || !mergeId || Number(mergeId) === shooter.id}
+            className="rounded-md border border-[var(--border)] px-4 py-1.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors disabled:opacity-50"
+          >
+            Spoji…
+          </button>
+        </div>
       </section>
 
       {/* Results */}

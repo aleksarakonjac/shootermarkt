@@ -12,6 +12,7 @@
     "db:link-sius": "tsx --env-file=../../.env.local scripts/link-sius-events.ts",
     "db:import-sius": "tsx --env-file=../../.env.local scripts/import-sius-results.ts",
     "db:fix-comp-names": "tsx --env-file=../../.env.local scripts/fix-competition-names.ts",
+    "db:find-duplicates": "tsx --env-file=../../.env.local scripts/find-duplicate-shooters.ts",
     "db:merge-shooters": "tsx --env-file=../../.env.local scripts/merge-shooters.ts",
     "db:recompute-forma": "tsx --env-file=../../.env.local scripts/recompute-forma-cache.ts",
     "db:backtest-forma": "tsx --env-file=../../.env.local scripts/backtest-forma.ts",
