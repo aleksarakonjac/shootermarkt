@@ -35,6 +35,7 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
   const [matches, setMatches] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [bulkPriority, setBulkPriority] = useState("");
+  const [editingName, setEditingName] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -163,13 +164,10 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
                     <input type="checkbox" aria-label={`Izaberi: ${r.name}`} checked={selected.has(r.id)} onChange={() => toggle(r.id)} />
                   </td>
                   <td className="px-3 py-2.5">
-                    <input
-                      aria-label={`Ime: ${r.name}`}
-                      value={name}
-                      maxLength={300}
-                      onChange={(e) => setComp(r.id, { name: e.target.value })}
-                      className={`${selectCls} font-medium ${name.trim() !== r.name ? changedCls : "border-[var(--border)]"}`}
-                    />
+                    <div className={`font-medium text-[var(--ink)] ${name.trim() !== r.name ? "text-[var(--brand-primary)]" : ""}`}>{name}</div>
+                    <button type="button" onClick={() => setEditingName(r.id)} className="mt-1 rounded border border-[var(--border-strong)] px-2 py-0.5 text-[0.7rem] font-semibold text-[var(--ink)] hover:bg-[var(--surface)]">
+                      Izmeni ime
+                    </button>
                     <div className="mt-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] text-[var(--subtle)]">{formatDateRangeSr(r.date, null)} · #{r.id} · <a href={`/admin/takmicenja/${r.id}/edit`} className="hover:text-[var(--brand-primary)]">uredi</a></div>
                   </td>
                   <td className="px-3 py-2.5">
@@ -238,6 +236,32 @@ export function BulkEditor({ rows }: { rows: BulkRow[] }) {
           </tbody>
         </table>
       </div>
+
+      {editingName != null && (() => {
+        const r = rows.find((x) => x.id === editingName);
+        if (!r) return null;
+        const close = () => setEditingName(null);
+        return (
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 pt-[20vh]" onMouseDown={close}>
+            <div role="dialog" aria-label="Izmena imena takmičenja" className="w-full max-w-2xl rounded-xl border border-[var(--border)] bg-[var(--bg)] p-4 shadow-xl" onMouseDown={(e) => e.stopPropagation()}>
+              <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">Ime takmičenja · #{r.id}</label>
+              <textarea
+                autoFocus
+                rows={3}
+                maxLength={300}
+                value={comps[r.id]?.name ?? r.name}
+                onChange={(e) => setComp(r.id, { name: e.target.value })}
+                onKeyDown={(e) => { if (e.key === "Escape" || (e.key === "Enter" && !e.shiftKey)) { e.preventDefault(); close(); } }}
+                className="w-full resize-none rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:border-[var(--brand-primary)] focus:outline-none"
+              />
+              <div className="mt-3 flex justify-end gap-2">
+                <button type="button" onClick={() => { setComp(r.id, { name: undefined }); close(); }} className="rounded-md border border-[var(--border-strong)] px-3 py-1.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)]">Vrati original</button>
+                <button type="button" onClick={close} className="rounded-md bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-semibold text-white hover:bg-[var(--brand-primary-hover)]">Gotovo</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3 shadow-lg">
         <span className="text-sm text-[var(--muted)]">
