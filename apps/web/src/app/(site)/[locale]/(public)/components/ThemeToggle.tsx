@@ -35,7 +35,7 @@ export default function ThemeToggle() {
     <button
       onClick={toggle}
       aria-label={en ? (isDark ? "Switch to light mode" : "Switch to dark mode") : (isDark ? "Prebaci na svetli mod" : "Prebaci na tamni mod")}
-      className="flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] lg:h-8 lg:w-8"
+      className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition-colors duration-150 hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
     >
       {mounted && isDark ? (
         /* Sun icon */

@@ -10,10 +10,6 @@ import { withScope } from "@/hooks/use-scoped-href";
 import { setPrefCookie } from "@/lib/client-prefs";
 import { startNavigationProgress } from "@/components/NavigationProgress";
 
-// ── Data ───────────────────────────────────────────────────────────────────────
-
-const SRB = { noc: "SRB", alpha2: "RS" };
-
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function scopeIcon(scope: Scope): React.ReactNode {
@@ -27,11 +23,14 @@ function scopeIcon(scope: Scope): React.ReactNode {
 interface Props {
   compact?: boolean;
   placement?: "bottom" | "top";
+  /** Niži trigger za mobilni header */
+  small?: boolean;
 }
 
-export function RegionSelector({ compact = false, placement = "bottom" }: Props) {
+export function RegionSelector({ compact = false, placement = "bottom", small = false }: Props) {
   const t = useTranslations("common");
   const srbName = t("serbia");
+  const scopeLabel = (s: Scope) => (s === "issf" ? "ISSF" : srbName);
   const [open, setOpen]   = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const params = useParams();
@@ -85,13 +84,15 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
         onClick={handleTriggerClick}
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label={`Opseg: ${scope === "issf" ? "ISSF" : srbName}`}
-        className={`flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] lg:min-h-8 ${
+        aria-label={`Opseg: ${scopeLabel(scope)}`}
+        className={`flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-xs font-semibold text-[var(--ink)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] ${
+          small ? "h-8 py-0" : "min-h-11 py-1.5 lg:min-h-8"
+        } ${
           open ? "border-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]" : ""
         }`}
       >
         {scopeIcon(scope)}
-        {!compact && <span>{scope === "issf" ? "ISSF" : srbName}</span>}
+        {!compact && <span>{scopeLabel(scope)}</span>}
         <svg
           width="9" height="9" viewBox="0 0 9 9"
           className={`shrink-0 text-[var(--muted)] transition-transform duration-150 ${open ? "rotate-180" : ""}`}
@@ -103,7 +104,7 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
 
       {/* Panel */}
       <div
-        className={`absolute right-0 z-[var(--z-dropdown)] w-[13rem] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]
+        className={`absolute right-0 z-[var(--z-dropdown)] w-[11rem] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]
           transition-[opacity,transform,visibility] duration-150 ease-out
           ${placement === "top" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]"}
           ${open
@@ -111,43 +112,26 @@ export function RegionSelector({ compact = false, placement = "bottom" }: Props)
             : `opacity-0 ${placement === "top" ? "translate-y-2" : "-translate-y-2"} invisible pointer-events-none`
           }`}
       >
-        {/* ISSF preset button */}
-        <div className="p-2 border-b border-[var(--border)]">
+        {/* Ravnopravni izbori — hijerarhija kad bude više scope-ova */}
+        {VALID_SCOPES.map((s) => (
           <button
-            onClick={() => select("issf")}
-            className={`w-full flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-3 font-semibold transition-colors ${
-              scope === "issf"
-                ? "bg-[var(--brand-primary)] text-white"
-                : "bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--border)]"
+            key={s}
+            onClick={() => select(s)}
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
+              scope === s
+                ? "bg-[var(--surface)] text-[var(--brand-primary)]"
+                : "text-[var(--ink)] hover:bg-[var(--surface-2)]"
             }`}
           >
-            <span className="flex items-center justify-center h-7 w-full">
-              <Image src="/logos/issf.svg" alt="" aria-hidden={true} width={0} height={0} className="h-7 w-auto max-w-[4rem] object-contain" />
-            </span>
-            <span className="text-[0.65rem] uppercase tracking-widest leading-none">ISSF</span>
+            <span className="flex w-8 shrink-0 justify-center">{scopeIcon(s)}</span>
+            <span className="flex-1 text-xs font-medium">{scopeLabel(s)}</span>
+            {scope === s && (
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="shrink-0 text-[var(--brand-primary)]" aria-hidden="true">
+                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
           </button>
-        </div>
-
-        {/* Serbia row */}
-        <button
-          onClick={() => select("srb")}
-          className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
-            scope === "srb"
-              ? "bg-[var(--surface)] text-[var(--brand-primary)]"
-              : "text-[var(--ink)] hover:bg-[var(--surface-2)]"
-          }`}
-        >
-          <span className="fi fi-rs shrink-0" style={{ fontSize: 15, borderRadius: 2 }} aria-hidden="true" />
-          <span className="flex-1 text-xs font-medium">{srbName}</span>
-          <span className="text-[0.62rem] font-bold font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)] shrink-0">
-            {SRB.noc}
-          </span>
-          {scope === "srb" && (
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" className="shrink-0 text-[var(--brand-primary)]" aria-hidden="true">
-              <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          )}
-        </button>
+        ))}
       </div>
     </div>
   );

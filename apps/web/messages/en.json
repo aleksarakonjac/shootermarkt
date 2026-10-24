@@ -475,6 +475,7 @@
     "rights": "Serbian Shooting Union · Pančevo, Serbia"
   },
   "locale": {
+    "label": "Site language",
     "sr": "Srpski",
     "en": "English",
     "switchToEn": "Switch to English",

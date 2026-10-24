@@ -450,9 +450,9 @@ export function MainNav() {
 
         {/* Bottom controls */}
         <div className="border-t border-[var(--border)] px-4 py-3 flex items-center gap-2">
-          <RegionSelector placement="top" />
-          <div className="ml-auto flex items-center gap-1">
-            <ThemeToggle />
+          <RegionSelector placement="top" small />
+          <ThemeToggle />
+          <div className="ml-auto">
             <LocaleSwitcher />
           </div>
         </div>

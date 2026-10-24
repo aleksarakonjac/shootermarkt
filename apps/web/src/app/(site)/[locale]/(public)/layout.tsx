@@ -50,6 +50,11 @@ export default async function PublicLayout({ children, params }: Props) {
             </div>
 
             {/* Global search — renders desktop pill + mobile icon */}
+            {/* Scope (mobile) — odmah vidljiv, ne samo u side meniju */}
+            <div className="lg:hidden">
+              <RegionSelector small />
+            </div>
+
             <GlobalSearch />
 
             {/* Desktop right controls */}
