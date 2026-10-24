@@ -27,9 +27,26 @@ export interface IssfCandidate {
   existingShooterId: number | null;
 }
 
-/** ISSF pretraga je ASCII: "Đorđević" → "Dordevic". */
-export function issfAscii(s: string): string {
-  return s.replace(/[đĐ]/g, (c) => (c === "đ" ? "d" : "D")).normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+// Slova koja NFD ne razlaže na osnovu + akcenat
+const NON_DECOMPOSING: Record<string, string> = { đ: "d", Đ: "D", ı: "i", ß: "ss", ẞ: "SS", ł: "l", Ł: "L", ø: "o", Ø: "O", æ: "ae", Æ: "AE", œ: "oe", Œ: "OE", þ: "th", Þ: "TH", ð: "d", Ð: "D" };
+const GERMAN: Record<string, string> = { ä: "ae", ö: "oe", ü: "ue", Ä: "AE", Ö: "OE", Ü: "UE" };
+
+/**
+ * ISSF pretraga je ASCII: "Đorđević" → "Dordevic", "Hajı" → "Haji", "Weiß" → "Weiss".
+ * `german`: ä/ö/ü → ae/oe/ue ("Jäggi" → "Jaeggi") — ISSF piše i tako, i to ne samo za GER
+ * (HUN ima i TOROK i TOEROEK), pa se probaju obe varijante.
+ */
+export function issfAscii(s: string, german = false): string {
+  return (german ? s.replace(/[äöüÄÖÜ]/g, (c) => GERMAN[c]) : s)
+    .replace(/[đĐıßẞłŁøØæÆœŒþÞðÐ]/g, (c) => NON_DECOMPOSING[c])
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+}
+
+/** Ime u obe ASCII varijante (bez duplikata kada nema umlauta). */
+function asciiVariants(first: string, last: string): { first: string; last: string }[] {
+  const plain = { first: issfAscii(first), last: issfAscii(last) };
+  const german = { first: issfAscii(first, true), last: issfAscii(last, true) };
+  return plain.first === german.first && plain.last === german.last ? [plain] : [plain, german];
 }
 
 /** Reči imena ("Al-Harbi" → al, harbi), svedene na fold ključ. */
@@ -56,6 +73,11 @@ function rankTokens(first: string, last: string, c: Pick<ISSFAthlete, "firstName
 }
 
 export function rankMatch(first: string, last: string, c: Pick<ISSFAthlete, "firstName" | "familyName">): IssfMatch {
+  const ranks = asciiVariants(first, last).map((v) => rankAscii(v.first, v.last, c));
+  return ranks.sort((a, b) => ORDER[a] - ORDER[b])[0];
+}
+
+function rankAscii(first: string, last: string, c: Pick<ISSFAthlete, "firstName" | "familyName">): IssfMatch {
   const lastEq = foldName(last) === foldName(c.familyName ?? "");
   if (!lastEq) return rankTokens(first, last, c) ?? "weak";
   const fa = foldName(first), fb = foldName(c.firstName ?? "");
@@ -66,17 +88,16 @@ export function rankMatch(first: string, last: string, c: Pick<ISSFAthlete, "fir
 const ORDER: Record<IssfMatch, number> = { exact: 0, close: 1, weak: 2 };
 
 export async function lookupIssfAthletes(first: string, last: string, noc?: string | null): Promise<IssfCandidate[]> {
-  const lastAscii = issfAscii(last);
-  const lastVariants = [...new Set([lastAscii, lastAscii.replace(/dj/gi, "d")])];
+  const variants = asciiVariants(first, last).flatMap((v) => [v, { ...v, last: v.last.replace(/dj/gi, "d") }]);
   const nocQ = noc && /^[A-Z]{3}$/.test(noc) ? noc : null;
 
-  // NOC + prezime je najuži upit; bez NOC-a kao fallback (pogrešan/klupski NOC u izvoru)
-  const queries = [
-    ...(nocQ ? lastVariants.map((l) => `${nocQ} ${l}`) : []),
-    ...lastVariants.map((l) => `${l} ${issfAscii(first)}`.trim()),
-  ];
+  // NOC + prezime je najuži upit; bez NOC-a kao fallback (pogrešan/klupski NOC u izvoru, npr. BAY)
+  const queries = [...new Set([
+    ...(nocQ ? variants.map((v) => `${nocQ} ${v.last}`) : []),
+    ...variants.map((v) => `${v.last} ${v.first}`.trim()),
+  ])];
   // Višečlana imena: ISSF može imati drugačiju podelu ime/prezime — traži i po najdužoj reči
-  const tokens = nameTokens(issfAscii(first), lastAscii);
+  const tokens = nameTokens(variants[0].first, variants[0].last);
   if (tokens.length > 2) {
     const longest = [...tokens].sort((x, y) => y.length - x.length)[0];
     queries.push(...(nocQ ? [`${nocQ} ${longest}`] : []), longest);
