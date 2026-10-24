@@ -26,6 +26,13 @@ declare global {
 
 if (!globalThis.pgClient) {
   globalThis.pgClient = postgres(connectionString, connectionOptions);
+  // max_pipeline: 0 lomi sql.begin: postgres.js rezerviše konekciju za transakciju tek kad
+  // `sent.length < max_pipeline` (0 < 0 nikad) → BEGIN na nerezervisanoj konekciji → UNSAFE_TRANSACTION.
+  // Zato transakcije (drizzle db.transaction → client.begin) idu preko zasebnog klijenta sa
+  // max_pipeline: 1; BEGIN tu rezerviše konekciju pa nema tuđih upita na njoj, a unutar transakcije
+  // Supavisor drži isti backend.
+  const txOptions = { ...connectionOptions, max_pipeline: 1, max: 2 };
+  globalThis.pgClient.begin = postgres(connectionString, txOptions).begin;
 }
 const client = globalThis.pgClient;
 
