@@ -63,7 +63,8 @@ export type CompetitionLevel = "club" | "regional" | "national" | "international
 export type EventType = "championship" | "world_cup" | "champions_league" | "cup" | "grand_prix" | "league_round" | "friendly" | "other";
 
 export interface ParsedShooterResult {
-  rank: number;
+  /** null za DNS/DNF redove bez plasmana */
+  rank: number | null;
   bibNumber?: number;
   lastName: string;
   firstName: string;
@@ -74,7 +75,8 @@ export interface ParsedShooterResult {
   /** Birth year if present in bulletin (npr. 2004), else null */
   birthYear?: number | null;
   series: number[];
-  total: number;
+  /** null kad strelac nije pucao (DNS) */
+  total: number | null;
   inners?: number | null;
   qualified?: boolean | null;
   /** ISSF/SIUS remark: RPO, DSQ, DNS, DNF, SO */
@@ -139,6 +141,11 @@ export interface ParsedEvent {
   category: AgeCategory;
   /** true when the PDF is from an international competition */
   isInternational?: boolean;
+  /** Lista gostiju (van konkurencije) — SIUS "Guests" tabela */
+  guest?: boolean;
+  /** Zaseban meč istog takmičenja (npr. memorijal drugog dana); null = glavno takmičenje */
+  eventName?: string | null;
+  eventDate?: string | null;
   results: ParsedShooterResult[] | ParsedFinalResult[];
 }
 
@@ -172,6 +179,9 @@ export interface ReviewRow {
   clubId?: number;           // matched DB club
 
   disciplineCode: DisciplineCode;
+  /** Zaseban meč istog takmičenja (competition_events); null/undefined = glavno takmičenje */
+  eventName?: string | null;
+  eventDate?: string | null;
   /** Uzrasna kategorija pod kojom rezultat važi (najmlađa u kojoj strelac nastupa). */
   category: AgeCategory;
   qualTotal: number | null;
@@ -217,26 +227,17 @@ export interface ReviewRow {
 }
 
 /**
- * Dedup po kategoriji: isti strelac+disciplina+rezultat u više uzrasnih tabela =
- * isti meč → zadrži najmlađu kategoriju (njegova prava klasa). Različit rezultat =
- * odvojen meč → zadrži oba. Sprečava duplo brojanje istih hitaca u formi.
+ * Dedup unutar iste liste: isti strelac+disciplina+kategorija+rezultat dva puta = isti red.
+ * Seniorska i juniorska lista istog meča se NAMERNO čuvaju obe (prikaz obe rang liste);
+ * forma isti skor istog dana broji jednom (`dedupeSameMatch` u forma.ts).
  */
 export function dedupeRowsByCategory(rows: ReviewRow[], foldName: (s: string) => string): ReviewRow[] {
-  // grupiši po strelac+disciplina, pa po rezultatu; za svaki rezultat najmlađa kategorija
-  const byKey = new Map<string, Map<string, ReviewRow>>();
+  const seen = new Map<string, ReviewRow>();
   for (const r of rows) {
-    const key = `${foldName(r.lastName)}|${foldName(r.firstName)}|${r.teamNoc}|${r.disciplineCode}`;
-    const scoreKey = String(r.qualTotal);
-    let scoreMap = byKey.get(key);
-    if (!scoreMap) { scoreMap = new Map(); byKey.set(key, scoreMap); }
-    const existing = scoreMap.get(scoreKey);
-    if (!existing || CATEGORY_RANK[r.category] < CATEGORY_RANK[existing.category]) {
-      scoreMap.set(scoreKey, r);
-    }
+    const key = `${foldName(r.lastName)}|${foldName(r.firstName)}|${r.teamNoc}|${r.eventName ?? ""}|${r.disciplineCode}|${r.category}|${r.qualTotal}`;
+    if (!seen.has(key)) seen.set(key, r);
   }
-  const out: ReviewRow[] = [];
-  for (const scoreMap of byKey.values()) for (const r of scoreMap.values()) out.push(r);
-  return out;
+  return [...seen.values()];
 }
 
 /**
@@ -259,6 +260,7 @@ export function mergeFinalsIntoRows(
       const teamNoc = rawResult.teamNoc.toUpperCase();
       const candidates = rows.filter((row) => (
         row.disciplineCode === event.discipline
+        && (row.eventName ?? null) === (event.eventName ?? null)
         && row.teamNoc.toUpperCase() === teamNoc
         && foldName(row.firstName) === foldName(rawResult.firstName)
         && foldName(row.lastName) === foldName(rawResult.lastName)

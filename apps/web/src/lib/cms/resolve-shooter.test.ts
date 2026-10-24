@@ -10,8 +10,10 @@ vi.mock("@shootermarkt/db", () => ({
     select: vi.fn(() => ({
       from: () => ({
         innerJoin: () => ({
-          innerJoin: () => ({
-            where: () => Promise.resolve([]),
+          leftJoin: () => ({
+            innerJoin: () => ({
+              where: () => Promise.resolve([]),
+            }),
           }),
         }),
       }),

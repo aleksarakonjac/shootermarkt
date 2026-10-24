@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { clubs, competitions, disciplines, results, shooters } from "@shootermarkt/db/schema";
+import { ensureCompetitionEvent } from "@/lib/competition-events";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { eventTypeFromName, groupsFromName } from "@/lib/competition-filters";
 import { refreshDisciplineGroups } from "@/lib/discipline-groups";
@@ -8,6 +9,9 @@ import { matchShooter } from "@shootermarkt/db/name-match";
 import { DISCIPLINE_META, type CommitPayload } from "@shootermarkt/db/pdf-import-types";
 
 export class CommitValidationError extends Error {}
+
+/** Broj rezultata strelca — za matchShooter (dvosmislena varijanta imena → aktivan strelac). */
+export const shooterResultCount = sql<number>`(select count(*)::int from ${results} where ${results.shooterId} = ${shooters.id})`;
 
 export type CommitResult = {
   inserted: number;
@@ -63,12 +67,20 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
     previousLastNames: shooters.previousLastNames,
     nationality: shooters.nationality, clubId: shooters.clubId,
     birthYear: shooters.birthYear, apparatus: shooters.apparatus, issfId: shooters.issfId,
+    resultCount: shooterResultCount,
   }).from(shooters);
   const shooterByIssfId = new Map(allShooters.filter((s) => s.issfId).map((s) => [s.issfId!, s]));
   let inserted = 0;
   let skipped = 0;
   const errors: string[] = [];
   const affectedShooterIds = new Set<number>();
+  const eventIds = new Map<string, number>();
+  const competitionDate = comp?.date
+    ?? (await db.query.competitions.findFirst({ where: eq(competitions.id, competitionId), columns: { date: true } }))?.date;
+  async function eventIdFor(name: string, date: string | null | undefined) {
+    if (!eventIds.has(name)) eventIds.set(name, await ensureCompetitionEvent(competitionId, name, date ?? competitionDate!));
+    return eventIds.get(name)!;
+  }
 
   for (const row of rows) {
     if (row.skip) { skipped++; continue; }
@@ -122,6 +134,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
             previousLastNames: null,
             nationality: row.teamNoc || null, clubId: clubId ?? null,
             birthYear: row.birthYear ?? null, apparatus: row.apparatus ?? meta?.apparatus ?? null, issfId,
+            resultCount: 1,
           };
           allShooters.push(added);
           if (issfId) shooterByIssfId.set(issfId, added);
@@ -140,8 +153,9 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
       const disciplineId = disciplineMap[row.disciplineCode];
       if (!disciplineId) { errors.push(`Unknown discipline: ${row.disciplineCode}`); continue; }
       const isElimOnly = row.elimRound != null && row.qualTotal == null;
+      const competitionEventId = row.eventName?.trim() ? await eventIdFor(row.eventName.trim(), row.eventDate) : null;
       const values = {
-        shooterId, competitionId, disciplineId,
+        shooterId, competitionId, competitionEventId, disciplineId,
         category: (row.category ?? "senior") as typeof results.$inferInsert.category,
         clubId: clubId ?? null,
         qualTotal: row.qualTotal?.toString() ?? null, qualInners: row.qualInners ?? null, qualRank: row.qualRank ?? null,
@@ -167,11 +181,11 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
       };
       if (isElimOnly) {
         await db.insert(results).values(values).onConflictDoUpdate({
-          target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
+          target: [results.shooterId, results.competitionId, results.competitionEventId, results.disciplineId, results.category],
           set: { elimRound: sql`excluded.elim_round`, elimTotal: sql`excluded.elim_total`, elimRank: sql`excluded.elim_rank`, elimDetail: sql`excluded.elim_detail`, elimRemark: sql`excluded.elim_remark`, remarkDetails: mergeRemarkDetails },
         });
       } else await db.insert(results).values(values).onConflictDoUpdate({
-        target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
+        target: [results.shooterId, results.competitionId, results.competitionEventId, results.disciplineId, results.category],
         set: {
           clubId: sql`excluded.club_id`,
           qualTotal: sql`excluded.qual_total`, qualInners: sql`excluded.qual_inners`, qualRank: sql`excluded.qual_rank`, qualDetail: sql`excluded.qual_detail`,

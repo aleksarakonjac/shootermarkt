@@ -2,7 +2,7 @@ export const revalidate = 300;
 
 import { db } from "@shootermarkt/db";
 import {
-  competitions,
+  competitions, competitionEvents,
   results,
   shooters,
   clubs,
@@ -91,6 +91,8 @@ export default async function CompetitionPage({ params }: Props) {
         disciplineName: disciplines.name,
         apparatus: disciplines.apparatus,
         category: results.category,
+        competitionEventId: results.competitionEventId,
+        eventName: competitionEvents.name,
         elimRound: results.elimRound,
         elimTotal: results.elimTotal,
         elimRank: results.elimRank,
@@ -111,6 +113,7 @@ export default async function CompetitionPage({ params }: Props) {
       .from(results)
       .innerJoin(shooters, eq(results.shooterId, shooters.id))
       .leftJoin(clubs, eq(results.clubId, clubs.id))
+      .leftJoin(competitionEvents, eq(results.competitionEventId, competitionEvents.id))
       .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
       .where(eq(results.competitionId, compId))
       .orderBy(asc(results.qualRank)),
@@ -205,27 +208,32 @@ export default async function CompetitionPage({ params }: Props) {
   }
   const mixedGroups = mixedGroupOrder.map((key) => mixedGroupMap.get(key)!);
 
-  // Group by discipline, then by age category, preserving order of first appearance
+  // Group by discipline (+ event: memorijal drugog dana je zasebna disciplina sa svojim nazivom),
+  // then by age category, preserving order of first appearance
   const disciplineOrder: string[] = [];
   const disciplineMap = new Map<string, DisciplineGroup>();
-  const categoryOrder = new Map<string, string[]>(); // disciplineCode -> category[]
+  const categoryOrder = new Map<string, string[]>(); // group key -> category[]
   const categoryMap = new Map<string, Map<string, DisciplineGroup["categories"][number]>>();
 
   for (const r of compResults) {
-    if (!disciplineMap.has(r.disciplineCode)) {
-      disciplineOrder.push(r.disciplineCode);
-      disciplineMap.set(r.disciplineCode, {
+    // isti format ključa koristi i link sa profila strelca (?disc=ARM@12)
+    const key = r.competitionEventId ? `${r.disciplineCode}@${r.competitionEventId}` : r.disciplineCode;
+    if (!disciplineMap.has(key)) {
+      disciplineOrder.push(key);
+      disciplineMap.set(key, {
+        key,
         code: r.disciplineCode,
         name: r.disciplineName,
+        eventName: r.eventName ?? null,
         apparatus: r.apparatus,
         categories: [],
       });
-      categoryOrder.set(r.disciplineCode, []);
-      categoryMap.set(r.disciplineCode, new Map());
+      categoryOrder.set(key, []);
+      categoryMap.set(key, new Map());
     }
 
-    const catsForDiscipline = categoryOrder.get(r.disciplineCode)!;
-    const catMapForDiscipline = categoryMap.get(r.disciplineCode)!;
+    const catsForDiscipline = categoryOrder.get(key)!;
+    const catMapForDiscipline = categoryMap.get(key)!;
     if (!catMapForDiscipline.has(r.category)) {
       catsForDiscipline.push(r.category);
       catMapForDiscipline.set(r.category, { category: r.category, results: [] });
@@ -260,13 +268,13 @@ export default async function CompetitionPage({ params }: Props) {
     });
   }
 
-  const groups = disciplineOrder.map((code) => {
-    const catMapForDiscipline = categoryMap.get(code)!;
+  const groups = disciplineOrder.map((key) => {
+    const catMapForDiscipline = categoryMap.get(key)!;
     const cats = categoryOrder
-      .get(code)!
+      .get(key)!
       .map((cat) => catMapForDiscipline.get(cat)!)
       .sort((a, b) => CATEGORY_RANK[b.category] - CATEGORY_RANK[a.category]); // stariji prvo
-    return { ...disciplineMap.get(code)!, categories: cats };
+    return { ...disciplineMap.get(key)!, categories: cats };
   });
 
   // ── Date display ────────────────────────────────────────────────

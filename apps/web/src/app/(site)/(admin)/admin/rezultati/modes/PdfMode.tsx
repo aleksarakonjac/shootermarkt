@@ -77,6 +77,7 @@ export function PdfMode() {
     const file = fileRef.current?.files?.[0];
     if (!file) { setError("Izaberi PDF fajl"); return; }
     if (!selectedCompId) { setError("Izaberi takmičenje iz baze"); return; }
+    if (rows.some((r) => r.eventName != null && !r.eventName.trim())) { setError("Svaki dodatni meč mora imati naziv"); return; }
     setLoading(true); setError(null);
     try {
       const fd = new FormData();
@@ -109,6 +110,7 @@ export function PdfMode() {
 
   async function handleCommit() {
     if (!selectedCompId) { setError("Izaberi takmičenje iz baze"); return; }
+    if (rows.some((r) => r.eventName != null && !r.eventName.trim())) { setError("Svaki dodatni meč mora imati naziv"); return; }
     setLoading(true);
     setError(null);
     const payload: CommitPayload = { competitionId: selectedCompId, tags: importTags, rows };
@@ -184,6 +186,7 @@ export function PdfMode() {
   }
 
   const activeCount = rows.filter((r) => !r.skip).length;
+  const eventNames = [...new Set(rows.flatMap((r) => (r.eventName != null ? [r.eventName] : [])))];
 
   if (step === "done" && result) {
     return <DonePanel result={result} onReset={reset} resetLabel="Import još jedan PDF" />;
@@ -292,6 +295,26 @@ export function PdfMode() {
             <div className="rounded-lg bg-[var(--surface)] border border-[var(--border)] px-4 py-2.5 text-sm">
               <span className="text-[var(--muted)]">Takmičenje: </span>
               <span className="font-semibold text-[var(--ink)]">{selectedCompName}</span>
+            </div>
+          )}
+
+          {eventNames.length > 0 && (
+            <div className="rounded-lg border border-[var(--border)] px-4 py-3 text-sm space-y-2">
+              <p className="text-[var(--muted)]">
+                Bilten ima i dodatne mečeve — upisuju se u isto takmičenje kao posebne discipline sa svojim nazivom i datumom:
+              </p>
+              {eventNames.map((name, i) => {
+                const date = rows.find((r) => r.eventName === name)?.eventDate ?? "";
+                const rename = (patch: Partial<ReviewRow>) => setRows((prev) => prev.map((r) => (r.eventName === name ? { ...r, ...patch } : r)));
+                return (
+                  <div key={i} className="flex flex-wrap items-center gap-2">
+                    <input value={name} onChange={(e) => rename({ eventName: e.target.value })} aria-label="Naziv meča"
+                      className="min-w-[280px] flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[var(--ink)]" />
+                    <input type="date" value={date} onChange={(e) => rename({ eventDate: e.target.value })} aria-label="Datum meča"
+                      className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[var(--ink)]" />
+                  </div>
+                );
+              })}
             </div>
           )}
 

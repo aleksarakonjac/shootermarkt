@@ -29,6 +29,7 @@ export async function planMerge(keepId: number, dropId: number): Promise<MergePl
     select d.id from results d join results k
       on k.shooter_id = ${keepId} and k.competition_id = d.competition_id and k.discipline_id = d.discipline_id
       and k.category is not distinct from d.category
+      and k.competition_event_id is not distinct from d.competition_event_id
     where d.shooter_id = ${dropId}`);
 
   // Staro prezime duplikata postaje alias (ako se zaista razlikuje od trenutnog)
@@ -51,7 +52,8 @@ export type MergeOptions = {
   resultIds?: number[];
 };
 
-const clashKey = (r: { competitionId: number; disciplineId: number; category: string }) => `${r.competitionId}|${r.disciplineId}|${r.category}`;
+const clashKey = (r: { competitionId: number; competitionEventId: number | null; disciplineId: number; category: string }) =>
+  `${r.competitionId}|${r.competitionEventId ?? ""}|${r.disciplineId}|${r.category}`;
 
 /**
  * Spaja `drop` u `keep`: rezultati se prebacuju, polja se biraju po strani (default: keep, pa drop),
@@ -136,7 +138,7 @@ export async function mergePreview(keepId: number, dropId: number) {
   const plan = await planMerge(keepId, dropId);
   const rows = await db
     .select({
-      id: results.id, shooterId: results.shooterId, competitionId: results.competitionId, disciplineId: results.disciplineId,
+      id: results.id, shooterId: results.shooterId, competitionId: results.competitionId, competitionEventId: results.competitionEventId, disciplineId: results.disciplineId,
       category: results.category, competition: competitions.name, date: competitions.date, discipline: disciplines.code,
       qualTotal: results.qualTotal, qualRank: results.qualRank, finalRank: results.finalRank, source: results.source,
     })

@@ -237,10 +237,16 @@ export function ReviewTable({ rows, nocFilter, onRowChange, onNocFilterChange, o
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const allNocs = Array.from(new Set(rows.map((row) => row.teamNoc))).sort();
   const filtered = nocFilter ? rows.filter((row) => row.teamNoc === nocFilter) : rows;
-  const byDiscipline = REVIEW_DISCIPLINE_CODES.map((discipline) => ({
-    discipline,
-    rows: filtered.flatMap((row) => row.disciplineCode === discipline ? [{ row, index: rows.indexOf(row) }] : []),
-  })).filter((group) => group.rows.length > 0);
+  // Jedna tabela po meču: disciplina + event (npr. memorijal drugog dana) + uzrasna lista
+  const byDiscipline = REVIEW_DISCIPLINE_CODES.flatMap((discipline) => {
+    const groups = new Map<string, IndexedRow[]>();
+    for (const row of filtered) {
+      if (row.disciplineCode !== discipline) continue;
+      const key = `${discipline}|${row.eventName ?? ""}|${row.category}`;
+      groups.set(key, [...(groups.get(key) ?? []), { row, index: rows.indexOf(row) }]);
+    }
+    return [...groups].map(([key, groupRows]) => ({ key, discipline, rows: groupRows }));
+  });
 
   return (
     <div className="space-y-5">
@@ -258,16 +264,20 @@ export function ReviewTable({ rows, nocFilter, onRowChange, onNocFilterChange, o
         })}
       </div> : null}
 
-      {byDiscipline.map(({ discipline, rows: disciplineRows }) => {
+      {byDiscipline.map(({ key, discipline, rows: disciplineRows }) => {
         const qualRows = disciplineRows.filter(({ row }) => row.qualTotal != null);
         const elimRows = disciplineRows.filter(({ row }) => row.elimRound != null);
         const finalRows = disciplineRows.filter(({ row }) => row.finalRank != null || row.finalTotal != null);
-        const isExpanded = expanded.has(discipline);
+        const isExpanded = expanded.has(key);
+        const { category, eventName } = disciplineRows[0].row;
         const visibleRows = isExpanded ? qualRows : qualRows.slice(0, COLLAPSE_AT);
         const hiddenCount = qualRows.length - COLLAPSE_AT;
-        return <section key={discipline} className="overflow-hidden rounded-lg border border-[var(--border)]">
+        return <section key={key} className="overflow-hidden rounded-lg border border-[var(--border)]">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
-            <h3 className="text-sm font-semibold text-[var(--ink)]">{DISCIPLINE_META[discipline].label}</h3>
+            <h3 className="text-sm font-semibold text-[var(--ink)]">
+              {DISCIPLINE_META[discipline].label}{category !== "senior" && ` · ${CATEGORY_LABEL[category]}`}
+              {eventName && <span className="ml-2 text-xs font-normal text-[var(--brand-primary)]">{eventName}</span>}
+            </h3>
             <div className="flex items-center gap-3">
               <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
                 {qualRows.length > 0 ? `${qualRows.length} kvalifikacija` : `${disciplineRows.length} za unos`}
@@ -276,7 +286,7 @@ export function ReviewTable({ rows, nocFilter, onRowChange, onNocFilterChange, o
                 <button
                   onClick={() => setExpanded((prev) => {
                     const next = new Set(prev);
-                    if (isExpanded) next.delete(discipline); else next.add(discipline);
+                    if (isExpanded) next.delete(key); else next.add(key);
                     return next;
                   })}
                   className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"

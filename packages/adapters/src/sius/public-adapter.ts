@@ -1,3 +1,4 @@
+import { normalizeNoc } from "@shootermarkt/db/name-match";
 const SIUS_PUB = "https://shootingsportscloud.com:8594/api/v1/pub";
 
 export const MIXED_TEAM_CODES = new Set(["ARMT", "APMT"]);
@@ -184,7 +185,7 @@ export async function fetchSiusSeries(
         displayName: row.DisplayName ?? "",
         firstName,
         lastName,
-        nation: row.Nation ?? "",
+        nation: normalizeNoc(row.Nation) ?? "",
         total,
         inners: inners === 0 ? null : inners, // 0 = not applicable (AR disciplines)
         series,
@@ -205,6 +206,40 @@ export interface SiusLiveData {
   qual: SiusLiveResult[];
   elim: SiusElimRound[];
   final: SiusLiveResult[];
+  /** Redni broj meča iste discipline na takmičenju (1 = prvi); >1 kad SIUS ima ponovljen događaj */
+  match?: number;
+  /** Datum početka SIUS događaja (YYYY-MM-DD, UTC) */
+  date?: string;
+}
+
+/** Ključ mape iz fetchLiveSiusResults: "ARM" za prvi meč, "ARM#2" za drugi… */
+export function parseSiusMatchKey(key: string): { eventCode: string; match: number } {
+  const [eventCode, n] = key.split("#");
+  return { eventCode, match: n ? Number(n) : 1 };
+}
+
+/**
+ * Raspodela SIUS događaja iste discipline na mečeve, hronološki. Svaki događaj sa sopstvenom
+ * kvalifikacijom je zaseban meč (npr. dva dana pojedinačnog na H&N Cup-u); događaj bez
+ * kvalifikacije (samo eliminacija/finale objavljeni odvojeno) nastavlja prethodni meč.
+ * Ništa se ne prepisuje — svaki meč dobija svoj ključ.
+ */
+export function assignSiusMatches(events: Array<{ eventCode: string; startDate: string; data: SiusLiveData }>): Map<string, SiusLiveData> {
+  const out = new Map<string, SiusLiveData>();
+  const count = new Map<string, number>();
+  for (const { eventCode, startDate, data } of [...events].sort((a, b) => a.startDate.localeCompare(b.startDate))) {
+    const n = count.get(eventCode) ?? 0;
+    const key = (m: number) => (m === 1 ? eventCode : `${eventCode}#${m}`);
+    const current = n ? out.get(key(n)) : undefined;
+    if (current && data.qual.length === 0) {
+      current.elim.push(...data.elim);
+      if (data.final.length > 0) current.final = data.final;
+      continue;
+    }
+    count.set(eventCode, n + 1);
+    out.set(key(n + 1), { ...data, match: n + 1, date: startDate.slice(0, 10) });
+  }
+  return out;
 }
 
 function isElimSubEvent(name: string): boolean {
@@ -227,14 +262,14 @@ function elimRoundNumber(name: string, fallback: number): number {
 
 /**
  * Fetch all live/finished qual and elimination results for the given discipline codes.
- * Returns a map of eventCode → { qual, elim[] }.
+ * Returns a map of match key ("ARM", "ARM#2"…, vidi parseSiusMatchKey) → { qual, elim[], final }.
  */
 export async function fetchLiveSiusResults(
   compUuid: string,
   disciplineCodes: string[],
   opts: FetchOpts = {}
 ): Promise<Map<string, SiusLiveData>> {
-  const out = new Map<string, SiusLiveData>();
+  const fetched: Array<{ eventCode: string; startDate: string; data: SiusLiveData }> = [];
 
   const allEvents = await fetchSiusEvents(compUuid);
   const relevantEvents = allEvents.filter((e) => disciplineCodes.includes(e.eventCode));
@@ -294,19 +329,12 @@ export async function fetchLiveSiusResults(
       }
 
       if (data.qual.length > 0 || data.elim.length > 0 || data.final.length > 0) {
-        const existing = out.get(event.eventCode);
-        if (existing) {
-          if (data.qual.length > 0) existing.qual = data.qual;
-          existing.elim.push(...data.elim);
-          if (data.final.length > 0) existing.final = data.final;
-        } else {
-          out.set(event.eventCode, data);
-        }
+        fetched.push({ eventCode: event.eventCode, startDate: event.startDate, data });
       }
     })
   );
 
-  return out;
+  return assignSiusMatches(fetched);
 }
 
 // ── Mixed team (ARMT / APMT) ────────────────────────────────────────────────────
@@ -414,7 +442,7 @@ async function fetchSiusTeamSeries(
           siusAthleteId: a.AthleteIdentifier?.Identifier ?? null,
           firstName,
           lastName,
-          nation: a.Nation ?? "",
+          nation: normalizeNoc(a.Nation) ?? "",
           total: aTotal,
           inners: aInners,
           series: parseSeriesTotals(a.Series ?? []),
@@ -484,7 +512,14 @@ export async function fetchLiveSiusMixedTeamResults(
       );
       data.final = finalResults.flat();
 
-      if (data.qual.length > 0 || data.final.length > 0) out.set(event.eventCode, data);
+      if (data.qual.length > 0 || data.final.length > 0) {
+        // ponovljen događaj (drugi meč) ne prepisuje prvi — dobija ključ "ARMT#2" (vidi parseSiusMatchKey)
+        const n = relevantEvents
+          .filter((e) => e.eventCode === event.eventCode)
+          .sort((a, b) => a.startDate.localeCompare(b.startDate))
+          .indexOf(event) + 1;
+        out.set(n === 1 ? event.eventCode : `${event.eventCode}#${n}`, data);
+      }
     })
   );
 
@@ -539,6 +574,8 @@ export function splitDisplayName(displayName: string): {
     if (/^[A-Z\-']+$/.test(parts[i])) split = i + 1;
     else break;
   }
+  // Sve velikim slovima ("HEINRICH ALISON"): poslednja reč je ime, ne deo prezimena.
+  if (split === parts.length) split = parts.length - 1;
   return { lastName: parts.slice(0, split).join(" "), firstName: parts.slice(split).join(" ") };
 }
 

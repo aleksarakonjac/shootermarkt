@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeFinalsIntoRows, type ParsedEvent, type ReviewRow } from "./pdf-import-types";
+import { dedupeRowsByCategory, mergeFinalsIntoRows, type ParsedEvent, type ReviewRow } from "./pdf-import-types";
 
 const foldName = (value: string) => value.toLowerCase();
 
@@ -134,5 +134,16 @@ describe("mergeFinalsIntoRows", () => {
       finalSeriesLabels: ["Klečeći", "Ležeći", "Stojeći 1", "Stojeći 2"],
       finalShots: [10.4, 10.7, 10.1],
     });
+  });
+});
+
+describe("dedupeRowsByCategory", () => {
+  const row = (category: ReviewRow["category"], qualTotal: number): ReviewRow => ({
+    firstName: "Marko", lastName: "Culibrk", teamNoc: "SRB", disciplineCode: "ARM", category, qualTotal,
+  });
+
+  it("keeps the same match on both senior and junior lists, drops exact repeats", () => {
+    const rows = dedupeRowsByCategory([row("senior", 619.1), row("junior", 619.1), row("junior", 619.1)], foldName);
+    expect(rows.map((r) => r.category)).toEqual(["senior", "junior"]);
   });
 });

@@ -2,11 +2,13 @@ import { db } from "@shootermarkt/db";
 import { clubs, shooters } from "@shootermarkt/db/schema";
 import { matchShooter, foldName } from "@shootermarkt/db/name-match";
 import { parsePdfWithGemini } from "./gemini-adapter";
+import { parseSiusPdf } from "./sius-pdf";
 import { DISCIPLINE_META, IMPORTED_DISCIPLINE_CODES, dedupeRowsByCategory, mergeFinalsIntoRows, type ParsedShooterResult, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 
 export async function parsePdfImport(pdfBuffer: Buffer) {
   const [bilten, allClubs, allShooters] = await Promise.all([
-    parsePdfWithGemini(pdfBuffer),
+    // SIUS bilten se čita deterministički; sve ostalo (skenovi, finala, nestandardni formati) ide u Gemini.
+    parseSiusPdf(pdfBuffer).catch(() => null).then((sius) => sius ?? parsePdfWithGemini(pdfBuffer)),
     db.select().from(clubs),
     db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality, clubId: shooters.clubId }).from(shooters),
   ]);
@@ -41,15 +43,21 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
         clubAbbr: result.clubName,
         clubId: club?.id,
         disciplineCode: event.discipline,
+        eventName: event.eventName ?? null,
+        eventDate: event.eventDate ?? null,
         category: event.category,
         qualTotal: result.total,
         qualInners: result.inners ?? null,
-        qualRank: result.rank,
+        qualRank: result.rank ?? undefined,
         qualSeries: result.series,
         qualified: result.qualified ?? null,
         remark: result.remark ?? null,
       };
-      if (!shooterId) row.warning = match.kind === "suggestion" ? `Možda: ${match.name}` : event.isInternational ? `Novi strelac (${nationality}) — biće kreiran` : "Novi strelac — biće kreiran";
+      if (event.guest) {
+        // ponytail: gosti nemaju svoje polje u bazi — preskočeni po defaultu, admin može da ih uključi
+        row.skip = true;
+        row.warning = "Gost (van konkurencije) — preskočen";
+      } else if (!shooterId) row.warning = match.kind === "suggestion" ? `Možda: ${match.name}` : event.isInternational ? `Novi strelac (${nationality}) — biće kreiran` : "Novi strelac — biće kreiran";
       rows.push(row);
     }
   }

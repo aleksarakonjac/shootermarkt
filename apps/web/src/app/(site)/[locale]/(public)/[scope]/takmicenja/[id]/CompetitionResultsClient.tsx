@@ -26,8 +26,12 @@ import { shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
 import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
 
 export type DisciplineGroup = {
+  /** Ključ izbora/URL-a: kod discipline, ili "ARM@12" za zaseban meč (competition_events) */
+  key: string;
   code: string;
   name: string;
+  /** Naziv zasebnog meča istog takmičenja (npr. memorijal drugog dana); null = glavno takmičenje */
+  eventName: string | null;
   apparatus: string | null;
   categories: Array<{
     category: AgeCategory;
@@ -186,7 +190,7 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
         : null;
     }
 
-    return category && groups.some((group) => group.code === disciplineCode && group.categories.some((item) => item.category === category))
+    return category && groups.some((group) => group.key === disciplineCode && group.categories.some((item) => item.category === category))
       ? { kind: "individual", disciplineCode, category, stage, elimRound }
       : null;
   }, [groups, mixedGroups, search]);
@@ -329,7 +333,7 @@ function CompetitionOverview({
         const singleCatData = singleCat ? g.categories[0] : null;
 
         return (
-          <div key={g.code} style={{ order: disciplineOrder(g.code) }}>
+          <div key={g.key} style={{ order: disciplineOrder(g.code) }}>
             <div className="flex items-center gap-2.5 mb-2">
               <span
                 className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded"
@@ -338,6 +342,7 @@ function CompetitionOverview({
                 {g.code}
               </span>
               <span className="text-sm font-semibold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
+              {g.eventName && <span className="text-xs font-semibold text-[var(--brand-primary)] truncate">{g.eventName}</span>}
               <span className="text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
                 {totalShooters} {locale === "en" ? "athletes" : "strelaca"}
               </span>
@@ -349,7 +354,7 @@ function CompetitionOverview({
                 <SingleCatRows
                   catData={singleCatData}
                   locale={locale}
-                  onSelect={(stage, elimRound) => onSelectIndividual(g.code, singleCatData.category, stage, elimRound)}
+                  onSelect={(stage, elimRound) => onSelectIndividual(g.key, singleCatData.category, stage, elimRound)}
                 />
               ) : (
                 /* Multiple categories: category rows */
@@ -360,7 +365,7 @@ function CompetitionOverview({
                   return (
                     <button
                       key={cat.category}
-                      onClick={() => onSelectIndividual(g.code, cat.category, hasQual ? "qual" : "elim")}
+                      onClick={() => onSelectIndividual(g.key, cat.category, hasQual ? "qual" : "elim")}
                       className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -665,7 +670,7 @@ function CompetitionDetail({
   }
 
   // Individual discipline
-  const group = groups.find((g) => g.code === selection.disciplineCode);
+  const group = groups.find((g) => g.key === selection.disciplineCode);
   const catGroup = group?.categories.find((c) => c.category === selection.category);
   const showCategory = (group?.categories.length ?? 0) > 1;
 
@@ -793,14 +798,17 @@ function CompetitionDetail({
             className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded shrink-0"
             style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
           >
-            {selection.disciplineCode}
+            {group?.code ?? selection.disciplineCode}
           </span>
           <h3
             className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase"
             style={{ fontSize: "1.1rem", letterSpacing: "-0.02em", lineHeight: 1.2 }}
           >
-            {disciplineName(selection.disciplineCode, locale)}
+            {disciplineName(group?.code ?? selection.disciplineCode, locale)}
           </h3>
+          {group?.eventName && (
+            <span className="text-[0.72rem] font-semibold text-[var(--brand-primary)]">{group.eventName}</span>
+          )}
           {showCategory && (
             <span className="text-[0.72rem] font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
               {CATEGORY_LABEL[selection.category]}

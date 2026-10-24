@@ -1,8 +1,8 @@
 export const revalidate = 300;
 
 import { db } from "@shootermarkt/db";
-import { shooters, results, competitions, countries, disciplines, shooterFormaCache } from "@shootermarkt/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { shooters, results, competitions, competitionEvents, countries, disciplines, shooterFormaCache } from "@shootermarkt/db/schema";
+import { eq, asc, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import type { Metadata } from "next";
@@ -79,7 +79,8 @@ export default async function ShooterPage({ params }: Props) {
         finalDetail: results.finalDetail,
         competitionId: competitions.id,
         competitionName: competitions.name,
-        competitionDate: competitions.date,
+        eventName: competitionEvents.name,
+        competitionDate: sql<string>`coalesce(${competitionEvents.date}, ${competitions.date})`, // memorijal drugog dana ima svoj datum
         competitionDateEnd: competitions.dateEnd,
         competitionLocation: competitions.location,
         competitionCountry: countries.name,
@@ -94,6 +95,7 @@ export default async function ShooterPage({ params }: Props) {
       })
       .from(results)
       .innerJoin(competitions, eq(results.competitionId, competitions.id))
+      .leftJoin(competitionEvents, eq(results.competitionEventId, competitionEvents.id))
       .leftJoin(countries, eq(competitions.countryId, countries.id))
       .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
       .where(eq(results.shooterId, shooterId))
@@ -163,7 +165,7 @@ export default async function ShooterPage({ params }: Props) {
       score: parseFloat(r.qualTotal!),
       discipline: r.disciplineCode,
       competitionId: r.competitionId,
-      competitionName: r.competitionName,
+      competitionName: r.eventName ? `${r.competitionName} — ${r.eventName}` : r.competitionName,
       location: r.competitionLocation,
       countryCode2: r.competitionCountryCode2,
       nocCode: r.competitionCountryNoc,

@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, ilike, inArray, lte, lt, or } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
-import { competitions, countries, disciplines, results } from "@shootermarkt/db/schema";
+import { competitions, competitionEvents, countries, disciplines, results } from "@shootermarkt/db/schema";
 import type { ResultRowData } from "@/components/result-display/ResultsHistoryTable";
 
 const SHOOTER_RESULTS_PAGE_SIZE = 8;
@@ -60,9 +60,12 @@ export async function getShooterResultsPage(shooterId: number, cursor?: ResultsC
       competitionCountry: countries.name,
       competitionCountryCode2: countries.code2,
       disciplineCode: disciplines.code,
+      competitionEventId: results.competitionEventId,
+      eventName: competitionEvents.name,
     })
     .from(results)
     .innerJoin(competitions, eq(results.competitionId, competitions.id))
+    .leftJoin(competitionEvents, eq(results.competitionEventId, competitionEvents.id))
     .leftJoin(countries, eq(competitions.countryId, countries.id))
     .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
     .where(and(eq(results.shooterId, shooterId), inArray(competitions.id, visibleCompetitions.map((competition) => competition.id))))

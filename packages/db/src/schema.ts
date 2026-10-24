@@ -13,6 +13,7 @@ import {
   pgEnum,
   index,
   uniqueIndex,
+  unique,
   customType,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
@@ -473,6 +474,21 @@ export const competitions = pgTable(
   ]
 );
 
+// ── Competition Events ────────────────────────────────────────────────────────
+// Zaseban meč u okviru istog takmičenja (npr. drugi dan Kupa = "Memorijal Zoran Zoki Stojilković").
+// Rezultat bez eventa pripada glavnom takmičenju.
+
+export const competitionEvents = pgTable(
+  "competition_events",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 300 }).notNull(),
+    date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD — forma koristi ovaj datum umesto datuma takmičenja
+  },
+  (t) => [uniqueIndex("competition_events_comp_name_unique").on(t.competitionId, t.name)]
+);
+
 // ── League Standings ──────────────────────────────────────────────────────────
 
 export const leagueStandings = pgTable(
@@ -506,6 +522,7 @@ export const results = pgTable(
     competitionId: integer("competition_id").notNull().references(() => competitions.id),
     disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
     disciplineVariantId: integer("discipline_variant_id").references(() => disciplineVariants.id),
+    competitionEventId: integer("competition_event_id").references(() => competitionEvents.id),
 
     // Exactly one should be set: club (club context) OR country (national team context)
     clubId: integer("club_id").references(() => clubs.id),
@@ -553,14 +570,16 @@ export const results = pgTable(
     index("results_shooter_id_idx").on(t.shooterId),
     index("results_competition_id_idx").on(t.competitionId),
     index("results_discipline_id_idx").on(t.disciplineId),
-    // Dozvoljava dva odvojena meča iste discipline (junior + senior) na istom
-    // takmičenju kad su različiti rezultati; isti rezultat se dedup-uje pre unosa.
-    uniqueIndex("results_shooter_comp_disc_cat_unique").on(
+    // Jedan red po strelac + takmičenje + event + disciplina + kategorija: seniorska i
+    // juniorska lista istog meča su dva reda; drugi dan (event) je zaseban meč.
+    // NULLS NOT DISTINCT: rezultati bez eventa i dalje imaju jedan red po kategoriji.
+    unique("results_shooter_comp_event_disc_cat_unique").on(
       t.shooterId,
       t.competitionId,
+      t.competitionEventId,
       t.disciplineId,
       t.category
-    ),
+    ).nullsNotDistinct(),
   ]
 );
 

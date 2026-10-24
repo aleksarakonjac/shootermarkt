@@ -1,6 +1,8 @@
 // Čiste funkcije žive u sius-merge.ts (client-safe, bez DB-a) — ovde re-export za postojeće pozivaoce
 export { mergeSiusFinals, type SiusFinalEntry } from "@/lib/sius-merge";
-import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, isJuniorEventCode, MIXED_TEAM_CODES } from "@shootermarkt/adapters/sius/public-adapter";
+import { fetchSiusEvents, fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, isJuniorEventCode, parseSiusMatchKey, MIXED_TEAM_CODES } from "@shootermarkt/adapters/sius/public-adapter";
+import { matchEventName } from "@/lib/competition-events";
+import { shooterResultCount } from "@/lib/import-commit";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
 import type { ReviewRow } from "@shootermarkt/db/pdf-import-types";
@@ -31,7 +33,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   const mixedCodes = requested.filter((c) => MIXED_TEAM_CODES.has(splitEventCode(c).code));
 
   const allShooters = await db
-    .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality })
+    .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality, resultCount: shooterResultCount })
     .from(shooters);
 
   let siusData: Awaited<ReturnType<typeof fetchLiveSiusResults>> = new Map();
@@ -60,9 +62,13 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   const finalEntries: SiusFinalEntry[] = [];
   const errors: string[] = [];
 
-  for (const [eventCode, data] of siusData) {
+  for (const [key, data] of siusData) {
+    const { eventCode, match } = parseSiusMatchKey(key);
     const { code: disciplineCode, category } = splitEventCode(eventCode);
     const code = disciplineCode as ReviewRow["disciplineCode"];
+    // drugi/treći meč iste discipline → zaseban event istog takmičenja
+    const eventName = match > 1 && data.date ? matchEventName(match, data.date) : null;
+    const eventDate = eventName ? data.date! : null;
 
     if (data.qual.length === 0 && data.elim.length === 0) {
       errors.push(`${disciplineCode}: no results`);
@@ -83,6 +89,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         teamNoc: r.nation,
         disciplineCode: code,
         category,
+        eventName,
+        eventDate,
         // Unranked (DSQ/DNS) rows have no real score — null, not 0, so they never count as a result.
         qualTotal: r.rank === null ? null : r.total,
         qualInners: r.rank === null ? null : r.inners,
@@ -119,6 +127,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
             teamNoc: e.nation,
             disciplineCode: code,
             category,
+            eventName,
+            eventDate,
             qualTotal: null,
             qualInners: null,
             qualRank: undefined,
@@ -156,6 +166,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
       finalEntries.push({
         disciplineCode,
         category,
+        eventName,
+        eventDate,
         rank: f.rank,
         remark: f.remark,
         penalty: f.penalty,
@@ -173,8 +185,14 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   }
 
   const teamEntries: MixedTeamEntry[] = [];
-  for (const [eventCode, data] of mixedData) {
+  for (const [key, data] of mixedData) {
+    const { eventCode, match } = parseSiusMatchKey(key);
     const { code, category } = splitEventCode(eventCode);
+    if (match > 1) {
+      // ponytail: mixed_team_results još nema competition_event_id — drugi meč se prijavljuje, ne upisuje preko prvog
+      errors.push(`${code}: ${match}. meč nije uvezen — mešoviti tim još nema podršku za više mečeva`);
+      continue;
+    }
     const disciplineCode = code as MixedTeamEntry["disciplineCode"];
     if (data.qual.length === 0 && data.final.length === 0) {
       errors.push(`${disciplineCode}: no results`);
@@ -266,6 +284,14 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
     }
 
     teamEntries.push(...byKey.values());
+  }
+
+  if (!disciplineCodes) {
+    // pun uvoz: prijavi SIUS događaje van podržanih disciplina umesto da nestanu bez traga
+    const unsupported = [...new Set((await fetchSiusEvents(siusId).catch(() => []))
+      .map((e) => e.eventCode)
+      .filter((c) => !requested.includes(c)))];
+    if (unsupported.length) errors.push(`Nije uvezeno (disciplina nije podržana): ${unsupported.join(", ")}`);
   }
 
   return { rows, finalEntries, teamEntries, eventCount: siusData.size + mixedData.size, errors };

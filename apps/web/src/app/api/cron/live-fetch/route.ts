@@ -4,7 +4,8 @@ import { competitions, competitionSchedule, disciplines, mixedTeamResults, resul
 import type { AgeCategory } from "@shootermarkt/db/schema";
 import { and, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml, fetchFinalResultsFromHtml, extractMixedTeamEvents, fetchMixedTeamQualFromHtml, fetchMixedTeamFinalFromHtml } from "@shootermarkt/adapters/issf/adapter";
-import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@shootermarkt/adapters/sius/public-adapter";
+import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, parseSiusMatchKey, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@shootermarkt/adapters/sius/public-adapter";
+import { ensureCompetitionEvent, matchEventName } from "@/lib/competition-events";
 import { matchShooter } from "@shootermarkt/db/name-match";
 import { buildIssfFinalDetails, buildSiusFinalDetails } from "@/lib/final-detail";
 import { recomputeFormaCache } from "@/lib/forma-cache";
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
       issfId: competitions.issfId,
       siusId: competitions.siusId,
       disciplineCode: disciplines.code,
+      startTime: competitionSchedule.startTime,
     })
     .from(competitionSchedule)
     .innerJoin(competitions, eq(competitionSchedule.competitionId, competitions.id))
@@ -104,7 +106,7 @@ export async function GET(req: NextRequest) {
 
 async function processCompetition(
   competitionId: number,
-  slots: Array<{ competitionId: number; disciplineId: number; stage: string; category: AgeCategory; issfId: string | null; siusId: string | null; disciplineCode: string }>,
+  slots: Array<{ competitionId: number; disciplineId: number; stage: string; category: AgeCategory; issfId: string | null; siusId: string | null; disciplineCode: string; startTime: Date }>,
   allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; nationality: string | null; issfId: string | null }>,
   shooterByIssfId: Map<string, number>
 ): Promise<number> {
@@ -148,8 +150,14 @@ async function processCompetition(
     }
 
     for (const slot of dedupedSlots) {
-      const eventData = siusData.get(slot.disciplineCode);
+      // Ponovljen meč iste discipline (npr. drugi dan pojedinačnog): uzmi SIUS meč tog dana.
+      const slotDate = slot.startTime.toISOString().slice(0, 10);
+      const matches = [...siusData.entries()].filter(([key]) => parseSiusMatchKey(key).eventCode === slot.disciplineCode).map(([, data]) => data);
+      const eventData = matches.find((m) => m.date === slotDate) ?? matches.filter((m) => !m.date || m.date <= slotDate).at(-1) ?? matches[0];
       if (!eventData) continue;
+      const competitionEventId = eventData.match && eventData.match > 1 && eventData.date
+        ? await ensureCompetitionEvent(competitionId, matchEventName(eventData.match, eventData.date), eventData.date)
+        : null;
 
       if (slot.stage.startsWith("qual") && eventData.qual.length > 0) {
         for (const r of eventData.qual) {
@@ -158,7 +166,7 @@ async function processCompetition(
           rows.push({
             shooterId,
             competitionId,
-            disciplineId: slot.disciplineId,
+            disciplineId: slot.disciplineId, competitionEventId,
             category: slot.category,
             // DSQ/DNS without a rank: no score (null, never 0) — coalesce keeps any earlier real value.
             qualTotal: r.rank === null ? null : r.total.toFixed(1),
@@ -181,7 +189,7 @@ async function processCompetition(
             rows.push({
               shooterId,
               competitionId,
-              disciplineId: slot.disciplineId,
+              disciplineId: slot.disciplineId, competitionEventId,
               category: slot.category,
               elimRound: round,
               elimTotal: r.rank === null ? null : Math.round(r.total),
@@ -207,7 +215,7 @@ async function processCompetition(
           rows.push({
             shooterId,
             competitionId,
-            disciplineId: slot.disciplineId,
+            disciplineId: slot.disciplineId, competitionEventId,
             category: slot.category,
             finalTotal: r.rank === null ? null : r.total.toFixed(1),
             finalRank: r.rank,
@@ -239,7 +247,7 @@ async function processCompetition(
   // "ON CONFLICT DO UPDATE command cannot affect row a second time" and
   // fails the whole batch. Merge stages into one row per key.
   const dedupedRows = [...rows.reduce((byKey, row) => {
-    const key = `${row.shooterId}|${row.competitionId}|${row.disciplineId}|${row.category}`;
+    const key = `${row.shooterId}|${row.competitionId}|${row.competitionEventId ?? ""}|${row.disciplineId}|${row.category}`;
     const prev = byKey.get(key);
     byKey.set(key, { ...prev, ...row, remarkDetails: prev?.remarkDetails || row.remarkDetails ? { ...prev?.remarkDetails, ...row.remarkDetails } : undefined });
     return byKey;
@@ -257,7 +265,7 @@ async function processCompetition(
       .insert(results)
       .values(qualRows)
       .onConflictDoUpdate({
-        target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
+        target: [results.shooterId, results.competitionId, results.competitionEventId, results.disciplineId, results.category],
         set: {
           // Coalesce: red samo sa finalom (kvalifikacije van 4h prozora) ne sme da obriše kvalifikacije.
           qualTotal: sql`coalesce(excluded.qual_total, ${results.qualTotal})`,
@@ -286,7 +294,7 @@ async function processCompetition(
       .insert(results)
       .values(row)
       .onConflictDoUpdate({
-        target: [results.shooterId, results.competitionId, results.disciplineId, results.category],
+        target: [results.shooterId, results.competitionId, results.competitionEventId, results.disciplineId, results.category],
         set: {
           elimRound: sql`excluded.elim_round`,
           elimTotal: sql`excluded.elim_total`,

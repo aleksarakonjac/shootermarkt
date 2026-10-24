@@ -1,6 +1,6 @@
 import { and, eq, gt, gte, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
-import { results, competitions, disciplines, shooterFormaCache } from "@shootermarkt/db/schema";
+import { results, competitions, competitionEvents, disciplines, shooterFormaCache } from "@shootermarkt/db/schema";
 import { RANKING_MIN_SAMPLE, type CompetitionEventType, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 
 /** qual_remark oznake koje znače da rezultat nije ispucan do kraja. */
@@ -53,7 +53,8 @@ export async function getFormaEntriesByDiscipline(
     .select({
       shooterId: results.shooterId,
       qualTotal: results.qualTotal,
-      date: competitions.date,
+      // zaseban meč (memorijal drugog dana…) ima svoj datum — bitno za time-decay i dedup istog dana
+      date: sql<string>`coalesce(${competitionEvents.date}, ${competitions.date})`,
       level: competitions.level,
       eventType: competitions.eventType,
       category: results.category,
@@ -61,6 +62,7 @@ export async function getFormaEntriesByDiscipline(
     })
     .from(results)
     .innerJoin(competitions, eq(results.competitionId, competitions.id))
+    .leftJoin(competitionEvents, eq(results.competitionEventId, competitionEvents.id))
     .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
     .where(
       and(

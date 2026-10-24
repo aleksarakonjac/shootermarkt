@@ -16,6 +16,9 @@ export interface SiusFinalEntry extends SiusExtraRemarks {
   disciplineCode: string;
   /** Uzrasna kategorija događaja (junior za SIUS događaje sa sufiksom J); default senior. */
   category?: ReviewRow["category"];
+  /** Ponovljen meč iste discipline (competition_events), npr. "2. meč · 22.01."; null = prvi meč */
+  eventName?: string | null;
+  eventDate?: string | null;
   rank: number | null; // null = DSQ/DNS without a rank
   remark: string | null;
   firstName: string;
@@ -46,11 +49,12 @@ export function mergeSiusFinals(rows: ReviewRow[], finalEntries: SiusFinalEntry[
   // Isti oblik kao live cron: kumulativ po seriji discipline + nazivi kolona + plasman posle
   // svake serije (lib/final-detail.ts), umesto čistih zbirova serija.
   const finalFields = new Map<SiusFinalEntry, Pick<ReviewRow, "finalCumulative" | "finalSeriesLabels" | "finalRanks">>();
-  const sameEvent = (f: SiusFinalEntry, r: Pick<ReviewRow, "disciplineCode" | "category">) =>
-    f.disciplineCode === r.disciplineCode && (f.category ?? "senior") === r.category;
-  for (const event of new Set(activeFinals.map((f) => `${f.disciplineCode}|${f.category ?? "senior"}`))) {
-    const [code, category] = event.split("|");
-    const finalists = activeFinals.filter((f) => f.disciplineCode === code && (f.category ?? "senior") === category && f.series.length > 0).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+  const sameEvent = (f: SiusFinalEntry, r: Pick<ReviewRow, "disciplineCode" | "category" | "eventName">) =>
+    f.disciplineCode === r.disciplineCode && (f.category ?? "senior") === r.category && (f.eventName ?? null) === (r.eventName ?? null);
+  const eventKey = (f: SiusFinalEntry) => `${f.disciplineCode}|${f.category ?? "senior"}|${f.eventName ?? ""}`;
+  for (const event of new Set(activeFinals.map(eventKey))) {
+    const code = event.split("|")[0];
+    const finalists = activeFinals.filter((f) => eventKey(f) === event && f.series.length > 0).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
     buildSiusFinalDetails(code, finalists).forEach((detail, i) => finalFields.set(finalists[i], {
       finalCumulative: detail.cumulative ?? null,
       finalSeriesLabels: detail.seriesLabels ?? null,
@@ -93,6 +97,8 @@ export function mergeSiusFinals(rows: ReviewRow[], finalEntries: SiusFinalEntry[
         teamNoc: f.nation,
         disciplineCode: f.disciplineCode as ReviewRow["disciplineCode"],
         category: f.category ?? "senior",
+        eventName: f.eventName ?? null,
+        eventDate: f.eventDate ?? null,
         qualTotal: null,
         qualInners: null,
         qualified: true,

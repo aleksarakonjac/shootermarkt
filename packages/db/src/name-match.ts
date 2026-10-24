@@ -58,6 +58,8 @@ export type MatchCandidate = {
   lastName: string;
   previousLastNames?: string[] | null;
   nationality?: string | null;
+  /** Broj rezultata u bazi — razrešava dvosmislenu varijantu imena (aktivan strelac pre neaktivnog imenjaka). */
+  resultCount?: number | null;
 };
 
 export type MatchResult =
@@ -79,8 +81,9 @@ export function matchShooter(
 ): MatchResult {
   const fLast = foldName(last);
   const fFirst = foldName(first);
+  const nation = normalizeNoc(noc);
   const nocOk = (c: MatchCandidate) =>
-    !c.nationality || !noc || c.nationality === noc || noc === "SRB" || noc === "AIN";
+    !c.nationality || !nation || normalizeNoc(c.nationality) === nation || nation === "SRB" || nation === "AIN";
 
   const lastMatches = (c: MatchCandidate) =>
     foldName(c.lastName) === fLast || !!c.previousLastNames?.some((p) => foldName(p) === fLast);
@@ -89,7 +92,22 @@ export function matchShooter(
   const exact = existing.find((c) => lastMatches(c) && foldName(c.firstName) === fFirst && nocOk(c));
   if (exact) return { kind: "exact", id: exact.id };
 
-  // 2. Fuzzy: isto prezime, ime blizu
+  // 2. Varijanta zapisa istog imena, ista država (ne SRB/AIN izuzetak): skraćeno ime ili prezime
+  //    ("FIORI Peter" = "FIORI Peter Matthew", "VIDAL Daniel" = "VIDAL MOLINA Daniel Andres"),
+  //    ß/ü transkripcija ("WEIß" = "WEISS", "BÜHLMEYER" = "BUEHLMEYER"), drugi redosled imena.
+  //    Auto-poveži samo kad je kandidat jedinstven.
+  const wLast = nameWords(last);
+  const wFirst = nameWords(first);
+  const variants = existing.filter((c) =>
+    !!nation && normalizeNoc(c.nationality) === nation
+    && [c.lastName, ...(c.previousLastNames ?? [])].some((l) => sameOrPrefix(nameWords(l), wLast))
+    && sameOrPrefix(nameWords(c.firstName), wFirst));
+  if (variants.length === 1) return { kind: "exact", id: variants[0].id };
+  // "FIORI Peter" → Peter Matthew (puca) a ne Peter Louis (bez ijednog rezultata)
+  const active = variants.filter((c) => (c.resultCount ?? 0) > 0);
+  if (active.length === 1) return { kind: "exact", id: active[0].id };
+
+  // 3. Fuzzy: isto prezime, ime blizu
   let best: { c: MatchCandidate; d: number } | null = null;
   for (const c of existing) {
     if (!lastMatches(c) || !nocOk(c)) continue;
@@ -97,6 +115,33 @@ export function matchShooter(
     if (d <= 2 && (!best || d < best.d)) best = { c, d };
   }
   if (best) return { kind: "suggestion", id: best.c.id, name: `${best.c.lastName} ${best.c.firstName}` };
+  if (variants.length > 1) return { kind: "suggestion", id: variants[0].id, name: `${variants[0].lastName} ${variants[0].firstName}` };
 
   return { kind: "none" };
+}
+
+/** Regionalni timovi u rezultatima (SIUS: bavarski strelci kao "BAY") → država. */
+const NOC_ALIASES: Record<string, string> = { BAY: "GER" };
+
+export function normalizeNoc(noc: string | null | undefined): string | null {
+  const code = noc?.trim().toUpperCase();
+  return code ? NOC_ALIASES[code] ?? code : null;
+}
+
+/**
+ * Reči imena za tolerantno poređenje: ß → ss, ł/ø/æ (NFD ih ne razlaže), nemačka transkripcija ae/oe/ue = ä/ö/ü.
+ * Namerno odvojeno od foldName — foldNameSql indeksi u bazi moraju ostati isti.
+ */
+function nameWords(s: string): string[] {
+  return s.replace(/ß/g, "ss").replace(/[łŁ]/g, "l").replace(/[øØ]/g, "o").replace(/[æÆ]/g, "ae").split(/[\s-]+/)
+    .map((w) => foldName(w).replace(/ae/g, "a").replace(/oe/g, "o").replace(/ue/g, "u"))
+    .filter(Boolean);
+}
+
+/** Iste reči (bilo kojim redom) ili je kraće ime početak dužeg, reč po reč ("ana" ≠ "anastasija"). */
+function sameOrPrefix(a: string[], b: string[]): boolean {
+  if (!a.length || !b.length) return false;
+  if (a.length === b.length && [...a].sort().join(" ") === [...b].sort().join(" ")) return true;
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  return short.every((w, i) => long[i] === w);
 }
