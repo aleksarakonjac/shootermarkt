@@ -277,8 +277,18 @@ export const processIssfDirectImport = inngest.createFunction(
     }
 
     const allShooters = await db
-      .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality })
+      .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality, issfId: shooters.issfId })
       .from(shooters);
+    // issfId je pouzdaniji od imena (JÄGGI/JAEGGI, promena prezimena) — po imenu samo kad ga nema
+    const shooterByIssfId = new Map(allShooters.filter((s) => s.issfId).map((s) => [s.issfId!, s.id]));
+    const resolveShooter = (r: { issfId?: string | null; firstName: string; lastName: string; nationCode: string }) => {
+      if (r.issfId && shooterByIssfId.has(r.issfId)) return shooterByIssfId.get(r.issfId);
+      const match = matchShooter(r.firstName, r.lastName, r.nationCode, allShooters);
+      if (match.kind !== "exact") return undefined;
+      // Isto ime, ali taj strelac ima drugi issfId → druga osoba
+      const other = r.issfId && allShooters.find((s) => s.id === match.id)?.issfId;
+      return other && other !== r.issfId ? undefined : match.id;
+    };
 
     const rows: ReviewRow[] = [];
 
@@ -302,8 +312,7 @@ export const processIssfDirectImport = inngest.createFunction(
         allR3P.forEach((r, idx) => { r.rank = idx + 1; });
 
         for (const result of allR3P) {
-          const match = matchShooter(result.firstName, result.lastName, result.nationCode, allShooters);
-          const shooterId = match.kind === "exact" ? match.id : undefined;
+          const shooterId = resolveShooter(result);
           rows.push({
             shooterId,
             issfId: result.issfId || undefined,
@@ -338,8 +347,7 @@ export const processIssfDirectImport = inngest.createFunction(
       const discRows: typeof rows = [];
 
       for (const result of qualResults) {
-        const match = matchShooter(result.firstName, result.lastName, result.nationCode, allShooters);
-        const shooterId = match.kind === "exact" ? match.id : undefined;
+        const shooterId = resolveShooter(result);
 
         discRows.push({
           shooterId,

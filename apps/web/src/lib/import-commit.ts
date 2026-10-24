@@ -62,8 +62,9 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
     id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName,
     previousLastNames: shooters.previousLastNames,
     nationality: shooters.nationality, clubId: shooters.clubId,
-    birthYear: shooters.birthYear, apparatus: shooters.apparatus,
+    birthYear: shooters.birthYear, apparatus: shooters.apparatus, issfId: shooters.issfId,
   }).from(shooters);
+  const shooterByIssfId = new Map(allShooters.filter((s) => s.issfId).map((s) => [s.issfId!, s]));
   let inserted = 0;
   let skipped = 0;
   const errors: string[] = [];
@@ -86,11 +87,20 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
 
       let shooterId = row.shooterId;
       if (!shooterId) {
+        // issfId (ISSF import) pre imena; ime se ne prihvata ako taj strelac ima drugi issfId — druga osoba
+        const issfId = row.issfId || null;
         const match = matchShooter(row.firstName, row.lastName, row.teamNoc || null, allShooters);
-        const existing = match.kind === "exact" ? allShooters.find((shooter) => shooter.id === match.id) : undefined;
+        const byName = match.kind === "exact" ? allShooters.find((shooter) => shooter.id === match.id) : undefined;
+        const existing = (issfId && shooterByIssfId.get(issfId))
+          || (byName && (!issfId || !byName.issfId) ? byName : undefined);
         if (existing) {
           shooterId = existing.id;
           const patch: Partial<typeof shooters.$inferInsert> = {};
+          if (issfId && !existing.issfId) {
+            patch.issfId = issfId;
+            existing.issfId = issfId;
+            shooterByIssfId.set(issfId, existing);
+          }
           if (!existing.clubId && clubId) patch.clubId = clubId;
           if (!existing.birthYear && row.birthYear) patch.birthYear = row.birthYear;
           if (!existing.apparatus && (row.apparatus ?? DISCIPLINE_META[row.disciplineCode]?.apparatus)) {
@@ -103,15 +113,25 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
             firstName: row.firstName, lastName: row.lastName, nationality: row.teamNoc || null,
             birthYear: row.birthYear ?? null, gender: row.gender ?? meta?.gender ?? null,
             apparatus: row.apparatus ?? meta?.apparatus ?? null, clubId: clubId ?? null,
-            createdBySelf: false, verified: false,
+            createdBySelf: false, verified: false, issfId,
           }).returning({ id: shooters.id });
           shooterId = created.id;
-          allShooters.push({
+          const added = {
             id: created.id, firstName: row.firstName, lastName: row.lastName,
             previousLastNames: null,
             nationality: row.teamNoc || null, clubId: clubId ?? null,
-            birthYear: row.birthYear ?? null, apparatus: row.apparatus ?? meta?.apparatus ?? null,
-          });
+            birthYear: row.birthYear ?? null, apparatus: row.apparatus ?? meta?.apparatus ?? null, issfId,
+          };
+          allShooters.push(added);
+          if (issfId) shooterByIssfId.set(issfId, added);
+        }
+      } else if (row.issfId && !shooterByIssfId.has(row.issfId)) {
+        // Strelac izabran u review-u (ili po imenu u ingest-u) — poveži ga sa ISSF ID-jem iz reda
+        const chosen = allShooters.find((shooter) => shooter.id === shooterId);
+        if (chosen && !chosen.issfId) {
+          await db.update(shooters).set({ issfId: row.issfId }).where(eq(shooters.id, chosen.id));
+          chosen.issfId = row.issfId;
+          shooterByIssfId.set(row.issfId, chosen);
         }
       }
       if (shooterId) affectedShooterIds.add(shooterId);
