@@ -155,7 +155,7 @@ async function processCompetition(
       const matches = [...siusData.entries()].filter(([key]) => parseSiusMatchKey(key).eventCode === slot.disciplineCode).map(([, data]) => data);
       const eventData = matches.find((m) => m.date === slotDate) ?? matches.filter((m) => !m.date || m.date <= slotDate).at(-1) ?? matches[0];
       if (!eventData) continue;
-      const competitionEventId = eventData.match && eventData.match > 1 && eventData.date
+      const competitionEventId = eventData.match && (eventData.matchCount ?? 1) > 1 && eventData.date
         ? await ensureCompetitionEvent(competitionId, matchEventName(eventData.match, eventData.date), eventData.date)
         : null;
 

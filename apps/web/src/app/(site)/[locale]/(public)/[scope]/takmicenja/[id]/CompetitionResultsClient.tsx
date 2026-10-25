@@ -26,12 +26,18 @@ import { shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
 import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
 
 export type DisciplineGroup = {
+  /** Jedinstven id bloka (ključ + kategorija kad je disciplina podeljena po mečevima) */
+  id: string;
   /** Ključ izbora/URL-a: kod discipline, ili "ARM@12" za zaseban meč (competition_events) */
   key: string;
   code: string;
   name: string;
   /** Naziv zasebnog meča istog takmičenja (npr. memorijal drugog dana); null = glavno takmičenje */
   eventName: string | null;
+  /** Oznaka bloka: naziv meča, uz kategoriju kad disciplina ima više mečeva */
+  label: string | null;
+  /** Datum meča ("22.01."), kad je poznat (event ili raspored) */
+  date: string | null;
   apparatus: string | null;
   categories: Array<{
     category: AgeCategory;
@@ -333,7 +339,7 @@ function CompetitionOverview({
         const singleCatData = singleCat ? g.categories[0] : null;
 
         return (
-          <div key={g.key} style={{ order: disciplineOrder(g.code) }}>
+          <div key={g.id} style={{ order: disciplineOrder(g.code) }}>
             <div className="flex items-center gap-2.5 mb-2">
               <span
                 className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded"
@@ -342,7 +348,8 @@ function CompetitionOverview({
                 {g.code}
               </span>
               <span className="text-sm font-semibold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
-              {g.eventName && <span className="text-xs font-semibold text-[var(--brand-primary)] truncate">{g.eventName}</span>}
+              {g.label && <span className="text-xs font-semibold text-[var(--brand-primary)] truncate">{g.label}</span>}
+              {g.date && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">{g.date}</span>}
               <span className="text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
                 {totalShooters} {locale === "en" ? "athletes" : "strelaca"}
               </span>
@@ -670,7 +677,7 @@ function CompetitionDetail({
   }
 
   // Individual discipline
-  const group = groups.find((g) => g.key === selection.disciplineCode);
+  const group = groups.find((g) => g.key === selection.disciplineCode && g.categories.some((c) => c.category === selection.category));
   const catGroup = group?.categories.find((c) => c.category === selection.category);
   const showCategory = (group?.categories.length ?? 0) > 1;
 
@@ -806,8 +813,11 @@ function CompetitionDetail({
           >
             {disciplineName(group?.code ?? selection.disciplineCode, locale)}
           </h3>
-          {group?.eventName && (
-            <span className="text-[0.72rem] font-semibold text-[var(--brand-primary)]">{group.eventName}</span>
+          {group?.label && (
+            <span className="text-[0.72rem] font-semibold text-[var(--brand-primary)]">{group.label}</span>
+          )}
+          {group?.date && (
+            <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">{group.date}</span>
           )}
           {showCategory && (
             <span className="text-[0.72rem] font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">

@@ -11,7 +11,8 @@ import { DISCIPLINE_META, type CommitPayload } from "@shootermarkt/db/pdf-import
 export class CommitValidationError extends Error {}
 
 /** Broj rezultata strelca — za matchShooter (dvosmislena varijanta imena → aktivan strelac). */
-export const shooterResultCount = sql<number>`(select count(*)::int from ${results} where ${results.shooterId} = ${shooters.id})`;
+// Sirov SQL: Drizzle u select listi ne kvalifikuje kolone, pa bi "id" u podupitu značio results.id.
+export const shooterResultCount = sql<number>`(select count(*)::int from results r where r.shooter_id = "shooters"."id")`;
 
 export type CommitResult = {
   inserted: number;

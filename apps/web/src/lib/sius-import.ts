@@ -66,8 +66,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
     const { eventCode, match } = parseSiusMatchKey(key);
     const { code: disciplineCode, category } = splitEventCode(eventCode);
     const code = disciplineCode as ReviewRow["disciplineCode"];
-    // drugi/treći meč iste discipline → zaseban event istog takmičenja
-    const eventName = match > 1 && data.date ? matchEventName(match, data.date) : null;
+    // disciplina sa više mečeva (npr. dva dana pojedinačnog) → svaki meč, i prvi, je event sa svojim datumom
+    const eventName = (data.matchCount ?? 1) > 1 && data.date ? matchEventName(match, data.date) : null;
     const eventDate = eventName ? data.date! : null;
 
     if (data.qual.length === 0 && data.elim.length === 0) {

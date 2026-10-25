@@ -59,5 +59,6 @@ describe("splitDisplayName", () => {
     const { splitDisplayName } = await import("./public-adapter");
     expect(splitDisplayName("HEINRICH ALISON")).toEqual({ lastName: "HEINRICH", firstName: "ALISON" });
     expect(splitDisplayName("KOCHALUMKAL VINOD Vidarsa")).toEqual({ lastName: "KOCHALUMKAL VINOD", firstName: "Vidarsa" });
+    expect(splitDisplayName("BOLA UJČIČ Denis")).toEqual({ lastName: "BOLA UJČIČ", firstName: "Denis" });
   });
 });

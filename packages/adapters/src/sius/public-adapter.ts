@@ -210,6 +210,8 @@ export interface SiusLiveData {
   match?: number;
   /** Datum početka SIUS događaja (YYYY-MM-DD, UTC) */
   date?: string;
+  /** Koliko mečeva te discipline takmičenje ima po SIUS rasporedu (različiti dani), i pre nego što svi počnu */
+  matchCount?: number;
 }
 
 /** Ključ mape iz fetchLiveSiusResults: "ARM" za prvi meč, "ARM#2" za drugi… */
@@ -329,6 +331,7 @@ export async function fetchLiveSiusResults(
       }
 
       if (data.qual.length > 0 || data.elim.length > 0 || data.final.length > 0) {
+        data.matchCount = new Set(relevantEvents.filter((e) => e.eventCode === event.eventCode).map((e) => e.startDate.slice(0, 10))).size;
         fetched.push({ eventCode: event.eventCode, startDate: event.startDate, data });
       }
     })
@@ -571,7 +574,7 @@ export function splitDisplayName(displayName: string): {
   if (parts.length === 1) return { firstName: "", lastName: parts[0] };
   let split = 1;
   for (let i = 1; i < parts.length; i++) {
-    if (/^[A-Z\-']+$/.test(parts[i])) split = i + 1;
+    if (/^[\p{Lu}\-']+$/u.test(parts[i])) split = i + 1; // i Č/Š/Ž… ("BOLA UJČIČ Denis")
     else break;
   }
   // Sve velikim slovima ("HEINRICH ALISON"): poslednja reč je ime, ne deo prezimena.

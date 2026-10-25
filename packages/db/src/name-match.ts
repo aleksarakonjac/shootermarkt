@@ -94,14 +94,19 @@ export function matchShooter(
 
   // 2. Varijanta zapisa istog imena, ista država (ne SRB/AIN izuzetak): skraćeno ime ili prezime
   //    ("FIORI Peter" = "FIORI Peter Matthew", "VIDAL Daniel" = "VIDAL MOLINA Daniel Andres"),
-  //    ß/ü transkripcija ("WEIß" = "WEISS", "BÜHLMEYER" = "BUEHLMEYER"), drugi redosled imena.
+  //    ß/ü transkripcija ("WEIß" = "WEISS", "BÜHLMEYER" = "BUEHLMEYER"), drugi redosled ili podela imena.
   //    Auto-poveži samo kad je kandidat jedinstven.
   const wLast = nameWords(last);
   const wFirst = nameWords(first);
+  const wFull = [...wLast, ...wFirst].sort().join(" ");
   const variants = existing.filter((c) =>
     !!nation && normalizeNoc(c.nationality) === nation
-    && [c.lastName, ...(c.previousLastNames ?? [])].some((l) => sameOrPrefix(nameWords(l), wLast))
-    && sameOrPrefix(nameWords(c.firstName), wFirst));
+    && (
+      ([c.lastName, ...(c.previousLastNames ?? [])].some((l) => sameOrPrefix(nameWords(l), wLast))
+        && sameOrPrefix(nameWords(c.firstName), wFirst))
+      // iste reči punog imena, drugačije presečeno na prezime/ime ("HO XIU" "YI" = "HO" "Xiu Yi")
+      || [...nameWords(c.lastName), ...nameWords(c.firstName)].sort().join(" ") === wFull
+    ));
   if (variants.length === 1) return { kind: "exact", id: variants[0].id };
   // "FIORI Peter" → Peter Matthew (puca) a ne Peter Louis (bez ijednog rezultata)
   const active = variants.filter((c) => (c.resultCount ?? 0) > 0);

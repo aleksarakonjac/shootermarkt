@@ -16,7 +16,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { ScopedLink } from "../../../components/ScopedLink";
 import type { EventType } from "@shootermarkt/db/pdf-import-types";
-import { CATEGORY_RANK } from "@shootermarkt/db/pdf-import-types";
+import { CATEGORY_LABEL, CATEGORY_RANK } from "@shootermarkt/db/pdf-import-types";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import {
   CompetitionResultsClient,
@@ -93,6 +93,7 @@ export default async function CompetitionPage({ params }: Props) {
         category: results.category,
         competitionEventId: results.competitionEventId,
         eventName: competitionEvents.name,
+        eventDate: competitionEvents.date,
         elimRound: results.elimRound,
         elimTotal: results.elimTotal,
         elimRank: results.elimRank,
@@ -208,23 +209,41 @@ export default async function CompetitionPage({ params }: Props) {
   }
   const mixedGroups = mixedGroupOrder.map((key) => mixedGroupMap.get(key)!);
 
-  // Group by discipline (+ event: memorijal drugog dana je zasebna disciplina sa svojim nazivom),
-  // then by age category, preserving order of first appearance
+  // Group by discipline (+ event: memorijal drugog dana / ponovljen meč je zasebna disciplina sa svojim nazivom),
+  // then by age category, preserving order of first appearance. Disciplina sa više mečeva se deli i po
+  // kategoriji, da svaki meč svake liste ima svoj blok ("Senior · 1. meč", "Junior · 2. meč · 25.01.").
+  const multiMatch = new Set(compResults.filter((r) => r.competitionEventId).map((r) => r.disciplineCode));
+  // Datum meča kad ga znamo: event → raspored (početak kvalifikacija) → datum takmičenja za glavni meč višednevnog biltena
+  const scheduledDate = new Map<string, string>();
+  for (const slot of scheduleRows) {
+    const key = `${slot.disciplineCode}|${slot.category}`;
+    const day = slot.startTime.toISOString().slice(0, 10);
+    if (slot.stage.startsWith("qual") && (!scheduledDate.has(key) || day < scheduledDate.get(key)!)) scheduledDate.set(key, day);
+  }
+  const matchDate = (r: (typeof compResults)[number]) =>
+    r.eventDate ?? scheduledDate.get(`${r.disciplineCode}|${r.category}`) ?? (multiMatch.has(r.disciplineCode) ? comp?.date ?? null : null);
+  const ddmm = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
   const disciplineOrder: string[] = [];
   const disciplineMap = new Map<string, DisciplineGroup>();
-  const categoryOrder = new Map<string, string[]>(); // group key -> category[]
+  const categoryOrder = new Map<string, string[]>(); // group id -> category[]
   const categoryMap = new Map<string, Map<string, DisciplineGroup["categories"][number]>>();
 
   for (const r of compResults) {
     // isti format ključa koristi i link sa profila strelca (?disc=ARM@12)
-    const key = r.competitionEventId ? `${r.disciplineCode}@${r.competitionEventId}` : r.disciplineCode;
+    const selectionKey = r.competitionEventId ? `${r.disciplineCode}@${r.competitionEventId}` : r.disciplineCode;
+    const split = multiMatch.has(r.disciplineCode);
+    const key = split ? `${selectionKey}|${r.category}` : selectionKey;
     if (!disciplineMap.has(key)) {
       disciplineOrder.push(key);
       disciplineMap.set(key, {
-        key,
+        id: key,
+        key: selectionKey,
         code: r.disciplineCode,
         name: r.disciplineName,
         eventName: r.eventName ?? null,
+        // datum ide u svoju oznaku, pa se skida sa kraja naziva ("2. meč · 22.01." → "2. meč")
+        label: (split ? `${CATEGORY_LABEL[r.category]} · ${r.eventName ?? "1. meč"}` : r.eventName)?.replace(/ · \d{2}\.\d{2}\.$/, "") ?? null,
+        date: matchDate(r) ? ddmm(matchDate(r)!) : null,
         apparatus: r.apparatus,
         categories: [],
       });
@@ -276,6 +295,11 @@ export default async function CompetitionPage({ params }: Props) {
       .sort((a, b) => CATEGORY_RANK[b.category] - CATEGORY_RANK[a.category]); // stariji prvo
     return { ...disciplineMap.get(key)!, categories: cats };
   });
+  // Unutar discipline (CSS order po kodu): stariji uzrast prvo, pa glavni meč, pa ostali po nazivu/datumu
+  groups.sort((a, b) =>
+    CATEGORY_RANK[b.categories[0].category] - CATEGORY_RANK[a.categories[0].category]
+    || Number(a.eventName != null) - Number(b.eventName != null)
+    || (a.eventName ?? "").localeCompare(b.eventName ?? ""));
 
   // ── Date display ────────────────────────────────────────────────
   function fmtDate(d: string) {
@@ -408,7 +432,7 @@ export default async function CompetitionPage({ params }: Props) {
                 <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.3"/>
                 <circle cx="7" cy="7" r="0.7" fill="currentColor"/>
               </svg>
-              <span>{groups.map((g) => g.code).join(" · ")}</span>
+              <span>{[...new Set(groups.map((g) => g.code))].join(" · ")}</span>
             </span>
           )}
         </div>

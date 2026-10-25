@@ -29,6 +29,7 @@ describe("matchShooter spelling variants (SIUS vs ISSF)", () => {
     expect(matchShooter("Daniel", "VIDAL", "CHI", [vidal])).toEqual({ kind: "exact", id: 12 });
     expect(matchShooter("Qian Ni Fernel", "TAN", "SGP", [tan])).toEqual({ kind: "exact", id: 13 });
     expect(matchShooter("Hanna", "BÜHLMEYER", "GER", [buehl])).toEqual({ kind: "exact", id: 14 });
+    expect(matchShooter("YI", "HO XIU", "SGP", [{ id: 18, firstName: "Xiu Yi", lastName: "HO", nationality: "SGP" }])).toEqual({ kind: "exact", id: 18 });
     expect(matchShooter("Małgorzata", "DĄBROWSKA", "POL", [{ id: 17, firstName: "Malgorzata", lastName: "DABROWSKA", nationality: "POL" }])).toEqual({ kind: "exact", id: 17 });
   });
 
