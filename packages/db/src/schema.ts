@@ -220,6 +220,8 @@ export const countries = pgTable(
     code: varchar("code", { length: 3 }).notNull().unique(),  // ISO 3166-1 alpha-3
     code2: varchar("code2", { length: 2 }),                   // alpha-2 (flag emoji, URLs)
     name: varchar("name", { length: 100 }).notNull(),
+    nameSr: varchar("name_sr", { length: 100 }),              // Serbian display name (falls back to name)
+    nameEn: varchar("name_en", { length: 100 }),              // English display name (falls back to name)
     nocCode: varchar("noc_code", { length: 10 }),
     flagUrl: text("flag_url"),
   },

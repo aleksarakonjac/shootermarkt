@@ -15,8 +15,8 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import type { Metadata } from "next";
 import { ScopedLink } from "../../../components/ScopedLink";
-import type { EventType } from "@shootermarkt/db/pdf-import-types";
 import { CATEGORY_LABEL, CATEGORY_RANK } from "@shootermarkt/db/pdf-import-types";
+import { categoryLabel, localizeMatchName } from "@/lib/match-name";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import {
   CompetitionResultsClient,
@@ -242,7 +242,7 @@ export default async function CompetitionPage({ params }: Props) {
         name: r.disciplineName,
         eventName: r.eventName ?? null,
         // datum ide u svoju oznaku, pa se skida sa kraja naziva ("2. meč · 22.01." → "2. meč")
-        label: (split ? `${CATEGORY_LABEL[r.category]} · ${r.eventName ?? "1. meč"}` : r.eventName)?.replace(/ · \d{2}\.\d{2}\.$/, "") ?? null,
+        label: localizeMatchName((split ? `${categoryLabel(r.category, CATEGORY_LABEL[r.category], locale)} · ${r.eventName ?? "1. meč"}` : r.eventName)?.replace(/ · \d{2}\.\d{2}\.$/, "") ?? "", locale) || null,
         date: matchDate(r) ? ddmm(matchDate(r)!) : null,
         apparatus: r.apparatus,
         categories: [],
@@ -313,30 +313,7 @@ export default async function CompetitionPage({ params }: Props) {
   const levelStyle = LEVEL_STYLE[comp.level] ?? { background: "#f3f4f6", color: "#4b5563" };
   const levelLabel = getLevelLabel(comp.level, locale);
 
-  // Event type labels (localized)
-  const EVENT_TYPE_LABELS: Record<string, string> = locale === "en"
-    ? {
-        championship:     "Championship",
-        world_cup:        "World Cup",
-        champions_league: "Champions League",
-        cup:              "Cup",
-        grand_prix:       "Grand Prix",
-        league_round:     "League Round",
-        friendly:         "Friendly",
-        other:            "",
-      }
-    : {
-        championship:     "Šampionat",
-        world_cup:        "Svetski kup",
-        champions_league: "Čempionska liga",
-        cup:              "Kup",
-        grand_prix:       "Grand prix",
-        league_round:     "Kolo lige",
-        friendly:         "Prijateljsko",
-        other:            "",
-      };
-
-  const eventTypeLabel = EVENT_TYPE_LABELS[comp.eventType as EventType] ?? "";
+  const countryName = comp.country && ((locale === "en" ? comp.country.nameEn : comp.country.nameSr) ?? comp.country.name);
 
   // Localized competition name
   const compName = locale === "en" ? (comp.nameEn ?? comp.name) : (comp.nameSr ?? comp.name);
@@ -369,16 +346,6 @@ export default async function CompetitionPage({ params }: Props) {
           >
             {levelLabel}
           </span>
-          {eventTypeLabel && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[0.7rem] font-semibold bg-[var(--surface-2)] text-[var(--muted)] font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide">
-              {eventTypeLabel}
-            </span>
-          )}
-          {comp.organizer && (
-            <span className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
-              {comp.organizer}
-            </span>
-          )}
         </div>
 
         {/* Title */}
@@ -416,13 +383,9 @@ export default async function CompetitionPage({ params }: Props) {
                   style={{ width: "16px", height: "11px", borderRadius: "2px", display: "inline-block" }}
                 />
               )}
-              {comp.location && <span>{(locale === "en" ? (comp.locationEn ?? comp.location) : (comp.locationSr ?? comp.location))}</span>}
-              {comp.country && comp.location && (
-                <span className="text-[var(--subtle)]">· {comp.country.name}</span>
-              )}
-              {comp.country && !comp.location && (
-                <span>{comp.country.name}</span>
-              )}
+              {countryName && <span>{countryName}</span>}
+              {countryName && comp.location && <span className="text-[var(--subtle)]">·</span>}
+              {comp.location && <span className={countryName ? "text-[var(--subtle)]" : undefined}>{(locale === "en" ? (comp.locationEn ?? comp.location) : (comp.locationSr ?? comp.location))}</span>}
             </span>
           )}
           {groups.length > 0 && (

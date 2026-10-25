@@ -1,3 +1,4 @@
+import { countryNameSql } from "@/lib/country-name";
 import { NextRequest, NextResponse } from "next/server";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   const end = `${year}-${String(month + 1).padStart(2, "0")}-01`;
   const startedAt = performance.now();
   const rows = await db
-    .select({ id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, dateEnd: competitions.dateEnd, location: competitions.location, locationSr: competitions.locationSr, locationEn: competitions.locationEn, level: competitions.level, countryName: countries.name, countryCode2: countries.code2 })
+    .select({ id: competitions.id, name: competitions.name, nameSr: competitions.nameSr, nameEn: competitions.nameEn, date: competitions.date, dateEnd: competitions.dateEnd, location: competitions.location, locationSr: competitions.locationSr, locationEn: competitions.locationEn, level: competitions.level, countryName: countryNameSql(locale), countryCode2: countries.code2 })
     .from(competitions)
     .leftJoin(countries, eq(competitions.countryId, countries.id))
     .where(and(sql`${competitions.date} < ${end} AND COALESCE(${competitions.dateEnd}, ${competitions.date}) >= ${start}`, buildCompetitionScopeFilter(scope)))

@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeMatchName } from "@/lib/match-name";
 import { Fragment, type ReactNode, useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useParams } from "next/navigation";

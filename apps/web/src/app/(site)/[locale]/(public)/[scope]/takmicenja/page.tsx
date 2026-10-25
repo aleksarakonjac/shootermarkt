@@ -1,5 +1,6 @@
 export const revalidate = 300;
 
+import { countryNameSql } from "@/lib/country-name";
 import { db } from "@shootermarkt/db";
 import { competitions, results, disciplines, countries } from "@shootermarkt/db/schema";
 import { eq, desc, ilike, inArray, and, sql } from "drizzle-orm";
@@ -359,7 +360,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
         level:           competitions.level,
         disciplineGroups: competitions.disciplineGroups,
         countryCode2:    countries.code2,
-        countryName:     countries.name,
+        countryName:     countryNameSql(locale),
         disciplineCodes: sql<string[]>`
           coalesce(
             array_agg(DISTINCT ${disciplines.code}::text) FILTER (WHERE ${disciplines.code} IS NOT NULL),
@@ -373,7 +374,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
       .leftJoin(results, eq(results.competitionId, competitions.id))
       .leftJoin(disciplines, eq(results.disciplineId, disciplines.id))
       .where(sqlFilters.length ? and(...sqlFilters) : undefined)
-      .groupBy(competitions.id, countries.name, countries.code2)
+      .groupBy(competitions.id, countries.name, countries.nameSr, countries.nameEn, countries.code2)
       .orderBy(desc(competitions.date)),
     db
       .selectDistinct({ year: sql<string>`LEFT(${competitions.date}, 4)` })
@@ -393,7 +394,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
         locationEn: competitions.locationEn,
         level:   competitions.level,
         disciplineGroups: competitions.disciplineGroups,
-        countryName: countries.name,
+        countryName: countryNameSql(locale),
         countryCode2: countries.code2,
       })
       .from(competitions)

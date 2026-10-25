@@ -1,5 +1,7 @@
 export const revalidate = 300;
 
+import { countryNameSql } from "@/lib/country-name";
+import { localizeMatchName } from "@/lib/match-name";
 import { db } from "@shootermarkt/db";
 import { shooters, results, competitions, competitionEvents, countries, disciplines, shooterFormaCache } from "@shootermarkt/db/schema";
 import { eq, asc, sql } from "drizzle-orm";
@@ -83,7 +85,7 @@ export default async function ShooterPage({ params }: Props) {
         competitionDate: sql<string>`coalesce(${competitionEvents.date}, ${competitions.date})`, // memorijal drugog dana ima svoj datum
         competitionDateEnd: competitions.dateEnd,
         competitionLocation: competitions.location,
-        competitionCountry: countries.name,
+        competitionCountry: countryNameSql(locale),
         competitionCountryCode2: countries.code2,
         competitionCountryNoc: countries.nocCode,
         competitionLevel: competitions.level,
@@ -165,7 +167,7 @@ export default async function ShooterPage({ params }: Props) {
       score: parseFloat(r.qualTotal!),
       discipline: r.disciplineCode,
       competitionId: r.competitionId,
-      competitionName: r.eventName ? `${r.competitionName} — ${r.eventName}` : r.competitionName,
+      competitionName: r.eventName ? `${r.competitionName} — ${localizeMatchName(r.eventName, locale)}` : r.competitionName,
       location: r.competitionLocation,
       countryCode2: r.competitionCountryCode2,
       nocCode: r.competitionCountryNoc,
