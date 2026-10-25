@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, type CSSProperties } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, type CSSProperties } from "react";
 import { Link } from "@/i18n/navigation";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import { useTranslations, useLocale } from "next-intl";
@@ -111,7 +111,7 @@ function formatDateRange(start: string, locale: string, end?: string): string {
 // ── Live detail rotator ───────────────────────────────────────────────────────
 
 // Link trenutnog detalja rešava roditelj (cela traka je jedan link), pa ovde nema <Link>.
-function LiveDetail({ item, onCurrentChange }: { item: TickerItem; onCurrentChange?: (detail?: TickerDetailItem) => void }) {
+function LiveDetail({ item, onCurrentChange, onFadeOut }: { item: TickerItem; onCurrentChange?: (detail?: TickerDetailItem) => void; onFadeOut?: (next: TickerDetailItem) => void }) {
   const items = useMemo<TickerDetailItem[]>(() => item.detailItems?.length
     ? item.detailItems
     : item.detailText ? [{ text: item.detailText }] : [], [item.detailItems, item.detailText]);
@@ -119,15 +119,18 @@ function LiveDetail({ item, onCurrentChange }: { item: TickerItem; onCurrentChan
   const [idx, setIdx]         = useState(0);
   const [visible, setVisible] = useState(true);
   const current = items.length ? items[idx % items.length] : undefined;
+  const idxRef = useRef(0);
+  idxRef.current = idx;
 
   useEffect(() => {
     if (items.length <= 1) return;
     const interval = setInterval(() => {
       setVisible(false);
+      onFadeOut?.(items[(idxRef.current + 1) % items.length]);
       setTimeout(() => { setIdx((i) => (i + 1) % items.length); setVisible(true); }, 350);
     }, TICKER_STEP_MS);
     return () => clearInterval(interval);
-  }, [items.length]);
+  }, [items, onFadeOut]);
 
   useEffect(() => {
     onCurrentChange?.(current);
@@ -279,8 +282,8 @@ function MobileUpperBar({ items, live, upcoming, nextLabel, review, inProgress }
 function MobileStatusBadge({ label, live = false, neutral = false, review = false, next = false, dot = false }: { label: string; live?: boolean; neutral?: boolean; review?: boolean; next?: boolean; dot?: boolean }) {
   return (
     <span className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded px-1.5 pb-[2px] font-extrabold select-none leading-none" style={{ fontSize: 12, letterSpacing: "0.08em", color: live ? "var(--brand-primary)" : review ? "var(--brand-accent)" : next ? "white" : neutral ? "rgba(255,255,255,0.85)" : "#92400e", background: live || review ? "white" : next ? "rgba(255,255,255,0.24)" : neutral ? "rgba(255,255,255,0.14)" : "#fefce8" }}>
-      {live && <span className="shrink-0 rounded-full" style={{ width: 5, height: 5, background: "var(--brand-primary)", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />}
-      {dot && <span className="shrink-0 rounded-full" style={{ width: 5, height: 5, background: "#92400e", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />}
+      {live && <span className="shrink-0 rounded-full relative top-px" style={{ width: 5, height: 5, background: "var(--brand-primary)", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />}
+      {dot && <span className="shrink-0 rounded-full relative top-px" style={{ width: 5, height: 5, background: "#92400e", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />}
       {label}
     </span>
   );
@@ -315,6 +318,19 @@ function DesktopUpperBar({ items, live, upcoming, nextLabel, review, inProgress,
 function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, locale }: { item: TickerItem; live: string; upcoming: string; nextLabel: string; review: string; inProgress: string; locale: string }) {
   const scopedHref = useScopedHref();
   const [currentDetail, setCurrentDetail] = useState<TickerDetailItem>();
+  const [badgeHidden, setBadgeHidden] = useState(false);
+  const badgeKey = (d?: TickerDetailItem) => `${d?.status ?? item.status}|${d?.badge ? d.label : ""}`;
+  const currentKeyRef = useRef("");
+  currentKeyRef.current = badgeKey(currentDetail);
+  // Bedž (LIVE/REVIEW/...) bledi samo kad se sa sledećim detaljem menja, usklađeno sa fade-om detalja.
+  const handleFadeOut = useCallback((next: TickerDetailItem) => {
+    if (badgeKey(next) !== currentKeyRef.current) setBadgeHidden(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const handleCurrentChange = useCallback((d?: TickerDetailItem) => {
+    setCurrentDetail(d);
+    setBadgeHidden(false);
+  }, []);
   const status = currentDetail?.status ?? item.status;
   const isLive   = status === "LIVE";
   const isUskoro = status === "USKORO";
@@ -326,13 +342,14 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, loc
     <div className="mx-auto max-w-7xl pl-2 pr-4 h-full flex items-center gap-3 min-w-0">
 
       {/* Status badge */}
+      <span className="shrink-0 flex items-center" style={{ opacity: badgeHidden ? 0 : 1, transition: "opacity 0.3s ease" }}>
       {isLive && (
         <span
           className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none"
           style={{ fontSize: 12, letterSpacing: "0.08em", color: "var(--brand-primary)", background: "white", height: 20 }}
         >
           <span
-            className="rounded-full shrink-0"
+            className="rounded-full shrink-0 relative top-px"
             style={{ width: 5, height: 5, background: "var(--brand-primary)", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }}
           />
           {live}
@@ -362,7 +379,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, loc
 
       {isNext && (
         <span className="inline-flex items-center gap-1.5 shrink-0 font-extrabold select-none rounded px-1.5 pb-[2px] leading-none" style={{ fontSize: 12, letterSpacing: "0.08em", color: "#92400e", background: "#fefce8", height: 20 }}>
-          <span className="rounded-full shrink-0" style={{ width: 5, height: 5, background: "#92400e", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />
+          <span className="rounded-full shrink-0 relative top-px" style={{ width: 5, height: 5, background: "#92400e", display: "inline-block", animation: "ticker-pulse 1.4s ease-in-out infinite" }} />
           {nextLabel.toUpperCase()}
         </span>
       )}
@@ -375,6 +392,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, loc
           {item.label}
         </span>
       )}
+      </span>
 
       {/* Divider */}
       <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
@@ -412,7 +430,7 @@ function LiveBarInner({ item, live, upcoming, nextLabel, review, inProgress, loc
         {(item.detailItems?.length || item.detailText) && (
           <>
             <span className="shrink-0" style={{ width: 1, height: 12, background: "rgba(255,255,255,0.25)", display: "inline-block" }} aria-hidden="true" />
-            <LiveDetail item={item} onCurrentChange={setCurrentDetail} />
+            <LiveDetail item={item} onCurrentChange={handleCurrentChange} onFadeOut={handleFadeOut} />
           </>
         )}
       </span>
