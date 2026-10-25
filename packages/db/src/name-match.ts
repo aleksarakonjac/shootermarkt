@@ -57,6 +57,8 @@ export type MatchCandidate = {
   firstName: string;
   lastName: string;
   previousLastNames?: string[] | null;
+  /** Varijante imena iz spojenih duplikata ("Mariam" uz "Mariami") */
+  previousFirstNames?: string[] | null;
   nationality?: string | null;
   /** Broj rezultata u bazi — razrešava dvosmislenu varijantu imena (aktivan strelac pre neaktivnog imenjaka). */
   resultCount?: number | null;
@@ -87,9 +89,10 @@ export function matchShooter(
 
   const lastMatches = (c: MatchCandidate) =>
     foldName(c.lastName) === fLast || !!c.previousLastNames?.some((p) => foldName(p) === fLast);
+  const firstNames = (c: MatchCandidate) => [c.firstName, ...(c.previousFirstNames ?? [])];
 
   // 1. Exact fold-ključ
-  const exact = existing.find((c) => lastMatches(c) && foldName(c.firstName) === fFirst && nocOk(c));
+  const exact = existing.find((c) => lastMatches(c) && firstNames(c).some((f) => foldName(f) === fFirst) && nocOk(c));
   if (exact) return { kind: "exact", id: exact.id };
 
   // 2. Varijanta zapisa istog imena, ista država (ne SRB/AIN izuzetak): skraćeno ime ili prezime
@@ -103,7 +106,7 @@ export function matchShooter(
     !!nation && normalizeNoc(c.nationality) === nation
     && (
       ([c.lastName, ...(c.previousLastNames ?? [])].some((l) => sameOrPrefix(nameWords(l), wLast))
-        && sameOrPrefix(nameWords(c.firstName), wFirst))
+        && firstNames(c).some((f) => sameOrPrefix(nameWords(f), wFirst)))
       // iste reči punog imena, drugačije presečeno na prezime/ime ("HO XIU" "YI" = "HO" "Xiu Yi")
       || [...nameWords(c.lastName), ...nameWords(c.firstName)].sort().join(" ") === wFull
     ));

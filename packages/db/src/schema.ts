@@ -316,6 +316,8 @@ export const shooters = pgTable(
     lastName: varchar("last_name", { length: 100 }).notNull(),
     // Ranija prezimena (npr. devojačko) — matchShooter ih tretira kao isto lice
     previousLastNames: text("previous_last_names").array(),
+    // Varijante imena iz spojenih duplikata (SIUS "Mariam" / ISSF "Mariami") — matchShooter ih tretira kao isto lice
+    previousFirstNames: text("previous_first_names").array(),
     birthYear: smallint("birth_year"),
     birthDate: date("birth_date"),
     apparatus: varchar("apparatus", { length: 10 }),

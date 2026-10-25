@@ -33,7 +33,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   const mixedCodes = requested.filter((c) => MIXED_TEAM_CODES.has(splitEventCode(c).code));
 
   const allShooters = await db
-    .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality, resultCount: shooterResultCount })
+    .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, resultCount: shooterResultCount })
     .from(shooters);
 
   let siusData: Awaited<ReturnType<typeof fetchLiveSiusResults>> = new Map();

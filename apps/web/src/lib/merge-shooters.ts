@@ -57,7 +57,7 @@ const clashKey = (r: { competitionId: number; competitionEventId: number | null;
 
 /**
  * Spaja `drop` u `keep`: rezultati se prebacuju, polja se biraju po strani (default: keep, pa drop),
- * izgubljeno prezime postaje alias, duplikat se briše. Jedna transakcija.
+ * izgubljeno prezime i ime postaju aliasi, duplikat se briše. Jedna transakcija.
  * Sa `opts.resultIds` ostaju samo izabrani rezultati (dva izabrana za isti meč nisu dozvoljena).
  * Pozivalac preračunava formu za `keepId`.
  */
@@ -88,9 +88,12 @@ export async function mergeShooters(keepId: number, dropId: number, opts: MergeO
   const sideOf = (f: MergeField) => (opts.fields?.[f] === "drop" && drop[f] != null ? drop : keep[f] != null ? keep : drop);
 
   const lastName = pick("lastName");
+  const firstName = pick("firstName");
   const birthSource = sideOf("birthDate");
   const aliases = [...new Set([...(keep.previousLastNames ?? []), ...(drop.previousLastNames ?? []), keep.lastName, drop.lastName]
     .filter((n) => n.toLowerCase() !== lastName.toLowerCase()))];
+  const firstAliases = [...new Set([...(keep.previousFirstNames ?? []), ...(drop.previousFirstNames ?? []), keep.firstName, drop.firstName]
+    .filter((n) => n.toLowerCase() !== firstName.toLowerCase()))];
 
   await db.transaction(async (tx) => {
     if (keepIds?.length) await tx.delete(results).where(inArray(results.id, keepIds));
@@ -101,9 +104,10 @@ export async function mergeShooters(keepId: number, dropId: number, opts: MergeO
     await tx.update(mixedTeamResults).set({ shooter2Id: keepId }).where(eq(mixedTeamResults.shooter2Id, dropId));
     await tx.delete(shooters).where(eq(shooters.id, dropId)); // unique issf_id/sius id se oslobađaju pre dopune
     await tx.update(shooters).set({
-      firstName: pick("firstName"),
+      firstName,
       lastName,
       previousLastNames: aliases.length ? aliases : null,
+      previousFirstNames: firstAliases.length ? firstAliases : null,
       issfId: pick("issfId"),
       siusAthleteId: pick("siusAthleteId"),
       avatarUrl: pick("avatarUrl"),

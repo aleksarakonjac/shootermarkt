@@ -10,7 +10,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
     // SIUS bilten se čita deterministički; sve ostalo (skenovi, finala, nestandardni formati) ide u Gemini.
     parseSiusPdf(pdfBuffer).catch(() => null).then((sius) => sius ?? parsePdfWithGemini(pdfBuffer)),
     db.select().from(clubs),
-    db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality, clubId: shooters.clubId }).from(shooters),
+    db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, clubId: shooters.clubId }).from(shooters),
   ]);
   const rows: ReviewRow[] = [];
   const skippedDisciplines = new Set<string>();

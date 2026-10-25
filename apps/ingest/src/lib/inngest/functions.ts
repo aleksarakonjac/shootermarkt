@@ -277,7 +277,7 @@ export const processIssfDirectImport = inngest.createFunction(
     }
 
     const allShooters = await db
-      .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, nationality: shooters.nationality, issfId: shooters.issfId })
+      .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, issfId: shooters.issfId })
       .from(shooters);
     // issfId je pouzdaniji od imena (JÄGGI/JAEGGI, promena prezimena) — po imenu samo kad ga nema
     const shooterByIssfId = new Map(allShooters.filter((s) => s.issfId).map((s) => [s.issfId!, s.id]));

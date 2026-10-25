@@ -44,4 +44,9 @@ describe("matchShooter spelling variants (SIUS vs ISSF)", () => {
     const peters = [{ ...fiori, resultCount: 13 }, { ...fiori, id: 16, firstName: "Peter Louis", resultCount: 0 }];
     expect(matchShooter("Peter", "FIORI", "USA", peters)).toEqual({ kind: "exact", id: 10 });
   });
+
+  it("remembered first-name variants from merges match exactly", () => {
+    const mariam = { id: 20, firstName: "Mariami", lastName: "PRANGISHVILI", previousFirstNames: ["Mariam"], nationality: "GEO" };
+    expect(matchShooter("Mariam", "PRANGISHVILI", "GEO", [mariam])).toEqual({ kind: "exact", id: 20 });
+  });
 });
