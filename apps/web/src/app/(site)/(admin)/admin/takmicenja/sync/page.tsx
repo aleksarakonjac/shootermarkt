@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Admin · Sync takmičenja" };
 
 export default async function TakmicenjaSyncPage() {
   const countryRows = await db
-    .select({ id: countries.id, name: countries.name, code2: countries.code2 })
+    .select({ id: countries.id, name: countries.name, nameSr: countries.nameSr, nameEn: countries.nameEn, code2: countries.code2, code: countries.code, nocCode: countries.nocCode })
     .from(countries)
     .orderBy(countries.name);
   return <CompetitionsSyncClient countries={countryRows} />;

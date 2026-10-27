@@ -1,5 +1,6 @@
 "use client";
 
+import { countryKeywords } from "@/lib/country-search";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { ScopedLink } from "../../components/ScopedLink";
@@ -231,6 +232,7 @@ export function RangiranjeClient({
           value: noc,
           label: noc,
           sublabel: locale === "en" ? (enName ?? (noc === "AIN" ? "Individual Neutral Athletes" : entry?.name)) : entry?.name,
+          keywords: countryKeywords(a2, entry?.name),
           prefix: a2 ? <span className={`fi fi-${a2.toLowerCase()}`} style={{ fontSize: "0.95em", borderRadius: 2 }} /> : undefined,
         };
       });

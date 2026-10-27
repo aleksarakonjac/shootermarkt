@@ -215,7 +215,7 @@ export default async function AdminTakmicenjaPage({
 
       <div className="mb-4 flex flex-wrap items-start gap-2">
         <TakmicenjaFilters years={years} currentLevel={level} currentTag={tag} currentPriority={priority} />
-        <TodayAnchor autoScroll={year === currentYear} />
+        <TodayAnchor />
       </div>
 
       <div className="rounded-xl border border-[var(--border)] overflow-hidden">

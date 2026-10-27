@@ -8,6 +8,8 @@ import { Link } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
+import { NOC_LIST } from "@shootermarkt/db/noc-list";
+import { countryNames } from "@/lib/country-search";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 import { startNavigationProgress } from "@/components/NavigationProgress";
@@ -145,6 +147,18 @@ const COUNTRY_NOC: Record<string, [string, string]> = {
   kanada:["CAN","Kanada"], canada:["CAN","Kanada"],
 };
 
+/** Sve države iz NOC_LIST pretražive po srpskom i engleskom nazivu (ručna mapa COUNTRY_NOC ima prednost). */
+let nocByName: Map<string, [string, string]> | null = null;
+function getNocByName() {
+  if (!nocByName) {
+    nocByName = new Map();
+    for (const n of NOC_LIST) {
+      for (const name of [n.name, ...countryNames(n.alpha2)]) nocByName.set(fold(name), [n.noc, NOC_DISPLAY[n.noc] ?? n.name]);
+    }
+  }
+  return nocByName;
+}
+
 function detectShortcuts(q: string, locale: string, scopedHref: (path: string) => string): Shortcut[] {
   if (q.length < 2) return [];
   const f = fold(q);
@@ -197,8 +211,11 @@ function detectShortcuts(q: string, locale: string, scopedHref: (path: string) =
     if (matched) { country = info; break; }
   }
   if (!country) {
-    const nocToken = upperTokens.find(t => /^[A-Z]{3}$/.test(t) && NOC_DISPLAY[t]);
-    if (nocToken) country = [nocToken, NOC_DISPLAY[nocToken]];
+    const nocToken = upperTokens.find(t => /^[A-Z]{3}$/.test(t) && (NOC_DISPLAY[t] || NOC_LIST.some(n => n.noc === t)));
+    if (nocToken) country = [nocToken, NOC_DISPLAY[nocToken] ?? NOC_LIST.find(n => n.noc === nocToken)!.name];
+  }
+  if (!country) {
+    country = getNocByName().get(f) ?? tokens.map(t => getNocByName().get(t)).find(Boolean) ?? null;
   }
 
   // ── Build shortcuts ──────────────────────────────────────────────────────────
@@ -255,7 +272,7 @@ function detectShortcuts(q: string, locale: string, scopedHref: (path: string) =
   // Country
   if (country) {
     const [noc, display] = country;
-    const code2 = NOC_TO_CODE2[noc];
+    const code2 = NOC_TO_CODE2[noc] ?? NOC_LIST.find(n => n.noc === noc)?.alpha2.toLowerCase();
     // Lokacija ostaje srpski naziv (tako su upisana mesta takmičenja); prikaz se prevodi.
     const shown = isEn && code2 ? new Intl.DisplayNames(["en"], { type: "region" }).of(code2.toUpperCase()) ?? display : display;
     const ps = new URLSearchParams(); ps.set("zemlja", noc);

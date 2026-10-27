@@ -20,7 +20,7 @@ export default async function CompetitionEditPage({
   const [comp, [{ resultCount }], countryRows] = await Promise.all([
     db.query.competitions.findFirst({ where: eq(competitions.id, compId) }),
     db.select({ resultCount: count() }).from(results).where(eq(results.competitionId, compId)),
-    db.select({ id: countries.id, name: countries.name, code2: countries.code2 }).from(countries).orderBy(countries.name),
+    db.select({ id: countries.id, name: countries.name, nameSr: countries.nameSr, nameEn: countries.nameEn, code2: countries.code2, code: countries.code, nocCode: countries.nocCode }).from(countries).orderBy(countries.name),
   ]);
 
   if (!comp) notFound();

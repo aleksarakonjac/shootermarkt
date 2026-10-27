@@ -1,5 +1,7 @@
 "use client";
 
+import type { Country as DropdownCountry } from "@/components/ui/CountryDropdown";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
@@ -9,7 +11,7 @@ import type { CompetitionMatch } from "@/app/api/admin/competitions/[id]/matches
 import { EVENT_TYPES } from "../sync/sync-row-editor";
 import { CompetitionModal, matchKey } from "./competition-modal";
 
-export type Country = { id: number; name: string; code2: string | null; nocCode: string | null };
+export type Country = DropdownCountry;
 export type BulkRow = {
   id: number;
   name: string;

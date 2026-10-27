@@ -3,7 +3,7 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { LevelDropdown } from "@/components/ui/LevelDropdown";
-import { CountryDropdown } from "@/components/ui/CountryDropdown";
+import { CountryDropdown, type Country as DropdownCountry } from "@/components/ui/CountryDropdown";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { TranslatedNameInput } from "@/components/ui/TranslatedNameInput";
 import { FocusPriorityField } from "@/components/ui/FocusPriorityField";
@@ -41,7 +41,7 @@ export interface SiusSuggestion {
   confident: boolean;
 }
 
-export type Country = { id: number; name: string; code2: string | null };
+export type Country = DropdownCountry;
 
 export const EVENT_TYPES = [
   { value: "championship", label: "Prvenstvo" },

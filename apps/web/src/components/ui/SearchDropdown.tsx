@@ -3,11 +3,14 @@
 import { useState, useRef, useEffect, ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useUiLocale } from "@/hooks/use-ui-locale";
+import { foldSearch } from "@/lib/country-search";
 
 export interface DropdownOption {
   value: string;
   label: string;
   sublabel?: string;
+  /** Dodatni termini koji se traže, a ne prikazuju (npr. engleski naziv države). */
+  keywords?: string;
   prefix?: ReactNode;
 }
 
@@ -89,13 +92,9 @@ export function SearchDropdown({
 
   const selected = options.find((o) => o.value === value);
 
+  const needle = foldSearch(search);
   const filtered = search
-    ? options.filter(
-        (o) =>
-          o.label.toLowerCase().includes(search.toLowerCase()) ||
-          o.sublabel?.toLowerCase().includes(search.toLowerCase()) ||
-          o.value.toLowerCase().includes(search.toLowerCase())
-      )
+    ? options.filter((o) => foldSearch(`${o.label} ${o.sublabel ?? ""} ${o.value} ${o.keywords ?? ""}`).includes(needle))
     : options;
   const pinnedOptions = filtered.filter((option) => pinnedValues.includes(option.value));
   const regularOptions = filtered.filter((option) => !pinnedValues.includes(option.value));

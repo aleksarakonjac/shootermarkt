@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { LevelDropdown } from "@/components/ui/LevelDropdown";
 import { TranslatedNameInput } from "@/components/ui/TranslatedNameInput";
-import { CountryDropdown } from "@/components/ui/CountryDropdown";
+import { CountryDropdown, type Country as DropdownCountry } from "@/components/ui/CountryDropdown";
 import { FocusPriorityField } from "@/components/ui/FocusPriorityField";
 import { defaultFocusPriority } from "@/lib/competition-priority";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 
-type Country = { id: number; name: string; code2: string | null };
+type Country = DropdownCountry;
 
 function detectLang(text: string): "sr" | "en" {
   return /[čćšđžČĆŠĐŽ]/.test(text) ? "sr" : "en";

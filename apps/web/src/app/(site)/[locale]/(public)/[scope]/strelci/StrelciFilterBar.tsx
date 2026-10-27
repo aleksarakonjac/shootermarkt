@@ -1,5 +1,6 @@
 "use client";
 
+import { countryKeywords } from "@/lib/country-search";
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { NOC_LIST } from "@shootermarkt/db/noc-list";
@@ -117,6 +118,7 @@ export function StrelciFilterBar({
         value: noc,
         label: noc,
         sublabel: entry?.name ?? noc,
+        keywords: countryKeywords(alpha2),
         prefix: alpha2 ? (
           <span
             className={`fi fi-${alpha2.toLowerCase()}`}

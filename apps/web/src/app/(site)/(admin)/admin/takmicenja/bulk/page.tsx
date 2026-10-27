@@ -42,7 +42,7 @@ export default async function BulkTakmicenjaPage({ searchParams }: { searchParam
       .from(competitions)
       .where(sql`date_part('year', ${competitions.date}::date) = ${year}`)
       .orderBy(desc(competitions.date), desc(competitions.id)),
-    db.select({ id: countries.id, name: countries.name, code2: countries.code2, nocCode: countries.nocCode }).from(countries).orderBy(countries.name),
+    db.select({ id: countries.id, name: countries.name, nameSr: countries.nameSr, nameEn: countries.nameEn, code2: countries.code2, code: countries.code, nocCode: countries.nocCode }).from(countries).orderBy(countries.name),
   ]);
 
   // Po takmičenju: broj mečeva (disciplina × meč × kategorija) i kategorije za auto prioritet
