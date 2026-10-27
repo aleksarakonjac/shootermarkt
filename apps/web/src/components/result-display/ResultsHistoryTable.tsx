@@ -7,7 +7,7 @@ import { useParams } from "next/navigation";
 import type { ElimDetail, QualDetail, FinalDetail } from "@shootermarkt/db/schema";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useScopedHref } from "@/hooks/use-scoped-href";
-import { ResultDetailPanel } from "./ResultDetailPanel";
+import { ResultDetailPanel, finalSeriesValues } from "./ResultDetailPanel";
 
 const MEDAL_COLOR: Record<number, string> = {
   1: "oklch(0.75 0.14 85)",
@@ -147,7 +147,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                           // Svaka disciplina uvek u svojoj koloni (prva po abecedi levo), da se ne mešaju između takmičenja.
                           const index = singleCol ? 0 : Math.min(availableDiscs.indexOf(r.disciplineCode), 1);
                           const isExpanded = expanded.has(r.id);
-                          const canExpand = r.elimDetail != null || r.elimTotal != null || r.qualDetail != null || (r.finalDetail?.format === "bulletin" && (r.finalDetail.series?.length ?? 0) > 0);
+                          const canExpand = r.elimDetail != null || r.elimTotal != null || r.qualDetail != null || (r.finalDetail != null && finalSeriesValues(r.finalDetail) != null);
                           const qualDecimals = r.disciplineCode.startsWith("AR");
                           const finalDecimals = r.disciplineCode.startsWith("AR") || r.disciplineCode.startsWith("R3P") || r.disciplineCode.startsWith("AP");
                           const showInners = r.disciplineCode !== "ARM" && r.disciplineCode !== "ARW";
@@ -165,7 +165,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                   </tr>
                   {group.map((r) => {
                     const isExpanded = expanded.has(r.id);
-                    const canExpand = r.elimDetail != null || r.elimTotal != null || r.qualDetail != null || (r.finalDetail?.format === "bulletin" && (r.finalDetail.series?.length ?? 0) > 0);
+                    const canExpand = r.elimDetail != null || r.elimTotal != null || r.qualDetail != null || (r.finalDetail != null && finalSeriesValues(r.finalDetail) != null);
                     if (!canExpand) return null;
                     const qualDecimals = r.disciplineCode.startsWith("AR");
                     const finalDecimals = r.disciplineCode.startsWith("AR") || r.disciplineCode.startsWith("R3P") || r.disciplineCode.startsWith("AP");

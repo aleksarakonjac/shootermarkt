@@ -80,7 +80,7 @@ export function ShooterResultsArchive({ shooterId, initialResults, initialCursor
   </form>;
 
   return <div className="space-y-4">
-    <ResultsHistoryTable key={`${appliedQuery}:${appliedFrom}:${appliedTo}`} results={results} allLabel={allLabel} locale={locale} toolbar={toolbar} emptyContent={emptyLabel} />
+    <ResultsHistoryTable key={`${appliedQuery}:${appliedFrom}:${appliedTo}`} results={[...results].reverse() /* tabela očekuje rastući redosled i sama ga okreće */} allLabel={allLabel} locale={locale} toolbar={toolbar} emptyContent={emptyLabel} />
     {cursor && <div className="flex justify-center">
       <button type="button" onClick={loadMore} disabled={loading} className="inline-flex min-h-11 items-center gap-2 rounded border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)] disabled:cursor-wait disabled:opacity-60">
         {loading && <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />}

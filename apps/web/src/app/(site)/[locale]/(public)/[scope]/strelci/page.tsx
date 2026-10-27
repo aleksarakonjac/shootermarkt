@@ -4,6 +4,7 @@ import { Suspense, type CSSProperties } from "react";
 import { unstable_cache } from "next/cache";
 import { ScopedLink } from "../../components/ScopedLink";
 import Image from "next/image";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { db } from "@shootermarkt/db";
 import { shooters, clubs, results, competitions, shooterFormaCache } from "@shootermarkt/db/schema";
 import { eq, asc, and, isNotNull, inArray, sql, desc, gte } from "drizzle-orm";
@@ -137,9 +138,10 @@ function DiscPanel({ code, label, show, t, className = "" }: { code: string; lab
         </span>
         <ScopedLink
           href={`/rangiranje?disciplina=${code.toLowerCase()}`}
-          className="ml-auto font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-bold uppercase tracking-widest text-[var(--brand-primary)] hover:underline shrink-0"
+          className="ml-1 inline-flex shrink-0 items-center gap-1 self-center text-xs font-semibold text-[var(--brand-primary)] underline underline-offset-2 transition-colors hover:text-[var(--ink)]"
         >
-          Top 3 →
+          Top 3
+          <ArrowRight size={14} aria-hidden="true" />
         </ScopedLink>
       </div>
       {rows.length > 0 ? (
@@ -704,9 +706,10 @@ export default async function StrelciPage({ params, searchParams }: Props) {
           <ScopedLink
             href={pageUrl(page - 1)}
             aria-disabled={page <= 1}
-            className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${page <= 1 ? "pointer-events-none opacity-30 text-[var(--muted)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"}`}
+            className={`inline-flex min-h-11 items-center gap-1 px-3 rounded-lg text-sm font-semibold transition-colors ${page <= 1 ? "pointer-events-none opacity-30 text-[var(--muted)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"}`}
           >
-            {locale === "en" ? "← Previous" : "← Prethodna"}
+            <ChevronLeft size={22} strokeWidth={3} aria-hidden="true" />
+            {locale === "en" ? "Previous" : "Prethodna"}
           </ScopedLink>
           <span className="text-xs text-[var(--muted)] px-3 font-[family-name:var(--font-jetbrains-mono)]">
             {page} / {totalPages}
@@ -714,9 +717,10 @@ export default async function StrelciPage({ params, searchParams }: Props) {
           <ScopedLink
             href={pageUrl(page + 1)}
             aria-disabled={page >= totalPages}
-            className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${page >= totalPages ? "pointer-events-none opacity-30 text-[var(--muted)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"}`}
+            className={`inline-flex min-h-11 items-center gap-1 px-3 rounded-lg text-sm font-semibold transition-colors ${page >= totalPages ? "pointer-events-none opacity-30 text-[var(--muted)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"}`}
           >
-            {locale === "en" ? "Next →" : "Sledeća →"}
+            {locale === "en" ? "Next" : "Sledeća"}
+            <ChevronRight size={22} strokeWidth={3} aria-hidden="true" />
           </ScopedLink>
         </div>
       )}

@@ -319,6 +319,17 @@ export function FormaChart({
     setWindowOffset(newOffset);
   }
 
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  function onTouchEnd(e: React.TouchEvent) {
+    const s = touchStart.current;
+    touchStart.current = null;
+    if (!s) return;
+    const dx = e.changedTouches[0].clientX - s.x;
+    const dy = e.changedTouches[0].clientY - s.y;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    navigate(dx > 0 ? "right" : "left"); // povuci udesno = starije
+  }
+
   function selectDiscipline(nextDisc: string) {
     setDisc(nextDisc);
     setWindowOffset(0);
@@ -470,7 +481,10 @@ export function FormaChart({
         </div>
 
         {/* SVG chart */}
-        <div ref={containerRef} className="select-none" style={{ cursor: isAnimating ? "default" : "crosshair" }}>
+        <div ref={containerRef} className="select-none" style={{ cursor: isAnimating ? "default" : "crosshair", touchAction: "pan-y" }}
+          onTouchStart={(e) => { touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
+          onTouchEnd={onTouchEnd}
+        >
           {svgW > 0 && built && (
             <svg
               width={W}
@@ -590,11 +604,11 @@ export function FormaChart({
 
         {/* Time navigation */}
         {allData.length > WINDOW && (
-          <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--border)] bg-[var(--surface)]">
+          <div className="flex items-center justify-between px-4 py-0.5 border-t border-[var(--border)] bg-[var(--surface)]">
             <button
               onClick={() => navigate("right")}
               disabled={!canGoBack || isAnimating}
-              className="min-h-11 px-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="min-h-8 px-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               ← {locale === "en" ? "Older" : "Starije"}
             </button>
@@ -624,7 +638,7 @@ export function FormaChart({
             <button
               onClick={() => navigate("left")}
               disabled={!canGoForward || isAnimating}
-              className="min-h-11 px-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="min-h-8 px-2 text-sm font-semibold text-[var(--muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               {locale === "en" ? "Newer" : "Novije"} →
             </button>
