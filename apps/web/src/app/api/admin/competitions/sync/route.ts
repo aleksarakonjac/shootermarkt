@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
 
   const filtered = events.filter((e) => {
     if (e.source !== "issf") return true;
-    return isRiflePistolCompetition(undefined, e.name);
+    return isRiflePistolCompetition(e.disciplines, e.name);
   });
 
   const withKeys = filtered.map((e) => ({

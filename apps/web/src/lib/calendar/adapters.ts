@@ -14,6 +14,7 @@ export interface CalendarEvent {
   is10m: boolean;
   url: string | null;
   externalId: string | null;
+  disciplines?: Array<{ id: number; name: string }>;
   competitionTypeId?: number;
   competitionTypeName?: string;
   competitionTypeAcronym?: string;
@@ -78,6 +79,7 @@ export async function fetchIssfEvents(year: number): Promise<CalendarEvent[]> {
     is10m: true,
     url: null,
     externalId: String(c.id),
+    disciplines: c.disciplines,
     competitionTypeId: c.competitionType?.id,
     competitionTypeName: c.competitionType?.name,
     competitionTypeAcronym: c.competitionType?.acronym,

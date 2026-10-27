@@ -109,9 +109,12 @@ export interface ISSFAchievement {
   scores: Array<{ name: string; score: string }>;
 }
 
-/** Fetch list of competitions for a year. */
+/**
+ * Fetch the year's calendar — the endpoint behind issf-sports.org/calendar.
+ * `/competitions?year=` returns only ~20% of it (the events that carry results).
+ */
 export async function fetchCompetitions(year: number): Promise<ISSFCompetition[]> {
-  const res = await fetch(`${ISSF_API}/competitions?year=${year}`, {
+  const res = await fetch(`${ISSF_API}/calendar?year=${year}`, {
     next: { revalidate: 3600 },
   });
   if (!res.ok) throw new Error(`ISSF competitions fetch failed: ${res.status}`);

@@ -25,7 +25,7 @@ async function main() {
   }));
   const events = batches.flat()
     .filter((e) => e.externalId && e.dateFrom && e.competitionTypeId != null && TYPE_IDS.has(e.competitionTypeId))
-    .filter((e) => isRiflePistolCompetition(undefined, e.name))
+    .filter((e) => isRiflePistolCompetition(e.disciplines, e.name))
     .sort((a, b) => a.dateFrom!.localeCompare(b.dateFrom!));
   console.log(`Posle filtera (tip + puška/pištolj): ${events.length}`);
 

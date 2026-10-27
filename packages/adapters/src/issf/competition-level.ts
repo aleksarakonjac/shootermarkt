@@ -32,6 +32,8 @@ export function isRiflePistolCompetition(
   disciplines: Array<{ id: number; name: string }> | undefined,
   name: string,
 ): boolean {
+  // Courses/seminars are on the ISSF calendar too but are not competitions.
+  if (/\b(course|seminar)\b/i.test(name)) return false;
   if (disciplines?.length) {
     return disciplines.some(
       (d) => d.name === "Rifle" || d.name === "Pistol"
