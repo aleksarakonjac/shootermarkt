@@ -350,6 +350,16 @@ function CompetitionOverview({
   // Lokalni "danas" tek posle hidratacije (server ne zna vremensku zonu posetioca)
   const [today, setToday] = useState<string | null>(null);
   useEffect(() => setToday(todayKey()), []);
+  // Današnji chip centriran u redu prečica (samo vodoravno, stranica se ne pomera)
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const chip = today && nav?.querySelector<HTMLElement>(`a[href="#sekcija-${today}"]`);
+    if (!nav || !chip) return;
+    const navRect = nav.getBoundingClientRect();
+    const chipRect = chip.getBoundingClientRect();
+    nav.scrollLeft += chipRect.left - navRect.left - (navRect.width - chipRect.width) / 2;
+  }, [today]);
   const todayLabel = locale === "en" ? "Today" : "Danas";
   const items: Array<{ key: string; code: string; date: string | null; node: React.ReactNode }> = [
       // Individual disciplines
@@ -473,6 +483,7 @@ function CompetitionOverview({
       {sections.length > 1 && (
         // Prečice do sekcija: sidra (rade i bez JS-a), skrol bez menjanja URL-a
         <nav
+          ref={navRef}
           aria-label={locale === "en" ? "Jump to section" : "Skok na sekciju"}
           className="-mb-4 flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 [scrollbar-width:none]"
         >
