@@ -445,8 +445,9 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                       className={`min-h-0 px-3 overflow-hidden sm:hidden ${isLastRow ? "" : "border-b border-[var(--border)]"}`}
                     >
                       {/* auto-fit: kad sve kartice staju u jedan red, razvlače se preko cele širine; kad se
-                          prelamaju, nepun poslednji red zadržava istu širinu kartica kao redovi iznad. */}
-                      <div className="grid grid-cols-[repeat(auto-fit,minmax(3.75rem,1fr))] gap-2 py-2.5">
+                          prelamaju, nepun poslednji red zadržava istu širinu kartica kao redovi iznad.
+                          3.25rem + gap-x-1: finale od 9 kartica (S1, S2 + 7 parova) staje u 2 reda (5 + 4) na 360–390px. */}
+                      <div className="grid grid-cols-[repeat(auto-fit,minmax(3.25rem,1fr))] gap-x-1 gap-y-2 py-2.5">
                         {seriesCells(columns, r).filter((cell) => cell.main).map((cell, i) => (
                           <div key={i} className="flex min-w-0 flex-col gap-1">
                             <span className="max-w-full truncate text-center text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{localizeSeriesLabel(cell.header, locale)}</span>

@@ -103,7 +103,7 @@ const DISC_FULL_NAMES: Record<string, { sr: string; en: string }> = {
   R3PW: { sr: "Puška trostav ženski", en: "Rifle 3 Position Women" },
   R3JM: { sr: "Puška trostav muški", en: "Rifle 3 Position Men" },
   R3JW: { sr: "Puška trostav ženski", en: "Rifle 3 Position Women" },
-  SPW: { sr: "Sportski pištolj ženski", en: "Sport Pistol Women" },
+  SPW: { sr: "Sport pištolj žene", en: "Sport Pistol Women" },
   RFPM: { sr: "Brzometni pištolj muški", en: "Rapid Fire Pistol Men" },
 };
 

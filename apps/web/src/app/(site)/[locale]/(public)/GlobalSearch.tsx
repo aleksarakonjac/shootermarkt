@@ -74,7 +74,7 @@ const DISC_LABELS: Record<string, DiscInfo> = {
   R3PW: { sr: "MK puška ženski",         en: "50m Rifle 3P Women",     aparat:"AR", pol:"f" },
   R3JM: { sr: "MK puška juniorski",      en: "50m Rifle 3P Junior Men",aparat:"AR", pol:"m" },
   R3JW: { sr: "MK puška juniork.",       en: "50m Rifle 3P Junior W.", aparat:"AR", pol:"f" },
-  SPW:  { sr: "Sport pištolj ženski",    en: "25m Sport Pistol Women", aparat:"AP", pol:"f" },
+  SPW:  { sr: "Sport pištolj žene",      en: "25m Sport Pistol Women", aparat:"AP", pol:"f" },
   RFPM: { sr: "Slobodna puška muški",    en: "50m Rifle Prone Men",    aparat:"AR", pol:"m" },
   FPM:  { sr: "Slobodni pištolj muški",  en: "50m Free Pistol Men",    aparat:"AP", pol:"m" },
 };
