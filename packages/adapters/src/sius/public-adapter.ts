@@ -372,7 +372,8 @@ export interface SiusMixedTeamData {
  * its members carry the competition NOC (AIN). Prefer the shared member NOC. */
 export function resolveTeamNoc(teamNoc: string, athletes: Pick<SiusTeamAthlete, "nation">[]): string {
   const athleteNocs = [...new Set(athletes.map((a) => a.nation).filter(Boolean))];
-  return athleteNocs.length === 1 ? athleteNocs[0] : teamNoc;
+  // SIUS labels extra teams "SRB 3"; noc_code is varchar(3), team_number is assigned separately.
+  return athleteNocs.length === 1 ? athleteNocs[0] : teamNoc.trim().slice(0, 3);
 }
 
 /** Stable across qualification/final and independent from a federation label.

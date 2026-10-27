@@ -9,6 +9,10 @@ describe("resolveTeamNoc", () => {
   it("keeps the team NOC when members do not agree", () => {
     expect(resolveTeamNoc("SRB", [{ nation: "SRB" }, { nation: "AIN" }])).toBe("SRB");
   });
+
+  it("strips the team-number suffix SIUS adds to extra teams (DNS rows have no member nation)", () => {
+    expect(resolveTeamNoc("SRB 3", [])).toBe("SRB");
+  });
 });
 
 describe("mixedTeamIdentity", () => {
