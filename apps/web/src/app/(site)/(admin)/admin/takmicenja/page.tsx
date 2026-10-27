@@ -52,9 +52,7 @@ export default async function AdminTakmicenjaPage({
 
   const baseWhere = conditions.length ? and(...conditions) : undefined;
 
-  const [data, yearRows] = await Promise.all([
-    db
-      .select({
+  const listCols = {
         id: competitions.id,
         name: competitions.name,
         nameSr: competitions.nameSr,
@@ -71,7 +69,16 @@ export default async function AdminTakmicenjaPage({
         eventType: competitions.eventType,
         ageCategory: competitions.ageCategory,
         focusPriority: competitions.focusPriority,
-      })
+      };
+
+  const currentCondition = and(
+    sql`${competitions.date} <= ${today}`,
+    sql`coalesce(${competitions.dateEnd}, ${competitions.date}) >= ${today}`,
+  );
+
+  const [data, yearRows, currentCompetitions] = await Promise.all([
+    db
+      .select(listCols)
       .from(competitions)
       .leftJoin(countries, eq(competitions.countryId, countries.id))
       .where(baseWhere)
@@ -81,6 +88,12 @@ export default async function AdminTakmicenjaPage({
       .from(competitions)
       .groupBy(sql`date_part('year', ${competitions.date}::date)`)
       .orderBy(desc(sql`date_part('year', ${competitions.date}::date)`)),
+    db
+      .select(listCols)
+      .from(competitions)
+      .leftJoin(countries, eq(competitions.countryId, countries.id))
+      .where(currentCondition)
+      .orderBy(asc(competitions.date), asc(competitions.dateEnd), desc(competitions.id)),
   ]);
 
   // Ručni prioritet je običan broj; auto je približan (bez kategorija iz rasporeda) pa je prigušen i sa "auto".
@@ -99,6 +112,29 @@ export default async function AdminTakmicenjaPage({
     byMonth.set(m, [...(byMonth.get(m) ?? []), c]);
   }
   const months = [...byMonth.entries()].sort((a, b) => a[0] - b[0]);
+
+  const renderName = (c: (typeof data)[number]) => (
+    <span className="flex min-w-0 flex-col md:max-w-sm">
+                              <span className="md:truncate">{c.nameSr ?? c.name}</span>
+                              <span className="text-xs font-normal text-[var(--muted)] md:truncate">{c.nameEn ?? c.name}</span>
+                              {(c.countryCode || c.locationSr || c.location) && (
+                                <span className="mt-0.5 flex items-center gap-1.5 text-xs font-normal text-[var(--muted)]">
+                                  {c.countryCode2 && (
+                                    <span
+                                      className={`fi fi-${c.countryCode2.toLowerCase()} shrink-0`}
+                                      style={{ width: "13px", height: "9px", borderRadius: "1px", display: "inline-block" }}
+                                    />
+                                  )}
+                                  {c.countryCode && (
+                                    <span className="rounded bg-[var(--surface)] border border-[var(--border)] px-1.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">
+                                      {c.countryCode}
+                                    </span>
+                                  )}
+                                  <span className="truncate">{c.locationSr ?? c.location}</span>
+                                </span>
+                              )}
+                            </span>
+  );
 
   const years = yearRows.map((r) => r.year).filter(Boolean);
 
@@ -142,6 +178,41 @@ export default async function AdminTakmicenjaPage({
         </div>
       </div>
 
+      {currentCompetitions.length > 0 && (
+        <section aria-labelledby="current-competitions-heading" className="mb-8">
+          <div className="flex items-baseline justify-between gap-4 mb-3">
+            <h2
+              id="current-competitions-heading"
+              className="font-[family-name:var(--font-barlow-condensed)] text-lg font-extrabold uppercase tracking-tight text-[var(--ink)]"
+            >
+              U toku
+            </h2>
+            <span className="text-xs text-[var(--muted)]">
+              {currentCompetitions.length} {currentCompetitions.length === 1 ? "takmičenje" : "takmičenja"}
+            </span>
+          </div>
+          <div className="overflow-hidden rounded-lg border border-[var(--live-border)] bg-[var(--live-bg)] divide-y divide-[var(--live-border)]">
+            {currentCompetitions.map((c) => (
+              <div key={c.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3.5">
+                <div className="flex min-w-0 basis-full items-center gap-2.5 sm:basis-0 sm:flex-1">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--live-dot)]" aria-hidden="true" />
+                  <span className="font-semibold text-[var(--ink)]">{renderName(c)}</span>
+                </div>
+                <span className="whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
+                  {formatDateRangeSr(c.date, c.dateEnd)}
+                </span>
+                <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded" style={LEVEL_STYLE[c.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
+                  {LEVEL_LABEL[c.level] ?? c.level}
+                </span>
+                <Link href={`/admin/takmicenja/${c.id}/edit`} className="ml-auto text-xs font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
+                  Uredi →
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="mb-4 flex flex-wrap items-start gap-2">
         <TakmicenjaFilters years={years} currentLevel={level} currentTag={tag} currentPriority={priority} />
         <TodayAnchor autoScroll={year === currentYear} />
@@ -181,26 +252,7 @@ export default async function AdminTakmicenjaPage({
                         <td className="px-4 py-3 font-medium text-[var(--ink)]">
                           <Link href={`/admin/takmicenja/${c.id}/edit`} className="flex items-center gap-2 no-underline">
                             {live && <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--live-dot)]" aria-label="U toku" />}
-                            <span className="flex min-w-0 flex-col md:max-w-sm">
-                              <span className="md:truncate">{c.nameSr ?? c.name}</span>
-                              <span className="text-xs font-normal text-[var(--muted)] md:truncate">{c.nameEn ?? c.name}</span>
-                              {(c.countryCode || c.locationSr || c.location) && (
-                                <span className="mt-0.5 flex items-center gap-1.5 text-xs font-normal text-[var(--muted)]">
-                                  {c.countryCode2 && (
-                                    <span
-                                      className={`fi fi-${c.countryCode2.toLowerCase()} shrink-0`}
-                                      style={{ width: "13px", height: "9px", borderRadius: "1px", display: "inline-block" }}
-                                    />
-                                  )}
-                                  {c.countryCode && (
-                                    <span className="rounded bg-[var(--surface)] border border-[var(--border)] px-1.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">
-                                      {c.countryCode}
-                                    </span>
-                                  )}
-                                  <span className="truncate">{c.locationSr ?? c.location}</span>
-                                </span>
-                              )}
-                            </span>
+                            {renderName(c)}
                           </Link>
                         </td>
                         <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] whitespace-nowrap">
