@@ -1,10 +1,11 @@
 import { db } from "@shootermarkt/db";
-import { competitions } from "@shootermarkt/db/schema";
-import { desc, asc, ilike, and, sql, eq, gt } from "drizzle-orm";
+import { competitions, countries } from "@shootermarkt/db/schema";
+import { desc, asc, ilike, and, sql, eq } from "drizzle-orm";
+import { Fragment } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Pagination } from "../components/Pagination";
 import { TakmicenjaFilters } from "./takmicenja-filters";
+import { TodayAnchor } from "./today-anchor";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { formatDateRangeSr } from "@/lib/date-utils";
 import { defaultFocusPriority } from "@/lib/competition-priority";
@@ -12,7 +13,8 @@ import { effectiveFocusPrioritySql } from "@/lib/competition-priority-sql";
 
 export const metadata: Metadata = { title: "Admin · Takmičenja" };
 
-const PAGE_SIZE = 30;
+const monthName = (m: number) =>
+  new Intl.DateTimeFormat("sr-Latn", { month: "long" }).format(new Date(2000, m, 1));
 
 export default async function AdminTakmicenjaPage({
   searchParams,
@@ -20,7 +22,6 @@ export default async function AdminTakmicenjaPage({
   searchParams: Promise<Record<string, string>>;
 }) {
   const sp = await searchParams;
-  const page = Math.max(1, parseInt(sp.page ?? "1"));
   const q = sp.q?.trim() ?? "";
   const currentYear = new Date().getFullYear().toString();
   const year = sp.year?.trim() ?? currentYear;
@@ -51,114 +52,19 @@ export default async function AdminTakmicenjaPage({
 
   const baseWhere = conditions.length ? and(...conditions) : undefined;
 
-  const currentCondition = and(
-    sql`${competitions.date} <= ${today}`,
-    sql`coalesce(${competitions.dateEnd}, ${competitions.date}) >= ${today}`,
-  );
-
-  const upcomingCondition = baseWhere
-    ? and(baseWhere, gt(competitions.date, today))
-    : gt(competitions.date, today);
-
-  const pastCondition = baseWhere
-    ? and(baseWhere, sql`coalesce(${competitions.dateEnd}, ${competitions.date}) < ${today}`)
-    : sql`coalesce(${competitions.dateEnd}, ${competitions.date}) < ${today}`;
-
-  const [upcomingCountRes, pastCountRes] = await Promise.all([
-    db.select({ total: sql<number>`count(*)::int` }).from(competitions).where(upcomingCondition),
-    db.select({ total: sql<number>`count(*)::int` }).from(competitions).where(pastCondition),
-  ]);
-
-  const upcomingCount = upcomingCountRes[0]?.total ?? 0;
-  const pastCount = pastCountRes[0]?.total ?? 0;
-
-  let status = sp.status?.trim();
-  if (status !== "upcoming" && status !== "past") {
-    status = upcomingCount > 0 ? "upcoming" : "past";
-  }
-
-  const activeWhere = status === "upcoming" ? upcomingCondition : pastCondition;
-  const total = status === "upcoming" ? upcomingCount : pastCount;
-
-  const defaultOrder = status === "upcoming" ? "asc" : "desc";
-  const sort = sp.sort?.trim() || "date";
-  const order = sp.order?.trim() || defaultOrder;
-
-  const sortColumnMap = {
-    name: competitions.name,
-    date: competitions.date,
-    location: competitions.location,
-    level: competitions.level,
-  };
-
-  const sortColumn = sortColumnMap[sort as keyof typeof sortColumnMap] ?? competitions.date;
-  // Prioritet: ručno postavljeni idu prvi (0 = najvažnije), auto (NULL) uvek na kraju.
-  const orderByExpr = sort === "priority"
-    ? [order === "desc" ? sql`${competitions.focusPriority} desc nulls last` : sql`${competitions.focusPriority} asc nulls last`, desc(competitions.date), desc(competitions.id)]
-    : order === "asc"
-      ? [asc(sortColumn), desc(competitions.id)]
-      : [desc(sortColumn), desc(competitions.id)];
-
-  const getSortHref = (col: string) => {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (year) params.set("year", year);
-    if (level) params.set("level", level);
-    if (tag) params.set("tag", tag);
-    if (priority) params.set("priority", priority);
-    params.set("status", status);
-
-    params.set("sort", col);
-    if (sort === col && order === "asc") {
-      params.set("order", "desc");
-    } else {
-      params.set("order", "asc");
-    }
-    params.set("page", "1");
-    return `/admin/takmicenja?${params.toString()}`;
-  };
-
-  const getStatusTabHref = (targetStatus: string) => {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (year) params.set("year", year);
-    if (level) params.set("level", level);
-    if (tag) params.set("tag", tag);
-    if (priority) params.set("priority", priority);
-
-    params.set("status", targetStatus);
-    params.set("page", "1");
-    return `/admin/takmicenja?${params.toString()}`;
-  };
-
-  const renderSortableHeader = (col: string, label: string) => {
-    const isActive = sort === col;
-    const isAsc = order === "asc";
-    return (
-      <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] select-none">
-        <Link
-          href={getSortHref(col)}
-          className="group inline-flex items-center gap-1 hover:text-[var(--ink)] transition-colors"
-        >
-          {label}
-          <span className={`inline-flex items-center transition-colors ${
-            isActive ? "text-[var(--brand-primary)] opacity-100" : "text-[var(--subtle)] opacity-0 group-hover:opacity-100"
-          }`}>
-            {isActive ? (isAsc ? "↑" : "↓") : "↕"}
-          </span>
-        </Link>
-      </th>
-    );
-  };
-
-  const [data, yearRows, currentCompetitions] = await Promise.all([
+  const [data, yearRows] = await Promise.all([
     db
       .select({
         id: competitions.id,
         name: competitions.name,
+        nameSr: competitions.nameSr,
+        nameEn: competitions.nameEn,
         date: competitions.date,
         dateEnd: competitions.dateEnd,
         location: competitions.location,
+        locationSr: competitions.locationSr,
+        countryCode: countries.code,
+        countryCode2: countries.code2,
         level: competitions.level,
         issfId: competitions.issfId,
         organizer: competitions.organizer,
@@ -167,33 +73,32 @@ export default async function AdminTakmicenjaPage({
         focusPriority: competitions.focusPriority,
       })
       .from(competitions)
-      .where(activeWhere)
-      .orderBy(...orderByExpr)
-      .limit(PAGE_SIZE)
-      .offset((page - 1) * PAGE_SIZE),
+      .leftJoin(countries, eq(competitions.countryId, countries.id))
+      .where(baseWhere)
+      .orderBy(asc(competitions.date), asc(competitions.dateEnd), desc(competitions.id)),
     db
       .select({ year: sql<number>`date_part('year', ${competitions.date}::date)::int` })
       .from(competitions)
       .groupBy(sql`date_part('year', ${competitions.date}::date)`)
       .orderBy(desc(sql`date_part('year', ${competitions.date}::date)`)),
-    db
-      .select({
-        id: competitions.id,
-        name: competitions.name,
-        date: competitions.date,
-        dateEnd: competitions.dateEnd,
-        location: competitions.location,
-        level: competitions.level,
-      })
-      .from(competitions)
-      .where(currentCondition)
-      .orderBy(asc(competitions.date), asc(competitions.dateEnd), desc(competitions.id)),
   ]);
 
   // Ručni prioritet je običan broj; auto je približan (bez kategorija iz rasporeda) pa je prigušen i sa "auto".
   const renderPriority = (c: (typeof data)[number]) => c.focusPriority != null
     ? <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold text-[var(--ink)] tabular-nums">{c.focusPriority}</span>
     : <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--subtle)] tabular-nums" title="Automatski prioritet (bez kategorija iz rasporeda)">auto {defaultFocusPriority(c)}</span>;
+
+  const isCurrentYear = year === currentYear;
+  // Sidro: prvo takmičenje koje je u toku ili tek dolazi.
+  const anchorId = isCurrentYear
+    ? data.find((c) => (c.dateEnd ?? c.date) >= today)?.id
+    : undefined;
+  const byMonth = new Map<number, typeof data>();
+  for (const c of data) {
+    const m = parseInt(c.date.slice(5, 7)) - 1;
+    byMonth.set(m, [...(byMonth.get(m) ?? []), c]);
+  }
+  const months = [...byMonth.entries()].sort((a, b) => a[0] - b[0]);
 
   const years = yearRows.map((r) => r.year).filter(Boolean);
 
@@ -207,7 +112,7 @@ export default async function AdminTakmicenjaPage({
           >
             Takmičenja
           </h1>
-          <p className="text-sm text-[var(--muted)] mt-0.5">prikazano {data.length} od {total}</p>
+          <p className="text-sm text-[var(--muted)] mt-0.5">{data.length} {year}.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
@@ -237,75 +142,9 @@ export default async function AdminTakmicenjaPage({
         </div>
       </div>
 
-      {currentCompetitions.length > 0 && (
-        <section aria-labelledby="current-competitions-heading" className="mb-8">
-          <div className="flex items-baseline justify-between gap-4 mb-3">
-            <h2
-              id="current-competitions-heading"
-              className="font-[family-name:var(--font-barlow-condensed)] text-lg font-extrabold uppercase tracking-tight text-[var(--ink)]"
-            >
-              U toku
-            </h2>
-            <span className="text-xs text-[var(--muted)]">
-              {currentCompetitions.length} {currentCompetitions.length === 1 ? "takmičenje" : "takmičenja"}
-            </span>
-          </div>
-          <div className="overflow-hidden rounded-lg border border-[var(--live-border)] bg-[var(--live-bg)] divide-y divide-[var(--live-border)]">
-            {currentCompetitions.map((competition) => (
-              <div
-                key={competition.id}
-                className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3.5"
-              >
-                <div className="flex min-w-0 basis-full items-center gap-2.5 sm:basis-0 sm:flex-1">
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--live-dot)]" aria-hidden="true" />
-                  <span className="font-semibold text-[var(--ink)] sm:truncate">{competition.name}</span>
-                </div>
-                <span className="whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">
-                  {formatDateRangeSr(competition.date, competition.dateEnd)}
-                </span>
-                <span className="min-w-28 text-sm text-[var(--muted)]">
-                  {competition.location ?? "—"}
-                </span>
-                <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded" style={LEVEL_STYLE[competition.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
-                  {LEVEL_LABEL[competition.level] ?? competition.level}
-                </span>
-                <Link
-                  href={`/admin/takmicenja/${competition.id}/edit`}
-                  className="ml-auto text-xs font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
-                >
-                  Uredi →
-                </Link>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <div className="flex border-b border-[var(--border)] mb-6">
-        <Link
-          href={getStatusTabHref("upcoming")}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
-            status === "upcoming"
-              ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
-              : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
-          }`}
-        >
-          Nadolazeća ({upcomingCount})
-        </Link>
-        <Link
-          href={getStatusTabHref("past")}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
-            status === "past"
-              ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
-              : "border-transparent text-[var(--muted)] hover:text-[var(--ink)]"
-          }`}
-        >
-          Prošla ({pastCount})
-        </Link>
-      </div>
-
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-start gap-2">
         <TakmicenjaFilters years={years} currentLevel={level} currentTag={tag} currentPriority={priority} />
+        <TodayAnchor autoScroll={year === currentYear} />
       </div>
 
       <div className="rounded-xl border border-[var(--border)] overflow-hidden">
@@ -317,71 +156,69 @@ export default async function AdminTakmicenjaPage({
             </Link>
           </div>
         ) : (
-          <>
-            {/* Mobile: card per competition */}
-            <ul className="divide-y divide-[var(--border)] md:hidden">
-              {data.map((c) => (
-                <li key={c.id}>
-                  <Link href={`/admin/takmicenja/${c.id}/edit`} className="flex min-h-11 flex-col gap-1.5 px-4 py-3.5 no-underline">
-                    <span className="text-sm font-semibold leading-snug text-[var(--ink)]">{c.name}</span>
-                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
-                      <span className="font-[family-name:var(--font-jetbrains-mono)]">{formatDateRangeSr(c.date, c.dateEnd)}</span>
-                      {c.location && <span>{c.location}</span>}
-                      <span className="rounded px-2 py-0.5 text-[0.7rem] font-semibold" style={LEVEL_STYLE[c.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
-                        {LEVEL_LABEL[c.level] ?? c.level}
-                      </span>
-                      {renderPriority(c)}
-                      <span className="ml-auto font-semibold text-[var(--brand-primary)]">Uredi →</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <table className="hidden w-full text-sm md:table">
-              <thead>
-                <tr className="bg-[var(--surface)] border-b border-[var(--border)]">
-                  {renderSortableHeader("name", "Naziv")}
-                  {renderSortableHeader("date", "Datum")}
-                  {renderSortableHeader("location", "Lokacija")}
-                  {renderSortableHeader("level", "Nivo")}
-                  {renderSortableHeader("priority", "Prioritet")}
-                  <th className="px-4 py-3 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Izvor</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {data.map((c) => (
-                  <tr key={c.id} className="hover:bg-[var(--surface)] transition-colors">
-                    <td className="px-4 py-3 font-medium text-[var(--ink)] max-w-xs truncate">{c.name}</td>
-                    <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] whitespace-nowrap">
-                      {formatDateRangeSr(c.date, c.dateEnd)}
-                    </td>
-                    <td className="px-4 py-3 text-[var(--muted)]">
-                      {c.location ?? <span className="text-[var(--subtle)]">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded" style={LEVEL_STYLE[c.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
-                        {LEVEL_LABEL[c.level] ?? c.level}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">{renderPriority(c)}</td>
-                    <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)]">
-                      {c.organizer ?? c.issfId ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/admin/takmicenja/${c.id}/edit`}
-                        className="text-xs font-medium text-[var(--muted)] hover:text-[var(--brand-primary)] transition-colors"
-                      >
-                        Uredi →
-                      </Link>
-                    </td>
+          <table className="w-full text-sm">
+            <tbody>
+              {months.map(([m, items]) => (
+                <Fragment key={m}>
+                  <tr>
+                    <th
+                      colSpan={4}
+                      className="bg-[var(--surface)] border-y border-[var(--border)] px-4 py-2 text-left font-[family-name:var(--font-barlow-condensed)] text-base font-extrabold uppercase tracking-tight text-[var(--ink)]"
+                    >
+                      {monthName(m)}
+                      <span className="ml-2 text-xs font-normal text-[var(--muted)]">{items.length}</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <Pagination page={page} total={total} pageSize={PAGE_SIZE} />
-          </>
+                  {items.map((c) => {
+                    const live = c.date <= today && (c.dateEnd ?? c.date) >= today;
+                    const isAnchor = c.id === anchorId;
+                    return (
+                      <tr
+                        key={c.id}
+                        id={isAnchor ? "danas" : undefined}
+                        className={`scroll-mt-20 border-b border-[var(--border)] hover:bg-[var(--surface)] transition-colors ${live ? "bg-[var(--live-bg)]" : ""}`}
+                      >
+                        <td className="px-4 py-3 font-medium text-[var(--ink)]">
+                          <Link href={`/admin/takmicenja/${c.id}/edit`} className="flex items-center gap-2 no-underline">
+                            {live && <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--live-dot)]" aria-label="U toku" />}
+                            <span className="flex min-w-0 flex-col md:max-w-sm">
+                              <span className="md:truncate">{c.nameSr ?? c.name}</span>
+                              <span className="text-xs font-normal text-[var(--muted)] md:truncate">{c.nameEn ?? c.name}</span>
+                              {(c.countryCode || c.locationSr || c.location) && (
+                                <span className="mt-0.5 flex items-center gap-1.5 text-xs font-normal text-[var(--muted)]">
+                                  {c.countryCode2 && (
+                                    <span
+                                      className={`fi fi-${c.countryCode2.toLowerCase()} shrink-0`}
+                                      style={{ width: "13px", height: "9px", borderRadius: "1px", display: "inline-block" }}
+                                    />
+                                  )}
+                                  {c.countryCode && (
+                                    <span className="rounded bg-[var(--surface)] border border-[var(--border)] px-1.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">
+                                      {c.countryCode}
+                                    </span>
+                                  )}
+                                  <span className="truncate">{c.locationSr ?? c.location}</span>
+                                </span>
+                              )}
+                            </span>
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)] whitespace-nowrap">
+                          {formatDateRangeSr(c.date, c.dateEnd)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-[0.7rem] font-semibold px-2 py-0.5 rounded" style={LEVEL_STYLE[c.level] ?? { background: "#f3f4f6", color: "#4b5563" }}>
+                            {LEVEL_LABEL[c.level] ?? c.level}
+                          </span>
+                        </td>
+                        <td className="hidden px-4 py-3 whitespace-nowrap md:table-cell">{renderPriority(c)}</td>
+                      </tr>
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
