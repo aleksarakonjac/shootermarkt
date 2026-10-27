@@ -152,6 +152,8 @@ export interface ParsedEvent {
 export interface ParsedBilten {
   events: ParsedEvent[];
   rawText?: string;
+  /** SIUS parser preskočio finala (različiti formati) — traže poseban izvor. */
+  hasFinals?: boolean;
 }
 
 /** One row in the admin review table, ready for commit */

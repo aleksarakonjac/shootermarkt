@@ -6,9 +6,20 @@ import { parseSiusPdf } from "./sius-pdf";
 import { DISCIPLINE_META, IMPORTED_DISCIPLINE_CODES, dedupeRowsByCategory, mergeFinalsIntoRows, type ParsedShooterResult, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 
 export async function parsePdfImport(pdfBuffer: Buffer) {
+  let finalsError: string | undefined;
   const [bilten, allClubs, allShooters] = await Promise.all([
-    // SIUS bilten se čita deterministički; sve ostalo (skenovi, finala, nestandardni formati) ide u Gemini.
-    parseSiusPdf(pdfBuffer).catch(() => null).then((sius) => sius ?? parsePdfWithGemini(pdfBuffer)),
+    // SIUS bilten se čita deterministički; Gemini samo za ne-SIUS PDF i (best-effort) za finala.
+    parseSiusPdf(pdfBuffer).catch(() => null).then(async (sius) => {
+      if (!sius) return parsePdfWithGemini(pdfBuffer);
+      if (!sius.hasFinals) return sius;
+      try {
+        const g = await parsePdfWithGemini(pdfBuffer);
+        return { events: [...sius.events, ...g.events.filter((e) => e.stage === "final")] };
+      } catch (e) {
+        finalsError = e instanceof Error ? e.message : String(e);
+        return sius;
+      }
+    }),
     db.select().from(clubs),
     db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, clubId: shooters.clubId }).from(shooters),
   ]);
@@ -70,5 +81,6 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
     skippedDisciplines: Array.from(skippedDisciplines),
     matchedFinals: finals.matchedFinals,
     unmatchedFinals: finals.unmatchedFinals,
+    finalsError,
   };
 }

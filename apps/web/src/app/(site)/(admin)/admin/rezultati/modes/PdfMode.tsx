@@ -13,9 +13,9 @@ import { PdfImportJobsPanel, type PdfImportJobSummary } from "./PdfImportJobsPan
 type Step = "upload" | "review" | "done";
 
 
-interface ParseInfo { eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number }
+interface ParseInfo { eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number; finalsError?: string }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
-interface PdfImportJob { id: number; competitionId: number; tags: string[]; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number } | null; error: string | null }
+interface PdfImportJob { id: number; competitionId: number; tags: string[]; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number; finalsError?: string } | null; error: string | null }
 
 export function PdfMode() {
   const [step, setStep] = useState<Step>("upload");
@@ -53,6 +53,7 @@ export function PdfMode() {
           skippedDisciplines: job.result.skippedDisciplines,
           matchedFinals: job.result.matchedFinals,
           unmatchedFinals: job.result.unmatchedFinals,
+          finalsError: job.result.finalsError,
         });
         setSelectedCompId(job.competitionId);
         setImportTags(job.tags);
@@ -155,6 +156,7 @@ export function PdfMode() {
         skippedDisciplines: job.result.skippedDisciplines,
         matchedFinals: job.result.matchedFinals,
         unmatchedFinals: job.result.unmatchedFinals,
+          finalsError: job.result.finalsError,
       });
       setSelectedCompId(job.competitionId);
       setSelectedCompName(jobSummary.competitionName);
@@ -278,6 +280,7 @@ export function PdfMode() {
               <span><span className="font-semibold text-[var(--ink)]">{activeCount}</span> za unos</span>
               <span><span className="font-semibold text-[var(--ink)]">{rows.filter(r => r.skip).length}</span> preskočeno</span>
               {(parseInfo?.matchedFinals ?? 0) > 0 && <span><span className="font-semibold text-[var(--ink)]">{parseInfo?.matchedFinals}</span> finala povezano</span>}
+              {parseInfo?.finalsError && <span style={{ color: "var(--warning)" }}>Finala nisu učitana (Gemini: {parseInfo.finalsError.slice(0, 80)}) — kvalifikacije su uredno uvezene</span>}
               {(parseInfo?.unmatchedFinals ?? 0) > 0 && <span style={{ color: "var(--warning)" }}>{parseInfo?.unmatchedFinals} finala bez kvalifikacionog reda</span>}
               {rows.filter(r => r.warning).length > 0 && (
                 <span style={{ color: "var(--warning)" }}>⚠ {rows.filter(r => r.warning).length} novih strelaca</span>

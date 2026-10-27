@@ -50,9 +50,9 @@ describe("parseSiusPdf — I kolo Kupa SSS 10m, Niš 2026", async () => {
     expect(arw.find((r) => r.lastName === "Belodedic")).toMatchObject({ rank: null, total: null, remark: "DNS" });
   });
 
-  it("returns null for a non-SIUS PDF, or one with finals (Gemini fallback)", () => {
+  it("returns null for a non-SIUS PDF; finals are skipped and flagged", () => {
     expect(parseSiusPages([[{ x: 0, y: 0, str: "Rezultati kola" }]])).toBeNull();
-    expect(parseSiusPages([[{ x: 0, y: 0, str: "F100000IA1710261015.1.ARM.0.001.pdf" }]])).toBeNull();
+    expect(parseSiusPages([[{ x: 0, y: 0, str: "F100000IA1710261015.1.ARM.0.001.pdf" }]])).toEqual({ events: [], hasFinals: true });
   });
 });
 

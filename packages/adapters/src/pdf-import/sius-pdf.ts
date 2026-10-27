@@ -6,7 +6,7 @@ import { normalizeDisciplineCode } from "@shootermarkt/db/discipline";
  * Deterministički parser SIUS biltena (digitalni PDF, ISSF format) — bez LLM-a.
  * Svaka lista u podnožju nosi ime SIUS fajla, npr. `Q100000IA1710261015.20.ARM.0.001.pdf`:
  *   Q = kvalifikacija, I/T = pojedinačno/ekipno, 20 = tip liste, ARM = disciplina.
- * Vraća null kad PDF nije SIUS bilten ili ima nešto što ne znamo da čitamo → Gemini fallback.
+ * Vraća null kad PDF nije SIUS bilten ili ima nešto što ne znamo da čitamo → Gemini fallback. Finala se preskaču (hasFinals)..
  */
 
 type Item = { x: number; y: number; str: string };
@@ -36,6 +36,7 @@ export async function parseSiusPdf(pdfBuffer: Buffer): Promise<ParsedBilten | nu
 export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
   const events = new Map<string, ParsedEvent>();
   let sawSius = false;
+  let hasFinals = false;
 
   for (const items of pages) {
     const file = items.map((it) => SIUS_FILE.exec(it.str)).find(Boolean);
@@ -43,8 +44,8 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
     sawSius = true;
     const [, stage, kind, dd, mm, yy, listCode, discRaw] = file;
     if (kind === "T") continue; // ekipno — ignorišemo
-    // ponytail: finala imaju više formata (eliminacija, kumulativ, R3P, SPW) — ceo bilten ide u Gemini dok ne dodamo SIUS finale
-    if (stage !== "Q") return null;
+    // ponytail: finala imaju više formata (eliminacija, kumulativ, R3P, SPW) — preskačemo, pozivalac ih vadi drugim putem
+    if (stage !== "Q") { hasFinals = true; continue; }
     const discipline = normalizeDisciplineCode(discRaw);
     if (!discipline) continue;
 
@@ -81,7 +82,7 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
   const all = [...events.values()];
   const mainKey = all.map((e) => `${e.eventDate}|${e.eventName}`).sort()[0];
   for (const e of all) if (`${e.eventDate}|${e.eventName}` === mainKey) { e.eventName = null; e.eventDate = null; }
-  return { events: all };
+  return { events: all, hasFinals };
 }
 
 function subtitleList(items: Item[]) {
