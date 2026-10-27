@@ -197,6 +197,8 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
   const router = useRouter();
   const pathname = usePathname();
   const detailRef = useRef<HTMLDivElement>(null);
+  // Overview se unmount-uje dok je disciplina otvorena; pamtimo scroll da ga vratimo na izlazu.
+  const overviewScroll = useRef<number | null>(null);
 
   const urlSelection = useMemo<Selection | null>(() => {
     const params = new URLSearchParams(search);
@@ -288,18 +290,24 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
   return (
     <AnimatePresence mode="wait" initial={false}>
       {selection === null ? (
-        <motion.div key="overview" variants={fadeVariants} initial="hidden" animate="visible" exit="exit">
+        <motion.div key="overview" variants={fadeVariants} initial="hidden" animate="visible" exit="exit" onAnimationStart={(def) => {
+          if (def !== "visible" || overviewScroll.current == null) return;
+          window.scrollTo({ top: overviewScroll.current, behavior: "instant" });
+          overviewScroll.current = null;
+        }}>
           <CompetitionOverview
             groups={groups}
             mixedGroups={mixedGroups}
             locale={locale}
             onSelectIndividual={(code, category, stage, elimRound) => {
               const next = { kind: "individual" as const, disciplineCode: code, category, stage, elimRound };
+              overviewScroll.current = window.scrollY;
               setSelection(next);
               setSelectionUrl(next);
             }}
             onSelectMixed={(code, category, stage) => {
               const next = { kind: "mixed" as const, disciplineCode: code, category, stage };
+              overviewScroll.current = window.scrollY;
               setSelection(next);
               setSelectionUrl(next);
             }}
