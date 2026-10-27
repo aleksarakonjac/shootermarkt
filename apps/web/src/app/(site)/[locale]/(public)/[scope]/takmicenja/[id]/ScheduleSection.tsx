@@ -137,7 +137,7 @@ function fmtPillDate(key: string, locale: string): string {
   });
 }
 
-function todayKey(): string {
+export function todayKey(): string {
   return localDateKey(new Date().toISOString());
 }
 

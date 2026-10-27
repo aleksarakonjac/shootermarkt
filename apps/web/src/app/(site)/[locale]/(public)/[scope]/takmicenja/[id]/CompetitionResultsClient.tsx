@@ -24,6 +24,7 @@ import {
 import { startNavigationProgress, finishNavigationProgress } from "@/components/NavigationProgress";
 import { shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
 import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
+import { todayKey } from "./ScheduleSection";
 
 export type DisciplineGroup = {
   /** Jedinstven id bloka (ključ + kategorija kad je disciplina podeljena po mečevima) */
@@ -36,7 +37,7 @@ export type DisciplineGroup = {
   eventName: string | null;
   /** Oznaka bloka: naziv meča, uz kategoriju kad disciplina ima više mečeva */
   label: string | null;
-  /** Datum meča ("22.01."), kad je poznat (event ili raspored) */
+  /** Datum meča (ISO "2026-01-22"), kad je poznat (event ili raspored) */
   date: string | null;
   apparatus: string | null;
   categories: Array<{
@@ -76,6 +77,8 @@ export type MixedTeamGroup = {
   category: AgeCategory;
   name: string;
   apparatus: string | null;
+  /** Datum kvalifikacija iz rasporeda (ISO), kad postoji */
+  date: string | null;
   teams: MixedTeamRow[];
 };
 
@@ -134,10 +137,27 @@ const DISCIPLINE_NAMES: Record<string, { sr: string; en: string }> = {
 
 // Keep the overview readable as a program, not as the order rows happened to
 // arrive from separate individual and mixed-result queries.
-const DISCIPLINE_ORDER = ["ARM", "ARW", "ARMT", "APM", "APW", "APMT", "R3PM", "R3PW", "R3JM", "R3JW", "SPW", "RFPM", "FPM"];
+const DISCIPLINE_ORDER = ["ARM", "ARW", "ARMT", "R3PM", "R3PW", "R3JM", "R3JW", "APM", "APW", "APMT", "SPW", "RFPM", "FPM"];
 function disciplineOrder(code: string) {
   const index = DISCIPLINE_ORDER.indexOf(code);
   return index === -1 ? DISCIPLINE_ORDER.length : index;
+}
+
+// Pregled se deli po danu kad svaka pojedinačna disciplina ima datum, inače po grupi disciplina
+// (oružje + vazdušno/MK), da muški, ženski i miks iste discipline stoje zajedno.
+type Family = "airRifle" | "rifle" | "airPistol" | "pistol";
+const FAMILY_ORDER: Family[] = ["airRifle", "rifle", "airPistol", "pistol"];
+const FAMILY_LABELS: Record<string, Record<Family, string>> = {
+  sr: { airRifle: "Vazdušna puška", rifle: "MK puška", airPistol: "Vazdušni pištolj", pistol: "MK pištolj" },
+  en: { airRifle: "Air rifle", rifle: "Rifle", airPistol: "Air pistol", pistol: "Pistol" },
+};
+function disciplineFamily(code: string): Family {
+  return code.startsWith("AR") ? "airRifle" : code.startsWith("AP") ? "airPistol" : code.startsWith("R3") ? "rifle" : "pistol";
+}
+const ddmm = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
+function weekday(iso: string, locale: string, format: "long" | "short" = "long"): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(locale === "sr" ? "sr-Latn-RS" : "en-GB", { weekday: format });
 }
 
 function disciplineName(code: string, locale: string): string {
@@ -325,10 +345,15 @@ function CompetitionOverview({
   onSelectIndividual: (code: string, category: AgeCategory, stage: Stage, elimRound?: number) => void;
   onSelectMixed: (code: string, category: AgeCategory, stage: "qual" | "final" | "gold" | "bronze") => void;
 }) {
-  return (
-    <div className="flex flex-col gap-5">
-      {/* Individual disciplines */}
-      {groups.map((g) => {
+  const byDay = groups.length > 0 && groups.every((g) => g.date);
+  const reduceMotion = useReducedMotion();
+  // Lokalni "danas" tek posle hidratacije (server ne zna vremensku zonu posetioca)
+  const [today, setToday] = useState<string | null>(null);
+  useEffect(() => setToday(todayKey()), []);
+  const todayLabel = locale === "en" ? "Today" : "Danas";
+  const items: Array<{ key: string; code: string; date: string | null; node: React.ReactNode }> = [
+      // Individual disciplines
+      ...groups.map((g) => {
         const totalShooters = g.categories.reduce((count, category) => {
           const eliminationRows = category.results.filter((result) => result.elimRound != null);
           return count + (eliminationRows.length > 0
@@ -338,8 +363,8 @@ function CompetitionOverview({
         const singleCat = g.categories.length === 1;
         const singleCatData = singleCat ? g.categories[0] : null;
 
-        return (
-          <div key={g.id} style={{ order: disciplineOrder(g.code) }}>
+        return { key: g.id, code: g.code, date: g.date, node: (
+          <div>
             <div className="flex items-center gap-2.5 mb-2">
               <span
                 className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded"
@@ -349,7 +374,7 @@ function CompetitionOverview({
               </span>
               <span className="text-sm font-semibold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
               {g.label && <span className="text-xs font-semibold text-[var(--brand-primary)] truncate">{g.label}</span>}
-              {g.date && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">{g.date}</span>}
+              {g.date && !byDay && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">{ddmm(g.date)}</span>}
               <span className="text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
                 {totalShooters} {locale === "en" ? "athletes" : "strelaca"}
               </span>
@@ -395,12 +420,12 @@ function CompetitionOverview({
               )}
             </div>
           </div>
-        );
-      })}
+        ) };
+      }),
 
-      {/* Mixed team disciplines */}
-      {mixedGroups.map((g) => (
-        <div key={`${g.code}|${g.category}`} style={{ order: disciplineOrder(g.code) }}>
+      // Mixed team disciplines
+      ...mixedGroups.map((g) => ({ key: `${g.code}|${g.category}`, code: g.code, date: g.date, node: (
+        <div>
           <div className="flex items-center gap-2.5 mb-2">
             <span
               className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded"
@@ -431,7 +456,72 @@ function CompetitionOverview({
             {mixedFinalStages(g.teams).map((stage) => <button key={stage} onClick={() => onSelectMixed(g.code, g.category, stage)} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"><div className="flex items-center gap-2.5 min-w-0"><PhaseBadge label={stage === "final" ? "F" : stage === "gold" ? "G" : "B"} accent /><span className="text-sm font-semibold text-[var(--ink)]">{stage === "final" ? (PHASE_LABELS[locale] ?? PHASE_LABELS.en).final : (MATCH_LABELS[locale] ?? MATCH_LABELS.en)[stage]}</span><span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">{stage === "final" ? g.teams.filter((t) => t.finalRank != null || t.finalTotal != null).length : matchTeams(g.teams, stage).length}</span></div><ChevronRight size={14} className="shrink-0 text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" /></button>)}
           </div>
         </div>
-      ))}
+      ) })),
+  ];
+
+  // Sekcija: dan (kad je pregled po danima i stavka ima datum), inače grupa disciplina. Unutar sekcije po kodu discipline.
+  const sectionOf = (item: (typeof items)[number]) => (byDay && item.date ? item.date : disciplineFamily(item.code));
+  // dani (ISO) hronološki, pa grupe disciplina; "~" je u ASCII posle cifara
+  const sectionRank = (key: string) => (/^\d/.test(key) ? key : `~${FAMILY_ORDER.indexOf(key as Family)}`);
+  const sections = [...new Set(items.map(sectionOf))].sort((a, b) => (sectionRank(a) < sectionRank(b) ? -1 : 1));
+  const familyLabels = FAMILY_LABELS[locale] ?? FAMILY_LABELS.en;
+
+  const isDaySection = (section: string) => /^\d/.test(section);
+
+  return (
+    <div className="flex flex-col gap-10">
+      {sections.length > 1 && (
+        // Prečice do sekcija: sidra (rade i bez JS-a), skrol bez menjanja URL-a
+        <nav
+          aria-label={locale === "en" ? "Jump to section" : "Skok na sekciju"}
+          className="-mb-4 flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 [scrollbar-width:none]"
+        >
+          {sections.map((section) => (
+            <a
+              key={section}
+              href={`#sekcija-${section}`}
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById(`sekcija-${section}`)?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+              }}
+              className="flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--bg)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand-primary)]"
+            >
+              {isDaySection(section) ? (
+                <>
+                  {section === today ? <span className="text-[var(--brand-primary)]">{todayLabel}</span> : weekday(section, locale, "short")}
+                  <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-medium normal-case tracking-normal text-[var(--subtle)]">{ddmm(section)}</span>
+                </>
+              ) : (
+                familyLabels[section as Family]
+              )}
+            </a>
+          ))}
+        </nav>
+      )}
+      {sections.map((section) => {
+        const sectionItems = items
+          .filter((item) => sectionOf(item) === section)
+          .sort((a, b) => disciplineOrder(a.code) - disciplineOrder(b.code));
+        const isDay = /^\d/.test(section);
+        return (
+          <section key={section} id={`sekcija-${section}`} className="flex scroll-mt-24 flex-col gap-5" aria-label={isDay ? `${weekday(section, locale)} ${ddmm(section)}` : familyLabels[section as Family]}>
+            {sections.length > 1 && (
+              <h3 className="flex items-center gap-3 font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[var(--ink)] text-lg leading-none tracking-[-0.01em]">
+                {isDay ? (
+                  <>
+                    <span className={section === today ? "text-[var(--brand-primary)]" : undefined}>{section === today ? todayLabel : weekday(section, locale)}</span>
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.75rem] font-medium text-[var(--muted)] translate-y-px">{ddmm(section)}</span>
+                  </>
+                ) : (
+                  <span>{familyLabels[section as Family]}</span>
+                )}
+                <span className="h-px flex-1 bg-[var(--border)]" aria-hidden="true" />
+              </h3>
+            )}
+            {sectionItems.map((item) => <div key={item.key}>{item.node}</div>)}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -817,7 +907,7 @@ function CompetitionDetail({
             <span className="text-[0.72rem] font-semibold text-[var(--brand-primary)]">{group.label}</span>
           )}
           {group?.date && (
-            <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">{group.date}</span>
+            <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">{ddmm(group.date)}</span>
           )}
           {showCategory && (
             <span className="text-[0.72rem] font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">

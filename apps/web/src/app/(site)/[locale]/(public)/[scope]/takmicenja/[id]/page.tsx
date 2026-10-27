@@ -196,14 +196,22 @@ export default async function CompetitionPage({ params }: Props) {
     endTime: r.endTime?.toISOString() ?? null,
   }));
 
+  // Datum meča kad ga znamo: event → raspored (početak kvalifikacija) → datum takmičenja za glavni meč višednevnog biltena
+  const scheduledDate = new Map<string, string>();
+  for (const slot of scheduleRows) {
+    const key = `${slot.disciplineCode}|${slot.category}`;
+    const day = slot.startTime.toISOString().slice(0, 10);
+    if (slot.stage.startsWith("qual") && (!scheduledDate.has(key) || day < scheduledDate.get(key)!)) scheduledDate.set(key, day);
+  }
+
   // Group mixed team results by discipline code
   const mixedGroupOrder: string[] = [];
-  const mixedGroupMap = new Map<string, { code: string; category: typeof mixedResults[number]["category"]; name: string; apparatus: string | null; teams: typeof mixedResults }>();
+  const mixedGroupMap = new Map<string, { code: string; category: typeof mixedResults[number]["category"]; name: string; apparatus: string | null; date: string | null; teams: typeof mixedResults }>();
   for (const r of mixedResults) {
     const key = `${r.disciplineCode}|${r.category}`;
     if (!mixedGroupMap.has(key)) {
       mixedGroupOrder.push(key);
-      mixedGroupMap.set(key, { code: r.disciplineCode, category: r.category, name: r.disciplineName, apparatus: r.apparatus, teams: [] });
+      mixedGroupMap.set(key, { code: r.disciplineCode, category: r.category, name: r.disciplineName, apparatus: r.apparatus, date: scheduledDate.get(key) ?? null, teams: [] });
     }
     mixedGroupMap.get(key)!.teams.push(r);
   }
@@ -213,16 +221,8 @@ export default async function CompetitionPage({ params }: Props) {
   // then by age category, preserving order of first appearance. Disciplina sa više mečeva se deli i po
   // kategoriji, da svaki meč svake liste ima svoj blok ("Senior · 1. meč", "Junior · 2. meč · 25.01.").
   const multiMatch = new Set(compResults.filter((r) => r.competitionEventId).map((r) => r.disciplineCode));
-  // Datum meča kad ga znamo: event → raspored (početak kvalifikacija) → datum takmičenja za glavni meč višednevnog biltena
-  const scheduledDate = new Map<string, string>();
-  for (const slot of scheduleRows) {
-    const key = `${slot.disciplineCode}|${slot.category}`;
-    const day = slot.startTime.toISOString().slice(0, 10);
-    if (slot.stage.startsWith("qual") && (!scheduledDate.has(key) || day < scheduledDate.get(key)!)) scheduledDate.set(key, day);
-  }
   const matchDate = (r: (typeof compResults)[number]) =>
     r.eventDate ?? scheduledDate.get(`${r.disciplineCode}|${r.category}`) ?? (multiMatch.has(r.disciplineCode) ? comp?.date ?? null : null);
-  const ddmm = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
   const disciplineOrder: string[] = [];
   const disciplineMap = new Map<string, DisciplineGroup>();
   const categoryOrder = new Map<string, string[]>(); // group id -> category[]
@@ -243,7 +243,7 @@ export default async function CompetitionPage({ params }: Props) {
         eventName: r.eventName ?? null,
         // datum ide u svoju oznaku, pa se skida sa kraja naziva ("2. meč · 22.01." → "2. meč")
         label: localizeMatchName((split ? `${categoryLabel(r.category, CATEGORY_LABEL[r.category], locale)} · ${r.eventName ?? "1. meč"}` : r.eventName)?.replace(/ · \d{2}\.\d{2}\.$/, "") ?? "", locale) || null,
-        date: matchDate(r) ? ddmm(matchDate(r)!) : null,
+        date: matchDate(r),
         apparatus: r.apparatus,
         categories: [],
       });
@@ -295,7 +295,7 @@ export default async function CompetitionPage({ params }: Props) {
       .sort((a, b) => CATEGORY_RANK[b.category] - CATEGORY_RANK[a.category]); // stariji prvo
     return { ...disciplineMap.get(key)!, categories: cats };
   });
-  // Unutar discipline (CSS order po kodu): stariji uzrast prvo, pa glavni meč, pa ostali po nazivu/datumu
+  // Unutar discipline (pregled ih deli po danu ili polu, pa po kodu): stariji uzrast prvo, pa glavni meč, pa ostali po nazivu/datumu
   groups.sort((a, b) =>
     CATEGORY_RANK[b.categories[0].category] - CATEGORY_RANK[a.categories[0].category]
     || Number(a.eventName != null) - Number(b.eventName != null)
