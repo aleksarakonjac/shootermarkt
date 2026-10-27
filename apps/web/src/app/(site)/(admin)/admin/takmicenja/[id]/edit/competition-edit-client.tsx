@@ -92,6 +92,9 @@ export function CompetitionEditClient({ competition, countries }: { competition:
     if (e.key === "Backspace" && !tagInput && tags.length) removeTag(tags[tags.length - 1]);
   }
 
+  // Vraća na listu, na godinu i red ovog takmičenja.
+  const backHref = `/admin/takmicenja?year=${form.date.slice(0, 4)}#c-${competition.id}`;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
@@ -104,7 +107,7 @@ export function CompetitionEditClient({ competition, countries }: { competition:
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Greška");
-      router.push("/admin/takmicenja");
+      router.push(backHref);
       router.refresh();
     } catch (e) {
       setError(String(e));
@@ -325,7 +328,7 @@ export function CompetitionEditClient({ competition, countries }: { competition:
             {loading ? "Snimam..." : "Sačuvaj izmene"}
           </button>
           <Link
-            href="/admin/takmicenja"
+            href={backHref}
             className="rounded-md border border-[var(--border-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors"
           >
             Otkaži

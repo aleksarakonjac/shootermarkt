@@ -246,7 +246,8 @@ export default async function AdminTakmicenjaPage({
                     return (
                       <tr
                         key={c.id}
-                        id={isAnchor ? "danas" : undefined}
+                        id={`c-${c.id}`}
+                        data-today={isAnchor ? "" : undefined}
                         className={`scroll-mt-20 border-b border-[var(--border)] hover:bg-[var(--surface)] transition-colors ${live ? "bg-[var(--live-bg)]" : ""}`}
                       >
                         <td className="px-4 py-3 font-medium text-[var(--ink)]">
