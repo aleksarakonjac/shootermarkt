@@ -441,7 +441,6 @@ export default async function ShooterPage({ params }: Props) {
           <h2 className="font-[family-name:var(--font-barlow-condensed)] font-bold text-xl uppercase tracking-tight text-[var(--ink)]">
             {tProfile("recentResults")}
           </h2>
-          {recentResults.length > 0 && <ScopedLink href={`/strelci/${shooterId}/rezultati`} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 px-1 text-sm font-semibold text-[var(--brand-primary)] transition-colors hover:text-[var(--ink)]">{tProfile("viewAllResults")}<ArrowRight size={16} aria-hidden="true" /></ScopedLink>}
         </div>
 
         {recentResults.length === 0 ? (
@@ -454,6 +453,12 @@ export default async function ShooterPage({ params }: Props) {
             allLabel={tProfile("allDisciplines")}
             locale={locale}
           />
+        )}
+        {recentResults.length > 0 && (
+          <ScopedLink href={`/strelci/${shooterId}/rezultati`} className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--brand-primary)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]">
+            {tProfile("viewAllResults", { count: totalAppearances })}
+            <ArrowRight size={16} aria-hidden="true" />
+          </ScopedLink>
         )}
       </div>
 
