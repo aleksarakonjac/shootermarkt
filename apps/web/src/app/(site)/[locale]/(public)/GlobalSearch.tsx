@@ -62,7 +62,7 @@ const LEVEL_LABELS: Record<string, { sr: string; en: string }> = {
   club:          { sr: "Klupsko",       en: "Club" },
 };
 
-const DISC_CODES = new Set(["ARM","ARW","APM","APW","R3PM","R3PW","R3JM","R3JW","SPW","RFPM","FPM"]);
+const DISC_CODES = new Set(["ARM","ARW","APM","APW","R3PM","R3PW","R3JM","R3JW","SPW","FPM"]);
 
 type DiscInfo = { sr: string; en: string; aparat: string; pol: "m" | "f" | null };
 const DISC_LABELS: Record<string, DiscInfo> = {
@@ -75,7 +75,6 @@ const DISC_LABELS: Record<string, DiscInfo> = {
   R3JM: { sr: "MK puška juniorski",      en: "50m Rifle 3P Junior Men",aparat:"AR", pol:"m" },
   R3JW: { sr: "MK puška juniork.",       en: "50m Rifle 3P Junior W.", aparat:"AR", pol:"f" },
   SPW:  { sr: "Sport pištolj žene",      en: "25m Sport Pistol Women", aparat:"AP", pol:"f" },
-  RFPM: { sr: "Slobodna puška muški",    en: "50m Rifle Prone Men",    aparat:"AR", pol:"m" },
   FPM:  { sr: "Slobodni pištolj muški",  en: "50m Free Pistol Men",    aparat:"AP", pol:"m" },
 };
 
