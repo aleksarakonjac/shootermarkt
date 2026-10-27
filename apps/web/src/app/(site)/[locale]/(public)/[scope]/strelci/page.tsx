@@ -135,6 +135,12 @@ function DiscPanel({ code, label, show, t, className = "" }: { code: string; lab
         <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-bold uppercase tracking-widest text-[var(--subtle)] shrink-0">
           {code}
         </span>
+        <ScopedLink
+          href={`/rangiranje?disciplina=${code.toLowerCase()}`}
+          className="ml-auto font-[family-name:var(--font-jetbrains-mono)] text-[0.6rem] font-bold uppercase tracking-widest text-[var(--brand-primary)] hover:underline shrink-0"
+        >
+          Top 3 →
+        </ScopedLink>
       </div>
       {rows.length > 0 ? (
         <div>
