@@ -10,6 +10,7 @@ import { CountryDropdown, type Country as DropdownCountry } from "@/components/u
 import { FocusPriorityField } from "@/components/ui/FocusPriorityField";
 import { defaultFocusPriority } from "@/lib/competition-priority";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
+import { ResultsManager } from "./results-manager";
 
 interface Competition {
   id: number;
@@ -335,6 +336,8 @@ export function CompetitionEditClient({ competition, countries }: { competition:
           </Link>
         </div>
       </form>
+
+      <ResultsManager competitionId={competition.id} />
 
       {/* Delete zone */}
       <div className="mt-8 rounded-xl border border-red-200 p-5">
