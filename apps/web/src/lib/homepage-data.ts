@@ -378,11 +378,26 @@ export async function getHomepageMain(scope: Scope) {
     // Takmičenje bez rasporeda (npr. rezultati uvezeni bez competition_schedule) se vodi po
     // unetim rezultatima: jedna faza po (disciplina, kategorija, kvalifikacije/elim/finale).
     const effectiveSlots = slots.length ? slots : slotsFromResults(competition, individualRows, mixedRows, disciplineCodes);
-    const dedupedSlots = [...new Map(
-      effectiveSlots.map((s) => [`${s.disciplineId}|${s.category}|${s.stage.startsWith("qual") ? "qual" : s.stage}`, s])
-    ).values()];
+    // Partije (relays) iste kvalifikacione liste su jedna zajednička rang lista: spajaju se u jednu
+    // fazu koja je "u toku" ako je bilo koja partija u toku (raspon = prva početak … poslednja kraj).
+    const slotGroups = new Map<string, typeof effectiveSlots>();
+    for (const s of effectiveSlots) {
+      const key = `${s.disciplineId}|${s.category}|${s.stage.startsWith("qual") ? "qual" : s.stage}`;
+      slotGroups.set(key, [...(slotGroups.get(key) ?? []), s]);
+    }
+    const nowForSlots = new Date();
+    const dedupedSlots = [...slotGroups.values()].map((group) => {
+      if (group.length === 1) return { ...group[0], isLive: isTickerSlotLive(group[0], nowForSlots) };
+      const ends = group.map((s) => getTickerSlotEnd(s));
+      return {
+        ...group[0],
+        startTime: new Date(Math.min(...group.map((s) => s.startTime.getTime()))),
+        endTime: ends.some((e) => e == null) ? null : new Date(Math.max(...ends.map((e) => e!.getTime()))),
+        isLive: group.some((s) => isTickerSlotLive(s, nowForSlots)),
+      };
+    });
     const rawPhases = dedupedSlots.flatMap((slot) => {
-      const isLive = isTickerSlotLive(slot, new Date());
+      const isLive = slot.isLive;
       const stageKind = slot.stage.startsWith("qual") ? "qual" : slot.stage;
       const individual = individualRows.flatMap((row): Entry[] => {
         if (row.disciplineId !== slot.disciplineId || row.category !== slot.category) return [];
@@ -411,8 +426,8 @@ export async function getHomepageMain(scope: Scope) {
       return rounds.flatMap((round) => {
       const entries = [...individual.filter((e) => e.round === round), ...mixed].sort((a, b) => a.rank - b.rank);
       // Faza u toku se prikazuje i bez rezultata (klijent pokazuje "LIVE · rezultati uskoro");
-      // završena faza samo ako ima rezultate.
-      if (!isLive && (!entries.length || getTickerSlotEnd(slot) == null || getTickerSlotEnd(slot)! >= new Date())) return [];
+      // faza koja nije u toku samo ako ima uvezene rezultate (npr. prva partija gotova, druga tek sledi).
+      if (!isLive && !entries.length) return [];
       const top3 = entries.slice(0, 3);
       const shown = new Set(top3.map((entry) => entry.id));
       const srbHighlights = showSrbHighlight ? entries.filter((entry) => entry.nationality === "SRB" && !shown.has(entry.id)) : [];
