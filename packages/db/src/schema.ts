@@ -44,7 +44,7 @@ export const disciplineCodeEnum = pgEnum("discipline_code", [
   "R3JW", // Rifle 3-Position Junior Women (3x20)
   // Pistol
   "SPW",  // 25m Sport Pistol Women
-  "RFPM", // 25m Rapid Fire Pistol Men
+  "RFPM", // 25m Rapid Fire Pistol Men — NA ČEKANJU: vrednost ostaje u enumu (bez migracije), ali se nigde ne uvozi ni prikazuje
   "FPM",  // 50m Free Pistol Men
 ]);
 

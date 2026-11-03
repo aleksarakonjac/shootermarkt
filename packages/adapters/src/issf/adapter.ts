@@ -292,8 +292,8 @@ const EVENT_DISCIPLINE_MAP: Array<[RegExp, string]> = [
   [/50m rifle 3.positions? women/i,"R3PW"],
   [/25m (?:sport )?pistol women/i,"SPW"],
   [/50m free pistol/i,            "FPM"],
-  // 25m rapid fire pistol (RFPM) namerno nije ovde: ne uvozimo ga, pa ne sme ni u raspored
-  // (live-fetch cron bi ga inače povukao iz SIUS-a).
+  // 25m rapid fire pistol (brzometni pištolj) namerno nije ovde: pravila još nisu implementirana,
+  // pa ne sme ni u raspored (live-fetch cron bi ga inače povukao iz SIUS-a).
 ];
 
 function mapTitleToDisciplineCode(title: string): string | null {
@@ -314,8 +314,7 @@ function mapTitleToDisciplineCode(title: string): string | null {
 // SPW splits qualification into two stages — precision and rapid fire — each
 // scheduled as its own slot (and each may span multiple relays/rounds), but
 // both feed one combined qual ranking (see live-fetch cron dedup). Only SPW
-// carries this split — "rapid" also appears in RFPM's own discipline name,
-// so the sub-stage check only applies once we know the row is SPW.
+// carries this split, so the sub-stage check only applies once we know the row is SPW.
 function detectStage(title: string, disciplineCode: string | null): ISSFScheduleEntry["stage"] {
   if (/^pre-event training/i.test(title)) return "training";
   if (/^medal ceremony/i.test(title))     return "ceremony";
