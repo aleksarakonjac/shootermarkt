@@ -65,9 +65,26 @@ async function handlePOST(req: NextRequest) {
     return NextResponse.json({ error: "No valid entries to import" }, { status: 400 });
   }
 
+  // Tabela nema unique ograničenje, pa onConflictDoNothing ne bi ništa sprečio: ponovni import
+  // bi dupirao ceo raspored. Preskačemo termine koji već postoje (isti meč, faza, kategorija, početak).
+  const slotKey = (s: { disciplineId: number; stage: string; category: string; startTime: Date }) =>
+    `${s.disciplineId}|${s.stage}|${s.category}|${s.startTime.getTime()}`;
+  const existing = await db.select({
+    disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage,
+    category: competitionSchedule.category, startTime: competitionSchedule.startTime,
+  }).from(competitionSchedule).where(eq(competitionSchedule.competitionId, dbCompetitionId));
+  const seen = new Set(existing.map(slotKey));
+  const fresh = toInsert.filter((s) => {
+    const key = slotKey(s);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  if (!fresh.length) return NextResponse.json({ imported: 0, skipped: toInsert.length });
+
   const inserted = await db.insert(competitionSchedule)
-    .values(toInsert)
-    .onConflictDoNothing()
+    .values(fresh)
     .returning({ id: competitionSchedule.id });
 
   return NextResponse.json({ imported: inserted.length, skipped: toInsert.length - inserted.length });
