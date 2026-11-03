@@ -88,8 +88,14 @@ describe("mergeQualRanking", () => {
     expect(merged.map((r) => [r.name, r.rank])).toEqual([["b", 1], ["a", 2], ["c", null]]);
   });
 
-  it("leaves a single sub-event untouched", () => {
+  it("closes gaps (2, 4, 6…) for a single sub-event that is still running", () => {
+    const rows = [row("a", 6, 1), row("b", 2, 3), row("c", 4, 2)];
+    const merged = mergeQualRanking(rows, [{ state: "InCompetition" }]);
+    expect(merged.map((r) => [r.name, r.rank])).toEqual([["b", 1], ["c", 2], ["a", 3]]);
+  });
+
+  it("leaves a single finished sub-event untouched", () => {
     const rows = [row("a", 2, 1), row("b", 1, 2)];
-    expect(mergeQualRanking(rows, [{ state: "InCompetition" }])).toBe(rows);
+    expect(mergeQualRanking(rows, [{ state: "Finished" }])).toBe(rows);
   });
 });

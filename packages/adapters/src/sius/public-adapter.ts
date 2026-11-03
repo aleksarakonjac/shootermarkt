@@ -273,11 +273,13 @@ export function mergeQualRanking<T extends { rank: number | null; total: number;
   rows: T[],
   qualSubs: Array<{ state: string }>
 ): T[] {
-  if (qualSubs.length <= 1 || rows.length === 0) return rows;
+  if (rows.length === 0) return rows;
+  const inProgress = qualSubs.some((s) => s.state !== "Finished");
+  if (qualSubs.length <= 1 && !inProgress) return rows;
   const ranked = rows.filter((r) => r.rank !== null);
   const unranked = rows.filter((r) => r.rank === null);
   const byTotal = (a: T, b: T) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0);
-  if (qualSubs.some((s) => s.state !== "Finished")) {
+  if (inProgress) {
     ranked.sort((a, b) => a.rank! - b.rank! || byTotal(a, b));
     // SIUS rang ima rupe (npr. 2, 4, 6…) jer broji i strelce koji nisu u ovoj listi — redosled
     // zadržavamo, a pozicije zbijamo u 1..n (isti SIUS rang ostaje izjednačen).
