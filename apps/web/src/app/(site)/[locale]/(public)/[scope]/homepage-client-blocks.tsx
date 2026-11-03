@@ -281,7 +281,9 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
       .on("postgres_changes", { event: "*", schema: "public", table: "mixed_team_results" }, debouncedRefresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, debouncedRefresh)
       .subscribe();
-    return () => { window.clearTimeout(timer); supabase.removeChannel(channel); };
+    // Rezervno osvežavanje: ako Realtime ne radi (publikacija/RLS/prekid veze), live kartica se svejedno menja.
+    const poll = window.setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 30_000);
+    return () => { window.clearTimeout(timer); window.clearInterval(poll); supabase.removeChannel(channel); };
   }, [hasLive, refresh]);
 
   if (state === "loading") return <MainSkeleton />;
