@@ -263,6 +263,21 @@ function elimRoundNumber(name: string, fallback: number): number {
 }
 
 /**
+ * Isti strelac može biti u više kvalifikacionih pod-događaja (npr. zbirna lista uz listu partije).
+ * Zadržava se jedan red po strelcu — onaj sa više serija, pa sa većim zbirom — inače bi review tabela
+ * prikazala svakog dvaput, a rang bi se računao preko duplikata.
+ */
+export function dedupeQualRows<T extends { siusAthleteId: string | null; firstName: string; lastName: string; nation: string; series: number[]; total: number }>(rows: T[]): T[] {
+  const key = (r: T) => r.siusAthleteId ?? `${r.lastName}|${r.firstName}|${r.nation}`.toLowerCase();
+  const best = new Map<string, T>();
+  for (const r of rows) {
+    const cur = best.get(key(r));
+    if (!cur || r.series.length > cur.series.length || (r.series.length === cur.series.length && r.total > cur.total)) best.set(key(r), r);
+  }
+  return [...best.values()];
+}
+
+/**
  * Spaja rang listu iz više kvalifikacionih pod-događaja (partija).
  * - Dok je bar jedna partija još u toku (`InCompetition`), strelci koji još pucaju imaju samo delimičan
  *   zbir, pa se poredak po zbiru ne sme koristiti: SIUS rang je opšti i predviđen (npr. 3. mesto pre kraja
@@ -334,7 +349,7 @@ export async function fetchLiveSiusResults(
           fetchSiusSeries(compUuid, event.runningId, sub.runningId, evOpts).catch(() => [])
         )
       );
-      data.qual.push(...qualResults.flat());
+      data.qual.push(...dedupeQualRows(qualResults.flat()));
       data.qual = mergeQualRanking(data.qual, qualSubs);
 
       // Elimination rounds (one per sub-event, ordered by round number), fetched in parallel

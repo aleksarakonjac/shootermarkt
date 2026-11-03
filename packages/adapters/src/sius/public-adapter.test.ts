@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignSiusMatches, mergeQualRanking, mixedTeamIdentity, parseSiusMatchKey, resolveTeamNoc, type SiusLiveData } from "./public-adapter";
+import { assignSiusMatches, dedupeQualRows, mergeQualRanking, mixedTeamIdentity, parseSiusMatchKey, resolveTeamNoc, type SiusLiveData } from "./public-adapter";
 
 describe("resolveTeamNoc", () => {
   it("uses the members' current competition NOC over a stale team federation", () => {
@@ -97,5 +97,18 @@ describe("mergeQualRanking", () => {
   it("closes gaps even when the sub-event is already Finished", () => {
     const rows = [row("a", 4, 1), row("b", 2, 2)];
     expect(mergeQualRanking(rows, [{ state: "Finished" }]).map((r) => [r.name, r.rank])).toEqual([["b", 1], ["a", 2]]);
+  });
+});
+
+describe("dedupeQualRows", () => {
+  const r = (id: string | null, series: number[], total: number) => ({ siusAthleteId: id, firstName: "A", lastName: "B", nation: "SRB", series, total });
+
+  it("keeps one row per shooter, preferring more series then higher total", () => {
+    const out = dedupeQualRows([r("1", [100], 100), r("1", [100, 101], 201), r("2", [99], 99), r("2", [99], 99.5)]);
+    expect(out.map((x) => x.total).sort()).toEqual([201, 99.5]);
+  });
+
+  it("falls back to name+nation when SIUS gives no athlete id", () => {
+    expect(dedupeQualRows([r(null, [1], 1), r(null, [1], 2)])).toHaveLength(1);
   });
 });
