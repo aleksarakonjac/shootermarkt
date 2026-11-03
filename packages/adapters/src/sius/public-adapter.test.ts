@@ -79,7 +79,7 @@ describe("mergeQualRanking", () => {
   it("closes gaps in SIUS ranks while a relay is running, keeping ties", () => {
     const rows = [row("a", 2, 3), row("b", 4, 2), row("c", 4, 2), row("d", 8, 1)];
     const merged = mergeQualRanking(rows, [{ state: "InCompetition" }, { state: "InCompetition" }]);
-    expect(merged.map((r) => [r.name, r.rank])).toEqual([["a", 1], ["b", 2], ["c", 2], ["d", 3]]);
+    expect(merged.map((r) => [r.name, r.rank])).toEqual([["a", 1], ["b", 2], ["c", 2], ["d", 4]]);
   });
 
   it("re-ranks by total once every relay is finished", () => {
@@ -94,8 +94,8 @@ describe("mergeQualRanking", () => {
     expect(merged.map((r) => [r.name, r.rank])).toEqual([["b", 1], ["c", 2], ["a", 3]]);
   });
 
-  it("leaves a single finished sub-event untouched", () => {
-    const rows = [row("a", 2, 1), row("b", 1, 2)];
-    expect(mergeQualRanking(rows, [{ state: "Finished" }])).toBe(rows);
+  it("closes gaps even when the sub-event is already Finished", () => {
+    const rows = [row("a", 4, 1), row("b", 2, 2)];
+    expect(mergeQualRanking(rows, [{ state: "Finished" }]).map((r) => [r.name, r.rank])).toEqual([["b", 1], ["a", 2]]);
   });
 });

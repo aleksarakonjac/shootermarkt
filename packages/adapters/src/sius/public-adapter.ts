@@ -266,7 +266,7 @@ function elimRoundNumber(name: string, fallback: number): number {
  * Spaja rang listu iz više kvalifikacionih pod-događaja (partija).
  * - Dok je bar jedna partija još u toku (`InCompetition`), strelci koji još pucaju imaju samo delimičan
  *   zbir, pa se poredak po zbiru ne sme koristiti: SIUS rang je opšti i predviđen (npr. 3. mesto pre kraja
- *   meča), zato se zadržava njegov redosled (zbir samo za izjednačen rang), a rang se zbija u 1..n.
+ *   meča), zato se zadržava njegov redosled (zbir samo za izjednačen rang), a rang se računa iz pozicije.
  * - Kad su sve partije gotove, rang se preračunava po ukupnom zbiru (pa po unutrašnjim desetkama).
  */
 export function mergeQualRanking<T extends { rank: number | null; total: number; inners: number | null }>(
@@ -274,21 +274,24 @@ export function mergeQualRanking<T extends { rank: number | null; total: number;
   qualSubs: Array<{ state: string }>
 ): T[] {
   if (rows.length === 0) return rows;
-  const inProgress = qualSubs.some((s) => s.state !== "Finished");
-  if (qualSubs.length <= 1 && !inProgress) return rows;
   const ranked = rows.filter((r) => r.rank !== null);
   const unranked = rows.filter((r) => r.rank === null);
   const byTotal = (a: T, b: T) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0);
-  if (inProgress) {
-    ranked.sort((a, b) => a.rank! - b.rank! || byTotal(a, b));
-    // SIUS rang ima rupe (npr. 2, 4, 6…) jer broji i strelce koji nisu u ovoj listi — redosled
-    // zadržavamo, a pozicije zbijamo u 1..n (isti SIUS rang ostaje izjednačen).
-    const dense = new Map([...new Set(ranked.map((r) => r.rank!))].map((rank, i) => [rank, i + 1]));
-    ranked.forEach((r) => { r.rank = dense.get(r.rank!)!; });
+  if (qualSubs.length > 1 && qualSubs.every((s) => s.state === "Finished")) {
+    ranked.sort(byTotal);
+    ranked.forEach((r, i) => { r.rank = i + 1; });
     return [...ranked, ...unranked];
   }
-  ranked.sort(byTotal);
-  ranked.forEach((r, i) => { r.rank = i + 1; });
+  // SIUS rang je opšti i predviđen, ali može imati rupe (npr. 2, 4, 6…) jer broji i strelce koji nisu u
+  // ovoj listi. Redosled zadržavamo, a rang računamo iz pozicije u listi (isti SIUS rang ostaje izjednačen,
+  // sledeći rang preskače kao u takmičarskom rangiranju: 1, 2, 2, 4).
+  const original = new Map(ranked.map((r) => [r, r.rank!]));
+  ranked.sort((a, b) => a.rank! - b.rank! || byTotal(a, b));
+  let tieStart = 0;
+  ranked.forEach((r, i) => {
+    if (i > 0 && original.get(r) !== original.get(ranked[i - 1])) tieStart = i;
+    r.rank = tieStart + 1;
+  });
   return [...ranked, ...unranked];
 }
 
