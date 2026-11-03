@@ -190,7 +190,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
         set: {
           clubId: sql`excluded.club_id`,
           qualTotal: sql`excluded.qual_total`, qualInners: sql`excluded.qual_inners`, qualRank: sql`excluded.qual_rank`, qualDetail: sql`excluded.qual_detail`,
-          qualified: sql`excluded.qualified`,
+          qualified: sql`coalesce(excluded.qualified, ${results.qualified})`,
           finalTotal: sql`excluded.final_total`, finalRank: sql`excluded.final_rank`, finalDetail: sql`excluded.final_detail`,
           qualRemark: sql`excluded.qual_remark`, finalRemark: sql`excluded.final_remark`,
           elimRemark: sql`coalesce(excluded.elim_remark, ${results.elimRemark})`,

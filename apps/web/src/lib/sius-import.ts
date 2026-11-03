@@ -96,7 +96,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         qualInners: r.rank === null ? null : r.inners,
         qualRank: r.rank ?? undefined,
         qualSeries: r.series.length > 0 ? r.series : undefined,
-        qualified: null,
+        // Q iz SIUS-a (QualificationRemark); kad SIUS još nije dodelio Q ostaje null pa import ne gazi postojeće.
+        qualified: r.qualified || null,
         remark: r.remark,
         remarkDetails: stageRemarks(r) ? { qual: stageRemarks(r) } : undefined,
         finalTotal: null,
