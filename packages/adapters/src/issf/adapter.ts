@@ -290,9 +290,10 @@ const EVENT_DISCIPLINE_MAP: Array<[RegExp, string]> = [
   [/10m air pistol women/i,       "APW"],
   [/50m rifle 3.positions? men/i, "R3PM"],
   [/50m rifle 3.positions? women/i,"R3PW"],
-  [/25m rapid fire pistol/i,      "RFPM"],
   [/25m (?:sport )?pistol women/i,"SPW"],
   [/50m free pistol/i,            "FPM"],
+  // 25m rapid fire pistol (RFPM) namerno nije ovde: ne uvozimo ga, pa ne sme ni u raspored
+  // (live-fetch cron bi ga inače povukao iz SIUS-a).
 ];
 
 function mapTitleToDisciplineCode(title: string): string | null {
