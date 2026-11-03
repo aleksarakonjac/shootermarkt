@@ -266,7 +266,7 @@ function elimRoundNumber(name: string, fallback: number): number {
  * Spaja rang listu iz više kvalifikacionih pod-događaja (partija).
  * - Dok je bar jedna partija još u toku (`InCompetition`), strelci koji još pucaju imaju samo delimičan
  *   zbir, pa se poredak po zbiru ne sme koristiti: SIUS rang je opšti i predviđen (npr. 3. mesto pre kraja
- *   meča), zato se zadržava i lista se sortira po njemu (zbir samo za izjednačen rang).
+ *   meča), zato se zadržava njegov redosled (zbir samo za izjednačen rang), a rang se zbija u 1..n.
  * - Kad su sve partije gotove, rang se preračunava po ukupnom zbiru (pa po unutrašnjim desetkama).
  */
 export function mergeQualRanking<T extends { rank: number | null; total: number; inners: number | null }>(
@@ -278,7 +278,12 @@ export function mergeQualRanking<T extends { rank: number | null; total: number;
   const unranked = rows.filter((r) => r.rank === null);
   const byTotal = (a: T, b: T) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0);
   if (qualSubs.some((s) => s.state !== "Finished")) {
-    return [...ranked.sort((a, b) => a.rank! - b.rank! || byTotal(a, b)), ...unranked];
+    ranked.sort((a, b) => a.rank! - b.rank! || byTotal(a, b));
+    // SIUS rang ima rupe (npr. 2, 4, 6…) jer broji i strelce koji nisu u ovoj listi — redosled
+    // zadržavamo, a pozicije zbijamo u 1..n (isti SIUS rang ostaje izjednačen).
+    const dense = new Map([...new Set(ranked.map((r) => r.rank!))].map((rank, i) => [rank, i + 1]));
+    ranked.forEach((r) => { r.rank = dense.get(r.rank!)!; });
+    return [...ranked, ...unranked];
   }
   ranked.sort(byTotal);
   ranked.forEach((r, i) => { r.rank = i + 1; });

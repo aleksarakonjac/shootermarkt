@@ -76,6 +76,12 @@ describe("mergeQualRanking", () => {
     expect(merged.map((r) => [r.name, r.rank])).toEqual([["live1", 1], ["done1", 2], ["live2", 3], ["done2", 4]]);
   });
 
+  it("closes gaps in SIUS ranks while a relay is running, keeping ties", () => {
+    const rows = [row("a", 2, 3), row("b", 4, 2), row("c", 4, 2), row("d", 8, 1)];
+    const merged = mergeQualRanking(rows, [{ state: "InCompetition" }, { state: "InCompetition" }]);
+    expect(merged.map((r) => [r.name, r.rank])).toEqual([["a", 1], ["b", 2], ["c", 2], ["d", 3]]);
+  });
+
   it("re-ranks by total once every relay is finished", () => {
     const rows = [row("a", 1, 620.0), row("b", 1, 630.1), row("c", null, 0)];
     const merged = mergeQualRanking(rows, [{ state: "Finished" }, { state: "Finished" }]);
