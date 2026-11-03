@@ -51,7 +51,6 @@ async function seed() {
       { code: "R3JW", name: "50m Rifle 3-Position Junior Women", shortName: "R3P Jr Women", gender: "F", distance: 50, apparatus: "rifle",   maxQualScore: "600"    },
       // Pistol
       { code: "SPW",  name: "25m Sport Pistol Women",     shortName: "SP Women", gender: "F", distance: 25, apparatus: "pistol", maxQualScore: "600"  },
-      { code: "RFPM", name: "25m Rapid Fire Pistol Men",  shortName: "RFP Men",  gender: "M", distance: 25, apparatus: "pistol", maxQualScore: "600"  },
       { code: "FPM",  name: "50m Free Pistol Men",        shortName: "FP Men",   gender: "M", distance: 50, apparatus: "pistol", maxQualScore: "600"  },
     ])
     .onConflictDoNothing();

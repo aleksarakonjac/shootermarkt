@@ -130,14 +130,13 @@ const DISCIPLINE_NAMES: Record<string, { sr: string; en: string }> = {
   APMT: { sr: "10m pištolj miks",    en: "Air Pistol Mixed Team" },
   ARMT: { sr: "10m puška miks",      en: "Air Rifle Mixed Team" },
   SPW:  { sr: "Sport pištolj Ž",     en: "Sport pistol W" },
-  RFPM: { sr: "Brza vatra M",        en: "Rapid fire M" },
   R3JM: { sr: "3×20 puška jr. M",    en: "3×20 rifle jr. M" },
   R3JW: { sr: "3×20 puška jr. Ž",    en: "3×20 rifle jr. W" },
 };
 
 // Keep the overview readable as a program, not as the order rows happened to
 // arrive from separate individual and mixed-result queries.
-const DISCIPLINE_ORDER = ["ARM", "ARW", "ARMT", "R3PM", "R3PW", "R3JM", "R3JW", "APM", "APW", "APMT", "SPW", "RFPM", "FPM"];
+const DISCIPLINE_ORDER = ["ARM", "ARW", "ARMT", "R3PM", "R3PW", "R3JM", "R3JW", "APM", "APW", "APMT", "SPW", "FPM"];
 function disciplineOrder(code: string) {
   const index = DISCIPLINE_ORDER.indexOf(code);
   return index === -1 ? DISCIPLINE_ORDER.length : index;

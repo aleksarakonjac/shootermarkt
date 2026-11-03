@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const windowStart = new Date(now.getTime() - 4 * 60 * 60 * 1000);
 
-  const activeSlots = await db
+  const allActiveSlots = await db
     .select({
       competitionId: competitionSchedule.competitionId,
       disciplineId: competitionSchedule.disciplineId,
@@ -54,6 +54,9 @@ export async function GET(req: NextRequest) {
         )
       )
     );
+
+  // Brzometni pištolj (RFPM) je na čekanju dok se ne implementiraju pravila — nikad ga ne povlačimo.
+  const activeSlots = allActiveSlots.filter((s) => s.disciplineCode !== "RFPM");
 
   console.log("[cron] active slots:", JSON.stringify(activeSlots.map((s) => ({ compId: s.competitionId, code: s.disciplineCode, stage: s.stage, siusId: s.siusId?.slice(0, 8), issfId: s.issfId }))));
   if (activeSlots.length === 0) {

@@ -14,6 +14,7 @@
     "db:fix-comp-names": "tsx --env-file=../../.env.local scripts/fix-competition-names.ts",
     "db:find-duplicates": "tsx --env-file=../../.env.local scripts/find-duplicate-shooters.ts",
     "db:merge-shooters": "tsx --env-file=../../.env.local scripts/merge-shooters.ts",
+    "db:remove-rfpm": "tsx --env-file=../../.env.local scripts/remove-rfpm.ts",
     "db:recompute-forma": "tsx --env-file=../../.env.local scripts/recompute-forma-cache.ts",
     "db:backtest-forma": "tsx --env-file=../../.env.local scripts/backtest-forma.ts",
     "db:backfill-country-names": "tsx --env-file=../../.env.local scripts/backfill-country-names.ts",
