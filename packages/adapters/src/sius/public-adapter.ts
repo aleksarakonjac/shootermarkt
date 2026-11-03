@@ -263,6 +263,29 @@ function elimRoundNumber(name: string, fallback: number): number {
 }
 
 /**
+ * Spaja rang listu iz više kvalifikacionih pod-događaja (partija).
+ * - Dok je bar jedna partija još u toku (`InCompetition`), strelci koji još pucaju imaju samo delimičan
+ *   zbir, pa se poredak po zbiru ne sme koristiti: SIUS rang je opšti i predviđen (npr. 3. mesto pre kraja
+ *   meča), zato se zadržava i lista se sortira po njemu (zbir samo za izjednačen rang).
+ * - Kad su sve partije gotove, rang se preračunava po ukupnom zbiru (pa po unutrašnjim desetkama).
+ */
+export function mergeQualRanking<T extends { rank: number | null; total: number; inners: number | null }>(
+  rows: T[],
+  qualSubs: Array<{ state: string }>
+): T[] {
+  if (qualSubs.length <= 1 || rows.length === 0) return rows;
+  const ranked = rows.filter((r) => r.rank !== null);
+  const unranked = rows.filter((r) => r.rank === null);
+  const byTotal = (a: T, b: T) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0);
+  if (qualSubs.some((s) => s.state !== "Finished")) {
+    return [...ranked.sort((a, b) => a.rank! - b.rank! || byTotal(a, b)), ...unranked];
+  }
+  ranked.sort(byTotal);
+  ranked.forEach((r, i) => { r.rank = i + 1; });
+  return [...ranked, ...unranked];
+}
+
+/**
  * Fetch all live/finished qual and elimination results for the given discipline codes.
  * Returns a map of match key ("ARM", "ARM#2"…, vidi parseSiusMatchKey) → { qual, elim[], final }.
  */
@@ -302,14 +325,7 @@ export async function fetchLiveSiusResults(
         )
       );
       data.qual.push(...qualResults.flat());
-      // Re-rank merged qual by total desc
-      if (qualSubs.length > 1 && data.qual.length > 0) {
-        const ranked = data.qual.filter((r) => r.rank !== null);
-        const unranked = data.qual.filter((r) => r.rank === null);
-        ranked.sort((a, b) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0));
-        ranked.forEach((r, i) => { r.rank = i + 1; });
-        data.qual = [...ranked, ...unranked];
-      }
+      data.qual = mergeQualRanking(data.qual, qualSubs);
 
       // Elimination rounds (one per sub-event, ordered by round number), fetched in parallel
       const elimResults = await Promise.all(
@@ -503,13 +519,7 @@ export async function fetchLiveSiusMixedTeamResults(
         )
       );
       data.qual.push(...qualResults.flat());
-      if (qualSubs.length > 1 && data.qual.length > 0) {
-        const ranked = data.qual.filter((r) => r.rank !== null);
-        const unranked = data.qual.filter((r) => r.rank === null);
-        ranked.sort((a, b) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0));
-        ranked.forEach((r, i) => { r.rank = i + 1; });
-        data.qual = [...ranked, ...unranked];
-      }
+      data.qual = mergeQualRanking(data.qual, qualSubs);
 
       const finalResults = await Promise.all(
         finalSubs.map((sub) => fetchSiusTeamSeries(compUuid, event.runningId, sub.runningId, evOpts).catch(() => []))

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignSiusMatches, mixedTeamIdentity, parseSiusMatchKey, resolveTeamNoc, type SiusLiveData } from "./public-adapter";
+import { assignSiusMatches, mergeQualRanking, mixedTeamIdentity, parseSiusMatchKey, resolveTeamNoc, type SiusLiveData } from "./public-adapter";
 
 describe("resolveTeamNoc", () => {
   it("uses the members' current competition NOC over a stale team federation", () => {
@@ -64,5 +64,26 @@ describe("splitDisplayName", () => {
     expect(splitDisplayName("HEINRICH ALISON")).toEqual({ lastName: "HEINRICH", firstName: "ALISON" });
     expect(splitDisplayName("KOCHALUMKAL VINOD Vidarsa")).toEqual({ lastName: "KOCHALUMKAL VINOD", firstName: "Vidarsa" });
     expect(splitDisplayName("BOLA UJČIČ Denis")).toEqual({ lastName: "BOLA UJČIČ", firstName: "Denis" });
+  });
+});
+
+describe("mergeQualRanking", () => {
+  const row = (name: string, rank: number | null, total: number) => ({ name, rank, total, inners: null as number | null });
+
+  it("keeps SIUS predicted ranks while a relay is still running", () => {
+    const rows = [row("done1", 2, 630.1), row("done2", 4, 620.0), row("live1", 1, 315.0), row("live2", 3, 310.0)];
+    const merged = mergeQualRanking(rows, [{ state: "Finished" }, { state: "InCompetition" }]);
+    expect(merged.map((r) => [r.name, r.rank])).toEqual([["live1", 1], ["done1", 2], ["live2", 3], ["done2", 4]]);
+  });
+
+  it("re-ranks by total once every relay is finished", () => {
+    const rows = [row("a", 1, 620.0), row("b", 1, 630.1), row("c", null, 0)];
+    const merged = mergeQualRanking(rows, [{ state: "Finished" }, { state: "Finished" }]);
+    expect(merged.map((r) => [r.name, r.rank])).toEqual([["b", 1], ["a", 2], ["c", null]]);
+  });
+
+  it("leaves a single sub-event untouched", () => {
+    const rows = [row("a", 2, 1), row("b", 1, 2)];
+    expect(mergeQualRanking(rows, [{ state: "InCompetition" }])).toBe(rows);
   });
 });
