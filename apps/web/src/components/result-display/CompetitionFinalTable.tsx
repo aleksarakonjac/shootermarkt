@@ -234,7 +234,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
       if (b.finalRank == null) return -1;
       return a.finalRank - b.finalRank;
     });
-  const flashing = useRowFlash(sorted.map((r) => [r.id, `${r.finalTotal}|${r.finalRank}|${r.remark}`] as const));
+  const flashing = useRowFlash(sorted.map((r) => [r.id, `${r.finalTotal}|${r.finalRank}|${r.remark}|${JSON.stringify(r.finalDetail)}`] as const));
 
   const remarkCodes = assignRemarkCodes(sorted.map((r) => remarkText(r.remark, r.remarkDetails)));
   const remarkLegend: RemarkLegendItem[] = sorted

@@ -92,7 +92,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const fmt = (value: number) => (isFinal || apparatus === "air_rifle" ? value.toFixed(1) : Math.round(value).toString());
   const isUnranked = (team: MixedTeamRow) => { return isUnrankedRemark(remark(team)); };
   const sorted = teams.filter((team) => !isFinal || total(team) != null || rank(team) != null || remark(team) != null).toSorted((a, b) => Number(isUnranked(a)) - Number(isUnranked(b)) || (rank(a) ?? Infinity) - (rank(b) ?? Infinity));
-  const flashing = useRowFlash(sorted.map((team) => [team.id, `${total(team)}|${rank(team)}|${remark(team)}`] as const));
+  const flashing = useRowFlash(sorted.map((team) => [team.id, `${total(team)}|${rank(team)}|${remark(team)}|${JSON.stringify([detail1(team), detail2(team)])}`] as const));
   const isMatch = isFinal && isMatchFormat(sorted);
   // Zlatni meč igraju 1. i 2. mesto, bronzani 3. i 4. — protivnik je drugi tim iz para.
   const opponentOf = (team: MixedTeamRow) => (team.finalRank == null ? undefined : sorted.find((other) => other.finalRank === (team.finalRank! % 2 ? team.finalRank! + 1 : team.finalRank! - 1)));
