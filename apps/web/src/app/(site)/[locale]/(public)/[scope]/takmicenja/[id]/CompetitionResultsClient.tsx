@@ -255,17 +255,35 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
     else finishNavigationProgress();
   }, [refreshing]);
   const refreshTimer = useRef<number | null>(null);
+  // router.refresh() ume da vrati stranicu na vrh; pamtimo poziciju i vraćamo je kad osvežavanje završi.
+  const savedScroll = useRef<number | null>(null);
+  const refreshing_ = useRef(false);
+  useEffect(() => {
+    refreshing_.current = refreshing;
+    if (refreshing) return;
+    const y = savedScroll.current;
+    savedScroll.current = null;
+    if (y == null) return;
+    const restore = () => { if (Math.abs(window.scrollY - y) > 2) window.scrollTo({ top: y, behavior: "instant" }); };
+    restore();
+    const frame = window.requestAnimationFrame(restore);
+    return () => window.cancelAnimationFrame(frame);
+  }, [refreshing]);
+  const doRefresh = useCallback(() => {
+    savedScroll.current = window.scrollY;
+    startRefresh(() => router.refresh());
+  }, [router]);
   const retry = useCallback(() => {
     // Import upisuje mnogo redova odjednom — spoji događaje u jedno osvežavanje.
     if (refreshTimer.current != null) window.clearTimeout(refreshTimer.current);
-    refreshTimer.current = window.setTimeout(() => startRefresh(() => router.refresh()), 800);
-  }, [router]);
+    refreshTimer.current = window.setTimeout(doRefresh, 800);
+  }, [doRefresh]);
   useEffect(() => () => { if (refreshTimer.current != null) window.clearTimeout(refreshTimer.current); }, []);
   // Ručno osvežavanje (dugme pored naslova): odmah, bez čekanja da se događaji slegnu.
   const refreshNow = useCallback(() => {
     if (refreshTimer.current != null) window.clearTimeout(refreshTimer.current);
-    startRefresh(() => router.refresh());
-  }, [router]);
+    doRefresh();
+  }, [doRefresh]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -325,7 +343,7 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
           />
         </motion.div>
       ) : (
-        <motion.div ref={detailRef} key="detail" variants={fadeVariants} initial="hidden" animate="visible" exit="exit" className="scroll-mt-24" onAnimationStart={(def) => { if (def === "visible") detailRef.current?.scrollIntoView({ block: "start" }); }}>
+        <motion.div ref={detailRef} key="detail" variants={fadeVariants} initial="hidden" animate="visible" exit="exit" className="scroll-mt-24" onAnimationStart={(def) => { if (def === "visible" && !refreshing_.current) detailRef.current?.scrollIntoView({ block: "start" }); }}>
           <CompetitionDetail
             groups={groups}
             mixedGroups={mixedGroups}

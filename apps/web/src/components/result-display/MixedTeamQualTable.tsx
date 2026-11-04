@@ -8,6 +8,7 @@ import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 import { displayNoc } from "@shootermarkt/db/noc-list";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
+import { useRowFlash } from "./useRowFlash";
 import { isUnrankedRemark, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
 
 export type MixedTeamRow = {
@@ -91,6 +92,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const fmt = (value: number) => (isFinal || apparatus === "air_rifle" ? value.toFixed(1) : Math.round(value).toString());
   const isUnranked = (team: MixedTeamRow) => { return isUnrankedRemark(remark(team)); };
   const sorted = teams.filter((team) => !isFinal || total(team) != null || rank(team) != null || remark(team) != null).toSorted((a, b) => Number(isUnranked(a)) - Number(isUnranked(b)) || (rank(a) ?? Infinity) - (rank(b) ?? Infinity));
+  const flashing = useRowFlash(sorted.map((team) => [team.id, `${total(team)}|${rank(team)}|${remark(team)}`] as const));
   const isMatch = isFinal && isMatchFormat(sorted);
   // Zlatni meč igraju 1. i 2. mesto, bronzani 3. i 4. — protivnik je drugi tim iz para.
   const opponentOf = (team: MixedTeamRow) => (team.finalRank == null ? undefined : sorted.find((other) => other.finalRank === (team.finalRank! % 2 ? team.finalRank! + 1 : team.finalRank! - 1)));
@@ -155,7 +157,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
         const statusBadge = (className: string) => <RemarkBadge remark={status!} code={remarkCodes[index]} details={stageDetails(team)} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className={className} />;
         const subtotalCell =`flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`;
         return <div key={team.id} role="rowgroup" style={{ display: "contents" }}>
-          <div role="row" className={`group ${hasSeries ? (isMatch ? "cursor-pointer" : "cursor-pointer sm:cursor-default") : ""}`} style={{ display: "contents" }} onClick={hasSeries ? () => toggle(team.id) : undefined}>
+          <div role="row" className={`group ${hasSeries ? (isMatch ? "cursor-pointer" : "cursor-pointer sm:cursor-default") : ""} ${flashing.has(team.id) ? "result-row-flash" : ""}`} style={{ display: "contents" }} onClick={hasSeries ? () => toggle(team.id) : undefined}>
             <div className={`${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{teamRank == null ? <span className="text-[var(--subtle)]">—</span> : isFinal && showMedals && teamRank <= 3 ? <span className="flex w-full justify-center"><MedalIcon rank={teamRank} /></span> : <span className={teamRank <= 3 && !isFinal ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>{teamRank}</span>}</div>
             <div className={`${cell} min-w-0 group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
               <span className="hidden sm:inline min-w-0 truncate text-sm text-[var(--ink)]">{nocEntry?.name && noc !== "AIN" ? nocEntry.name : noc} {team.teamNumber}</span>

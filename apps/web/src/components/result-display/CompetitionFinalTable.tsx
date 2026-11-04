@@ -8,6 +8,7 @@ import { Link } from "@/i18n/navigation";
 import type { FinalDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
+import { useRowFlash } from "./useRowFlash";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
@@ -233,6 +234,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
       if (b.finalRank == null) return -1;
       return a.finalRank - b.finalRank;
     });
+  const flashing = useRowFlash(sorted.map((r) => [r.id, `${r.finalTotal}|${r.finalRank}|${r.remark}`] as const));
 
   const remarkCodes = assignRemarkCodes(sorted.map((r) => remarkText(r.remark, r.remarkDetails)));
   const remarkLegend: RemarkLegendItem[] = sorted
@@ -327,7 +329,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
               <div key={r.id} role="rowgroup" style={{ display: "contents" }}>
                 <div
                   role="row"
-                  className={`group ${hasDetail ? "cursor-pointer sm:cursor-default" : ""}`}
+                  className={`group ${hasDetail ? "cursor-pointer sm:cursor-default" : ""} ${flashing.has(r.id) ? "result-row-flash" : ""}`}
                   style={{ display: "contents" }}
                   onClick={hasDetail ? () => toggleRow(r.id) : undefined}
                 >

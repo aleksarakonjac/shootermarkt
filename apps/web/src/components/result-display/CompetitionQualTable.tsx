@@ -8,6 +8,7 @@ import type { QualDetail, PositionsQualDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
+import { useRowFlash } from "./useRowFlash";
 import { isUnrankedRemark, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 const POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"] as const;
@@ -249,6 +250,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
     return ra - rb;
   });
 
+  const flashing = useRowFlash(sorted.map((r) => [r.id, `${r.qualTotal}|${r.qualRank}|${r.remark}|${r.qualified}`] as const));
   const remarkCodes = assignRemarkCodes(sorted.map((r) => remarkText(r.remark, r.remarkDetails)));
   const remarkLegend: RemarkLegendItem[] = sorted
     .map((r, idx) => (remarkCodes[idx] ? { code: remarkCodes[idx]!, remark: remarkText(r.remark, r.remarkDetails)!, label: `${r.lastName} ${r.firstName}` } : null))
@@ -345,7 +347,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
               <div key={r.id} role="rowgroup" style={{ display: "contents" }}>
                 <div
                   role="row"
-                  className={`group ${hasSeriesDetail ? "cursor-pointer sm:cursor-default" : ""}`}
+                  className={`group ${hasSeriesDetail ? "cursor-pointer sm:cursor-default" : ""} ${flashing.has(r.id) ? "result-row-flash" : ""}`}
                   style={{ display: "contents" }}
                   onClick={hasSeriesDetail ? () => toggleRow(r.id) : undefined}
                 >

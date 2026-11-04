@@ -424,6 +424,17 @@ input.no-focus-ring:focus-visible {
   font-size: 0.875rem;
 }
 
+/* ── Live rezultati: red čiji je sadržaj upravo stigao/promenjen kratko zasvetli ── */
+@keyframes result-row-flash {
+  from { background-color: color-mix(in oklch, var(--brand-primary) 22%, var(--bg)); }
+}
+.result-row-flash > * {
+  animation: result-row-flash 2.2s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .result-row-flash > * { animation: none; }
+}
+
 /* ── Ticker animations ────────────────────────────────────────────────────── */
 @keyframes ticker-pulse {
   0%, 100% { opacity: 1; }
