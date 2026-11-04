@@ -6,7 +6,7 @@ import { recomputeFormaCache } from "@/lib/forma-cache";
 import { eventTypeFromName, groupsFromName } from "@/lib/competition-filters";
 import { refreshDisciplineGroups } from "@/lib/discipline-groups";
 import { matchShooter } from "@shootermarkt/db/name-match";
-import { DISCIPLINE_META, type CommitPayload } from "@shootermarkt/db/pdf-import-types";
+import { DISCIPLINE_META, isUnrankedRemark, type CommitPayload } from "@shootermarkt/db/pdf-import-types";
 
 export class CommitValidationError extends Error {}
 
@@ -159,7 +159,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
         shooterId, competitionId, competitionEventId, disciplineId,
         category: (row.category ?? "senior") as typeof results.$inferInsert.category,
         clubId: clubId ?? null,
-        qualTotal: row.qualTotal?.toString() ?? null, qualInners: row.qualInners ?? null, qualRank: row.qualRank ?? null,
+        qualTotal: row.qualTotal?.toString() ?? null, qualInners: row.qualInners ?? null, qualRank: isUnrankedRemark(row.remark) ? null : row.qualRank ?? null,
         qualDetail: row.qualPositions
           ? { kneeling: row.qualPositions.kneeling, prone: row.qualPositions.prone, standing: row.qualPositions.standing }
           : row.qualSeries ? { series: row.qualSeries } : null,

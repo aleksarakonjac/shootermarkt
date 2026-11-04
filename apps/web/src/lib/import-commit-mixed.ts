@@ -3,7 +3,7 @@ import { competitions, disciplines, mixedTeamResults } from "@shootermarkt/db/sc
 import { and, eq, sql } from "drizzle-orm";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
 import { eventTypeFromName } from "@/lib/competition-filters";
-import type { CompetitionLevel, EventType, StageRemarks } from "@shootermarkt/db/pdf-import-types";
+import { isUnrankedRemark, type CompetitionLevel, type EventType, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 export class MixedCommitError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -135,7 +135,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
             shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
             shooter1Detail: { series: e.m_series ?? [], inners: e.mInners ?? null, total: e.mTotal ?? 0 },
             shooter2Detail: { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
-            qualRank: e.qualRank ?? null,
+            qualRank: isUnrankedRemark(e.qualRemark) ? null : e.qualRank ?? null,
             qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
             qualInners: e.qualInners ?? null,
             qualRemark: e.qualRemark ?? null,
@@ -150,7 +150,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
               shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
               shooter1Detail: { series: e.m_series ?? [], inners: e.mInners ?? null, total: e.mTotal ?? 0 },
               shooter2Detail: { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
-              qualRank: e.qualRank ?? null,
+              qualRank: isUnrankedRemark(e.qualRemark) ? null : e.qualRank ?? null,
               qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
               qualInners: e.qualInners ?? null,
               qualRemark: e.qualRemark ?? null,

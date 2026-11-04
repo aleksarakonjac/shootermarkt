@@ -7,7 +7,7 @@ import { Link } from "@/i18n/navigation";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
-import type { RemarkDetails } from "@shootermarkt/db/pdf-import-types";
+import { isUnrankedRemark, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
 
 export type MixedTeamRow = {
   id: number; nocCode: string; teamNumber: number; shooter1Id: number | null; shooter2Id: number | null;
@@ -18,8 +18,6 @@ export type MixedTeamRow = {
 };
 
 const STATUS_MARKS = new Set(["DSQ", "DNS", "DNF", "RPO"]);
-// Tim sa DSQ/DNS/DNF nije rangiran: ima samo zbir preostalog člana, pa ide na dno bez mesta.
-const UNRANKED_MARKS = new Set(["DSQ", "DNS", "DNF"]);
 
 // showMedals: false dok finale traje — prva tri mesta bez medalja.
 interface Props { teams: MixedTeamRow[]; apparatus: string | null; stage?: "qual" | "final"; showMedals?: boolean; }
@@ -87,7 +85,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const shooterTotal1 = (team: MixedTeamRow) => isFinal ? sumOrNull(detail1(team)?.series) : (team.shooter1Detail?.total ?? null);
   const shooterTotal2 = (team: MixedTeamRow) => isFinal ? sumOrNull(detail2(team)?.series) : (team.shooter2Detail?.total ?? null);
   const fmt = (value: number) => (isFinal || apparatus === "air_rifle" ? value.toFixed(1) : Math.round(value).toString());
-  const isUnranked = (team: MixedTeamRow) => { const mark = remark(team); return mark != null && UNRANKED_MARKS.has(mark); };
+  const isUnranked = (team: MixedTeamRow) => { return isUnrankedRemark(remark(team)); };
   const sorted = teams.filter((team) => !isFinal || total(team) != null || rank(team) != null || remark(team) != null).toSorted((a, b) => Number(isUnranked(a)) - Number(isUnranked(b)) || (rank(a) ?? Infinity) - (rank(b) ?? Infinity));
   const isMatch = isFinal && isMatchFormat(sorted);
   // Zlatni meč igraju 1. i 2. mesto, bronzani 3. i 4. — protivnik je drugi tim iz para.

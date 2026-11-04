@@ -5,7 +5,7 @@ import { matchEventName } from "@/lib/competition-events";
 import { shooterResultCount } from "@/lib/import-commit";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
-import type { ReviewRow } from "@shootermarkt/db/pdf-import-types";
+import { isUnrankedRemark, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
 import { stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
 import { matchShooter } from "@shootermarkt/db/name-match";
@@ -216,7 +216,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         teamNumber: nextTeamNumber(r.nocCode),
         disciplineCode,
         category,
-        qualRank: r.rank,
+        qualRank: isUnrankedRemark(r.statusRemark) ? null : r.rank,
         qualTotal: r.rank === null ? null : r.total,
         inners: r.inners,
         qualRemark: r.statusRemark, // short mark only (qual_remark is varchar(10)); the penalty text goes to remarkDetails

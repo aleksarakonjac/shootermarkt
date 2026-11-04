@@ -8,7 +8,7 @@ import type { QualDetail, PositionsQualDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
-import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
+import { isUnrankedRemark, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 const POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"] as const;
 const POSITION_LABELS_EN = ["Kneeling", "Prone", "Standing"] as const;
@@ -239,11 +239,14 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
   const fmt = (v: number) =>
     hasDecimals ? v.toFixed(1) : Math.round(v).toString();
 
+  // DSQ/DNS/DNF nisu rangirani (ni sa polovičnim ni sa punim skorom) — idu na dno, bez mesta.
+  const rankOf = (r: CompResultRow) => (isUnrankedRemark(r.remark) ? null : r.qualRank);
   const sorted = [...results].sort((a, b) => {
-    if (a.qualRank == null && b.qualRank == null) return 0;
-    if (a.qualRank == null) return 1;
-    if (b.qualRank == null) return -1;
-    return a.qualRank - b.qualRank;
+    const ra = rankOf(a), rb = rankOf(b);
+    if (ra == null && rb == null) return 0;
+    if (ra == null) return 1;
+    if (rb == null) return -1;
+    return ra - rb;
   });
 
   const remarkCodes = assignRemarkCodes(sorted.map((r) => remarkText(r.remark, r.remarkDetails)));
@@ -351,9 +354,9 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                     className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`}
                     style={{ background: rowBg }}
                   >
-                    {r.qualRank != null ? (
-                      <span className={r.qualRank <= 3 ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>
-                        {r.qualRank}
+                    {rankOf(r) != null ? (
+                      <span className={rankOf(r)! <= 3 ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>
+                        {rankOf(r)}
                       </span>
                     ) : (
                       <span className="text-[var(--subtle)]">—</span>

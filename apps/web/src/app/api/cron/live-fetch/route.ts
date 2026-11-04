@@ -10,6 +10,7 @@ import { matchShooter } from "@shootermarkt/db/name-match";
 import { buildIssfFinalDetails, buildSiusFinalDetails } from "@/lib/final-detail";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { stageRemarks } from "@/lib/sius-merge";
+import { isUnrankedRemark } from "@shootermarkt/db/pdf-import-types";
 import { revalidateCompetitionPages } from "@/lib/revalidate-public";
 
 // Same per-stage jsonb merge as the manual/CLI import (lib/import-commit.ts): one stage never wipes another.
@@ -174,7 +175,7 @@ async function processCompetition(
             // DSQ/DNS without a rank: no score (null, never 0) — coalesce keeps any earlier real value.
             qualTotal: r.rank === null ? null : r.total.toFixed(1),
             qualInners: r.rank === null ? null : r.inners ?? null,
-            qualRank: r.rank,
+            qualRank: isUnrankedRemark(r.remark) ? null : r.rank,
             qualified: r.qualified || null,
             qualRemark: r.remark,
             ...(stageRemarks(r) ? { remarkDetails: { qual: stageRemarks(r) } } : {}),
@@ -380,7 +381,7 @@ async function processMixedTeamSlots(
           ...(isFinal
             ? { finalRank: r.rank, finalTotal: r.rank === null ? null : r.total.toFixed(1), finalRemark: r.remark }
             // qual_remark is varchar(10): only the short status mark; the penalty sentence goes to remark_details.
-            : { qualRank: r.rank, qualTotal: r.rank === null ? null : r.total.toFixed(1), qualInners: r.inners, qualified: r.qualified || null, qualRemark: r.statusRemark }),
+            : { qualRank: isUnrankedRemark(r.statusRemark) ? null : r.rank, qualTotal: r.rank === null ? null : r.total.toFixed(1), qualInners: r.inners, qualified: r.qualified || null, qualRemark: r.statusRemark }),
           ...(stageRemarks(r) ? { remarkDetails: isFinal ? { final: stageRemarks(r) } : { qual: stageRemarks(r) } } : {}),
           source: "sius_import",
         });

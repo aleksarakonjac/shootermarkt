@@ -1,6 +1,10 @@
 /** Dodatne SIUS/ISSF oznake jedne faze: tekst kazne, shoot-off ("SO", "+10", "+1+1+3"), rekord ("WR", "QWR"…). */
 export type StageRemarks = { penalty?: string; shootOff?: string; record?: string };
 /** Oznake po fazi; kvalifikacije/eliminacije/finale su odvojeni nastupi. */
+/** DSQ/DNS/DNF: strelac/tim nije rangiran, ni sa polovičnim ni sa punim skorom. */
+export const UNRANKED_REMARKS: ReadonlySet<string> = new Set(["DSQ", "DNS", "DNF"]);
+export const isUnrankedRemark = (remark: string | null | undefined): boolean => remark != null && UNRANKED_REMARKS.has(remark);
+
 export type RemarkDetails = { qual?: StageRemarks; elim?: StageRemarks; final?: StageRemarks };
 
 export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "ARMT" | "APMT" | "R3PM" | "R3PW" | "SPW";
