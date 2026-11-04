@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, useTransition, Suspe
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { ChevronRight, ChevronLeft } from "lucide-react";
+import { ChevronRight, ChevronLeft, RefreshCw } from "lucide-react";
 import type { QualDetail, FinalDetail, ElimDetail, AgeCategory } from "@shootermarkt/db/schema";
 import { CATEGORY_LABEL, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
 import {
@@ -261,6 +261,11 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
     refreshTimer.current = window.setTimeout(() => startRefresh(() => router.refresh()), 800);
   }, [router]);
   useEffect(() => () => { if (refreshTimer.current != null) window.clearTimeout(refreshTimer.current); }, []);
+  // Ručno osvežavanje (dugme pored naslova): odmah, bez čekanja da se događaji slegnu.
+  const refreshNow = useCallback(() => {
+    if (refreshTimer.current != null) window.clearTimeout(refreshTimer.current);
+    startRefresh(() => router.refresh());
+  }, [router]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -270,6 +275,13 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
         event: "*",
         schema: "public",
         table: "results",
+        filter: `competition_id=eq.${competitionId}`,
+      }, retry)
+      // Miks timovi su u zasebnoj tabeli — bez ovoga se njihovi rezultati ne osvežavaju uživo.
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "mixed_team_results",
         filter: `competition_id=eq.${competitionId}`,
       }, retry)
       .subscribe();
@@ -321,6 +333,8 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
             locale={locale}
             competitionLevel={competitionLevel}
             finalSlots={finalSlots}
+            onRefresh={refreshNow}
+            refreshing={refreshing}
             onBack={() => {
               setSelection(null);
               setSelectionUrl(null, true);
@@ -691,6 +705,22 @@ function PhaseBadge({
 
 // ── Detail ────────────────────────────────────────────────────────────────────
 
+function RefreshButton({ onRefresh, refreshing, locale }: { onRefresh: () => void; refreshing: boolean; locale: string }) {
+  const label = locale === "en" ? "Refresh results" : "Osveži rezultate";
+  return (
+    <button
+      type="button"
+      onClick={onRefresh}
+      disabled={refreshing}
+      aria-label={label}
+      title={label}
+      className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition-colors duration-150 hover:text-[var(--ink)] disabled:cursor-default"
+    >
+      <RefreshCw size={13} aria-hidden="true" className={refreshing ? "animate-spin" : undefined} />
+    </button>
+  );
+}
+
 function CompetitionDetail({
   groups,
   mixedGroups,
@@ -698,6 +728,8 @@ function CompetitionDetail({
   locale,
   competitionLevel,
   finalSlots,
+  onRefresh,
+  refreshing,
   onBack,
   onStageChange,
 }: {
@@ -707,6 +739,8 @@ function CompetitionDetail({
   locale: string;
   competitionLevel?: string;
   finalSlots: NonNullable<Props["finalSlots"]>;
+  onRefresh: () => void;
+  refreshing: boolean;
   onBack: () => void;
   onStageChange: (stage: string, elimRound?: number) => void;
 }) {
@@ -752,6 +786,7 @@ function CompetitionDetail({
             >
               {mixedGroup ? disciplineName(mixedGroup.code, locale) : ""}{selection.category !== "senior" && ` · ${CATEGORY_LABEL[selection.category]}`}
             </h3>
+            <RefreshButton onRefresh={onRefresh} refreshing={refreshing} locale={locale} />
           </div>
         </div>
 
@@ -932,6 +967,7 @@ function CompetitionDetail({
               {CATEGORY_LABEL[selection.category]}
             </span>
           )}
+          <RefreshButton onRefresh={onRefresh} refreshing={refreshing} locale={locale} />
         </div>
       </div>
 
