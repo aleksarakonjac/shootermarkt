@@ -5,6 +5,7 @@ import { useLocale } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
+import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 import { displayNoc } from "@shootermarkt/db/noc-list";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import { isUnrankedRemark, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
@@ -40,8 +41,11 @@ function ChevronIcon({ open }: { open: boolean }) {
 }
 
 function TeamMember({ id, name }: { id: number | null; name: string | null }) {
-  const content = <span className="truncate">{name ?? "—"}</span>;
-  return id ? <Link href={`/strelci/${id}`} onClick={(event) => event.stopPropagation()} className="flex min-w-0 items-center gap-1.5 font-medium text-[var(--ink)] transition-colors hover:text-[var(--brand-primary)]">{content}</Link> : <span className="flex min-w-0 items-center gap-1.5 font-medium text-[var(--ink)]">{content}</span>;
+  // Prezime istaknuto, ime tanje i prigušeno — kao u pojedinačnim rezultatima.
+  const { lastName, firstName } = name ? splitDisplayName(name) : { lastName: "—", firstName: "" };
+  const content = <><span className="min-w-0 truncate font-medium text-[var(--ink)] transition-colors group-hover/name:text-[var(--brand-primary)]">{lastName}</span>{firstName && <span className="min-w-0 truncate text-[var(--muted)]">{firstName}</span>}</>;
+  const cls = "group/name flex min-w-0 items-baseline gap-1.5";
+  return id ? <Link href={`/strelci/${id}`} onClick={(event) => event.stopPropagation()} className={cls}>{content}</Link> : <span className={cls}>{content}</span>;
 }
 
 /** Finala do 2025: Gold/Bronze Medal Match na poene (do 16–17), ne zbir krugova — ukupno je broj poena meča. */
