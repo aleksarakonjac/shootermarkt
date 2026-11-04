@@ -18,6 +18,8 @@ export type MixedTeamRow = {
 };
 
 const STATUS_MARKS = new Set(["DSQ", "DNS", "DNF", "RPO"]);
+// Tim sa DSQ/DNS/DNF nije rangiran: ima samo zbir preostalog člana, pa ide na dno bez mesta.
+const UNRANKED_MARKS = new Set(["DSQ", "DNS", "DNF"]);
 
 // showMedals: false dok finale traje — prva tri mesta bez medalja.
 interface Props { teams: MixedTeamRow[]; apparatus: string | null; stage?: "qual" | "final"; showMedals?: boolean; }
@@ -85,7 +87,8 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const shooterTotal1 = (team: MixedTeamRow) => isFinal ? sumOrNull(detail1(team)?.series) : (team.shooter1Detail?.total ?? null);
   const shooterTotal2 = (team: MixedTeamRow) => isFinal ? sumOrNull(detail2(team)?.series) : (team.shooter2Detail?.total ?? null);
   const fmt = (value: number) => (isFinal || apparatus === "air_rifle" ? value.toFixed(1) : Math.round(value).toString());
-  const sorted = teams.filter((team) => !isFinal || total(team) != null || rank(team) != null || remark(team) != null).toSorted((a, b) => (rank(a) ?? Infinity) - (rank(b) ?? Infinity));
+  const isUnranked = (team: MixedTeamRow) => { const mark = remark(team); return mark != null && UNRANKED_MARKS.has(mark); };
+  const sorted = teams.filter((team) => !isFinal || total(team) != null || rank(team) != null || remark(team) != null).toSorted((a, b) => Number(isUnranked(a)) - Number(isUnranked(b)) || (rank(a) ?? Infinity) - (rank(b) ?? Infinity));
   const isMatch = isFinal && isMatchFormat(sorted);
   // Zlatni meč igraju 1. i 2. mesto, bronzani 3. i 4. — protivnik je drugi tim iz para.
   const opponentOf = (team: MixedTeamRow) => (team.finalRank == null ? undefined : sorted.find((other) => other.finalRank === (team.finalRank! % 2 ? team.finalRank! + 1 : team.finalRank! - 1)));
@@ -137,7 +140,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
         {hasSeries && <div role="columnheader" className={`${header} sm:hidden`} aria-hidden="true" />}
       </div>
       {sorted.map((team, index) => {
-        const teamRank = rank(team); const isExpanded = expanded.has(team.id); const isLast = index === sorted.length - 1; const rowBg = index % 2 ? "var(--surface)" : "var(--bg)";
+        const teamRank = isUnranked(team) ? null : rank(team); const isExpanded = expanded.has(team.id); const isLast = index === sorted.length - 1; const rowBg = index % 2 ? "var(--surface)" : "var(--bg)";
         // Explicit row placement — with two sub-rows per team sharing spanning cells, CSS
         // Grid's implicit auto-flow can misplace items once column count changes; pin it down.
         const r1 = 2 + index * 3; const r2 = r1 + 1; const accordionRow = r1 + 2;
