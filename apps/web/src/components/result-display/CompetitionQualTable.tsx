@@ -250,7 +250,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
     return ra - rb;
   });
 
-  const flashing = useRowFlash(sorted.map((r) => [r.id, `${r.qualTotal}|${r.qualRank}|${r.remark}|${r.qualified}`] as const));
+  const flashing = useRowFlash(sorted.map((r) => [r.id, `${r.qualTotal}|${r.qualRank}|${r.qualInners}|${r.remark}|${r.qualified}|${JSON.stringify(r.qualDetail)}`] as const));
   const remarkCodes = assignRemarkCodes(sorted.map((r) => remarkText(r.remark, r.remarkDetails)));
   const remarkLegend: RemarkLegendItem[] = sorted
     .map((r, idx) => (remarkCodes[idx] ? { code: remarkCodes[idx]!, remark: remarkText(r.remark, r.remarkDetails)!, label: `${r.lastName} ${r.firstName}` } : null))
