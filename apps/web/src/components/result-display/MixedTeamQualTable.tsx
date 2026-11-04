@@ -41,9 +41,9 @@ function ChevronIcon({ open }: { open: boolean }) {
 }
 
 function TeamMember({ id, name }: { id: number | null; name: string | null }) {
-  // Prezime istaknuto, ime tanje i prigušeno — kao u pojedinačnim rezultatima.
+  // Prezime istaknuto, ime tanje i prigušeno — kao u pojedinačnim rezultatima. Prezime se ne skraćuje zarad imena: kad nema mesta, skraćuje se ime.
   const { lastName, firstName } = name ? splitDisplayName(name) : { lastName: "—", firstName: "" };
-  const content = <><span className="min-w-0 truncate font-medium text-[var(--ink)] transition-colors group-hover/name:text-[var(--brand-primary)]">{lastName}</span>{firstName && <span className="min-w-0 truncate text-[var(--muted)]">{firstName}</span>}</>;
+  const content = <><span className="max-w-full shrink-0 truncate font-medium text-[var(--ink)] transition-colors group-hover/name:text-[var(--brand-primary)]">{lastName}</span>{firstName && <span className="min-w-0 truncate text-[var(--muted)]">{firstName}</span>}</>;
   const cls = "group/name flex min-w-0 items-baseline gap-1.5";
   return id ? <Link href={`/strelci/${id}`} onClick={(event) => event.stopPropagation()} className={cls}>{content}</Link> : <span className={cls}>{content}</span>;
 }
