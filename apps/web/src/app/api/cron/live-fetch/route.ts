@@ -6,9 +6,9 @@ import { and, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml, fetchFinalResultsFromHtml, extractMixedTeamEvents, fetchMixedTeamQualFromHtml, fetchMixedTeamFinalFromHtml } from "@shootermarkt/adapters/issf/adapter";
 import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, parseSiusMatchKey, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@shootermarkt/adapters/sius/public-adapter";
 import { ensureCompetitionEvent, matchEventName } from "@/lib/competition-events";
-import { matchShooter } from "@shootermarkt/db/name-match";
 import { buildIssfFinalDetails, buildSiusFinalDetails } from "@/lib/final-detail";
 import { recomputeFormaCache } from "@/lib/forma-cache";
+import { loadShooterRoster, type ShooterRoster } from "@/lib/live-shooter-roster";
 import { stageRemarks } from "@/lib/sius-merge";
 import { isUnrankedRemark } from "@shootermarkt/db/pdf-import-types";
 import { revalidateCompetitionPages } from "@/lib/revalidate-public";
@@ -64,20 +64,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, active: 0, upserted: 0 });
   }
 
-  const allShooters = await db
-    .select({
-      id: shooters.id,
-      firstName: shooters.firstName,
-      lastName: shooters.lastName,
-      previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames,
-      nationality: shooters.nationality,
-      issfId: shooters.issfId,
-    })
-    .from(shooters);
-
-  const shooterByIssfId = new Map(
-    allShooters.filter((s) => s.issfId).map((s) => [s.issfId!, s.id])
-  );
+  const roster = await loadShooterRoster([...new Set(activeSlots.map((s) => s.competitionId))]);
 
   let totalUpserted = 0;
 
@@ -92,7 +79,7 @@ export async function GET(req: NextRequest) {
   const counts = await Promise.all(
     [...byComp.entries()].map(async ([competitionId, slots]) => {
       try {
-        return await processCompetition(competitionId, slots, allShooters, shooterByIssfId);
+        return await processCompetition(competitionId, slots, roster);
       } catch (e) {
         console.error(`[cron] comp ${competitionId} failed:`, e);
         return 0;
@@ -111,8 +98,7 @@ export async function GET(req: NextRequest) {
 async function processCompetition(
   competitionId: number,
   slots: Array<{ competitionId: number; disciplineId: number; stage: string; category: AgeCategory; issfId: string | null; siusId: string | null; disciplineCode: string; startTime: Date }>,
-  allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; previousFirstNames?: string[] | null; nationality: string | null; issfId: string | null }>,
-  shooterByIssfId: Map<string, number>
+  roster: ShooterRoster,
 ): Promise<number> {
   const { siusId, issfId } = slots[0];
   const rows: Array<typeof results.$inferInsert> = [];
@@ -134,7 +120,7 @@ async function processCompetition(
     // handle it separately, then fall through to the individual-discipline path.
     const mixedSlots = dedupedSlots.filter((s) => MIXED_TEAM_CODES.has(s.disciplineCode));
     if (mixedSlots.length > 0) {
-      mixedUpserted = await processMixedTeamSlots(competitionId, siusId, issfId, mixedSlots, allShooters, shooterByIssfId);
+      mixedUpserted = await processMixedTeamSlots(competitionId, siusId, issfId, mixedSlots, roster);
     }
 
     // ── SIUS primary source ─────────────────────────────────────────────
@@ -165,7 +151,7 @@ async function processCompetition(
 
       if (slot.stage.startsWith("qual") && eventData.qual.length > 0) {
         for (const r of eventData.qual) {
-          const shooterId = await resolveOrCreateShooter(r, allShooters);
+          const shooterId = await resolveOrCreateShooter(r, roster);
           if (!shooterId) continue;
           rows.push({
             shooterId,
@@ -188,7 +174,7 @@ async function processCompetition(
       if (slot.stage === "elimination") {
         for (const { round, results: elimResults } of eventData.elim) {
           for (const r of elimResults) {
-            const shooterId = await resolveOrCreateShooter(r, allShooters);
+            const shooterId = await resolveOrCreateShooter(r, roster);
             if (!shooterId) continue;
             rows.push({
               shooterId,
@@ -214,7 +200,7 @@ async function processCompetition(
         const withSeries = finalists.filter((r) => r.series.length > 0);
         const detailOf = new Map(buildSiusFinalDetails(slot.disciplineCode, withSeries).map((d, i) => [withSeries[i], d]));
         for (const r of finalists) {
-          const shooterId = await resolveOrCreateShooter(r, allShooters);
+          const shooterId = await resolveOrCreateShooter(r, roster);
           if (!shooterId) continue;
           rows.push({
             shooterId,
@@ -234,15 +220,15 @@ async function processCompetition(
 
     // if SIUS returned nothing, fall back to ISSF
     if (rows.length === 0 && issfId) {
-      await fetchFromIssf(parseInt(issfId), dedupedSlots, competitionId, allShooters, shooterByIssfId, rows);
+      await fetchFromIssf(parseInt(issfId), dedupedSlots, competitionId, roster, rows);
     }
   } else if (issfId) {
     // ── ISSF only ───────────────────────────────────────────────────────
-    await fetchFromIssf(parseInt(issfId), dedupedSlots, competitionId, allShooters, shooterByIssfId, rows);
+    await fetchFromIssf(parseInt(issfId), dedupedSlots, competitionId, roster, rows);
 
     const mixedSlots = dedupedSlots.filter((s) => MIXED_TEAM_CODES.has(s.disciplineCode));
     if (mixedSlots.length > 0) {
-      mixedUpserted = await processMixedTeamSlots(competitionId, null, issfId, mixedSlots, allShooters, shooterByIssfId);
+      mixedUpserted = await processMixedTeamSlots(competitionId, null, issfId, mixedSlots, roster);
     }
   }
 
@@ -323,8 +309,7 @@ async function processMixedTeamSlots(
   siusId: string | null,
   issfId: string | null,
   mixedSlots: Array<{ disciplineId: number; stage: string; disciplineCode: string; category: AgeCategory }>,
-  allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; previousFirstNames?: string[] | null; nationality: string | null; issfId: string | null }>,
-  shooterByIssfId: Map<string, number>
+  roster: ShooterRoster,
 ): Promise<number> {
   // SIUS vodi juniorski mixed team kao poseban događaj (APMTJ); druge mlađe kategorije za mixed ne postoje.
   const siusEventCode = (s: { disciplineCode: string; category: AgeCategory }) => (s.category === "junior" ? `${s.disciplineCode}J` : s.disciplineCode);
@@ -364,8 +349,8 @@ async function processMixedTeamSlots(
 
       const push = async (r: SiusTeamResult, isFinal: boolean) => {
         const [a1, a2] = r.athletes;
-        const shooter1Id = a1 ? await resolveOrCreateShooter({ ...a1, nation: r.nocCode }, allShooters) : null;
-        const shooter2Id = a2 ? await resolveOrCreateShooter({ ...a2, nation: r.nocCode }, allShooters) : null;
+        const shooter1Id = a1 ? await resolveOrCreateShooter({ ...a1, nation: r.nocCode }, roster) : null;
+        const shooter2Id = a2 ? await resolveOrCreateShooter({ ...a2, nation: r.nocCode }, roster) : null;
         rows.push({
           competitionId,
           disciplineId: slot.disciplineId,
@@ -395,7 +380,7 @@ async function processMixedTeamSlots(
   // SIUS gave nothing (not scheduled there, or no siusId at all) — fall back to
   // the ISSF HTML scraper, same as the individual-discipline path above.
   if (rows.length === 0 && issfId) {
-    await fetchMixedTeamFromIssf(parseInt(issfId), mixedSlots, competitionId, allShooters, shooterByIssfId, rows);
+    await fetchMixedTeamFromIssf(parseInt(issfId), mixedSlots, competitionId, roster, rows);
   }
 
   // Same (comp, disc, noc, teamNumber) can appear from both a qual and a final
@@ -442,9 +427,9 @@ async function processMixedTeamSlots(
 
 async function resolveOrCreateShooter(
   r: { firstName: string; lastName: string; nation?: string; siusAthleteId?: string | null },
-  allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; previousFirstNames?: string[] | null; nationality: string | null; issfId: string | null }>
+  roster: ShooterRoster
 ): Promise<number | null> {
-  const match = matchShooter(r.firstName, r.lastName, r.nation ?? null, allShooters);
+  const match = await roster.match(r.firstName, r.lastName, r.nation ?? null);
   if (match.kind === "exact") return match.id;
 
   if (r.siusAthleteId) {
@@ -463,7 +448,7 @@ async function resolveOrCreateShooter(
         set: { firstName: r.firstName, lastName: r.lastName, nationality: r.nation ?? null },
       })
       .returning({ id: shooters.id });
-    allShooters.push({ id: created.id, firstName: r.firstName, lastName: r.lastName, nationality: r.nation ?? null, issfId: null });
+    roster.add({ id: created.id, firstName: r.firstName, lastName: r.lastName, nationality: r.nation ?? null, issfId: null });
     return created.id;
   }
 
@@ -476,8 +461,7 @@ async function fetchMixedTeamFromIssf(
   issfCompId: number,
   slots: Array<{ disciplineCode: string; stage: string; disciplineId: number; category: AgeCategory }>,
   competitionId: number,
-  allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; previousFirstNames?: string[] | null; nationality: string | null; issfId: string | null }>,
-  shooterByIssfId: Map<string, number>,
+  roster: ShooterRoster,
   rows: Array<typeof mixedTeamResults.$inferInsert>
 ) {
   if (isNaN(issfCompId)) return;
@@ -490,11 +474,6 @@ async function fetchMixedTeamFromIssf(
   }
 
   const mixedEvents = extractMixedTeamEvents(groups);
-  const resolveId = (issfId: string | null, firstName: string, lastName: string, nocCode: string) => {
-    if (issfId && shooterByIssfId.has(issfId)) return shooterByIssfId.get(issfId)!;
-    const m = matchShooter(firstName, lastName, nocCode, allShooters);
-    return m.kind === "exact" ? m.id : null;
-  };
 
   for (const slot of slots) {
     const event = mixedEvents.find((e) => e.disciplineCode === slot.disciplineCode && e.category === slot.category);
@@ -523,8 +502,8 @@ async function fetchMixedTeamFromIssf(
           teamNumber,
           mIssfId: r.mIssfId,
           fIssfId: r.fIssfId,
-          shooter1Id: resolveId(r.mIssfId, r.mFirstName, r.mLastName, r.nocCode),
-          shooter2Id: resolveId(r.fIssfId, r.fFirstName, r.fLastName, r.nocCode),
+          shooter1Id: await roster.matchIssf(r.mIssfId, r.mFirstName, r.mLastName, r.nocCode),
+          shooter2Id: await roster.matchIssf(r.fIssfId, r.fFirstName, r.fLastName, r.nocCode),
           shooter1Name: `${r.mLastName} ${r.mFirstName}`.trim() || null,
           shooter2Name: `${r.fLastName} ${r.fFirstName}`.trim() || null,
           shooter1Detail: { series: r.mSeries, inners: r.mInners, total: r.mTotal },
@@ -563,8 +542,8 @@ async function fetchMixedTeamFromIssf(
             teamNumber,
             mIssfId: r.mIssfId,
             fIssfId: r.fIssfId,
-            shooter1Id: resolveId(r.mIssfId, r.mFirstName, r.mLastName, r.nocCode),
-            shooter2Id: resolveId(r.fIssfId, r.fFirstName, r.fLastName, r.nocCode),
+            shooter1Id: await roster.matchIssf(r.mIssfId, r.mFirstName, r.mLastName, r.nocCode),
+            shooter2Id: await roster.matchIssf(r.fIssfId, r.fFirstName, r.fLastName, r.nocCode),
             shooter1Name: `${r.mLastName} ${r.mFirstName}`.trim() || null,
             shooter2Name: `${r.fLastName} ${r.fFirstName}`.trim() || null,
             finalRank: r.rank,
@@ -585,8 +564,7 @@ async function fetchFromIssf(
   issfCompId: number,
   slots: Array<{ disciplineCode: string; stage: string; disciplineId: number; category: AgeCategory }>,
   competitionId: number,
-  allShooters: Array<{ id: number; firstName: string; lastName: string; previousLastNames?: string[] | null; previousFirstNames?: string[] | null; nationality: string | null; issfId: string | null }>,
-  shooterByIssfId: Map<string, number>,
+  roster: ShooterRoster,
   rows: Array<typeof results.$inferInsert>
 ) {
   if (isNaN(issfCompId)) return;
@@ -613,9 +591,7 @@ async function fetchFromIssf(
       } catch { continue; }
 
       for (const r of issfResults) {
-        const shooterId = r.issfId && shooterByIssfId.has(r.issfId)
-          ? shooterByIssfId.get(r.issfId)!
-          : (() => { const m = matchShooter(r.firstName, r.lastName, r.nationCode, allShooters); return m.kind === "exact" ? m.id : undefined; })();
+        const shooterId = await roster.matchIssf(r.issfId, r.firstName, r.lastName, r.nationCode);
         if (!shooterId) continue;
 
         rows.push({
@@ -642,9 +618,7 @@ async function fetchFromIssf(
         } catch { continue; }
 
         for (const r of issfResults) {
-          const shooterId = r.issfId && shooterByIssfId.has(r.issfId)
-            ? shooterByIssfId.get(r.issfId)!
-            : (() => { const m = matchShooter(r.firstName, r.lastName, r.nationCode, allShooters); return m.kind === "exact" ? m.id : undefined; })();
+          const shooterId = await roster.matchIssf(r.issfId, r.firstName, r.lastName, r.nationCode);
           if (!shooterId) continue;
 
           rows.push({
@@ -674,9 +648,7 @@ async function fetchFromIssf(
       const finalDetails = buildIssfFinalDetails(slot.disciplineCode, finalists);
 
       for (const [index, r] of finalists.entries()) {
-        const shooterId = r.issfId && shooterByIssfId.has(r.issfId)
-          ? shooterByIssfId.get(r.issfId)!
-          : (() => { const m = matchShooter(r.firstName, r.lastName, r.nationCode, allShooters); return m.kind === "exact" ? m.id : undefined; })();
+        const shooterId = await roster.matchIssf(r.issfId, r.firstName, r.lastName, r.nationCode);
         if (!shooterId) continue;
 
         rows.push({

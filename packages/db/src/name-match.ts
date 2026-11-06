@@ -79,7 +79,9 @@ export function matchShooter(
   first: string,
   last: string,
   noc: string | null,
-  existing: MatchCandidate[]
+  existing: MatchCandidate[],
+  /** Samo tačno ime: bezbedno i nad delom tabele; varijante traže sve strelce te države. */
+  { exactOnly = false }: { exactOnly?: boolean } = {}
 ): MatchResult {
   const fLast = foldName(last);
   const fFirst = foldName(first);
@@ -94,6 +96,7 @@ export function matchShooter(
   // 1. Exact fold-ključ
   const exact = existing.find((c) => lastMatches(c) && firstNames(c).some((f) => foldName(f) === fFirst) && nocOk(c));
   if (exact) return { kind: "exact", id: exact.id };
+  if (exactOnly) return { kind: "none" };
 
   // 2. Varijanta zapisa istog imena, ista država (ne SRB/AIN izuzetak): skraćeno ime ili prezime
   //    ("FIORI Peter" = "FIORI Peter Matthew", "VIDAL Daniel" = "VIDAL MOLINA Daniel Andres"),
@@ -129,7 +132,7 @@ export function matchShooter(
 }
 
 /** Regionalni timovi u rezultatima (SIUS: bavarski strelci kao "BAY") → država. */
-const NOC_ALIASES: Record<string, string> = { BAY: "GER" };
+export const NOC_ALIASES: Record<string, string> = { BAY: "GER" };
 
 export function normalizeNoc(noc: string | null | undefined): string | null {
   const code = noc?.trim().toUpperCase();
