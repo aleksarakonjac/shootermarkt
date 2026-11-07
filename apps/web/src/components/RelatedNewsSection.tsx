@@ -27,7 +27,7 @@ function RelatedArticleCard({
   article: ArticleSummary;
   locale: string;
 }) {
-  const imgUrl = article.coverImage?.url ?? null;
+  const imgUrl = article.coverImage?.thumbnailUrl ?? null;
   const accentColor = article.category
     ? (CATEGORY_COLOR[article.category] ?? "var(--muted)")
     : "var(--muted)";

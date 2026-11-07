@@ -180,7 +180,7 @@ export default async function VestPage({ params }: Props) {
           {article.coverImage?.url && (
             <div className="relative w-full rounded-xl overflow-hidden mb-8 bg-[var(--surface-2)]" style={{ aspectRatio: "16/9" }}>
               <Image
-                src={article.coverImage.url}
+                src={article.coverImage.cardUrl}
                 alt={article.coverImage.alt ?? article.title}
                 fill
                 sizes="(min-width: 1280px) 800px, (min-width: 1024px) 60vw, 100vw"
@@ -261,7 +261,7 @@ function RelatedWidget({
 
       <div className="divide-y divide-[var(--border)]">
         {articles.map((article) => {
-          const imgUrl = article.coverImage?.url ?? null;
+          const imgUrl = article.coverImage?.thumbnailUrl ?? null;
           const catColor = article.category
             ? (CATEGORY_COLOR_WIDGET[article.category] ?? "var(--muted)")
             : "var(--muted)";

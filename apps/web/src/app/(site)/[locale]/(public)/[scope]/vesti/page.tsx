@@ -226,7 +226,7 @@ function HeroCard({
   categoryLabel: string;
   locale: string;
 }) {
-  const imgUrl = article.coverImage?.url ?? null;
+  const imgUrl = article.coverImage?.cardUrl ?? null;
   return (
     <ScopedLink href={`/vesti/${article.slug}`} className="group block">
       <article
@@ -310,7 +310,7 @@ function ArticleCard({
   categoryLabel: string;
   locale: string;
 }) {
-  const imgUrl = article.coverImage?.url ?? null;
+  const imgUrl = article.coverImage?.thumbnailUrl ?? null;
   return (
     <ScopedLink href={`/vesti/${article.slug}`} className="group block">
       <article className="flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] p-3 hover:border-[var(--brand-primary)] transition-colors overflow-hidden">

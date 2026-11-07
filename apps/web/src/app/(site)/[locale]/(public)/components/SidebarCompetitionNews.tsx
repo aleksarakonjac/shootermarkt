@@ -33,7 +33,7 @@ export async function SidebarCompetitionNews({ competitionIds, locale }: { compe
           <ScopedLink key={article.id} href={`/vesti/${article.slug}`} className="group block">
             <article className="relative aspect-[16/10] overflow-hidden rounded-md bg-[var(--surface-2)]">
               {article.coverImage?.url ? (
-                <Image src={article.coverImage.url} alt={article.coverImage.alt ?? article.title} fill sizes="(min-width: 1024px) 320px, 100vw" className="object-cover transition-transform duration-200 group-hover:scale-[1.02]" />
+                <Image src={article.coverImage.cardUrl} alt={article.coverImage.alt ?? article.title} fill sizes="(min-width: 1024px) 320px, 100vw" className="object-cover transition-transform duration-200 group-hover:scale-[1.02]" />
               ) : (
                 <span className="flex h-full items-center justify-center px-1 text-center font-[family-name:var(--font-barlow-condensed)] text-xs font-bold uppercase text-[var(--muted)]">
                   {article.category ?? (locale === "en" ? "News" : "Vest")}
@@ -53,7 +53,7 @@ export async function SidebarCompetitionNews({ competitionIds, locale }: { compe
           <ScopedLink key={article.id} href={`/vesti/${article.slug}`} className="group flex gap-3 border-t border-[var(--border)] pt-3">
             <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md bg-[var(--surface-2)]">
               {article.coverImage?.url ? (
-                <Image src={article.coverImage.url} alt={article.coverImage.alt ?? article.title} fill sizes="96px" className="object-cover" />
+                <Image src={article.coverImage.thumbnailUrl} alt={article.coverImage.alt ?? article.title} fill sizes="96px" className="object-cover" />
               ) : null}
             </div>
             <div className="min-w-0 py-0.5">

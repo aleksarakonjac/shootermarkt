@@ -60,3 +60,17 @@ describe("getRelatedCompetitionArticles", () => {
     expect(articles.map((article) => article.id)).toEqual([2, 3]);
   });
 });
+
+describe("cover image variants", () => {
+  it("uses Payload card and thumbnail sizes, falling back to the original", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      docs: [
+        { id: 1, title: "A", slug: "a", excerpt: "", coverImage: { url: "https://x/a.jpg", sizes: { card: { url: "https://x/a-800x500.webp" }, thumbnail: { url: "https://x/a-400x300.webp" } } } },
+        { id: 2, title: "B", slug: "b", excerpt: "", coverImage: { url: "https://x/b.jpg", sizes: { card: { url: null } } } },
+      ],
+    })));
+    const [a, b] = await getPublishedArticles();
+    expect(a.coverImage).toMatchObject({ url: "https://x/a.jpg", cardUrl: "https://x/a-800x500.webp", thumbnailUrl: "https://x/a-400x300.webp" });
+    expect(b.coverImage).toMatchObject({ cardUrl: "https://x/b.jpg", thumbnailUrl: "https://x/b.jpg" });
+  });
+});

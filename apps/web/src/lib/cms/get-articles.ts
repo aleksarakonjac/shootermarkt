@@ -7,6 +7,9 @@ export interface ArticleTag {
 
 export interface CoverImageData {
   url: string;
+  /** Payload varijante (WebP); padaju na original ako ih nema. */
+  cardUrl: string;
+  thumbnailUrl: string;
   filename?: string;
   alt?: string;
   width?: number;
@@ -36,8 +39,12 @@ function toCoverImage(value: unknown): CoverImageData | null {
   if (!value || typeof value !== "object") return null;
   const image = value as Record<string, unknown>;
   if (typeof image.url !== "string") return null;
+  const sizes = (image.sizes ?? {}) as Record<string, { url?: unknown } | undefined>;
+  const sizeUrl = (name: string) => typeof sizes[name]?.url === "string" ? sizes[name].url as string : image.url as string;
   return {
     url: image.url,
+    cardUrl: sizeUrl("card"),
+    thumbnailUrl: sizeUrl("thumbnail"),
     filename: typeof image.filename === "string" ? image.filename : undefined,
     alt: typeof image.alt === "string" ? image.alt : undefined,
     width: typeof image.width === "number" ? image.width : undefined,

@@ -8,6 +8,7 @@ interface MediaDoc {
   id: number;
   url: string;
   alt: string;
+  sizes?: { card?: { url?: string | null } };
 }
 
 function gridClass(count: number): string {
@@ -44,7 +45,7 @@ export function GalleryBlock({ images }: { images: MediaDoc[] }) {
             aria-label={en ? `Open image: ${img.alt || `Image ${i + 1}`}` : `Otvori sliku: ${img.alt || `Slika ${i + 1}`}`}
           >
             <Image
-              src={img.url}
+              src={img.sizes?.card?.url ?? img.url}
               alt={img.alt || ""}
               fill
               sizes="(min-width: 640px) 33vw, 50vw"
