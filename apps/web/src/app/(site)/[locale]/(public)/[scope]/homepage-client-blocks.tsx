@@ -109,6 +109,13 @@ const DISC_FULL_NAMES: Record<string, { sr: string; en: string }> = {
   SPM: { sr: "Sport pištolj muški", en: "Sport Pistol Men" },
   FPM: { sr: "Pištolj 50m muški", en: "50m Pistol Men" },
   RFPM: { sr: "Brzometni pištolj muški", en: "25m Rapid Fire Pistol Men" },
+  STPM: { sr: "25m standard pištolj muški", en: "25m Standard Pistol Men" },
+  STPW: { sr: "25m standard pištolj ženski", en: "25m Standard Pistol Women" },
+  R3P300M: { sr: "300m puška 3x20 muški", en: "300m Rifle 3x20 Men" },
+  R3P300W: { sr: "300m puška 3x20 ženski", en: "300m Rifle 3x20 Women" },
+  RPR300M: { sr: "300m puška ležeći muški", en: "300m Rifle Prone Men" },
+  RPR300W: { sr: "300m puška ležeći ženski", en: "300m Rifle Prone Women" },
+  STR300: { sr: "300m standard puška", en: "300m Standard Rifle" },
 };
 
 const FALLBACK_LEVEL_STYLE = { background: "var(--level-club-bg)", color: "var(--level-club-fg)" };

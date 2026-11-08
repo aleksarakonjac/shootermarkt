@@ -49,6 +49,14 @@ export const disciplineCodeEnum = pgEnum("discipline_code", [
   "SPM",  // 25m Sport Pistol Men (nacionalna disciplina, format kao SPW)
   "RFPM", // 25m Rapid Fire Pistol Men — samo kvalifikacija; format finala još nije potvrđen
   "FPM",  // 50m Free Pistol Men
+  "STPM", // 25m Standard Pistol Men
+  "STPW", // 25m Standard Pistol Women
+  // 300m Rifle — sve celi brojevi, bez finala
+  "R3P300M", // 300m Rifle 3x20 Men
+  "R3P300W", // 300m Rifle 3x20 Women
+  "RPR300M", // 300m Rifle Prone Men
+  "RPR300W", // 300m Rifle Prone Women
+  "STR300",  // 300m Standard Rifle 3x20 Open (mešana konkurencija, gender null)
 ]);
 
 export const competitionLevelEnum = pgEnum("competition_level", [

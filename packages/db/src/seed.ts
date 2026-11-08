@@ -57,6 +57,14 @@ async function seed() {
       { code: "RFPM", name: "25m Rapid Fire Pistol Men",  shortName: "RFP Men",  gender: "M", distance: 25, apparatus: "pistol", maxQualScore: "600"  },
       { code: "SPW",  name: "25m Sport Pistol Women",     shortName: "SP Women", gender: "F", distance: 25, apparatus: "pistol", maxQualScore: "600"  },
       { code: "FPM",  name: "50m Free Pistol Men",        shortName: "FP Men",   gender: "M", distance: 50, apparatus: "pistol", maxQualScore: "600"  },
+      { code: "STPM", name: "25m Standard Pistol Men",    shortName: "STP Men",   gender: "M", distance: 25, apparatus: "pistol", maxQualScore: "600" },
+      { code: "STPW", name: "25m Standard Pistol Women",  shortName: "STP Women", gender: "F", distance: 25, apparatus: "pistol", maxQualScore: "600" },
+      // 300m Rifle — celi brojevi, bez finala; STR300 je Open (gender null)
+      { code: "R3P300M", name: "300m Rifle 3x20 Men",     shortName: "300m 3x20 Men",   gender: "M",  distance: 300, apparatus: "rifle", maxQualScore: "600" },
+      { code: "R3P300W", name: "300m Rifle 3x20 Women",   shortName: "300m 3x20 Women", gender: "F",  distance: 300, apparatus: "rifle", maxQualScore: "600" },
+      { code: "RPR300M", name: "300m Rifle Prone Men",    shortName: "300m Prone Men",  gender: "M",  distance: 300, apparatus: "rifle", maxQualScore: "600" },
+      { code: "RPR300W", name: "300m Rifle Prone Women",  shortName: "300m Prone Women",gender: "F",  distance: 300, apparatus: "rifle", maxQualScore: "600" },
+      { code: "STR300",  name: "300m Standard Rifle",     shortName: "300m Std Rifle",  gender: null, distance: 300, apparatus: "rifle", maxQualScore: "600" },
     ])
     .onConflictDoNothing();
 
@@ -285,6 +293,52 @@ async function seed() {
         finalStructureDef: null,
         isDefault: true,
       },
+      // ── 25m Standard Pistol — 60 hitaca (150 s / 20 s / 10 s), celi brojevi, bez finala ──
+      // ponytail: 6 serija po 10 (2 po vremenskom delu) — proveriti kad stigne prvi bilten
+      ...(["STPM", "STPW"] as const).map((code) => ({
+        disciplineId: byCode[code],
+        code: `${code.toLowerCase()}-issf-60`,
+        name: `Standard pištolj 60 metaka (${code === "STPM" ? "Muškarci" : "Žene"})`,
+        totalShots: 60,
+        maxScore: "600",
+        hasDecimals: false,
+        structureType: "series" as const,
+        structureDef: apSeries6,
+        qualDisplayType: "series_6_inners",
+        finalDisplayType: null,
+        finalStructureDef: null,
+        isDefault: true,
+      })),
+      // ── 300m Rifle 3x20 i 300m Standard Rifle — stavovi kao 50m 3x20, bez finala ──
+      ...(["R3P300M", "R3P300W", "STR300"] as const).map((code) => ({
+        disciplineId: byCode[code],
+        code: `${code.toLowerCase()}-3x20`,
+        name: code === "STR300" ? "300m standard puška 3×20 (Open)" : `300m puška 3×20 (${code === "R3P300M" ? "Muškarci" : "Žene"})`,
+        totalShots: 60,
+        maxScore: "600",
+        hasDecimals: false,
+        structureType: "positions_series" as const,
+        structureDef: positions3x20,
+        qualDisplayType: "positions_3x2",
+        finalDisplayType: null,
+        finalStructureDef: null,
+        isDefault: true,
+      })),
+      // ── 300m Rifle Prone — 60 hitaca celi brojevi, bez finala ──
+      ...(["RPR300M", "RPR300W"] as const).map((code) => ({
+        disciplineId: byCode[code],
+        code: `${code.toLowerCase()}-60`,
+        name: `300m puška ležeći 60 metaka (${code === "RPR300M" ? "Muškarci" : "Žene"})`,
+        totalShots: 60,
+        maxScore: "600",
+        hasDecimals: false,
+        structureType: "series" as const,
+        structureDef: apSeries6,
+        qualDisplayType: "series_6_inners",
+        finalDisplayType: null,
+        finalStructureDef: null,
+        isDefault: true,
+      })),
     ])
     .onConflictDoNothing();
 

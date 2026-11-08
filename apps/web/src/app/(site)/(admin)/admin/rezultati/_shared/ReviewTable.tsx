@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORY_LABEL, DISCIPLINE_META, isSportPistolCode, qualHasDecimals, type AgeCategory, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
+import { CATEGORY_LABEL, DISCIPLINE_META, isSportPistolCode, isThreePositionCode, qualHasDecimals, type AgeCategory, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import { REVIEW_DISCIPLINE_CODES } from "@shootermarkt/db/discipline";
 import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { ShooterMatchCell } from "./ShooterMatchCell";
@@ -68,7 +68,7 @@ function ShotBreakdown({ groups, prefix = "S" }: { groups?: number[][] | null; p
 }
 
 function QualificationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: Props["onRowChange"] }) {
-  const isR3P = rows[0]?.row.disciplineCode.startsWith("R3P") ?? false;
+  const isR3P = isThreePositionCode(rows[0]?.row.disciplineCode);
   return (
     <div className="overflow-x-auto border-t border-[var(--border)]">
       <table className="w-full min-w-[1260px] text-sm">

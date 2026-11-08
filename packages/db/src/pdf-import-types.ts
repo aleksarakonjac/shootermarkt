@@ -7,11 +7,18 @@ export const isUnrankedRemark = (remark: string | null | undefined): boolean => 
 
 export type RemarkDetails = { qual?: StageRemarks; elim?: StageRemarks; final?: StageRemarks };
 
-export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "ARMT" | "APMT" | "R3PM" | "R3PW" | "RPRM" | "RPRW" | "SPW" | "SPM" | "FPM" | "RFPM";
+export type DisciplineCode =
+  | "ARM" | "ARW" | "APM" | "APW" | "ARMT" | "APMT" | "R3PM" | "R3PW" | "RPRM" | "RPRW"
+  | "SPW" | "SPM" | "FPM" | "RFPM" | "STPM" | "STPW"
+  | "R3P300M" | "R3P300W" | "RPR300M" | "RPR300W" | "STR300";
 /** 25m sport pištolj (precizno + brzo, finale na pogotke) — SPM ima isti format kao SPW. */
 export const isSportPistolCode = (code: string | null | undefined): boolean => code === "SPW" || code === "SPM";
-/** Kvalifikacija u decimalama: vazdušna puška (AR*) i MK ležeći (RPR*). R3P ima svoju logiku po varijanti. */
-export const qualHasDecimals = (code: string | null | undefined): boolean => !!code && (code.startsWith("AR") || code.startsWith("RPR"));
+/** Kvalifikacija u decimalama: vazdušna puška (AR*) i 50m ležeći (RPRM/RPRW). 300m je celobrojan. R3P ima svoju logiku po varijanti. */
+export const qualHasDecimals = (code: string | null | undefined): boolean =>
+  !!code && (code.startsWith("AR") || code === "RPRM" || code === "RPRW");
+/** Trostav (klečeći → ležeći → stojeći): 50m R3P*, 300m R3P300* i 300m standard puška. */
+export const isThreePositionCode = (code: string | null | undefined): boolean =>
+  !!code && (code.startsWith("R3P") || code === "STR300");
 export const MIXED_TEAM_CODES = ["ARMT", "APMT"] as const;
 export type MixedTeamCode = typeof MIXED_TEAM_CODES[number];
 
@@ -111,6 +118,14 @@ export const DISCIPLINE_META: Record<DisciplineCode, { apparatus: string; gender
   SPM:  { apparatus: "pistol",     gender: "M",  label: "Sport pištolj M" },
   FPM:  { apparatus: "pistol",     gender: "M",  label: "Slobodni pištolj M" },
   RFPM: { apparatus: "pistol",     gender: "M",  label: "Brzometni pištolj M" },
+  STPM: { apparatus: "pistol",     gender: "M",  label: "25m standard pištolj M" },
+  STPW: { apparatus: "pistol",     gender: "F",  label: "25m standard pištolj Ž" },
+  R3P300M: { apparatus: "rifle",   gender: "M",  label: "300m puška 3x20 M" },
+  R3P300W: { apparatus: "rifle",   gender: "F",  label: "300m puška 3x20 Ž" },
+  RPR300M: { apparatus: "rifle",   gender: "M",  label: "300m puška ležeći M" },
+  RPR300W: { apparatus: "rifle",   gender: "F",  label: "300m puška ležeći Ž" },
+  // Open: muški i ženski u istoj konkurenciji, pol se ne izvodi iz discipline.
+  STR300: { apparatus: "rifle",    gender: null, label: "300m standard puška (Open)" },
 };
 
 /** Kodovi disciplina koje uvozimo. */

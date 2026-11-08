@@ -1,4 +1,5 @@
 import type { ElimDetail, QualDetail, FinalDetail } from "@shootermarkt/db/schema";
+import { isThreePositionCode } from "@shootermarkt/db/pdf-import-types";
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { SeriesQualDisplay } from "./SeriesQualDisplay";
@@ -64,7 +65,7 @@ export function ResultDetailPanel({
   const finalSeries = finalDetail ? finalSeriesValues(finalDetail) : null;
   const qualSeries = qualDetail && "series" in qualDetail ? qualDetail.series : null;
   const sharedSeriesCount = elimDetail && qualSeries ? Math.max(elimDetail.series.length, qualSeries.length) : undefined;
-  const r3pGroupLabels = disciplineCode.startsWith("R3P") && (sharedSeriesCount ?? qualSeries?.length ?? elimDetail?.series.length) === 6
+  const r3pGroupLabels = isThreePositionCode(disciplineCode) && (sharedSeriesCount ?? qualSeries?.length ?? elimDetail?.series.length) === 6
     ? (locale === "en" ? ["Kneeling", "Prone", "Standing"] : ["Klečeći", "Ležeći", "Stojeći"])
     : undefined;
   const isAirRifle = disciplineCode === "ARM" || disciplineCode === "ARW";

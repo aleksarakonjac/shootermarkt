@@ -15,10 +15,10 @@ interface DbComp { id: number; name: string; date: string; location: string | nu
 interface SiusEvent { runningId: string; eventCode: string; name: string; state: string }
 interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
 
-const SUPPORTED_CODES = new Set(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "RFPM", "ARMT", "APMT"]);
+const SUPPORTED_CODES = new Set(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "RFPM", "STPM", "STPW", "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300", "ARMT", "APMT"]);
 
 const fmtVal = (v: number, code: string) =>
-  (code.startsWith("AR") || code.startsWith("R3P") || code.startsWith("AP") || code.startsWith("RPR")) ? v.toFixed(1) : String(Math.round(v));
+  (code.startsWith("AR") || code.startsWith("R3P") || code.startsWith("AP") || code === "RPRM" || code === "RPRW") && !code.includes("300") ? v.toFixed(1) : String(Math.round(v));
 
 // ── CompSearch ────────────────────────────────────────────────────────────────
 

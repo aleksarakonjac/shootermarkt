@@ -12,10 +12,11 @@ import { LEVEL_LABEL, LEVEL_STYLE } from "@/lib/competition-utils";
 
 const ALL_DISCIPLINES: DisciplineCode[] = [
   "ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "RFPM",
+  "STPM", "STPW", "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300",
 ];
 
-const MULTI_SERIES = new Set<DisciplineCode>(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "FPM", "RFPM"]);
-const THREE_POS    = new Set<DisciplineCode>(["R3PM", "R3PW"]);
+const MULTI_SERIES = new Set<DisciplineCode>(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "FPM", "RFPM", "STPM", "STPW", "RPR300M", "RPR300W"]);
+const THREE_POS    = new Set<DisciplineCode>(["R3PM", "R3PW", "R3P300M", "R3P300W", "STR300"]);
 const MIXED_TEAM   = new Set<DisciplineCode>(["ARMT", "APMT"]);
 
 const THREE_POS_STANCES = [
@@ -44,6 +45,13 @@ const DISC_LABEL: Record<DisciplineCode, string> = {
   SPM:  "25m Sport Pistol Men",
   FPM:  "50m Pistol Men",
   RFPM: "25m Rapid Fire Pistol Men",
+  STPM: "25m Standard Pistol Men",
+  STPW: "25m Standard Pistol Women",
+  R3P300M: "300m Rifle 3x20 Men",
+  R3P300W: "300m Rifle 3x20 Women",
+  RPR300M: "300m Rifle Prone Men",
+  RPR300W: "300m Rifle Prone Women",
+  STR300: "300m Standard Rifle",
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────

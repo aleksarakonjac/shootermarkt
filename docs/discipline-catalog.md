@@ -18,7 +18,43 @@ ARM, ARW, APM, APW, ARMT, APMT, R3PM, R3PW (varijante 3x20 i 3x40), SPW.
 | FPM | 50m pištolj | 60 hitaca, 6×10, celi brojevi, iksevi | 600 | nema | ✓ |
 | RFPM | 25m brzometni pištolj | 2 poluprograma × 30; svaki ima 6 serija po 5 hitaca: 2×8 s, 2×6 s, 2×4 s; celi brojevi, iksevi | 600 | ? | kvalifikacija ~ (ISSF 2026, 8.7.6.3), finale ? |
 
-Izostavljeno za sad: CFPM, STPM, 300m.
+### Dodajemo posle (sve celi brojevi, iksevi, bez finala, max 600)
+
+| Kod (predlog) | Disciplina | Kvalifikacija | Status |
+|---|---|---|---|
+| STPM / STPW | 25m standard pištolj | 60 hitaca: 4×5 u 150 s, 4×5 u 20 s, 4×5 u 10 s | ✓ gađa se na SSS; ženska konkurencija na SSS ? |
+| R3P300M / R3P300W | 300m puška 3x20 | 60 hitaca, klečeći/ležeći/stojeći | ✓ |
+| RPR300M / RPR300W | 300m puška ležeći | 60 hitaca | ✓ |
+| STR300 | 300m standard puška | 3x20, Open (mešana konkurencija, bez pola) | ✓ |
+
+R3P300 i STR300 se prikazuju kao 50m puška 3x20: serije grupisane po stavu (2×10 po stavu, zbir stava), ista
+varijanta/raspored kao postojeći R3P 3x20. Redosled stavova isti za sve trostav discipline: klečeći → ležeći →
+stojeći ✓.
+
+Izostavljeno za sad: CFPM.
+
+## Nazivi u aplikaciji
+
+Na profilu bez pola; na rang listama i takmičenju dodaje se pol (seniori/seniorke, Men/Women). R3JM/R3JW se ne prikazuju (samo interno za SIUS import), vide se kao 50m puška 3x20.
+
+| Kod | Srpski | Engleski |
+|---|---|---|
+| ARM / ARW | 10m vazdušna puška | 10m Air Rifle |
+| APM / APW | 10m vazdušni pištolj | 10m Air Pistol |
+| ARMT | 10m vazdušna puška miks | 10m Air Rifle Mixed Team |
+| APMT | 10m vazdušni pištolj miks | 10m Air Pistol Mixed Team |
+| R3PM / R3PW (3x40) | 50m puška 3x40 | 50m Rifle 3x40 |
+| R3PM / R3PW (3x20) | 50m puška 3x20 | 50m Rifle 3x20 |
+| RPRM / RPRW | 50m puška ležeći | 50m Rifle Prone |
+| SPW / SPM | 25m pištolj | 25m Pistol |
+| RFPM | 25m Rapid Fire pištolj | 25m Rapid Fire Pistol |
+| FPM | 50m pištolj | 50m Pistol |
+| STPM / STPW | 25m standard pištolj | 25m Standard Pistol |
+| R3P300M / R3P300W | 300m puška 3x20 | 300m Rifle 3x20 |
+| RPR300M / RPR300W | 300m puška ležeći | 300m Rifle Prone |
+| STR300 | 300m standard puška | 300m Standard Rifle |
+| ESC_*_SOLO | <oružje> ESC Solo (npr. 10m vazdušna puška ESC Solo) | 10m Air Rifle ESC Solo |
+| ESC_*_TRIO / _DUET | <oružje> ESC Trio / ESC Duet | 50m Rifle Prone ESC Duet |
 
 ## ESC Challenge — zajedničko
 

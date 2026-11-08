@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { dedupeRowsByCategory, mergeFinalsIntoRows, type ParsedEvent, type ReviewRow } from "./pdf-import-types";
+import { dedupeRowsByCategory, isThreePositionCode, mergeFinalsIntoRows, qualHasDecimals, type ParsedEvent, type ReviewRow } from "./pdf-import-types";
+
+describe("discipline format helpers", () => {
+  it("keeps 300m integer and groups 300m 3x20 and standard rifle by position", () => {
+    expect(["ARM", "RPRM", "RPRW"].every(qualHasDecimals)).toBe(true);
+    expect(["RPR300M", "RPR300W", "R3P300M", "STR300", "STPM"].some(qualHasDecimals)).toBe(false);
+    expect(["R3PM", "R3P300W", "STR300"].every(isThreePositionCode)).toBe(true);
+    expect(["RPR300M", "STPW"].some(isThreePositionCode)).toBe(false);
+  });
+});
 
 const foldName = (value: string) => value.toLowerCase();
 

@@ -9,7 +9,7 @@ import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import { useRowFlash } from "./useRowFlash";
-import { isSportPistolCode, isUnrankedRemark, qualHasDecimals, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
+import { isSportPistolCode, isThreePositionCode, isUnrankedRemark, qualHasDecimals, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 const POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"] as const;
 const POSITION_LABELS_EN = ["Kneeling", "Prone", "Standing"] as const;
@@ -22,7 +22,7 @@ const POSITION_KEYS = ["kneeling", "prone", "standing"] as const;
 // the match progresses).
 type FlatGroup = { label: string; count: number };
 const FLAT_GROUPS_BY_DISCIPLINE: Array<{ match: (code: string) => boolean; groups: FlatGroup[] }> = [
-  { match: (c) => c.startsWith("R3P"), groups: [
+  { match: isThreePositionCode, groups: [
     { label: "Klečeći", count: 2 },
     { label: "Ležeći", count: 2 },
     { label: "Stojeći", count: 2 },

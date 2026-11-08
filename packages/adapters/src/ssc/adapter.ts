@@ -130,6 +130,10 @@ const DISC_MAP: Record<string, { male: string; female: string }> = {
   "25m Sport Pistol":   { male: "SPM", female: "SPW" },
   "50m Pistol":         { male: "FPM", female: "FPM" },
   "25m Rapid Fire Pistol": { male: "RFPM", female: "RFPM" },
+  "25m Standard Pistol": { male: "STPM", female: "STPW" },
+  "300m Rifle 3 Positions": { male: "R3P300M", female: "R3P300W" },
+  "300m Rifle Prone":   { male: "RPR300M", female: "RPR300W" },
+  "300m Standard Rifle": { male: "STR300", female: "STR300" },
 };
 
 function resolveDisc(exerciseName: string, gender: string | null): string | null {

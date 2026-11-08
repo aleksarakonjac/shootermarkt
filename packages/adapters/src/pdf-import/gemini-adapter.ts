@@ -10,8 +10,8 @@ Razlikuj dva tipa biltena:
 - NACIONALNI: rezultati pokazuju naziv kluba (npr. "SK Pančevo 1813", "ŽSK Beograd")
 - INTERNACIONALNI/ISSF: rezultati pokazuju kod države/tima (SRB, GER, KOR, CHN, USA...)
 
-Uzimaj SAMO ove discipline (ostale potpuno ignoriši — trap, skeet, 25m rapid fire,
-50m free pistol, vazdušna puška/pištolj mix team, juniori, pioniri, veterani):
+Uzimaj SAMO ove discipline (ostale potpuno ignoriši — trap, skeet, 25m center fire,
+vazdušna puška/pištolj mix team, juniori, pioniri, veterani):
 - ARM = vazdušna puška 10m seniori (muški)
 - ARW = vazdušna puška 10m seniorke (ženske)
 - APM = vazdušni pištolj 10m seniori (muški)
@@ -24,9 +24,16 @@ Uzimaj SAMO ove discipline (ostale potpuno ignoriši — trap, skeet, 25m rapid 
 - SPM = 25m sport pištolj seniori (muški)
 - FPM = 50m pištolj (slobodni pištolj) seniori (muški)
 - RFPM = 25m brzometni pištolj seniori (muški)
+- STPM = 25m standard pištolj seniori (muški)
+- STPW = 25m standard pištolj seniorke (ženske)
+- R3P300M = 300m puška trostav 3x20 seniori (muški)
+- R3P300W = 300m puška trostav 3x20 seniorke (ženske)
+- RPR300M = 300m puška ležeći 60 hitaca seniori (muški)
+- RPR300W = 300m puška ležeći 60 hitaca seniorke (ženske)
+- STR300 = 300m standard puška 3x20, Open (muški i ženski u istoj listi)
 
 Za svaki event (tabela) u PDF-u izvuci:
-- discipline: kod discipline (ARM/ARW/APM/APW/R3PM/R3PW/RPRM/RPRW/SPW/SPM/FPM/RFPM)
+- discipline: kod discipline (ARM/ARW/APM/APW/R3PM/R3PW/RPRM/RPRW/SPW/SPM/FPM/RFPM/STPM/STPW/R3P300M/R3P300W/RPR300M/RPR300W/STR300)
 - stage: "qualification" ili "final"
 - category: uzrasna kategorija iz naslova tabele — "cadet" (kadet/U16), "youth_junior" (mlađi junior/U18), "junior" (junior/U21), "u23" (U23), "senior" (seniori/seniorke ili bez oznake). Default "senior".
 - is_international: true ako su prikazane države kao timovi, false ako su klubovi
@@ -65,6 +72,11 @@ Pravila:
   series = 6 zbirova redom kako ih bilten prikazuje (8 s, 6 s, 4 s za prvi pa za drugi poluprogram).
   RFPM finale za sada ignoriši (ne vraćaj final event).
 - Sport pištolj M (SPM) ima isti format kao SPW, uključujući finale.
+- Standard pištolj (STPM/STPW): 25m, 60 hitaca (150 s, 20 s, 10 s), celi brojevi, ima inners, ukupno do 600, nema finala.
+  series = zbirovi redom kako ih bilten prikazuje.
+- 300m (R3P300M/R3P300W/RPR300M/RPR300W/STR300): celi brojevi, ima inners, ukupno do 600, nema finala.
+  Trostav 300m i standard puška: 6 serija po 10, redosled klečeći, ležeći, stojeći (2 serije po stavu).
+  Ležeći 300m: 6 serija po 10.
 - Sport pištolj Ž (SPW): 25m, precizni + brzi deo, ukupno do 600. SPW FINALE
   u biltenu ima DVA reda brojeva po strelcu, bez pojedinačnih decimalnih hica:
   GORNJI red je kumulativni broj pogodaka, a DONJI red je broj pogodaka u toj
