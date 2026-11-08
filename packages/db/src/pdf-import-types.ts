@@ -1,3 +1,5 @@
+import type { EscSoloQualDetail } from "./schema";
+
 /** Dodatne SIUS/ISSF oznake jedne faze: tekst kazne, shoot-off ("SO", "+10", "+1+1+3"), rekord ("WR", "QWR"…). */
 export type StageRemarks = { penalty?: string; shootOff?: string; record?: string };
 /** Oznake po fazi; kvalifikacije/eliminacije/finale su odvojeni nastupi. */
@@ -10,7 +12,16 @@ export type RemarkDetails = { qual?: StageRemarks; elim?: StageRemarks; final?: 
 export type DisciplineCode =
   | "ARM" | "ARW" | "APM" | "APW" | "ARMT" | "APMT" | "R3PM" | "R3PW" | "RPRM" | "RPRW"
   | "SPW" | "SPM" | "FPM" | "RFPM" | "STPM" | "STPW"
-  | "R3P300M" | "R3P300W" | "RPR300M" | "RPR300W" | "STR300";
+  | "R3P300M" | "R3P300W" | "RPR300M" | "RPR300W" | "STR300"
+  | "SOLOARM" | "SOLOARW" | "SOLOAPM" | "SOLOAPW";
+/** ESC Challenge Solo — pogoci (ne ISSF skor), ne ulazi u formu ni u poređenja skorova. */
+export const ESC_SOLO_CODES = ["SOLOARM", "SOLOARW", "SOLOAPM", "SOLOAPW"] as const;
+export type EscSoloCode = typeof ESC_SOLO_CODES[number];
+export const isEscSoloCode = (code: string | null | undefined): code is EscSoloCode =>
+  !!code && (ESC_SOLO_CODES as readonly string[]).includes(code);
+/** Konačno mesto u Solo-u: iz meča za medalju (1–4), inače iz kvalifikacije. */
+export const escSoloPlacement = (row: { finalRank: number | null; qualRank: number | null }): number | null =>
+  row.finalRank ?? row.qualRank;
 /** 25m sport pištolj (precizno + brzo, finale na pogotke) — SPM ima isti format kao SPW. */
 export const isSportPistolCode = (code: string | null | undefined): boolean => code === "SPW" || code === "SPM";
 /** Kvalifikacija u decimalama: vazdušna puška (AR*) i 50m ležeći (RPRM/RPRW). 300m je celobrojan. R3P ima svoju logiku po varijanti. */
@@ -126,6 +137,10 @@ export const DISCIPLINE_META: Record<DisciplineCode, { apparatus: string; gender
   RPR300W: { apparatus: "rifle",   gender: "F",  label: "300m puška ležeći Ž" },
   // Open: muški i ženski u istoj konkurenciji, pol se ne izvodi iz discipline.
   STR300: { apparatus: "rifle",    gender: null, label: "300m standard puška (Open)" },
+  SOLOARM: { apparatus: "air_rifle",  gender: "M", label: "10m vazdušna puška ESC Solo M" },
+  SOLOARW: { apparatus: "air_rifle",  gender: "F", label: "10m vazdušna puška ESC Solo Ž" },
+  SOLOAPM: { apparatus: "air_pistol", gender: "M", label: "10m vazdušni pištolj ESC Solo M" },
+  SOLOAPW: { apparatus: "air_pistol", gender: "F", label: "10m vazdušni pištolj ESC Solo Ž" },
 };
 
 /** Kodovi disciplina koje uvozimo. */
@@ -241,6 +256,11 @@ export interface ReviewRow {
   finalShotsByStage?: number[][] | null;
   /** Strelac je bio u shoot-off-u. */
   finalShootOff?: boolean | null;
+  /** ESC Solo: K1/K2 detalj (ide u results.qual_detail umesto qualSeries). */
+  qualEscSolo?: EscSoloQualDetail;
+  /** ESC meč za medalju: protivnik. */
+  finalOpponentTotal?: number | null;
+  finalOpponentName?: string | null;
 
   /** ISSF/SIUS remark: RPO, DSQ, DNS, DNF, SO */
   remark?: string | null;
