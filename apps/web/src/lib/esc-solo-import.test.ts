@@ -30,6 +30,12 @@ describe("escSoloReviewRows", () => {
     expect(rows[1].qualEscSolo).toEqual({ format: "esc_solo", part1: OUT_IN_K1.part1 });
   });
 
+  it("keeps the K1 result when the shooter is DNS in K2", () => {
+    const dnsK2 = { ...ALEKSA, part2: { series: [], total: null, rank: null, remark: "DNS" }, match: null };
+    const [row] = escSoloReviewRows([dnsK2], "SOLOARM", "senior", () => 7);
+    expect(row).toMatchObject({ qualTotal: 26, qualRank: 4, remark: "DNS" });
+  });
+
   it("keeps the shoot-off mark of a tied medal match", () => {
     const tied = { ...ALEKSA, match: { ...ALEKSA.match!, total: 12, rank: 1, shootOff: "SO" } };
     const [row] = escSoloReviewRows([tied], "SOLOARM", "senior", () => undefined);

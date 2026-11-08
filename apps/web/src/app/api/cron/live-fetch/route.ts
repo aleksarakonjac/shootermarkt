@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { siusEventCode } from "@/lib/sius-event-code";
+import { siusEventCodes } from "@/lib/sius-event-code";
 import { db } from "@shootermarkt/db";
 import { competitions, competitionSchedule, disciplines, mixedTeamResults, results, shooters } from "@shootermarkt/db/schema";
 import type { AgeCategory } from "@shootermarkt/db/schema";
@@ -127,7 +127,7 @@ async function processCompetition(
     // ── SIUS primary source ─────────────────────────────────────────────
     // Juniorski / U16 / U18 slot čita svoj SIUS event (ARWJ…), ne seniorski sa istim kodom.
     const disciplineCodes = [...new Set(
-      dedupedSlots.filter((s) => !MIXED_TEAM_CODES.has(s.disciplineCode)).map((s) => siusEventCode(s.disciplineCode, s.category))
+      dedupedSlots.filter((s) => !MIXED_TEAM_CODES.has(s.disciplineCode)).flatMap((s) => siusEventCodes(s.disciplineCode, s.category))
     )];
 
     console.log("[cron] SIUS disciplineCodes:", disciplineCodes);
@@ -144,7 +144,9 @@ async function processCompetition(
     for (const slot of dedupedSlots) {
       // Ponovljen meč iste discipline (npr. drugi dan pojedinačnog): uzmi SIUS meč tog dana.
       const slotDate = slot.startTime.toISOString().slice(0, 10);
-      const slotEventCode = siusEventCode(slot.disciplineCode, slot.category);
+      const candidates = siusEventCodes(slot.disciplineCode, slot.category);
+      if (candidates.length === 0) { console.log(`[cron] nema SIUS eventa za ${slot.disciplineCode}/${slot.category}, preskačem`); continue; }
+      const slotEventCode = candidates.find((code) => [...siusData.keys()].some((key) => parseSiusMatchKey(key).eventCode === code));
       const matches = [...siusData.entries()].filter(([key]) => parseSiusMatchKey(key).eventCode === slotEventCode).map(([, data]) => data);
       const eventData = matches.find((m) => m.date === slotDate) ?? matches.filter((m) => !m.date || m.date <= slotDate).at(-1) ?? matches[0];
       if (!eventData) continue;
@@ -316,7 +318,7 @@ async function processMixedTeamSlots(
 ): Promise<number> {
   // SIUS vodi juniorski mixed team kao poseban događaj (APMTJ); druge mlađe kategorije za mixed ne postoje.
   const siusSlots = mixedSlots.filter((s) => s.category === "senior" || s.category === "junior");
-  const disciplineCodes = [...new Set(siusSlots.map((s) => siusEventCode(s.disciplineCode, s.category)))];
+  const disciplineCodes = [...new Set(siusSlots.flatMap((s) => siusEventCodes(s.disciplineCode, s.category)))];
   const rows: Array<typeof mixedTeamResults.$inferInsert> = [];
   const teamNumbersByDiscipline = new Map<string, Map<string, number>>();
   const nocCountsByDiscipline = new Map<string, Map<string, number>>();
@@ -331,7 +333,7 @@ async function processMixedTeamSlots(
     }
 
     for (const slot of siusSlots) {
-      const eventCode = siusEventCode(slot.disciplineCode, slot.category);
+      const eventCode = siusEventCodes(slot.disciplineCode, slot.category)[0];
       const eventData = siusData.get(eventCode);
       if (!eventData) continue;
 

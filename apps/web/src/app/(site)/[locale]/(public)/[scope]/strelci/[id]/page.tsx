@@ -140,19 +140,18 @@ export default async function ShooterPage({ params }: Props) {
   // ESC Solo (pogoci) se ne meša sa ISSF finalima ni sa najboljim skorom.
   const finalesCount = shooterResults.filter((r) => r.finalRank != null && !isEscSoloCode(r.disciplineCode)).length;
 
+  // Peak samo iz forma (olimpijskih) disciplina — ležeći, 300m, standard i Solo ne ulaze.
   const peakResult = shooterResults
-    .filter((r) => r.qualTotal != null && !isEscSoloCode(r.disciplineCode))
+    .filter((r) => r.qualTotal != null && FORMA_DISCIPLINE_CODES.includes(r.disciplineCode))
     .reduce<{ score: number; code: string } | null>((best, r) => {
       const s = parseFloat(r.qualTotal!);
       return !best || s > best.score ? { score: s, code: r.disciplineCode } : best;
     }, null);
 
-  const activeSince = shooterResults.length > 0
-    ? new Date(shooterResults[0].competitionDate).getFullYear()
-    : null;
   // Istorija: pojedinačni + mešoviti redovi, hronološki (tabela sama okreće na najnovije).
   const historyRows = [...shooterResults.map(toIndividualHistoryRow), ...mixedRows]
     .sort((a, b) => (a.competitionDate === b.competitionDate ? a.competitionId - b.competitionId : a.competitionDate < b.competitionDate ? -1 : 1));
+  const activeSince = historyRows.length > 0 ? new Date(historyRows[0].competitionDate).getFullYear() : null;
   const recentCompetitionIds = new Set(
     [...historyRows].reverse().map((result) => result.competitionId).filter((id, index, ids) => ids.indexOf(id) === index).slice(0, 5),
   );

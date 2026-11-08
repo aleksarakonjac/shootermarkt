@@ -124,7 +124,8 @@ export function escSoloReviewRows(
 ): ReviewRow[] {
   return athletes.map((a) => {
     const shooterId = match(a.firstName, a.lastName, a.nation);
-    const qual = a.part2 ?? a.part1;
+    // DNS/DSQ u K2 (bez skora) ne briše važeći K1 rezultat; status iz K2 ostaje kao oznaka.
+    const qual = a.part2?.total != null ? a.part2 : { ...a.part1, remark: a.part2?.remark ?? a.part1.remark };
     return {
       shooterId,
       issfId: a.siusAthleteId ?? undefined,
