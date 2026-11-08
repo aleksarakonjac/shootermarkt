@@ -1,4 +1,5 @@
 import { normalizeNoc } from "@shootermarkt/db/name-match";
+import type { EscSoloPart } from "@shootermarkt/db/schema";
 const SIUS_PUB = "https://shootingsportscloud.com:8594/api/v1/pub";
 
 export const MIXED_TEAM_CODES = new Set(["ARMT", "APMT"]);
@@ -58,6 +59,8 @@ export interface SiusLiveResult extends SiusExtraRemarks {
   siusAthleteId: string | null;
   qualified: boolean;    // Result.Extensions["QualificationRemark"] === "Q"
   remark: string | null; // ShooterGroupRemark (RPO) or StatusRemark (DSQ/DNS/DNF), whichever is set
+  /** Raw QualificationRemark ("Q", ESC Solo "QG"/"QB"). */
+  qualificationRemark?: string | null;
 }
 
 // ── HTTP ──────────────────────────────────────────────────────────────────────
@@ -176,7 +179,7 @@ export async function fetchSiusSeries(
     const series = parseSeriesTotals(athlete.Series ?? []);
 
     const { firstName, lastName } = splitDisplayName(row.DisplayName ?? "");
-    const { qualified, remark, ...extra } = parseRemark(extensions);
+    const { qualified, remark, qualificationRemark, ...extra } = parseRemark(extensions);
 
     return [
       {
@@ -192,6 +195,7 @@ export async function fetchSiusSeries(
         siusAthleteId: athlete.AthleteIdentifier?.Identifier ?? null,
         qualified,
         remark,
+        qualificationRemark,
       },
     ];
   });
@@ -588,10 +592,12 @@ function parseSeriesTotals(
 function parseRemark(extensions: Array<{ Key: string; Value: string }>): {
   qualified: boolean;
   remark: string | null;
+  qualificationRemark: string | null;
 } & SiusExtraRemarks {
   const byKey = Object.fromEntries(extensions.map((e) => [e.Key, e.Value]));
   return {
     qualified: byKey.QualificationRemark === "Q",
+    qualificationRemark: byKey.QualificationRemark ?? null,
     remark: byKey.StatusRemark ?? byKey.ShooterGroupRemark ?? null,
     penalty: byKey.PenaltyRemark ?? null,
     shootOff: byKey.ShootOffRemark ?? null,
@@ -616,6 +622,91 @@ export function splitDisplayName(displayName: string): {
   // Sve velikim slovima ("HEINRICH ALISON"): poslednja reč je ime, ne deo prezimena.
   if (split === parts.length) split = parts.length - 1;
   return { lastName: parts.slice(0, split).join(" "), firstName: parts.slice(split).join(" ") };
+}
+
+// ── ESC Challenge Solo ────────────────────────────────────────────────────────
+// Subeventi: Qualification Part 1 (30 hitaca), Part 2 (+30, kumulativno), Gold/Bronze Medal Match.
+// Ko prolazi u K2 i u meč odlučuje SIUS — ovde se samo spaja ko se pojavio u kojoj fazi.
+
+export type EscSoloEventCode = "SOLOARM" | "SOLOARW" | "SOLOAPM" | "SOLOAPW";
+
+export function escSoloCodeFromEvent(eventCode: string): EscSoloEventCode | null {
+  const m = eventCode.match(/^(AR|AP)([MW])-ECH-SOLO$/);
+  return m ? (`SOLO${m[1]}${m[2]}` as EscSoloEventCode) : null;
+}
+
+export interface SiusEscSoloMatch {
+  total: number;
+  rank: number;
+  series: number[];
+  opponentTotal: number | null;
+  opponentName: string | null;
+  shootOff: string | null;
+}
+
+export interface SiusEscSoloAthlete {
+  siusAthleteId: string | null;
+  firstName: string;
+  lastName: string;
+  nation: string;
+  part1: EscSoloPart;
+  part2: EscSoloPart | null;
+  match: SiusEscSoloMatch | null;
+  qualified: boolean;
+}
+
+// Status (DNS/DSQ) ima prednost; inače oznaka prolaska Q / QG / QB.
+const soloPart = (r: SiusLiveResult): EscSoloPart => ({
+  series: r.series,
+  total: r.rank === null ? null : r.total,
+  rank: r.rank,
+  remark: r.remark ?? r.qualificationRemark ?? null,
+});
+
+export function mergeEscSoloPhases(p: {
+  part1: SiusLiveResult[]; part2: SiusLiveResult[]; gold: SiusLiveResult[]; bronze: SiusLiveResult[];
+}): SiusEscSoloAthlete[] {
+  const athletes: SiusEscSoloAthlete[] = [];
+  const find = (r: SiusLiveResult) => athletes.find((a) =>
+    (r.siusAthleteId && a.siusAthleteId === r.siusAthleteId) ||
+    (a.lastName.toLowerCase() === r.lastName.toLowerCase() && a.firstName.toLowerCase() === r.firstName.toLowerCase()));
+  const upsert = (r: SiusLiveResult) => {
+    let a = find(r);
+    if (!a) {
+      a = { siusAthleteId: r.siusAthleteId, firstName: r.firstName, lastName: r.lastName, nation: r.nation,
+        part1: { series: [], total: null, rank: null, remark: null }, part2: null, match: null, qualified: false };
+      athletes.push(a);
+    }
+    return a;
+  };
+  for (const r of p.part1) upsert(r).part1 = soloPart(r);
+  for (const r of p.part2) upsert(r).part2 = soloPart(r);
+  for (const [rows, offset] of [[p.gold, 0], [p.bronze, 2]] as const) {
+    for (const r of rows) {
+      if (r.rank === null) continue;
+      const opponent = rows.find((o) => o !== r);
+      const a = upsert(r);
+      a.match = {
+        total: r.total, rank: r.rank + offset, series: r.series,
+        opponentTotal: opponent ? opponent.total : null, opponentName: opponent?.displayName || null,
+        shootOff: r.shootOff,
+      };
+      a.qualified = true;
+    }
+  }
+  return athletes;
+}
+
+export async function fetchSiusEscSoloResults(compUuid: string, eventUuid: string): Promise<SiusEscSoloAthlete[]> {
+  const subs = await fetchSiusSubEvents(compUuid, eventUuid);
+  const pick = async (re: RegExp) => {
+    const sub = subs.find((s) => re.test(s.name));
+    return sub ? fetchSiusSeries(compUuid, eventUuid, sub.runningId, { includeUnranked: true }) : [];
+  };
+  const [part1, part2, gold, bronze] = await Promise.all([
+    pick(/qualification part 1/i), pick(/qualification part 2/i), pick(/gold medal match/i), pick(/bronze medal match/i),
+  ]);
+  return mergeEscSoloPhases({ part1, part2, gold, bronze });
 }
 
 // ── Raw response types ────────────────────────────────────────────────────────
