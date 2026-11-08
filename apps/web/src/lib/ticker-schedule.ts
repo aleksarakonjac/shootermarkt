@@ -4,6 +4,8 @@ const DURATION_MINUTES: Record<string, Record<string, number>> = {
   ARM: { qual: 75, final: 30 }, ARW: { qual: 75, final: 30 }, APM: { qual: 75, final: 30 }, APW: { qual: 75, final: 30 },
   R3PM: { qual: 105, elimination: 105, final: 40 }, R3PW: { qual: 105, elimination: 105, final: 40 },
   SPW: { qual: 45, qual_precision: 45, qual_rapid: 30, final: 30 },
+  SPM: { qual: 45, qual_precision: 45, qual_rapid: 30, final: 30 },
+  RPRM: { qual: 60 }, RPRW: { qual: 60 }, FPM: { qual: 90 },
   ARMT: { qual: 40, final: 30 }, APMT: { qual: 40, final: 30 },
 };
 

@@ -42,9 +42,12 @@ export const disciplineCodeEnum = pgEnum("discipline_code", [
   "R3PW", // Rifle 3-Position Women (3x40 Senior)
   "R3JM", // Rifle 3-Position Junior Men (3x20)
   "R3JW", // Rifle 3-Position Junior Women (3x20)
+  "RPRM", // 50m Rifle Prone Men (60 hitaca)
+  "RPRW", // 50m Rifle Prone Women (60 hitaca)
   // Pistol
   "SPW",  // 25m Sport Pistol Women
-  "RFPM", // 25m Rapid Fire Pistol Men — NA ČEKANJU: vrednost ostaje u enumu (bez migracije), ali se nigde ne uvozi ni prikazuje
+  "SPM",  // 25m Sport Pistol Men (nacionalna disciplina, format kao SPW)
+  "RFPM", // 25m Rapid Fire Pistol Men — samo kvalifikacija; format finala još nije potvrđen
   "FPM",  // 50m Free Pistol Men
 ]);
 

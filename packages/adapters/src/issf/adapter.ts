@@ -1,7 +1,7 @@
 const ISSF_API = "https://api.issf-sports.org/api/v01";
 const ISSF_WEB = "https://www.issf-sports.org";
 
-export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "R3PM" | "R3PW";
+export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "R3PM" | "R3PW" | "RPRM" | "RPRW" | "FPM";
 export type MixedTeamDisciplineCode = "APMT" | "ARMT";
 
 const ISSF_EVENT_MAP: Record<string, DisciplineCode> = {
@@ -11,6 +11,9 @@ const ISSF_EVENT_MAP: Record<string, DisciplineCode> = {
   APW:  "APW",
   R3PM: "R3PM",
   R3PW: "R3PW",
+  RPRM: "RPRM",
+  RPRW: "RPRW",
+  FPM:  "FPM",
 };
 
 // ISSF may use various codes for mixed team events
@@ -290,7 +293,10 @@ const EVENT_DISCIPLINE_MAP: Array<[RegExp, string]> = [
   [/10m air pistol women/i,       "APW"],
   [/50m rifle 3.positions? men/i, "R3PM"],
   [/50m rifle 3.positions? women/i,"R3PW"],
+  [/50m rifle prone men/i,        "RPRM"],
+  [/50m rifle prone women/i,      "RPRW"],
   [/25m (?:sport )?pistol women/i,"SPW"],
+  [/25m (?:sport )?pistol men/i,  "SPM"],
   [/50m free pistol/i,            "FPM"],
   // 25m rapid fire pistol (brzometni pištolj) namerno nije ovde: pravila još nisu implementirana,
   // pa ne sme ni u raspored (live-fetch cron bi ga inače povukao iz SIUS-a).
@@ -311,7 +317,7 @@ function mapTitleToDisciplineCode(title: string): string | null {
   return null;
 }
 
-// SPW splits qualification into two stages — precision and rapid fire — each
+// SPW/SPM split qualification into two stages — precision and rapid fire — each
 // scheduled as its own slot (and each may span multiple relays/rounds), but
 // both feed one combined qual ranking (see live-fetch cron dedup). Only SPW
 // carries this split, so the sub-stage check only applies once we know the row is SPW.
@@ -320,7 +326,7 @@ function detectStage(title: string, disciplineCode: string | null): ISSFSchedule
   if (/^medal ceremony/i.test(title))     return "ceremony";
   if (/^final\s/i.test(title))            return "final";
   if (/elimination/i.test(title))         return "elimination";
-  if (disciplineCode === "SPW") {
+  if (disciplineCode === "SPW" || disciplineCode === "SPM") {
     if (/precision/i.test(title)) return "qual_precision";
     if (/rapid/i.test(title))     return "qual_rapid";
   }

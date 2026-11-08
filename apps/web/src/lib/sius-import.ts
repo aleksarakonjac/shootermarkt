@@ -10,7 +10,7 @@ import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_share
 import { stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
 import { matchShooter } from "@shootermarkt/db/name-match";
 
-const SUPPORTED_CODES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW"] as const;
+const SUPPORTED_CODES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "RFPM"] as const;
 
 /** SIUS juniorski događaji imaju sufiks J (ARMJ, APMTJ…): osnovna disciplina + kategorija junior (U21). */
 function splitEventCode(eventCode: string): { code: string; category: ReviewRow["category"] } {

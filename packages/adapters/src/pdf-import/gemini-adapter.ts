@@ -18,10 +18,15 @@ Uzimaj SAMO ove discipline (ostale potpuno ignoriši — trap, skeet, 25m rapid 
 - APW = vazdušni pištolj 10m seniorke (ženske)
 - R3PM = MK puška trostav 3x40 seniori (muški) — 50m, tri stava
 - R3PW = MK puška trostav 3x40 seniorke (ženske) — 50m, tri stava
+- RPRM = MK puška ležeći 60 hitaca seniori (muški) — 50m
+- RPRW = MK puška ležeći 60 hitaca seniorke (ženske) — 50m
 - SPW = 25m sport pištolj seniorke (ženske)
+- SPM = 25m sport pištolj seniori (muški)
+- FPM = 50m pištolj (slobodni pištolj) seniori (muški)
+- RFPM = 25m brzometni pištolj seniori (muški)
 
 Za svaki event (tabela) u PDF-u izvuci:
-- discipline: kod discipline (ARM/ARW/APM/APW/R3PM/R3PW/SPW)
+- discipline: kod discipline (ARM/ARW/APM/APW/R3PM/R3PW/RPRM/RPRW/SPW/SPM/FPM/RFPM)
 - stage: "qualification" ili "final"
 - category: uzrasna kategorija iz naslova tabele — "cadet" (kadet/U16), "youth_junior" (mlađi junior/U18), "junior" (junior/U21), "u23" (U23), "senior" (seniori/seniorke ili bez oznake). Default "senior".
 - is_international: true ako su prikazane države kao timovi, false ako su klubovi
@@ -54,6 +59,12 @@ Pravila:
   Stojeći 2 (5). Vrati ih kroz series i series_labels baš tim redom. Tek posle
   eliminacije 8. i 7. strelca se hici pucaju pojedinačno: samo taj nastavak
   vrati kroz shots; cumulative čuva kumulativne vrednosti koje PDF prikazuje.
+- MK puška ležeći (RPRM/RPRW): 50m, 60 hitaca, decimalni skorovi, 6 serija po 10, ukupno do 654.0
+- Pištolj 50m (FPM): 60 hitaca, celi brojevi, 6 serija, ima inners, ukupno do 600
+- Brzometni pištolj (RFPM): 2 poluprograma po 30 hitaca, celi brojevi, ima inners, ukupno do 600.
+  series = 6 zbirova redom kako ih bilten prikazuje (8 s, 6 s, 4 s za prvi pa za drugi poluprogram).
+  RFPM finale za sada ignoriši (ne vraćaj final event).
+- Sport pištolj M (SPM) ima isti format kao SPW, uključujući finale.
 - Sport pištolj Ž (SPW): 25m, precizni + brzi deo, ukupno do 600. SPW FINALE
   u biltenu ima DVA reda brojeva po strelcu, bez pojedinačnih decimalnih hica:
   GORNJI red je kumulativni broj pogodaka, a DONJI red je broj pogodaka u toj

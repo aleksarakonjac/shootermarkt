@@ -16,7 +16,7 @@ const EXCEL_RESULT_COLUMNS = [
   { key: "gender", required: false, description: "M ili F. Ako je prazno, izvodi se iz discipline." },
   { key: "apparatus", required: false, description: "air_rifle, air_pistol, rifle ili pistol. Ako je prazno, izvodi se iz discipline." },
   { key: "club_name", required: false, description: "Naziv ili skraćenica kluba." },
-  { key: "discipline_code", required: true, description: "ARM, ARW, APM, APW, R3PM, R3PW ili SPW." },
+  { key: "discipline_code", required: true, description: "ARM, ARW, APM, APW, R3PM, R3PW, RPRM, RPRW, SPW, SPM, FPM ili RFPM." },
   { key: "result_category", required: false, description: "cadet, youth_junior, junior, u23 ili senior. Podrazumevano senior." },
   { key: "qualification_total", required: true, description: "Ukupan rezultat kvalifikacije." },
   { key: "qualification_inners", required: false, description: "Broj unutrašnjih desetki." },

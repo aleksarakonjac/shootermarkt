@@ -5,6 +5,7 @@ import { Fragment, type ReactNode, useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useParams } from "next/navigation";
 import type { ElimDetail, QualDetail, FinalDetail } from "@shootermarkt/db/schema";
+import { qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 import { ResultDetailPanel, finalSeriesValues } from "./ResultDetailPanel";
@@ -148,7 +149,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                           const index = singleCol ? 0 : Math.min(availableDiscs.indexOf(r.disciplineCode), 1);
                           const isExpanded = expanded.has(r.id);
                           const canExpand = r.elimDetail != null || r.elimTotal != null || r.qualDetail != null || (r.finalDetail != null && finalSeriesValues(r.finalDetail) != null);
-                          const qualDecimals = r.disciplineCode.startsWith("AR");
+                          const qualDecimals = qualHasDecimals(r.disciplineCode);
                           const finalDecimals = r.disciplineCode.startsWith("AR") || r.disciplineCode.startsWith("R3P") || r.disciplineCode.startsWith("AP");
                           const showInners = r.disciplineCode !== "ARM" && r.disciplineCode !== "ARW";
                           const fmtQual = (v: string) => qualDecimals ? parseFloat(v).toFixed(1) : Math.round(parseFloat(v)).toString();
@@ -167,7 +168,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                     const isExpanded = expanded.has(r.id);
                     const canExpand = r.elimDetail != null || r.elimTotal != null || r.qualDetail != null || (r.finalDetail != null && finalSeriesValues(r.finalDetail) != null);
                     if (!canExpand) return null;
-                    const qualDecimals = r.disciplineCode.startsWith("AR");
+                    const qualDecimals = qualHasDecimals(r.disciplineCode);
                     const finalDecimals = r.disciplineCode.startsWith("AR") || r.disciplineCode.startsWith("R3P") || r.disciplineCode.startsWith("AP");
                     const showInners = r.disciplineCode !== "ARM" && r.disciplineCode !== "ARW";
                     const fmtQual = (v: string) => qualDecimals ? parseFloat(v).toFixed(1) : Math.round(parseFloat(v)).toString();

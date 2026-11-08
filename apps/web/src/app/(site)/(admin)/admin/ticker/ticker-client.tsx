@@ -93,8 +93,8 @@ interface Props {
 
 const STAGE_OPTIONS = [
   { value: "qual",           label: "Kvalifikacije" },
-  { value: "qual_precision", label: "Precizna paljba (SPW)" },
-  { value: "qual_rapid",     label: "Brza paljba (SPW)" },
+  { value: "qual_precision", label: "Precizna paljba (SP)" },
+  { value: "qual_rapid",     label: "Brza paljba (SP)" },
   { value: "elimination",    label: "Eliminacije (R3)" },
   { value: "final",          label: "Finale" },
 ];
@@ -946,7 +946,7 @@ function SlotRow({ slot, timezone, live, onDelete }: { slot: SlotRow; timezone: 
 
 // ── AddSlotForm ───────────────────────────────────────────────────────────────
 
-const TICKER_DISCIPLINE_CODES = new Set(["ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "SPW"]);
+const TICKER_DISCIPLINE_CODES = new Set(["ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM"]);
 
 function AddSlotForm({ disciplines, compDateStart, compDateEnd, timezone, onAdd }: {
   disciplines: DisciplineOption[];

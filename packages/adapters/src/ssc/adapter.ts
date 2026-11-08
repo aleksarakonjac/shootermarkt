@@ -124,6 +124,12 @@ const DISC_MAP: Record<string, { male: string; female: string }> = {
   "10m Air Rifle 30 Shots": { male: "ARM", female: "ARW" },
   "10m Air Pistol":     { male: "APM", female: "APW" },
   "10m Air Pistol 30 Shots": { male: "APM", female: "APW" },
+  // ponytail: nazivi MK vežbi su pretpostavka po ISSF nazivima — dopuniti kad se vide na SSC-u
+  "50m Rifle Prone":    { male: "RPRM", female: "RPRW" },
+  "25m Pistol":         { male: "SPM", female: "SPW" },
+  "25m Sport Pistol":   { male: "SPM", female: "SPW" },
+  "50m Pistol":         { male: "FPM", female: "FPM" },
+  "25m Rapid Fire Pistol": { male: "RFPM", female: "RFPM" },
 };
 
 function resolveDisc(exerciseName: string, gender: string | null): string | null {

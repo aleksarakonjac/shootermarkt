@@ -14,7 +14,7 @@ import { TopFormaClient } from "./top-forma-client";
 import { useHomepageDataStatus } from "./homepage-data-status";
 import { LEVEL_STYLE } from "@/lib/competition-utils";
 import { MainSkeleton, TickerSkeleton } from "./homepage-skeleton";
-import { MIXED_TEAM_CODES } from "@shootermarkt/db/pdf-import-types";
+import { isSportPistolCode, MIXED_TEAM_CODES, qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
 import type { HomepageMainData } from "@/lib/homepage-data";
 
 type ResultPlace = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null; rpo?: boolean };
@@ -103,7 +103,12 @@ const DISC_FULL_NAMES: Record<string, { sr: string; en: string }> = {
   R3PW: { sr: "Puška trostav ženski", en: "Rifle 3 Position Women" },
   R3JM: { sr: "Puška trostav muški", en: "Rifle 3 Position Men" },
   R3JW: { sr: "Puška trostav ženski", en: "Rifle 3 Position Women" },
+  RPRM: { sr: "MK puška ležeći muški", en: "50m Rifle Prone Men" },
+  RPRW: { sr: "MK puška ležeći ženski", en: "50m Rifle Prone Women" },
   SPW: { sr: "Sport pištolj žene", en: "Sport Pistol Women" },
+  SPM: { sr: "Sport pištolj muški", en: "Sport Pistol Men" },
+  FPM: { sr: "Pištolj 50m muški", en: "50m Pistol Men" },
+  RFPM: { sr: "Brzometni pištolj muški", en: "25m Rapid Fire Pistol Men" },
 };
 
 const FALLBACK_LEVEL_STYLE = { background: "var(--level-club-bg)", color: "var(--level-club-fg)" };
@@ -324,7 +329,6 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
             .filter((p) => p.qualTop3.length > 0 || p.srbHighlights.length > 0 || p.isLive)
             .toSorted((a, b) => Number(b.stage === "final") - Number(a.stage === "final"));
           if (shownPhases.length === 0) return null;
-          const isAP = disc.discCode.startsWith("AP");
           const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-barlow-condensed)] text-[15px] font-bold uppercase tracking-[0.04em] text-[var(--muted)]">{DISC_FULL_NAMES[disc.discCode]?.[locale === "en" ? "en" : "sr"] ?? disc.discCode}</span>;
           const categoryLabel = CATEGORY_BADGE[disc.category]?.[locale === "en" ? 0 : 1] ?? null;
           const junBadge = categoryLabel ? <span className="shrink-0 text-[11px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>{categoryLabel}</span> : null;
@@ -334,7 +338,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
               {/* Naziv discipline vodi na prvu prikazanu fazu (finale ako postoji, inače kvalifikacije). */}
               <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="flex w-fit items-center gap-1 no-underline hover:opacity-80 transition-opacity">{discBadge}{junBadge}</ScopedLink>
               {shownPhases.map((phase) => {
-                const decimals = phase.stage === "elimination" || (isAP && phase.stage !== "final") || disc.discCode === "SPW" || (disc.discCode.startsWith("R3") && phase.stage !== "final") ? 0 : 1;
+                const decimals = phase.stage === "elimination" || (!qualHasDecimals(disc.discCode) && phase.stage !== "final") || isSportPistolCode(disc.discCode) ? 0 : 1;
                 const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? `E${phase.elimRound ?? ""}` : phase.stage === "final" ? "F" : "Q"}</span>;
                 const hasFinal = shownPhases.some((item) => item.stage === "final");
                 const qualKey = `${competitionId}:${disc.discCode}:${phase.category}:qual`;

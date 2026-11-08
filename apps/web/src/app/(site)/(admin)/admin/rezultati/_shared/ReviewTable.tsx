@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORY_LABEL, DISCIPLINE_META, type AgeCategory, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
+import { CATEGORY_LABEL, DISCIPLINE_META, isSportPistolCode, qualHasDecimals, type AgeCategory, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import { REVIEW_DISCIPLINE_CODES } from "@shootermarkt/db/discipline";
 import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { ShooterMatchCell } from "./ShooterMatchCell";
@@ -9,10 +9,9 @@ import { UnmatchedPanel } from "./UnmatchedPanel";
 
 const COLLAPSE_AT = 10;
 
-const isQualDecimal = (code: string) => code.startsWith("AR");
 const isFinalDecimal = (code: string) => code.startsWith("AR") || code.startsWith("R3P") || code.startsWith("AP");
 const fmtScore = (v: number, code: string) =>
-  isQualDecimal(code) ? v.toFixed(1) : String(Math.round(v));
+  qualHasDecimals(code) ? v.toFixed(1) : String(Math.round(v));
 const fmtFinal = (v: number, code: string) =>
   isFinalDecimal(code) ? v.toFixed(1) : String(Math.round(v));
 const CATEGORY_OPTIONS = (Object.keys(CATEGORY_LABEL) as AgeCategory[]).map((value) => ({ value, label: CATEGORY_LABEL[value] }));
@@ -190,7 +189,7 @@ function EliminationTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChan
 
 function FinalsTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: Props["onRowChange"] }) {
   if (rows.length === 0) return null;
-  const isHitCountFinal = rows[0]?.row.disciplineCode === "SPW";
+  const isHitCountFinal = isSportPistolCode(rows[0]?.row.disciplineCode);
   const finalValues = (row: ReviewRow) => row.finalCumulative ?? row.finalSeries ?? [];
   const intermediateCount = Math.max(...rows.map(({ row }) => Math.max(row.finalCumulative?.length ?? 0, row.finalSeries?.length ?? 0)));
   const intermediateLabel = isHitCountFinal ? "Gore: ukupno pogodaka. Dole: pogodaka u seriji." : rows.some(({ row }) => row.finalCumulative?.length) ? "Tok finala" : "Međuserije";

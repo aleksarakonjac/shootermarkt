@@ -9,7 +9,7 @@ import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import { useRowFlash } from "./useRowFlash";
-import { isUnrankedRemark, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
+import { isSportPistolCode, isUnrankedRemark, qualHasDecimals, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 const POSITION_LABELS = ["Klečeći", "Ležeći", "Stojeći"] as const;
 const POSITION_LABELS_EN = ["Kneeling", "Prone", "Standing"] as const;
@@ -27,7 +27,7 @@ const FLAT_GROUPS_BY_DISCIPLINE: Array<{ match: (code: string) => boolean; group
     { label: "Ležeći", count: 2 },
     { label: "Stojeći", count: 2 },
   ] },
-  { match: (c) => c === "SPW", groups: [
+  { match: isSportPistolCode, groups: [
     { label: "Precizno", count: 3 },
     { label: "Brzo", count: 3 },
   ] },
@@ -214,7 +214,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
   const isAirRifle =
     results[0]?.apparatus === "air_rifle" ||
     (results[0]?.disciplineCode?.startsWith("AR") ?? false);
-  const hasDecimals = isAirRifle;
+  const hasDecimals = isAirRifle || qualHasDecimals(results[0]?.disciplineCode);
 
   // Detect display type from first result with qualDetail
   const firstWithDetail = results.find((r) => r.qualDetail != null);

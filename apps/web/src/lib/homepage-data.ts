@@ -1,6 +1,7 @@
 import { db } from "@shootermarkt/db";
 import { clubs, competitionSchedule, competitions, countries, disciplines, mixedTeamResults, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@shootermarkt/db/schema";
 import { displayNoc, NOC_LIST } from "@shootermarkt/db/noc-list";
+import { isSportPistolCode, qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
 import { effectiveFocusPriority } from "@/lib/competition-priority";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
@@ -257,7 +258,7 @@ export async function getHomepageTicker(scope: Scope, locale: string) {
     const isFinal = slot.stage === "final" || slot.stage === "elimination";
     const ranked = resultRows.filter((row) => row.competitionId === slot.competitionId && row.disciplineId === slot.disciplineId && row.category === slot.category && (isFinal ? row.finalRank != null && row.finalTotal != null : row.qualRank != null && row.qualTotal != null)).sort((a, b) => Number(isFinal ? a.finalRank : a.qualRank) - Number(isFinal ? b.finalRank : b.qualRank)).slice(0, 3);
     if (!ranked.length) return null;
-    return ranked.map((row, index) => `${index + 1}. ${row.lastName} ${Number(isFinal ? row.finalTotal : row.qualTotal).toFixed(!isFinal && (slot.discCode.startsWith("AP") || slot.discCode.startsWith("R3")) ? 0 : 1)}`).join(" · ");
+    return ranked.map((row, index) => `${index + 1}. ${row.lastName} ${Number(isFinal ? row.finalTotal : row.qualTotal).toFixed((isFinal ? isSportPistolCode(slot.discCode) : !qualHasDecimals(slot.discCode)) ? 0 : 1)}`).join(" · ");
   };
   const live = liveRows.map((competition) => {
     const competitionSlots = slots.filter((slot) => slot.competitionId === competition.id);

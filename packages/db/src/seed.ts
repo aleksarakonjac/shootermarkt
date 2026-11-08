@@ -49,7 +49,12 @@ async function seed() {
       { code: "R3PW", name: "50m Rifle 3-Position Women",        shortName: "R3P Women",    gender: "F", distance: 50, apparatus: "rifle",   maxQualScore: "1308.0" },
       { code: "R3JM", name: "50m Rifle 3-Position Junior Men",   shortName: "R3P Jr Men",   gender: "M", distance: 50, apparatus: "rifle",   maxQualScore: "600"    },
       { code: "R3JW", name: "50m Rifle 3-Position Junior Women", shortName: "R3P Jr Women", gender: "F", distance: 50, apparatus: "rifle",   maxQualScore: "600"    },
+      // 50m Rifle Prone (MK Puška ležeći)
+      { code: "RPRM", name: "50m Rifle Prone Men",   shortName: "Prone Men",   gender: "M", distance: 50, apparatus: "rifle", maxQualScore: "654.0" },
+      { code: "RPRW", name: "50m Rifle Prone Women", shortName: "Prone Women", gender: "F", distance: 50, apparatus: "rifle", maxQualScore: "654.0" },
       // Pistol
+      { code: "SPM",  name: "25m Sport Pistol Men",       shortName: "SP Men",   gender: "M", distance: 25, apparatus: "pistol", maxQualScore: "600"  },
+      { code: "RFPM", name: "25m Rapid Fire Pistol Men",  shortName: "RFP Men",  gender: "M", distance: 25, apparatus: "pistol", maxQualScore: "600"  },
       { code: "SPW",  name: "25m Sport Pistol Women",     shortName: "SP Women", gender: "F", distance: 25, apparatus: "pistol", maxQualScore: "600"  },
       { code: "FPM",  name: "50m Free Pistol Men",        shortName: "FP Men",   gender: "M", distance: 50, apparatus: "pistol", maxQualScore: "600"  },
     ])
@@ -248,6 +253,36 @@ async function seed() {
         qualDisplayType: "positions_3x4",
         finalDisplayType: "3x40_mk",
         finalStructureDef: mk3x40Final,
+        isDefault: true,
+      },
+      // ── 50m Rifle Prone — 60 hitaca decimalno, bez finala ──
+      ...(["RPRM", "RPRW"] as const).map((code) => ({
+        disciplineId: byCode[code],
+        code: `${code.toLowerCase()}-issf-60`,
+        name: `MK Puška ležeći 60 metaka (${code === "RPRM" ? "Muškarci" : "Žene"})`,
+        totalShots: 60,
+        maxScore: "654.0",
+        hasDecimals: true,
+        structureType: "series" as const,
+        structureDef: arSeries6,
+        qualDisplayType: "series_6",
+        finalDisplayType: null,
+        finalStructureDef: null,
+        isDefault: true,
+      })),
+      // ── 50m Free Pistol Men — 60 hitaca celi brojevi, bez finala ──
+      {
+        disciplineId: byCode["FPM"],
+        code: "fpm-issf-60",
+        name: "Slobodni pištolj 60 metaka",
+        totalShots: 60,
+        maxScore: "600",
+        hasDecimals: false,
+        structureType: "series",
+        structureDef: apSeries6,
+        qualDisplayType: "series_6_inners",
+        finalDisplayType: null,
+        finalStructureDef: null,
         isDefault: true,
       },
     ])

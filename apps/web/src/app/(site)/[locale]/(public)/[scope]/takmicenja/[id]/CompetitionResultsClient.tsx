@@ -130,13 +130,18 @@ const DISCIPLINE_NAMES: Record<string, { sr: string; en: string }> = {
   APMT: { sr: "10m pištolj miks",    en: "Air Pistol Mixed Team" },
   ARMT: { sr: "10m puška miks",      en: "Air Rifle Mixed Team" },
   SPW:  { sr: "Sport pištolj Ž",     en: "Sport pistol W" },
+  SPM:  { sr: "Sport pištolj M",     en: "Sport pistol M" },
+  RPRM: { sr: "MK ležeći M",         en: "50m prone M" },
+  RPRW: { sr: "MK ležeći Ž",         en: "50m prone W" },
+  FPM:  { sr: "Pištolj 50m M",       en: "50m pistol M" },
+  RFPM: { sr: "Brzometni pištolj M", en: "Rapid fire pistol M" },
   R3JM: { sr: "3×20 puška jr. M",    en: "3×20 rifle jr. M" },
   R3JW: { sr: "3×20 puška jr. Ž",    en: "3×20 rifle jr. W" },
 };
 
 // Keep the overview readable as a program, not as the order rows happened to
 // arrive from separate individual and mixed-result queries.
-const DISCIPLINE_ORDER = ["ARM", "ARW", "ARMT", "R3PM", "R3PW", "R3JM", "R3JW", "APM", "APW", "APMT", "SPW", "FPM"];
+const DISCIPLINE_ORDER = ["ARM", "ARW", "ARMT", "R3PM", "R3PW", "R3JM", "R3JW", "RPRM", "RPRW", "APM", "APW", "APMT", "SPW", "SPM", "RFPM", "FPM"];
 function disciplineOrder(code: string) {
   const index = DISCIPLINE_ORDER.indexOf(code);
   return index === -1 ? DISCIPLINE_ORDER.length : index;
@@ -151,7 +156,7 @@ const FAMILY_LABELS: Record<string, Record<Family, string>> = {
   en: { airRifle: "Air rifle", rifle: "Rifle", airPistol: "Air pistol", pistol: "Pistol" },
 };
 function disciplineFamily(code: string): Family {
-  return code.startsWith("AR") ? "airRifle" : code.startsWith("AP") ? "airPistol" : code.startsWith("R3") ? "rifle" : "pistol";
+  return code.startsWith("AR") ? "airRifle" : code.startsWith("AP") ? "airPistol" : code.startsWith("R3") || code.startsWith("RPR") ? "rifle" : "pistol";
 }
 const ddmm = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
 function weekday(iso: string, locale: string, format: "long" | "short" = "long"): string {

@@ -7,7 +7,11 @@ export const isUnrankedRemark = (remark: string | null | undefined): boolean => 
 
 export type RemarkDetails = { qual?: StageRemarks; elim?: StageRemarks; final?: StageRemarks };
 
-export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "ARMT" | "APMT" | "R3PM" | "R3PW" | "SPW";
+export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "ARMT" | "APMT" | "R3PM" | "R3PW" | "RPRM" | "RPRW" | "SPW" | "SPM" | "FPM" | "RFPM";
+/** 25m sport pištolj (precizno + brzo, finale na pogotke) — SPM ima isti format kao SPW. */
+export const isSportPistolCode = (code: string | null | undefined): boolean => code === "SPW" || code === "SPM";
+/** Kvalifikacija u decimalama: vazdušna puška (AR*) i MK ležeći (RPR*). R3P ima svoju logiku po varijanti. */
+export const qualHasDecimals = (code: string | null | undefined): boolean => !!code && (code.startsWith("AR") || code.startsWith("RPR"));
 export const MIXED_TEAM_CODES = ["ARMT", "APMT"] as const;
 export type MixedTeamCode = typeof MIXED_TEAM_CODES[number];
 
@@ -101,7 +105,12 @@ export const DISCIPLINE_META: Record<DisciplineCode, { apparatus: string; gender
   APMT: { apparatus: "air_pistol", gender: null, label: "Vazdušni pištolj Mešoviti tim" },
   R3PM: { apparatus: "rifle",      gender: "M",  label: "MK puška trostav M" },
   R3PW: { apparatus: "rifle",      gender: "F",  label: "MK puška trostav Ž" },
+  RPRM: { apparatus: "rifle",      gender: "M",  label: "MK puška ležeći M" },
+  RPRW: { apparatus: "rifle",      gender: "F",  label: "MK puška ležeći Ž" },
   SPW:  { apparatus: "pistol",     gender: "F",  label: "Sport pištolj Ž" },
+  SPM:  { apparatus: "pistol",     gender: "M",  label: "Sport pištolj M" },
+  FPM:  { apparatus: "pistol",     gender: "M",  label: "Slobodni pištolj M" },
+  RFPM: { apparatus: "pistol",     gender: "M",  label: "Brzometni pištolj M" },
 };
 
 /** Kodovi disciplina koje uvozimo. */
@@ -262,6 +271,8 @@ export function mergeFinalsIntoRows(
   let unmatchedFinals = 0;
 
   for (const event of finalEvents) {
+    // ponytail: format RFPM finala nije potvrđen — finale se ne uvozi dok se ne definiše struktura
+    if (event.discipline === "RFPM") continue;
     for (const rawResult of event.results as ParsedFinalResult[]) {
       const teamNoc = rawResult.teamNoc.toUpperCase();
       const candidates = rows.filter((row) => (
@@ -290,7 +301,7 @@ export function mergeFinalsIntoRows(
         rawResult.cumulative ?? undefined,
         (event.results as ParsedFinalResult[]).map((result) => result.cumulative ?? undefined),
       );
-      row.finalScoring = event.discipline === "SPW" ? "hit_count" : "decimal";
+      row.finalScoring = isSportPistolCode(event.discipline) ? "hit_count" : "decimal";
       row.qualified = true;
       matchedFinals++;
     }

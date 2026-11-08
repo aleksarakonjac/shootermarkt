@@ -113,6 +113,24 @@ describe("mergeFinalsIntoRows", () => {
     });
   });
 
+  it("marks SPM finals as hit-count and skips RFPM finals", () => {
+    const row = (disciplineCode: ReviewRow["disciplineCode"]): ReviewRow => ({
+      firstName: "Petar", lastName: "Jović", teamNoc: "SRB", disciplineCode, category: "senior", qualTotal: 580,
+    });
+    const final = (discipline: ParsedEvent["discipline"]): ParsedEvent => ({
+      discipline, stage: "final", category: "senior", results: [{
+        rank: 1, lastName: "Jović", firstName: "Petar", teamNoc: "SRB", total: 30,
+      }],
+    });
+    const rows = [row("SPM"), row("RFPM")];
+
+    const merged = mergeFinalsIntoRows(rows, [final("SPM"), final("RFPM")], foldName);
+
+    expect(rows[0]).toMatchObject({ finalTotal: 30, finalScoring: "hit_count" });
+    expect(rows[1]?.finalTotal).toBeUndefined();
+    expect(merged.matchedFinals).toBe(1);
+  });
+
   it("preserves MK final phase labels and only its elimination shots", () => {
     const rows: ReviewRow[] = [{
       firstName: "Nikola", lastName: "Kovačević", teamNoc: "SRB", disciplineCode: "R3PM",

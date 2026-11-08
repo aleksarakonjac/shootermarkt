@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useState } from "react";
-import type { ReviewRow, DisciplineCode } from "@shootermarkt/db/pdf-import-types";
+import { isSportPistolCode, type ReviewRow, type DisciplineCode } from "@shootermarkt/db/pdf-import-types";
 import { CompetitionSearchSelect, type CompetitionOption } from "@/components/ui/CompetitionSearchSelect";
 import { DonePanel } from "../_shared/DonePanel";
 import { NocCellSelect } from "@/components/ui/NocCellSelect";
@@ -11,10 +11,10 @@ import { LEVEL_LABEL, LEVEL_STYLE } from "@/lib/competition-utils";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ALL_DISCIPLINES: DisciplineCode[] = [
-  "ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "SPW",
+  "ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "RFPM",
 ];
 
-const MULTI_SERIES = new Set<DisciplineCode>(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW"]);
+const MULTI_SERIES = new Set<DisciplineCode>(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "FPM", "RFPM"]);
 const THREE_POS    = new Set<DisciplineCode>(["R3PM", "R3PW"]);
 const MIXED_TEAM   = new Set<DisciplineCode>(["ARMT", "APMT"]);
 
@@ -38,7 +38,12 @@ const DISC_LABEL: Record<DisciplineCode, string> = {
   APMT: "10m Air Pistol Mixed Team",
   R3PM: "50m Rifle 3 Positions Men",
   R3PW: "50m Rifle 3 Positions Women",
+  RPRM: "50m Rifle Prone Men",
+  RPRW: "50m Rifle Prone Women",
   SPW:  "25m Sport Pistol Women",
+  SPM:  "25m Sport Pistol Men",
+  FPM:  "50m Pistol Men",
+  RFPM: "25m Rapid Fire Pistol Men",
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -125,6 +130,7 @@ function getConstraints(disc: DisciplineCode, finals: boolean): SeriesConstraint
   const int = (maxSeries: number, maxTotal: number): SeriesConstraints =>
     ({ step: 1, maxSeries, maxTotal, placeholder: "0" });
   if (disc === "ARM" || disc === "ARW")   return finals ? dec(54.5, 261.6)  : dec(109.0, 654.0);
+  if (disc === "RPRM" || disc === "RPRW") return dec(109.0, 654.0);
   if (disc === "APM" || disc === "APW")   return finals ? dec(54.5, 261.6)  : int(100, 600);
   if (disc === "R3PM" || disc === "R3PW") return finals ? dec(54.5, 381.5)  : int(100, 600);
   return int(100, 600);
@@ -173,7 +179,7 @@ export function ManualMode() {
   const isMixedTeam  = MIXED_TEAM.has(discipline);
   const isMultiSeries = MULTI_SERIES.has(discipline);
   const isThreePos    = THREE_POS.has(discipline);
-  const isSportPistol = discipline === "SPW";
+  const isSportPistol = isSportPistolCode(discipline);
   const constraints   = getConstraints(discipline, isFinals);
   const mixedCons     = getMixedSeriesConstraints(discipline);
 
