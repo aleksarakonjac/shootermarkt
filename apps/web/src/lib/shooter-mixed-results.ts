@@ -39,7 +39,8 @@ const titleCase = (value: string) => value.toLowerCase().replace(/(^|[\s-])(\p{L
 
 /** "Ž. Petrović" iz povezanog strelca, inače iz SIUS imena "PETROVIĆ Žaklina". */
 export function partnerShortName(firstName: string | null, lastName: string | null, displayName: string | null): string | null {
-  if (firstName && lastName) return `${firstName[0]}. ${lastName}`;
+  // Prezimena u bazi su često velikim slovima (ISSF/SIUS uvoz) — prikaz u title case.
+  if (firstName && lastName) return `${firstName[0]}. ${lastName === lastName.toUpperCase() ? titleCase(lastName) : lastName}`;
   if (!displayName?.trim()) return null;
   const split = splitDisplayName(displayName);
   return split.firstName ? `${split.firstName[0]}. ${titleCase(split.lastName)}` : titleCase(split.lastName);

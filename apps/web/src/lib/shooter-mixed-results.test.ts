@@ -34,6 +34,7 @@ describe("partnerShortName", () => {
     expect(partnerShortName(null, null, "KOCHALUMKAL VINOD Vidarsa")).toBe("V. Kochalumkal Vinod");
     expect(partnerShortName("Žaklina", "Petrović", "ignored")).toBe("Ž. Petrović");
     expect(partnerShortName(null, null, null)).toBeNull();
+    expect(partnerShortName("Islam", "SATPAYEV", null)).toBe("I. Satpayev");
   });
 });
 
