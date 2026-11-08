@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
 import { shooters, clubs, results, disciplines, competitions, shooterFormaCache } from "@shootermarkt/db/schema";
-import { eq, inArray, isNotNull, and, asc } from "drizzle-orm";
+import { eq, inArray, isNotNull, and, asc, notInArray } from "drizzle-orm";
+import { ESC_SOLO_CODES } from "@shootermarkt/db/pdf-import-types";
 import { currentSeasonStartYear, seasonLabel as formatSeasonLabel } from "@/lib/ranking-metrics";
 
 export async function GET(req: NextRequest) {
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
       .from(results)
       .innerJoin(disciplines, eq(results.disciplineId, disciplines.id))
       .innerJoin(competitions, eq(results.competitionId, competitions.id))
-      .where(and(inArray(results.shooterId, ids), isNotNull(results.qualTotal)))
+      .where(and(inArray(results.shooterId, ids), isNotNull(results.qualTotal), notInArray(disciplines.code, [...ESC_SOLO_CODES])))
       .orderBy(asc(competitions.date)),
   ]);
 

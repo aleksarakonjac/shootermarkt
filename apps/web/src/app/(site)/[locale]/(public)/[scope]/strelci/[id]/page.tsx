@@ -14,7 +14,7 @@ import { FormaChart } from "@/components/shooter/FormaChart";
 import type { ChartPoint, FormaScore } from "@/components/shooter/FormaChart";
 import { FormaScoreHeading } from "@/components/shooter/FormaScoreHeading";
 import { CareerStats, type CareerStat } from "@/components/shooter/CareerStats";
-import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@shootermarkt/db/pdf-import-types";
+import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear, isEscSoloCode } from "@shootermarkt/db/pdf-import-types";
 import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
 import { getLocale, getTranslations } from "next-intl/server";
 import { pageParams } from "@/i18n/page-params";
@@ -133,10 +133,11 @@ export default async function ShooterPage({ params }: Props) {
 
   // ── Quick stats ──────────────────────────────────────────────────────────────
   const totalAppearances = shooterResults.length;
-  const finalesCount = shooterResults.filter((r) => r.finalRank != null).length;
+  // ESC Solo (pogoci) se ne meša sa ISSF finalima ni sa najboljim skorom.
+  const finalesCount = shooterResults.filter((r) => r.finalRank != null && !isEscSoloCode(r.disciplineCode)).length;
 
   const peakResult = shooterResults
-    .filter((r) => r.qualTotal != null)
+    .filter((r) => r.qualTotal != null && !isEscSoloCode(r.disciplineCode))
     .reduce<{ score: number; code: string } | null>((best, r) => {
       const s = parseFloat(r.qualTotal!);
       return !best || s > best.score ? { score: s, code: r.disciplineCode } : best;
