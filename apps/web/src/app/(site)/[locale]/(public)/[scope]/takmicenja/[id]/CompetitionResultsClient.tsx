@@ -6,7 +6,9 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { ChevronRight, ChevronLeft, RefreshCw } from "lucide-react";
 import type { QualDetail, FinalDetail, ElimDetail, AgeCategory } from "@shootermarkt/db/schema";
-import { CATEGORY_LABEL, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
+import { CATEGORY_LABEL, isEscSoloCode, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
+import { DISCIPLINE_DISPLAY_ORDER } from "@shootermarkt/db/discipline-names";
+import { EscSoloResults } from "@/components/result-display/EscSoloResults";
 import {
   CompetitionQualTable,
   type CompResultRow,
@@ -142,13 +144,17 @@ const DISCIPLINE_NAMES: Record<string, { sr: string; en: string }> = {
   RPR300M: { sr: "300m ležeći M",    en: "300m prone M" },
   RPR300W: { sr: "300m ležeći Ž",    en: "300m prone W" },
   STR300:  { sr: "300m standard puška", en: "300m standard rifle" },
+  SOLOARM: { sr: "Vazdušna puška ESC Solo M", en: "Air rifle ESC Solo M" },
+  SOLOARW: { sr: "Vazdušna puška ESC Solo Ž", en: "Air rifle ESC Solo W" },
+  SOLOAPM: { sr: "Vazdušni pištolj ESC Solo M", en: "Air pistol ESC Solo M" },
+  SOLOAPW: { sr: "Vazdušni pištolj ESC Solo Ž", en: "Air pistol ESC Solo W" },
   R3JM: { sr: "3×20 puška jr. M",    en: "3×20 rifle jr. M" },
   R3JW: { sr: "3×20 puška jr. Ž",    en: "3×20 rifle jr. W" },
 };
 
 // Keep the overview readable as a program, not as the order rows happened to
 // arrive from separate individual and mixed-result queries.
-const DISCIPLINE_ORDER = ["ARM", "ARW", "ARMT", "R3PM", "R3PW", "R3JM", "R3JW", "RPRM", "RPRW", "APM", "APW", "APMT", "SPW", "SPM", "STPW", "STPM", "RFPM", "FPM", "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300"];
+const DISCIPLINE_ORDER = DISCIPLINE_DISPLAY_ORDER;
 function disciplineOrder(code: string) {
   const index = DISCIPLINE_ORDER.indexOf(code);
   return index === -1 ? DISCIPLINE_ORDER.length : index;
@@ -163,6 +169,8 @@ const FAMILY_LABELS: Record<string, Record<Family, string>> = {
   en: { airRifle: "Air rifle", rifle: "Rifle", airPistol: "Air pistol", pistol: "Pistol" },
 };
 function disciplineFamily(code: string): Family {
+  if (code.startsWith("SOLOAR")) return "airRifle";
+  if (code.startsWith("SOLOAP")) return "airPistol";
   return code.startsWith("AR") ? "airRifle" : code.startsWith("AP") ? "airPistol" : code.startsWith("R3") || code.startsWith("RPR") || code === "STR300" ? "rifle" : "pistol";
 }
 const ddmm = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
@@ -955,6 +963,9 @@ function CompetitionDetail({
     ...(hasFinal ? [{ key: "final" as Stage, label: phaseL.final, shortLabel: phaseL.final, badge: <PhaseBadge label="F" accent={selection.stage === "final"} /> }] : []),
   ];
 
+  // ESC Solo nema Q/E/F tabove: jedna stranica sa mečevima i obe kvalifikacije.
+  const isSolo = isEscSoloCode(group?.code ?? selection.disciplineCode);
+
   // If the selected stage no longer applies (e.g. qual hasn't started yet), fall back to a valid one
   const effectiveStage: Stage = stageOptions.some((o) => o.key === selection.stage)
     ? selection.stage
@@ -978,7 +989,7 @@ function CompetitionDetail({
             className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded shrink-0"
             style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
           >
-            {group?.code ?? selection.disciplineCode}
+            {isEscSoloCode(group?.code ?? selection.disciplineCode) ? "ESC" : group?.code ?? selection.disciplineCode}
           </span>
           <h3
             className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase"
@@ -1002,7 +1013,7 @@ function CompetitionDetail({
       </div>
 
       {/* ── Stage toggle ─────────────────────────────────────────── */}
-      {(stageOptions.length > 1 || (effectiveStage === "elim" && elimRounds.length > 1)) && (
+      {!isSolo && (stageOptions.length > 1 || (effectiveStage === "elim" && elimRounds.length > 1)) && (
         <div className={`mb-4 flex w-full flex-col items-start sm:inline-flex sm:w-auto ${elimRounds.length > 1 ? "min-h-[5rem]" : ""}`}>
           {stageOptions.length > 1 && (
             <div className={`${stageOptions.length === 3 ? "grid-cols-3" : "grid-cols-2"} grid w-full items-center gap-0.5 border border-[var(--border)] bg-[var(--surface)] p-1 sm:flex sm:w-auto ${effectiveStage === "elim" && elimRounds.length > 1 ? "rounded-t-lg rounded-br-lg rounded-bl-none" : "rounded-lg"}`}>
@@ -1076,6 +1087,9 @@ function CompetitionDetail({
       )}
 
       {/* ── Table ────────────────────────────────────────────────── */}
+      {isSolo ? (
+        <EscSoloResults results={catGroup?.results ?? []} disciplineCode={group?.code ?? selection.disciplineCode} locale={locale} />
+      ) : (
       <AnimatePresence mode="wait" initial={false}>
         {effectiveStage === "elim" ? (
           <motion.div
@@ -1106,6 +1120,7 @@ function CompetitionDetail({
           </motion.div>
         )}
       </AnimatePresence>
+      )}
     </div>
   );
 }
