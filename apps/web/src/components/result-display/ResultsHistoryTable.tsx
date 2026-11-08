@@ -27,6 +27,13 @@ function formatCompetitionDate(date: string, dateEnd: string | null) {
 
 export type ResultRowData = {
   id: number;
+  /** Jedinstven ključ reda: "r:<results.id>" ili "m:<mixed_team_results.id>" (id-jevi iz dve tabele se preklapaju). */
+  rowKey: string;
+  kind: "individual" | "mixed" | "esc";
+  /** Mešoviti tim: partner ("Ž. Petrović"). */
+  partnerName?: string | null;
+  /** Mešoviti tim: serije ovog strelca i partnera. */
+  mixedDetail?: { own: { series: number[]; total: number } | null; partner: { series: number[]; total: number } | null } | null;
   competitionId: number;
   qualTotal: string | null;
   qualRank: number | null;

@@ -25,6 +25,8 @@ import { ArrowRight } from "lucide-react";
 import { ShooterAvatarLightbox } from "@/components/shooter/ShooterAvatarLightbox";
 import { INVALID_REMARKS } from "@/lib/forma-query";
 import { FORMA_DISCIPLINE_CODES } from "@/lib/forma";
+import { getShooterMixedRows } from "@/lib/shooter-mixed-results";
+import { toIndividualHistoryRow } from "@/lib/shooter-results";
 
 type Props = { params: Promise<{ locale: string; id: string; scope: Scope }> };
 
@@ -62,7 +64,7 @@ export default async function ShooterPage({ params }: Props) {
   const shooterId = parseInt(id);
   if (!/^\d{1,9}$/.test(id)) notFound();
 
-  const [shooter, shooterResults, cacheRows] = await Promise.all([
+  const [shooter, shooterResults, cacheRows, mixedRows] = await Promise.all([
     getShooter(shooterId),
     db
       .select({
@@ -126,13 +128,15 @@ export default async function ShooterPage({ params }: Props) {
       })
       .from(shooterFormaCache)
       .where(eq(shooterFormaCache.shooterId, shooterId)),
+    getShooterMixedRows(shooterId),
   ]);
   if (!shooter) notFound();
 
   const initials = `${shooter.firstName[0]}${shooter.lastName[0]}`;
 
   // ── Quick stats ──────────────────────────────────────────────────────────────
-  const totalAppearances = shooterResults.length;
+  // Nastupi: pojedinačni (uključujući ESC Solo) i mešoviti tim.
+  const totalAppearances = shooterResults.length + mixedRows.length;
   // ESC Solo (pogoci) se ne meša sa ISSF finalima ni sa najboljim skorom.
   const finalesCount = shooterResults.filter((r) => r.finalRank != null && !isEscSoloCode(r.disciplineCode)).length;
 
@@ -146,10 +150,13 @@ export default async function ShooterPage({ params }: Props) {
   const activeSince = shooterResults.length > 0
     ? new Date(shooterResults[0].competitionDate).getFullYear()
     : null;
+  // Istorija: pojedinačni + mešoviti redovi, hronološki (tabela sama okreće na najnovije).
+  const historyRows = [...shooterResults.map(toIndividualHistoryRow), ...mixedRows]
+    .sort((a, b) => (a.competitionDate === b.competitionDate ? a.competitionId - b.competitionId : a.competitionDate < b.competitionDate ? -1 : 1));
   const recentCompetitionIds = new Set(
-    [...shooterResults].reverse().map((result) => result.competitionId).filter((id, index, ids) => ids.indexOf(id) === index).slice(0, 5),
+    [...historyRows].reverse().map((result) => result.competitionId).filter((id, index, ids) => ids.indexOf(id) === index).slice(0, 5),
   );
-  const recentResults = shooterResults.filter((result) => recentCompetitionIds.has(result.competitionId));
+  const recentResults = historyRows.filter((result) => recentCompetitionIds.has(result.competitionId));
 
   // Trenutna uzrasna kategorija — uvek iz godine rođenja (ISSF standard), nezavisno
   // od kategorije zabeleženih rezultata (koja je istorijska, po konkretnom takmičenju).
