@@ -24,6 +24,7 @@ import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 import { ArrowRight } from "lucide-react";
 import { ShooterAvatarLightbox } from "@/components/shooter/ShooterAvatarLightbox";
 import { INVALID_REMARKS } from "@/lib/forma-query";
+import { FORMA_DISCIPLINE_CODES } from "@/lib/forma";
 
 type Props = { params: Promise<{ locale: string; id: string; scope: Scope }> };
 
@@ -159,6 +160,7 @@ export default async function ShooterPage({ params }: Props) {
   // ── Chart data ───────────────────────────────────────────────────────────────
   // Isti filter kao forma (forma-query): bez nula i DNF/DNS/DSQ — tačke odgovaraju liniji forme.
   const isFormaResult = (r: (typeof shooterResults)[number]) =>
+    FORMA_DISCIPLINE_CODES.includes(r.disciplineCode) &&
     r.qualTotal != null && parseFloat(r.qualTotal) > 0 && !INVALID_REMARKS.includes(r.qualRemark ?? "");
   const chartPoints: ChartPoint[] = shooterResults
     .filter(isFormaResult)
