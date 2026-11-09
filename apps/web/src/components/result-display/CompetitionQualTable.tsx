@@ -282,8 +282,8 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
     .filter(Boolean)
     .join(" ");
   const mobileGridTemplateColumns = hasSeriesDetail
-    ? "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 30px 14px"
-    : "28px minmax(120px, 1fr) minmax(56px, 88px) 72px 34px";
+    ? "40px minmax(120px, 1fr) minmax(56px, 88px) 72px 30px 14px"
+    : "40px minmax(120px, 1fr) minmax(56px, 88px) 72px 34px";
 
   const allExpanded = hasSeriesDetail && sorted.every((r) => expanded.has(r.id));
   const toggleAll = () => {
@@ -362,7 +362,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                 >
                   {/* Rank */}
                   <div
-                    className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`}
+                    className={`${cellCls} max-sm:!px-1.5 justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`}
                     style={{ background: rowBg }}
                   >
                     {rankOf(r) != null ? (

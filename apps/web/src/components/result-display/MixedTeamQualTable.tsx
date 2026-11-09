@@ -115,7 +115,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   // Meč ima 12–16 hitaca po strelcu — ne staju u kolone, pa se prikazuju u proširenom redu (na svim širinama).
   const seriesHeaders = isMatch ? [] : Array.from({ length: seriesLen }, (_, i) => `S${i + 1}`);
   const SERIES_COL_W = "64px";
-  const mobileColumns = ["28px", "0px", "minmax(56px, 72px)", "minmax(0, 1fr)", "44px", "60px", "minmax(20px, max-content)", hasSeries ? "16px" : ""].filter(Boolean).join(" ");
+  const mobileColumns = ["40px", "0px", "minmax(56px, 72px)", "minmax(0, 1fr)", "44px", "60px", "minmax(20px, max-content)", hasSeries ? "16px" : ""].filter(Boolean).join(" ");
   // Imena strelaca dobijaju slobodan prostor (ne kolona ukupnog), da serije budu odmah uz NOC/imena.
   const desktopColumns = ["32px", "minmax(90px, 200px)", "80px", "minmax(140px, 1fr)", ...seriesHeaders.map(() => SERIES_COL_W), "72px", "max-content", "minmax(28px, max-content)", "28px"].join(" ");
   const header = "flex items-center border-b border-[var(--border)] bg-[var(--surface-2)] px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-3";
@@ -158,7 +158,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
         const subtotalCell =`flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`;
         return <div key={team.id} role="rowgroup" style={{ display: "contents" }}>
           <div role="row" className={`group ${hasSeries ? (isMatch ? "cursor-pointer" : "cursor-pointer sm:cursor-default") : ""} ${flashing.has(team.id) ? "result-row-flash" : ""}`} style={{ display: "contents" }} onClick={hasSeries ? () => toggle(team.id) : undefined}>
-            <div className={`${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{teamRank == null ? <span className="text-[var(--subtle)]">—</span> : isFinal && showMedals && teamRank <= 3 ? <span className="flex w-full justify-center"><MedalIcon rank={teamRank} /></span> : <span className={teamRank <= 3 && !isFinal ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>{teamRank}</span>}</div>
+            <div className={`${cell} max-sm:!px-1.5 justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{teamRank == null ? <span className="text-[var(--subtle)]">—</span> : isFinal && showMedals && teamRank <= 3 ? <span className="flex w-full justify-center"><MedalIcon rank={teamRank} /></span> : <span className={teamRank <= 3 && !isFinal ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>{teamRank}</span>}</div>
             <div className={`${cell} min-w-0 group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
               <span className="hidden sm:inline min-w-0 truncate text-sm text-[var(--ink)]">{nocEntry?.name && noc !== "AIN" ? nocEntry.name : noc} {team.teamNumber}</span>
             </div>

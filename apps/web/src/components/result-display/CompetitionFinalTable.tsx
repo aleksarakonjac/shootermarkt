@@ -242,8 +242,8 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
     .filter(Boolean)
     .join(" ");
   const mobileGridTemplateColumns = hasDetail
-    ? "32px 36px minmax(110px, 1fr) minmax(48px, 80px) 64px 14px 18px"
-    : "32px 36px minmax(110px, 1fr) minmax(48px, 80px) 64px 14px";
+    ? "40px 36px minmax(110px, 1fr) minmax(48px, 80px) 64px 14px 18px"
+    : "40px 36px minmax(110px, 1fr) minmax(48px, 80px) 64px 14px";
 
   const allExpanded = hasDetail && sorted.every((r) => expanded.has(r.id));
   const toggleAll = () => {
@@ -315,7 +315,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                   onClick={hasDetail ? () => toggleRow(r.id) : undefined}
                 >
                   {/* Rank */}
-                  <div className={`${cellCls} justify-center font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`}>
+                  <div className={`${cellCls} max-sm:!px-1 justify-center font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`}>
                     {r.finalRank != null ? (
                       showMedals && MEDAL_COLOR[r.finalRank] ? (
                         <MedalIcon rank={r.finalRank} />
