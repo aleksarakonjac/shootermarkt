@@ -2,13 +2,13 @@
 
 import { useState, type CSSProperties } from "react";
 import { useLocale } from "next-intl";
-import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
 import type { FinalDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
 import { useRowFlash } from "./useRowFlash";
+import { ShooterAvatar } from "./ShooterAvatar";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
@@ -27,25 +27,6 @@ export type FinalResultRow = {
   remark: string | null | undefined;
   remarkDetails?: StageRemarks | null;
 };
-
-function Avatar({ firstName, lastName, avatarUrl }: { firstName: string; lastName: string; avatarUrl: string | null }) {
-  const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
-  if (avatarUrl) {
-    return (
-      <div className="relative shrink-0 w-7 h-7 rounded-full ring-1 ring-[var(--border)] overflow-hidden">
-        <Image src={avatarUrl} alt="" fill sizes="28px" className="object-cover" />
-      </div>
-    );
-  }
-  return (
-    <div
-      className="shrink-0 w-7 h-7 rounded-full ring-1 ring-[var(--border)] flex items-center justify-center bg-[var(--surface-2)]"
-      aria-hidden="true"
-    >
-      <span className="text-[0.6rem] font-bold text-[var(--muted)]">{initials}</span>
-    </div>
-  );
-}
 
 interface Props {
   results: FinalResultRow[];
@@ -348,7 +329,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
 
                   {/* Avatar */}
                   <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)]`}>
-                    <Avatar firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} />
+                    <ShooterAvatar firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} />
                   </div>
 
                   {/* Name — mobile: last name and first name each fixed to their own
