@@ -155,8 +155,9 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
   return (
     <div className="rounded-xl border border-[var(--border)]">
       {(showFilter || toolbar) && (
-        <div className="flex flex-nowrap items-center gap-1 border-b border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:gap-1.5 sm:px-4">
-          {showFilter && <div className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto [scrollbar-width:none] sm:gap-1.5">
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-3 py-3 sm:flex-nowrap sm:gap-1.5 sm:px-4">
+          {/* Telefon: čipovi u svom redu, alati (pretraga, datum) ispod; desktop: jedan red. */}
+          {showFilter && <div className="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto [scrollbar-width:none] sm:w-auto sm:gap-1.5">
             {filterButton(null, allLabel)}
             {availableDiscs.map((code) => filterButton(code, discLabel(code)))}
           </div>}
