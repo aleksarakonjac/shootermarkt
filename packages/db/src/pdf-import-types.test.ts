@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { dedupeRowsByCategory, isThreePositionCode, mergeFinalsIntoRows, qualHasDecimals, type ParsedEvent, type ReviewRow } from "./pdf-import-types";
+import { dedupeRowsByCategory, ESC_SOLO_CODES, escSoloPlacement, isEscSoloCode, isThreePositionCode, mergeFinalsIntoRows, qualHasDecimals, type ParsedEvent, type ReviewRow } from "./pdf-import-types";
+
+describe("ESC Solo helpers", () => {
+  it("recognizes Solo codes and derives placement", () => {
+    expect(ESC_SOLO_CODES.every(isEscSoloCode)).toBe(true);
+    expect(["ARM", "APMT", "SPW"].some(isEscSoloCode)).toBe(false);
+    expect(qualHasDecimals("SOLOARM")).toBe(false);
+    expect(isThreePositionCode("SOLOARM")).toBe(false);
+    expect(escSoloPlacement({ finalRank: 2, qualRank: 1 })).toBe(2);
+    expect(escSoloPlacement({ finalRank: null, qualRank: 9 })).toBe(9);
+  });
+});
 
 describe("discipline format helpers", () => {
   it("keeps 300m integer and groups 300m 3x20 and standard rifle by position", () => {

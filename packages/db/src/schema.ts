@@ -57,6 +57,8 @@ export const disciplineCodeEnum = pgEnum("discipline_code", [
   "RPR300M", // 300m Rifle Prone Men
   "RPR300W", // 300m Rifle Prone Women
   "STR300",  // 300m Standard Rifle 3x20 Open (mešana konkurencija, gender null)
+  // ESC Challenge Solo — pogoci, ne ulazi u formu
+  "SOLOARM", "SOLOARW", "SOLOAPM", "SOLOAPW",
 ]);
 
 export const competitionLevelEnum = pgEnum("competition_level", [
@@ -164,7 +166,11 @@ export type PositionsQualDetail = {
   standing: { series: number[][]; total: number };
 };
 
-export type QualDetail = SeriesQualDetail | PositionsQualDetail;
+/** ESC Solo: K1 (30 hitaca) i K2 (+30, kumulativno). Pogoci, celi brojevi. K2 postoji samo za one koje je SIUS pustio dalje. */
+export type EscSoloPart = { series: number[]; total: number | null; rank: number | null; remark: string | null };
+export type EscSoloQualDetail = { format: "esc_solo"; part1: EscSoloPart; part2?: EscSoloPart };
+
+export type QualDetail = SeriesQualDetail | PositionsQualDetail | EscSoloQualDetail;
 
 // Final detail stored per result
 export type ArApFinalDetail = {
@@ -212,6 +218,9 @@ export type BulletinFinalDetail = {
   cumulative?: number[];
   /** Plasman posle svakog prikazanog hica/faze, izveden pri importu. */
   ranks?: Array<number | null>;
+  /** ESC meč za medalju: rezultat i ime protivnika. */
+  opponentTotal?: number | null;
+  opponentName?: string | null;
 };
 
 export type FinalDetail = ArApFinalDetail | PositionsFinalDetail | BulletinFinalDetail;

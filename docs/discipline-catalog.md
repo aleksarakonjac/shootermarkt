@@ -53,7 +53,7 @@ Na profilu bez pola; na rang listama i takmičenju dodaje se pol (seniori/senior
 | R3P300M / R3P300W | 300m puška 3x20 | 300m Rifle 3x20 |
 | RPR300M / RPR300W | 300m puška ležeći | 300m Rifle Prone |
 | STR300 | 300m standard puška | 300m Standard Rifle |
-| ESC_*_SOLO | <oružje> ESC Solo (npr. 10m vazdušna puška ESC Solo) | 10m Air Rifle ESC Solo |
+| SOLOARM/W, SOLOAPM/W | <oružje> ESC Solo (npr. 10m vazdušna puška ESC Solo) | 10m Air Rifle ESC Solo |
 | ESC_*_TRIO / _DUET | <oružje> ESC Trio / ESC Duet | 50m Rifle Prone ESC Duet |
 
 ## ESC Challenge — zajedničko
@@ -69,8 +69,8 @@ Na profilu bez pola; na rang listama i takmičenju dodaje se pol (seniori/senior
 
 | Kod (predlog) | Događaj | Faze kvalifikacije (po članu) | Bodovanje kval | Meč za medalju | Status |
 |---|---|---|---|---|---|
-| ESC_AR_SOLO_M/W | 10m AR Solo | K1: 30 hitaca/30 min → top 16; K2: +30 hitaca/30 min (prenosi se) → top 4 | pogodak ≥10.3 | 5 serija × 3 hica (150 s); više pogodaka pobeđuje; kod nerešenog pojedinačni hici | ✓ |
-| ESC_AP_SOLO_M/W | 10m AP Solo | isto | pogodak ≥9.8 | isto | ✓ |
+| SOLOARM/W | 10m AR Solo | K1: 30 hitaca/30 min → top 16; K2: +30 hitaca/30 min (prenosi se) → top 4 | pogodak ≥10.3 | 5 serija × 3 hica (150 s); više pogodaka pobeđuje; kod nerešenog pojedinačni hici | ✓ |
+| SOLOAPM/W | 10m AP Solo | isto | pogodak ≥9.8 | isto | ✓ |
 | ESC_AR_TRIO_M/W | 10m AR Trio | K: 20 hitaca → top 8; četvrtfinale: 20 hitaca → top 4; polufinale: 20 hitaca → raspored | decimale | pojedinačni hici (50 s), zbir 3 člana u decimalama, 2/1/0 poena, do 16 | ✓ |
 | ESC_AP_TRIO_M/W | 10m AP Trio | isto | celi brojevi | isto (meč u decimalama) | ✓ |
 | ESC_R3P_TRIO_M/W | 50m trostav Trio | K1: 15 klečeći + 15 ležeći + 15 stojeći (50 min) → top 8; K2: isto → top 4 | celi brojevi | pojedinačni hici, svaki član u drugom stavu (stoj/kleč/lež), decimale, do 16 | ✓ |

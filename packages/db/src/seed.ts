@@ -65,6 +65,11 @@ async function seed() {
       { code: "RPR300M", name: "300m Rifle Prone Men",    shortName: "300m Prone Men",  gender: "M",  distance: 300, apparatus: "rifle", maxQualScore: "600" },
       { code: "RPR300W", name: "300m Rifle Prone Women",  shortName: "300m Prone Women",gender: "F",  distance: 300, apparatus: "rifle", maxQualScore: "600" },
       { code: "STR300",  name: "300m Standard Rifle",     shortName: "300m Std Rifle",  gender: null, distance: 300, apparatus: "rifle", maxQualScore: "600" },
+      // ESC Challenge Solo — pogoci od 60, ne ulazi u formu
+      { code: "SOLOARM", name: "10m Air Rifle ESC Solo Men",    shortName: "AR Solo Men",   gender: "M", distance: 10, apparatus: "air_rifle",  maxQualScore: "60" },
+      { code: "SOLOARW", name: "10m Air Rifle ESC Solo Women",  shortName: "AR Solo Women", gender: "F", distance: 10, apparatus: "air_rifle",  maxQualScore: "60" },
+      { code: "SOLOAPM", name: "10m Air Pistol ESC Solo Men",   shortName: "AP Solo Men",   gender: "M", distance: 10, apparatus: "air_pistol", maxQualScore: "60" },
+      { code: "SOLOAPW", name: "10m Air Pistol ESC Solo Women", shortName: "AP Solo Women", gender: "F", distance: 10, apparatus: "air_pistol", maxQualScore: "60" },
     ])
     .onConflictDoNothing();
 
@@ -335,6 +340,21 @@ async function seed() {
         structureType: "series" as const,
         structureDef: apSeries6,
         qualDisplayType: "series_6_inners",
+        finalDisplayType: null,
+        finalStructureDef: null,
+        isDefault: true,
+      })),
+      // ── ESC Solo — K1+K2 pogoci (od 60), meč za medalju na pogotke ──
+      ...(["SOLOARM", "SOLOARW", "SOLOAPM", "SOLOAPW"] as const).map((code) => ({
+        disciplineId: byCode[code],
+        code: `${code.toLowerCase()}-esc`,
+        name: "ESC Solo 60 hitaca (pogoci)",
+        totalShots: 60,
+        maxScore: "60",
+        hasDecimals: false,
+        structureType: "series" as const,
+        structureDef: { seriesCount: 6, shotsPerSeries: 10, maxPerSeries: 10 },
+        qualDisplayType: "series_6",
         finalDisplayType: null,
         finalStructureDef: null,
         isDefault: true,

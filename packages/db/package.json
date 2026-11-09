@@ -13,6 +13,7 @@
     "./retry": "./src/retry.ts",
     "./noc-list": "./src/noc-list.ts",
     "./discipline": "./src/discipline.ts",
+    "./discipline-names": "./src/discipline-names.ts",
     "./upload-avatar": "./src/upload-avatar.ts",
     "./upload-avatar-raw": "./src/upload-avatar-raw.ts"
   },

@@ -1,8 +1,9 @@
 "use server";
 
 import { db } from "@shootermarkt/db";
-import { shooters, results } from "@shootermarkt/db/schema";
-import { eq, and, isNotNull, sql } from "drizzle-orm";
+import { shooters, results, disciplines } from "@shootermarkt/db/schema";
+import { ESC_SOLO_CODES } from "@shootermarkt/db/pdf-import-types";
+import { eq, and, isNotNull, notInArray, sql } from "drizzle-orm";
 import { computeFormaFromEntries } from "@/lib/forma";
 import { getFormaEntriesForShooter } from "@/lib/forma-query";
 
@@ -88,9 +89,12 @@ export async function compareShooters(idA: number, idB: number): Promise<Compari
         scoreB: sql`MAX(CASE WHEN ${results.shooterId} = ${idB} THEN ${results.qualTotal} END)`,
       })
       .from(results)
+      .innerJoin(disciplines, eq(disciplines.id, results.disciplineId))
       .where(and(
         sql`${results.shooterId} IN (${idA}, ${idB})`,
-        isNotNull(results.qualTotal)
+        isNotNull(results.qualTotal),
+        // ESC Solo: K1 i K2 pogoci nisu uporedivi skorovi
+        notInArray(disciplines.code, [...ESC_SOLO_CODES])
       ))
       .groupBy(results.competitionId, results.disciplineId);
 

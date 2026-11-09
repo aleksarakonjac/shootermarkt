@@ -52,6 +52,10 @@ const DISC_LABEL: Record<DisciplineCode, string> = {
   RPR300M: "300m Rifle Prone Men",
   RPR300W: "300m Rifle Prone Women",
   STR300: "300m Standard Rifle",
+  SOLOARM: "10m Air Rifle ESC Solo Men",
+  SOLOARW: "10m Air Rifle ESC Solo Women",
+  SOLOAPM: "10m Air Pistol ESC Solo Men",
+  SOLOAPW: "10m Air Pistol ESC Solo Women",
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 // Client-safe: bez DB importa — koristi ga i SiusMode (browser bundle).
-import type { SiusExtraRemarks } from "@shootermarkt/adapters/sius/public-adapter";
-import type { ReviewRow, StageRemarks } from "@shootermarkt/db/pdf-import-types";
+import type { SiusEscSoloAthlete, SiusExtraRemarks } from "@shootermarkt/adapters/sius/public-adapter";
+import type { AgeCategory, EscSoloCode, ReviewRow, StageRemarks } from "@shootermarkt/db/pdf-import-types";
 import { buildSiusFinalDetails } from "@/lib/final-detail";
 
 /** Only the non-empty penalty / shoot-off / record marks, or undefined when there are none. */
@@ -110,4 +110,46 @@ export function mergeSiusFinals(rows: ReviewRow[], finalEntries: SiusFinalEntry[
   }
 
   return mergedRows;
+}
+
+/**
+ * ESC Solo → review redovi. K1+K2 su jedna kvalifikacija (qual* kolone, detalj u qualEscSolo),
+ * meč za medalju ide u final*. Eliminacija se namerno ne popunjava.
+ */
+export function escSoloReviewRows(
+  athletes: SiusEscSoloAthlete[],
+  code: EscSoloCode,
+  category: AgeCategory,
+  match: (firstName: string, lastName: string, noc: string) => number | undefined,
+): ReviewRow[] {
+  return athletes.map((a) => {
+    const shooterId = match(a.firstName, a.lastName, a.nation);
+    // DNS/DSQ u K2 (bez skora) ne briše važeći K1 rezultat; status iz K2 ostaje kao oznaka.
+    const qual = a.part2?.total != null ? a.part2 : { ...a.part1, remark: a.part2?.remark ?? a.part1.remark };
+    return {
+      shooterId,
+      issfId: a.siusAthleteId ?? undefined,
+      firstName: a.firstName,
+      lastName: a.lastName,
+      teamNoc: a.nation,
+      disciplineCode: code,
+      category,
+      qualTotal: qual.total,
+      qualRank: qual.rank ?? undefined,
+      qualified: a.match != null,
+      // Q/QG/QB su oznake prolaska (čuvaju se u qualEscSolo); qual_remark nosi samo status (DNS/DSQ/DNF).
+      remark: qual.remark && !/^Q[GB]?$/.test(qual.remark) ? qual.remark : null,
+      qualEscSolo: { format: "esc_solo", part1: a.part1, ...(a.part2 ? { part2: a.part2 } : {}) },
+      finalTotal: a.match?.total ?? null,
+      finalRank: a.match?.rank ?? null,
+      ...(a.match ? {
+        finalSeries: a.match.series,
+        finalScoring: "hit_count" as const,
+        finalOpponentTotal: a.match.opponentTotal,
+        finalOpponentName: a.match.opponentName,
+      } : {}),
+      ...(a.match?.shootOff ? { remarkDetails: { final: { shootOff: a.match.shootOff } } } : {}),
+      warning: shooterId ? undefined : "Novi strelac — biće kreiran",
+    };
+  });
 }

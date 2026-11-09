@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORY_LABEL, DISCIPLINE_META, isSportPistolCode, isThreePositionCode, qualHasDecimals, type AgeCategory, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
+import { CATEGORY_LABEL, DISCIPLINE_META, isEscSoloCode, isSportPistolCode, isThreePositionCode, qualHasDecimals, type AgeCategory, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import { REVIEW_DISCIPLINE_CODES } from "@shootermarkt/db/discipline";
 import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { ShooterMatchCell } from "./ShooterMatchCell";
@@ -232,6 +232,43 @@ function FinalsTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: P
   );
 }
 
+/** ESC Solo: K1, K2 i meč za medalju u jednoj tabeli (samo pregled; povezivanje strelaca ide kroz UnmatchedPanel). */
+function EscSoloReviewTable({ rows }: { rows: IndexedRow[] }) {
+  const th = "px-3 py-2.5 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]";
+  const td = "px-3 py-2 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums";
+  return (
+    <div className="overflow-x-auto border-t border-[var(--border)]">
+      <table className="w-full min-w-[820px] text-sm">
+        <thead><tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+          <th className={`${th} text-right`}>#</th>
+          <th className={`${th} text-left`}>Strelac</th>
+          <th className={`${th} text-left`}>Zemlja</th>
+          <th className={`${th} text-left`}>K1 serije</th>
+          <th className={`${th} text-right`}>K1</th>
+          <th className={`${th} text-left`}>K2 serije</th>
+          <th className={`${th} text-right`}>K2</th>
+          <th className={`${th} text-right`}>Meč</th>
+        </tr></thead>
+        <tbody className="divide-y divide-[var(--border)]">
+          {[...rows].sort((a, b) => (a.row.finalRank ?? 99) - (b.row.finalRank ?? 99) || (a.row.qualRank ?? 999) - (b.row.qualRank ?? 999)).map(({ row, index }) => {
+            const solo = row.qualEscSolo;
+            return <tr key={index} className={row.skip ? "opacity-40" : "hover:bg-[var(--bg)]"}>
+              <td className={`${td} text-right font-semibold text-[var(--ink)]`}>{row.finalRank ?? row.qualRank ?? "—"}</td>
+              <td className="px-3 py-2 text-[var(--ink)]"><span className="font-medium">{row.lastName}</span> {row.firstName}</td>
+              <td className="px-3 py-2"><span className="flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]"><NocFlag noc={row.teamNoc} />{row.teamNoc}</span></td>
+              <td className={`${td} text-[var(--muted)]`}>{solo?.part1.series.join(" ") || "—"}</td>
+              <td className={`${td} text-right text-[var(--ink)]`}>{solo?.part1.total ?? "—"} <span className="text-[var(--subtle)]">#{solo?.part1.rank ?? "—"}</span></td>
+              <td className={`${td} text-[var(--muted)]`}>{solo?.part2?.series.join(" ") ?? ""}</td>
+              <td className={`${td} text-right text-[var(--ink)]`}>{solo?.part2 ? <>{solo.part2.total ?? "—"} <span className="text-[var(--subtle)]">#{solo.part2.rank ?? "—"}</span></> : ""}</td>
+              <td className={`${td} text-right font-semibold text-[var(--ink)]`}>{row.finalTotal != null ? `${row.finalTotal} : ${row.finalOpponentTotal ?? "—"}${row.remarkDetails?.final?.shootOff ? " SO" : ""}` : ""}</td>
+            </tr>;
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function ReviewTable({ rows, nocFilter, onRowChange, onNocFilterChange, onSkipNoc }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const allNocs = Array.from(new Set(rows.map((row) => row.teamNoc))).sort();
@@ -295,9 +332,11 @@ export function ReviewTable({ rows, nocFilter, onRowChange, onNocFilterChange, o
               )}
             </div>
           </div>
-          {qualRows.length > 0 && <QualificationTable rows={visibleRows} onRowChange={onRowChange} />}
-          <EliminationTable rows={elimRows} onRowChange={onRowChange} />
-          <FinalsTable rows={finalRows} onRowChange={onRowChange} />
+          {isEscSoloCode(discipline) ? <EscSoloReviewTable rows={isExpanded ? disciplineRows : disciplineRows.slice(0, COLLAPSE_AT)} /> : <>
+            {qualRows.length > 0 && <QualificationTable rows={visibleRows} onRowChange={onRowChange} />}
+            <EliminationTable rows={elimRows} onRowChange={onRowChange} />
+            <FinalsTable rows={finalRows} onRowChange={onRowChange} />
+          </>}
         </section>;
       })}
     </div>

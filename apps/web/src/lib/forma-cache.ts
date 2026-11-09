@@ -1,7 +1,7 @@
-import { inArray, sql } from "drizzle-orm";
+import { inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { shooterFormaCache } from "@shootermarkt/db/schema";
-import { computeFormaFromEntries } from "@/lib/forma";
+import { computeFormaFromEntries, FORMA_DISCIPLINE_CODES } from "@/lib/forma";
 import { getFormaEntriesByDiscipline } from "@/lib/forma-query";
 import {
   computeAvgOfTopN,
@@ -25,6 +25,8 @@ export async function recomputeFormaCache(shooterIds?: number[]): Promise<void> 
   if (shooterIds?.length) {
     await db.delete(shooterFormaCache).where(inArray(shooterFormaCache.shooterId, shooterIds));
   }
+  // Discipline izbačene iz forme (300m, ležeći, standard…) ne smeju da ostanu u kešu ni kod punog preračuna.
+  await db.delete(shooterFormaCache).where(notInArray(shooterFormaCache.disciplineCode, FORMA_DISCIPLINE_CODES));
 
   const airSeasonYear = currentSeasonStartYear("vazdusna");
   const seasonWin = seasonWindow("vazdusna", airSeasonYear);

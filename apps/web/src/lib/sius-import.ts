@@ -1,14 +1,17 @@
 // Čiste funkcije žive u sius-merge.ts (client-safe, bez DB-a) — ovde re-export za postojeće pozivaoce
 export { mergeSiusFinals, type SiusFinalEntry } from "@/lib/sius-merge";
-import { fetchSiusEvents, fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, isJuniorEventCode, parseSiusMatchKey, MIXED_TEAM_CODES } from "@shootermarkt/adapters/sius/public-adapter";
+import { fetchSiusEvents, fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, fetchSiusEscSoloResults, escSoloCodeFromEvent, mixedTeamIdentity, isJuniorEventCode, parseSiusMatchKey, MIXED_TEAM_CODES } from "@shootermarkt/adapters/sius/public-adapter";
 import { matchEventName } from "@/lib/competition-events";
 import { shooterResultCount } from "@/lib/import-commit";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
 import { isUnrankedRemark, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
-import { stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
+import { escSoloReviewRows, stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
 import { matchShooter } from "@shootermarkt/db/name-match";
+
+/** ESC Solo SIUS eventi (juniorske varijante se ne nagađaju dok se ne pojave u podacima). */
+export const ESC_SOLO_EVENT_CODES = ["ARM-ECH-SOLO", "ARW-ECH-SOLO", "APM-ECH-SOLO", "APW-ECH-SOLO"];
 
 const SUPPORTED_CODES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "RFPM", "STPM", "STPW", "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300"] as const;
 
@@ -28,7 +31,11 @@ export class SiusImportError extends Error {
 
 /** Fetches SIUS public results for a competition UUID and shapes them as review rows (no DB writes). */
 export async function buildSiusImport(siusId: string, disciplineCodes?: string[]) {
-  const requested = withJunior(disciplineCodes ?? [...SUPPORTED_CODES, ...MIXED_TEAM_CODES]);
+  const requested = [
+    ...withJunior((disciplineCodes ?? [...SUPPORTED_CODES, ...MIXED_TEAM_CODES]).filter((c) => !escSoloCodeFromEvent(c))),
+    ...(disciplineCodes ?? ESC_SOLO_EVENT_CODES).filter((c) => escSoloCodeFromEvent(c)),
+  ];
+  const soloCodes = requested.filter((c) => escSoloCodeFromEvent(c));
   const codes = requested.filter((c) => (SUPPORTED_CODES as readonly string[]).includes(splitEventCode(c).code));
   const mixedCodes = requested.filter((c) => MIXED_TEAM_CODES.has(splitEventCode(c).code));
 
@@ -54,11 +61,29 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
     }
   }
 
-  if (siusData.size === 0 && mixedData.size === 0) {
+  const soloRows: ReviewRow[] = [];
+  let soloEventCount = 0;
+  if (soloCodes.length > 0) {
+    try {
+      const soloEvents = (await fetchSiusEvents(siusId)).filter((e) => soloCodes.includes(e.eventCode));
+      soloEventCount = soloEvents.length;
+      for (const event of soloEvents) {
+        const athletes = await fetchSiusEscSoloResults(siusId, event.runningId);
+        soloRows.push(...escSoloReviewRows(athletes, escSoloCodeFromEvent(event.eventCode)!, "senior", (first, last, noc) => {
+          const m = matchShooter(first, last, noc, allShooters);
+          return m.kind === "exact" ? m.id : undefined;
+        }));
+      }
+    } catch (e) {
+      throw new SiusImportError(`SIUS ESC Solo fetch failed: ${e}`, 502);
+    }
+  }
+
+  if (siusData.size === 0 && mixedData.size === 0 && soloRows.length === 0) {
     throw new SiusImportError("No results found for this competition UUID", 404);
   }
 
-  const rows: ReviewRow[] = [];
+  const rows: ReviewRow[] = [...soloRows];
   const finalEntries: SiusFinalEntry[] = [];
   const errors: string[] = [];
 
@@ -295,5 +320,5 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
     if (unsupported.length) errors.push(`Nije uvezeno (disciplina nije podržana): ${unsupported.join(", ")}`);
   }
 
-  return { rows, finalEntries, teamEntries, eventCount: siusData.size + mixedData.size, errors };
+  return { rows, finalEntries, teamEntries, eventCount: siusData.size + mixedData.size + soloEventCount, errors };
 }

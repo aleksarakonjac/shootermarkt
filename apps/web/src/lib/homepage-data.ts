@@ -1,7 +1,7 @@
 import { db } from "@shootermarkt/db";
 import { clubs, competitionSchedule, competitions, countries, disciplines, mixedTeamResults, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@shootermarkt/db/schema";
 import { displayNoc, NOC_LIST } from "@shootermarkt/db/noc-list";
-import { isSportPistolCode, qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
+import { isEscSoloCode, isSportPistolCode, qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
 import { effectiveFocusPriority } from "@/lib/competition-priority";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
@@ -369,7 +369,8 @@ export async function getHomepageMain(scope: Scope) {
   ]) : [[], [], []] as const;
   const recent = recentComps.map((competition) => {
     const slots = allSlots.filter((row) => row.competitionId === competition.id);
-    const individualRows = allIndividualRows.filter((row) => row.competitionId === competition.id);
+    // ESC Solo (pogoci) nema mesto u top-3 pored ISSF skorova.
+    const individualRows = allIndividualRows.filter((row) => row.competitionId === competition.id && !isEscSoloCode(disciplineCodes.get(row.disciplineId)));
     const mixedRows = allMixedRows.filter((row) => row.competitionId === competition.id);
     type Entry = { id: string; firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; rank: number; total: number; round: number | null; rpo?: boolean };
     // A discipline/category can have multiple "qual" schedule rows at different

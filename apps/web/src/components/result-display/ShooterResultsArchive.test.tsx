@@ -4,7 +4,7 @@ import { ShooterResultsArchive } from "./ShooterResultsArchive";
 import type { ResultRowData } from "./ResultsHistoryTable";
 
 const result: ResultRowData = {
-  id: 1, competitionId: 1, competitionName: "Kup Srbije", competitionDate: "2026-07-29", competitionDateEnd: null, competitionLocation: null,
+  id: 1, rowKey: "r:1", kind: "individual", competitionId: 1, competitionName: "Kup Srbije", competitionDate: "2026-07-29", competitionDateEnd: null, competitionLocation: null,
   competitionCountry: null, competitionCountryCode2: null, disciplineCode: "ARM", category: "senior",
   qualTotal: "630.0", qualRank: 5, qualInners: null, qualified: true,
   elimTotal: null, elimRank: null, elimRound: null, elimDetail: null, finalTotal: null, finalRank: null, qualDetail: null, finalDetail: null,

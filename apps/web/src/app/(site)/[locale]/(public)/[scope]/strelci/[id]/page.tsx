@@ -14,7 +14,7 @@ import { FormaChart } from "@/components/shooter/FormaChart";
 import type { ChartPoint, FormaScore } from "@/components/shooter/FormaChart";
 import { FormaScoreHeading } from "@/components/shooter/FormaScoreHeading";
 import { CareerStats, type CareerStat } from "@/components/shooter/CareerStats";
-import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@shootermarkt/db/pdf-import-types";
+import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear, isEscSoloCode } from "@shootermarkt/db/pdf-import-types";
 import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
 import { getLocale, getTranslations } from "next-intl/server";
 import { pageParams } from "@/i18n/page-params";
@@ -24,6 +24,9 @@ import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 import { ArrowRight } from "lucide-react";
 import { ShooterAvatarLightbox } from "@/components/shooter/ShooterAvatarLightbox";
 import { INVALID_REMARKS } from "@/lib/forma-query";
+import { countFormaAppearances, FORMA_DISCIPLINE_CODES } from "@/lib/forma";
+import { getShooterMixedRows } from "@/lib/shooter-mixed-results";
+import { toIndividualHistoryRow } from "@/lib/shooter-results";
 
 type Props = { params: Promise<{ locale: string; id: string; scope: Scope }> };
 
@@ -61,7 +64,7 @@ export default async function ShooterPage({ params }: Props) {
   const shooterId = parseInt(id);
   if (!/^\d{1,9}$/.test(id)) notFound();
 
-  const [shooter, shooterResults, cacheRows] = await Promise.all([
+  const [shooter, shooterResults, cacheRows, mixedRows] = await Promise.all([
     getShooter(shooterId),
     db
       .select({
@@ -79,6 +82,7 @@ export default async function ShooterPage({ params }: Props) {
         finalRank: results.finalRank,
         qualDetail: results.qualDetail,
         finalDetail: results.finalDetail,
+      remarkDetails: results.remarkDetails,
         competitionId: competitions.id,
         competitionName: competitions.name,
         eventName: competitionEvents.name,
@@ -125,29 +129,38 @@ export default async function ShooterPage({ params }: Props) {
       })
       .from(shooterFormaCache)
       .where(eq(shooterFormaCache.shooterId, shooterId)),
+    getShooterMixedRows(shooterId),
   ]);
   if (!shooter) notFound();
 
   const initials = `${shooter.firstName[0]}${shooter.lastName[0]}`;
 
   // ── Quick stats ──────────────────────────────────────────────────────────────
-  const totalAppearances = shooterResults.length;
-  const finalesCount = shooterResults.filter((r) => r.finalRank != null).length;
+  // Redovi istorije (pojedinačni, ESC Solo, mešoviti tim) — za link "svi rezultati".
+  const totalAppearances = shooterResults.length + mixedRows.length;
+  // Statistika "Nastupi" = samo nastupi koji ulaze u formu (bez Solo, mix, ležećeg, 300m…).
+  const formaAppearances = countFormaAppearances(
+    shooterResults.map((r) => ({ disciplineCode: r.disciplineCode, date: r.competitionDate, qualTotal: r.qualTotal, qualRemark: r.qualRemark })),
+  );
+  // ESC Solo (pogoci) se ne meša sa ISSF finalima ni sa najboljim skorom.
+  const finalesCount = shooterResults.filter((r) => r.finalRank != null && !isEscSoloCode(r.disciplineCode)).length;
 
+  // Peak samo iz forma (olimpijskih) disciplina — ležeći, 300m, standard i Solo ne ulaze.
   const peakResult = shooterResults
-    .filter((r) => r.qualTotal != null)
+    .filter((r) => r.qualTotal != null && FORMA_DISCIPLINE_CODES.includes(r.disciplineCode))
     .reduce<{ score: number; code: string } | null>((best, r) => {
       const s = parseFloat(r.qualTotal!);
       return !best || s > best.score ? { score: s, code: r.disciplineCode } : best;
     }, null);
 
-  const activeSince = shooterResults.length > 0
-    ? new Date(shooterResults[0].competitionDate).getFullYear()
-    : null;
+  // Istorija: pojedinačni + mešoviti redovi, hronološki (tabela sama okreće na najnovije).
+  const historyRows = [...shooterResults.map(toIndividualHistoryRow), ...mixedRows]
+    .sort((a, b) => (a.competitionDate === b.competitionDate ? a.competitionId - b.competitionId : a.competitionDate < b.competitionDate ? -1 : 1));
+  const activeSince = historyRows.length > 0 ? new Date(historyRows[0].competitionDate).getFullYear() : null;
   const recentCompetitionIds = new Set(
-    [...shooterResults].reverse().map((result) => result.competitionId).filter((id, index, ids) => ids.indexOf(id) === index).slice(0, 5),
+    [...historyRows].reverse().map((result) => result.competitionId).filter((id, index, ids) => ids.indexOf(id) === index).slice(0, 5),
   );
-  const recentResults = shooterResults.filter((result) => recentCompetitionIds.has(result.competitionId));
+  const recentResults = historyRows.filter((result) => recentCompetitionIds.has(result.competitionId));
 
   // Trenutna uzrasna kategorija — uvek iz godine rođenja (ISSF standard), nezavisno
   // od kategorije zabeleženih rezultata (koja je istorijska, po konkretnom takmičenju).
@@ -159,6 +172,7 @@ export default async function ShooterPage({ params }: Props) {
   // ── Chart data ───────────────────────────────────────────────────────────────
   // Isti filter kao forma (forma-query): bez nula i DNF/DNS/DSQ — tačke odgovaraju liniji forme.
   const isFormaResult = (r: (typeof shooterResults)[number]) =>
+    FORMA_DISCIPLINE_CODES.includes(r.disciplineCode) &&
     r.qualTotal != null && parseFloat(r.qualTotal) > 0 && !INVALID_REMARKS.includes(r.qualRemark ?? "");
   const chartPoints: ChartPoint[] = shooterResults
     .filter(isFormaResult)
@@ -350,7 +364,7 @@ export default async function ShooterPage({ params }: Props) {
                   {tProfile("statAppearances")}
                 </p>
                 <p className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-2xl leading-none tabular-nums text-[var(--ink)] mt-0.5">
-                  {totalAppearances}
+                  {formaAppearances > 0 ? formaAppearances : <span className="text-[var(--subtle)]">—</span>}
                 </p>
               </div>
               <div className="bg-[var(--bg)] px-3 py-2">

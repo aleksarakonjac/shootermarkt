@@ -112,14 +112,14 @@ export function ResultDetailPanel({
               groupLabels={r3pGroupLabels}
               showTotal={false}
             />
-          ) : (
+          ) : "kneeling" in qualDetail ? (
             <PositionsQualDisplay
               detail={qualDetail}
               hasDecimals={hasDecimals}
               locale={locale}
               showGrandTotal={false}
             />
-          )}
+          ) : null}
         </div>
       )}
 
