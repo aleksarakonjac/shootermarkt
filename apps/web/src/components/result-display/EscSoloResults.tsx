@@ -88,7 +88,7 @@ function QualTable({ rows, part, testId, title, seriesCount, locale }: { rows: E
             <th className={`${th} w-10 text-right`}>#</th>
             <th className={`${th} w-full text-left`}>{locale === "en" ? "Athlete" : "Strelac"}</th>
             <th className={`${th} hidden text-left sm:table-cell`}>{locale === "en" ? "Series" : "Serije"}</th>
-            <th className={`${th} text-right`}>{locale === "en" ? "Hits" : "Pogoci"}</th>
+            <th className={`${th} text-right`}>{locale === "en" ? "Hits" : "Hitovi"}</th>
             <th className={`${th} w-12`} />
           </tr></thead>
           <tbody className="divide-y divide-[var(--border)]">
@@ -118,7 +118,7 @@ export function EscSoloResults({ results, disciplineCode, locale }: { results: E
   const bronze = results.filter((r) => r.finalRank === 3 || r.finalRank === 4);
   return (
     <div className="space-y-6">
-      <p className="text-sm text-[var(--muted)]">{en ? `Hit: ${threshold} or higher` : `Pogodak: ${threshold} i više`}</p>
+      <p className="text-sm text-[var(--muted)]">{en ? `Hit: ${threshold} or higher` : `Hit: ${threshold} i više`}</p>
       {(gold.length > 0 || bronze.length > 0) && (
         <section className="space-y-2">
           <h4 className="font-[family-name:var(--font-barlow-condensed)] text-base font-bold uppercase text-[var(--ink)]">{en ? "Medal matches" : "Mečevi za medalju"}</h4>

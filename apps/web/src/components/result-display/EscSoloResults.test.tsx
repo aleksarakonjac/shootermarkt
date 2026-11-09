@@ -38,7 +38,7 @@ const VROCLAV_ROWS: EscSoloRow[] = escSoloReviewRows(athletes, "SOLOARM", "senio
 describe("EscSoloResults", () => {
   it("shows medal matches, then qualification 2 and qualification 1", () => {
     render(<EscSoloResults results={VROCLAV_ROWS} disciplineCode="SOLOARM" locale="sr" />);
-    expect(screen.getByText("Pogodak: 10.3 i više")).toBeInTheDocument();
+    expect(screen.getByText("Hit: 10.3 i više")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Mečevi za medalju" })).toBeInTheDocument();
     expect(within(screen.getByTestId("gold-match")).getByText("12 : 10")).toBeInTheDocument();
     expect(within(screen.getByTestId("bronze-match")).getByText("11 : 9")).toBeInTheDocument();
