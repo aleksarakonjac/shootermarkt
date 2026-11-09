@@ -877,7 +877,8 @@ function CompetitionDetail({
     : elimRounds[0];
 
   const qualRows: CompResultRow[] =
-    catGroup?.results.map((r) => ({
+    // Strelci koji su samo u eliminacijama (bez kvalifikacionog nastupa) ne idu u kval. listu.
+    catGroup?.results.filter((r) => r.qualTotal != null || r.qualRank != null || r.qualRemark != null).map((r) => ({
       id: r.id,
       shooterId: r.shooterId,
       firstName: r.firstName,
