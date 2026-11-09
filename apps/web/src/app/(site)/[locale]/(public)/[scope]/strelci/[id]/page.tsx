@@ -82,6 +82,7 @@ export default async function ShooterPage({ params }: Props) {
         finalRank: results.finalRank,
         qualDetail: results.qualDetail,
         finalDetail: results.finalDetail,
+      remarkDetails: results.remarkDetails,
         competitionId: competitions.id,
         competitionName: competitions.name,
         eventName: competitionEvents.name,

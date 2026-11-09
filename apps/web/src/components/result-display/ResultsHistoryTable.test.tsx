@@ -101,6 +101,13 @@ describe("ResultsHistoryTable", () => {
     expect(screen.getByText(/18\. mesto/)).toBeInTheDocument();
   });
 
+  it("shows the Solo qualification mark and a shoot-off on the match", () => {
+    const tied: ResultRowData = { ...SOLO, finalTotal: "12", finalRank: 2, finalDetail: { ...SOLO.finalDetail!, opponentTotal: 12 } as ResultRowData["finalDetail"], remarkDetails: { final: { shootOff: "SO" } } };
+    render(<ResultsHistoryTable results={[tied]} locale="sr" />);
+    expect(screen.getByText("QG")).toBeInTheDocument();
+    expect(screen.getByText(/meč 12 : 12 SO/)).toBeInTheDocument();
+  });
+
   it("expands a mixed team row with both members' series", () => {
     render(<ResultsHistoryTable results={[MIXED]} locale="sr" />);
     fireEvent.click(screen.getByText("10m vazdušna puška miks"));

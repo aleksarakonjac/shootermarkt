@@ -5,7 +5,7 @@ import { Fragment, type ReactNode, useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useParams } from "next/navigation";
 import type { ElimDetail, QualDetail, FinalDetail } from "@shootermarkt/db/schema";
-import { CATEGORY_LABEL, escSoloPlacement, qualHasDecimals, type AgeCategory } from "@shootermarkt/db/pdf-import-types";
+import { CATEGORY_LABEL, escSoloPlacement, qualHasDecimals, type AgeCategory, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
 import { DISCIPLINE_DISPLAY_ORDER, disciplineName } from "@shootermarkt/db/discipline-names";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useScopedHref } from "@/hooks/use-scoped-href";
@@ -48,6 +48,8 @@ export type ResultRowData = {
   elimDetail: ElimDetail | null;
   finalTotal: string | null;
   finalRank: number | null;
+  /** Oznake faza (shoot-off meča, kazne, rekordi). */
+  remarkDetails?: RemarkDetails | null;
   competitionName: string;
   competitionDate: string;
   competitionDateEnd: string | null;
@@ -196,6 +198,10 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                       : isSolo ? "ESC Challenge" : null;
                     const soloFinal = isSolo && r.finalDetail && "opponentTotal" in r.finalDetail ? r.finalDetail : null;
                     const placement = isSolo ? escSoloPlacement(r) : null;
+                    // Q / QG / QB iz poslednje odstreljane Solo kvalifikacije
+                    const soloPart = isSolo && r.qualDetail && "format" in r.qualDetail ? r.qualDetail.part2 ?? r.qualDetail.part1 : null;
+                    const soloMark = soloPart?.remark && /^Q[GB]?$/.test(soloPart.remark) ? soloPart.remark : null;
+                    const shootOff = r.remarkDetails?.final?.shootOff ? " SO" : "";
                     // Druga linija na telefonu samo kad ima šta da pokaže (dodatak ili finale/meč).
                     const hasFinalCell = isSolo ? placement != null || r.finalTotal != null : r.finalTotal != null || r.finalRank != null;
                     const hasLine2 = Boolean(extra || categoryLabel || r.eventName || hasFinalCell);
@@ -224,12 +230,13 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                                     ? <span className="font-semibold text-[var(--ink)]">{Math.round(r.elimTotal!)}<span className="ml-1 inline-flex rounded bg-amber-100 px-1 py-px font-[family-name:var(--font-barlow-condensed)] text-[0.6rem] font-bold leading-none text-amber-800">E</span></span>
                                     : <span className="text-[var(--subtle)]">—</span>}
                                 <span className="text-[0.65rem] text-[var(--subtle)]">{r.qualRank != null ? `#${r.qualRank}` : r.elimRank != null ? `#${r.elimRank}` : ""}</span>
+                                {soloMark && <span className="text-[0.65rem] font-bold text-[var(--brand-primary)]">{soloMark}</span>}
                                 {canExpand && !hasLine2 && <ChevronDown size={14} className={`shrink-0 self-center text-[var(--muted)] transition-transform duration-200 sm:hidden ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true" />}
                               </span>
                               <span className={`order-4 ${hasLine2 ? "flex" : "max-sm:hidden sm:flex"} items-center justify-end gap-1.5 whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--muted)] sm:text-xs`}>
                                 {isSolo ? (
                                   soloFinal && r.finalTotal != null
-                                    ? <><MedalOrRank rank={r.finalRank} locale={locale} /><span>{en ? "match" : "meč"} {Math.round(parseFloat(r.finalTotal))} : {soloFinal.opponentTotal ?? "—"}</span></>
+                                    ? <><MedalOrRank rank={r.finalRank} locale={locale} /><span>{en ? "match" : "meč"} {Math.round(parseFloat(r.finalTotal))} : {soloFinal.opponentTotal ?? "—"}{shootOff}</span></>
                                     : placement != null ? <span>{en ? `place ${placement}` : `${placement}. mesto`}</span> : null
                                 ) : r.finalTotal != null || r.finalRank != null ? (
                                   <><span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{en ? "Final" : "Finale"}</span>{r.finalTotal != null && <span>{fmtFinal(r.finalTotal)}</span>}<MedalOrRank rank={r.finalRank} locale={locale} /></>

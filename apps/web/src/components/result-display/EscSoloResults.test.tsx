@@ -47,6 +47,13 @@ describe("EscSoloResults", () => {
     expect(within(screen.getByTestId("qual2")).getAllByText("QG")).toHaveLength(2);
   });
 
+  it("marks a shoot-off even when only the loser row carries it", () => {
+    const winner: EscSoloRow = { ...VROCLAV_ROWS[0], id: 101, finalTotal: "12", finalRank: 1, remarkDetails: null };
+    const loser: EscSoloRow = { ...VROCLAV_ROWS[1], id: 102, finalTotal: "12", finalRank: 2, remarkDetails: { final: { shootOff: "SO" } } };
+    render(<EscSoloResults results={[winner, loser]} disciplineCode="SOLOARM" locale="sr" />);
+    expect(within(screen.getByTestId("gold-match")).getByText("12 : 12 SO")).toBeInTheDocument();
+  });
+
   it("uses the pistol hit threshold for air pistol Solo", () => {
     render(<EscSoloResults results={[]} disciplineCode="SOLOAPW" locale="en" />);
     expect(screen.getByText("Hit: 9.8 or higher")).toBeInTheDocument();

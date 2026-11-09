@@ -48,7 +48,7 @@ function Shooter({ r }: { r: EscSoloRow }) {
 function Match({ rows, testId, title }: { rows: EscSoloRow[]; testId: string; title: string }) {
   const [winner, loser] = [...rows].sort((a, b) => (a.finalRank ?? 9) - (b.finalRank ?? 9));
   if (!winner) return null;
-  const shootOff = winner.remarkDetails?.final?.shootOff;
+  const shootOff = winner.remarkDetails?.final?.shootOff ?? loser?.remarkDetails?.final?.shootOff;
   return (
     <div data-testid={testId} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
       <div className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">{title}</div>

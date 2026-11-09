@@ -67,6 +67,7 @@ export async function getShooterResultsPage(shooterId: number, cursor?: ResultsC
       finalRank: results.finalRank,
       qualDetail: results.qualDetail,
       finalDetail: results.finalDetail,
+      remarkDetails: results.remarkDetails,
       competitionId: competitions.id,
       competitionName: competitions.name,
       competitionDate: competitions.date,
