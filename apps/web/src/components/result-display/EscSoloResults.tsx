@@ -86,7 +86,7 @@ function QualTable({ rows, part, testId, title, seriesCount, locale }: { rows: E
         <table data-testid={testId} className="w-full text-sm">
           <thead><tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
             <th className={`${th} w-10 text-right`}>#</th>
-            <th className={`${th} text-left`}>{locale === "en" ? "Athlete" : "Strelac"}</th>
+            <th className={`${th} w-full text-left`}>{locale === "en" ? "Athlete" : "Strelac"}</th>
             <th className={`${th} hidden text-left sm:table-cell`}>{locale === "en" ? "Series" : "Serije"}</th>
             <th className={`${th} text-right`}>{locale === "en" ? "Hits" : "Pogoci"}</th>
             <th className={`${th} w-12`} />
