@@ -33,9 +33,14 @@ const FLAT_GROUPS_BY_DISCIPLINE: Array<{ match: (code: string) => boolean; group
   ] },
 ];
 
-function getFlatGroups(code: string | undefined): FlatGroup[] | null {
+const FLAT_LABELS_EN: Record<string, string> = {
+  "Klečeći": "Kneeling", "Ležeći": "Prone", "Stojeći": "Standing", "Precizno": "Precision", "Brzo": "Rapid",
+};
+
+function getFlatGroups(code: string | undefined, en = false): FlatGroup[] | null {
   if (!code) return null;
-  return FLAT_GROUPS_BY_DISCIPLINE.find((d) => d.match(code))?.groups ?? null;
+  const groups = FLAT_GROUPS_BY_DISCIPLINE.find((d) => d.match(code))?.groups ?? null;
+  return en && groups ? groups.map((g) => ({ ...g, label: FLAT_LABELS_EN[g.label] ?? g.label })) : groups;
 }
 
 export type CompResultRow = {
@@ -220,7 +225,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
   const firstWithDetail = results.find((r) => r.qualDetail != null);
   const isPositionsType =
     firstWithDetail?.qualDetail != null && "kneeling" in firstWithDetail.qualDetail;
-  const flatGroups = isPositionsType ? null : getFlatGroups(results[0]?.disciplineCode);
+  const flatGroups = isPositionsType ? null : getFlatGroups(results[0]?.disciplineCode, en);
   const isSeriesType =
     flatGroups != null || (firstWithDetail?.qualDetail != null && "series" in firstWithDetail.qualDetail);
   const hasSeriesDetail = isPositionsType || isSeriesType;
