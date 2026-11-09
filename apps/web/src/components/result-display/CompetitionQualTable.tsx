@@ -65,7 +65,7 @@ export type CompResultRow = {
   apparatus: string | null;
 };
 
-function QualifiedBadge({ size = "base" }: { size?: "base" | "lg" }) {
+export function QualifiedBadge({ size = "base" }: { size?: "base" | "lg" }) {
   const en = useLocale() === "en";
   return (
     <span
@@ -185,12 +185,14 @@ function flattenGroups(groups: DetailGroup[]): Array<{ value: number | null; isB
 
 // Mobilni prikaz serija (auto-fit): jedan red se razvlači preko cele širine, a nepun poslednji
 // red pri prelamanju zadržava istu širinu kartica kao redovi iznad.
-const SERIES_GRID_CLS = "grid grid-cols-[repeat(auto-fit,minmax(3rem,1fr))] gap-1.5";
+const SERIES_GRID_CLS = "grid gap-1.5";
+/** Rezerviše 3 ili 6 mesta po redu — jedna serija ne razvlači karticu na celu širinu reda. */
+export const seriesGridStyle = (n: number): CSSProperties => ({ gridTemplateColumns: `repeat(${n <= 3 ? 3 : 6}, minmax(0, 1fr))` });
 /** Grupisane serije (trostav 3×20 = 6) idu u jedan red dok staju; preko toga po grupi u svom redu. */
 const ONE_ROW_MAX = 8;
 
 /** `onSurface`: red je sivi (zebra) → kartica dobija svetlu pozadinu da se ne utopi u red. */
-function SeriesBox({ text, best, onSurface }: { text: string; best: boolean; onSurface: boolean }) {
+export function SeriesBox({ text, best, onSurface }: { text: string; best: boolean; onSurface: boolean }) {
   return (
     <span
       className={`flex min-w-0 items-center justify-center rounded-md px-1 py-1.5 font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums ring-1 ${
@@ -518,7 +520,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                               <span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
                                 {g.label}
                               </span>
-                              <div className={SERIES_GRID_CLS}>
+                              <div className={SERIES_GRID_CLS} style={seriesGridStyle(g.values.length)}>
                                 {g.values.map((v, vi) => (
                                   <SeriesBox key={vi} text={v != null ? fmt(v) : "—"} best={v != null && v === g.bestValue} onSurface={isOddRow} />
                                 ))}
@@ -527,7 +529,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                           ))}
                         </div>
                       ) : (
-                        <div className={`${SERIES_GRID_CLS} py-2.5`}>
+                        <div className={`${SERIES_GRID_CLS} py-2.5`} style={seriesGridStyle(seriesFlat.length)}>
                           {seriesFlat.map((item, i) => (
                             <SeriesBox key={i} text={item.value != null ? fmt(item.value) : "—"} best={item.isBest} onSurface={isOddRow} />
                           ))}

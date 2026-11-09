@@ -192,9 +192,9 @@ const RANK_W = "40px";
 const AVATAR_W = "40px";
 // Ime dobija sav slobodan prostor; klub/NOC je uzak, da ne pravi prazan razmak do serija.
 const NAME_W = "minmax(160px, 1fr)";
-const NOC_W = "84px";
+const NOC_W = "72px";
 const CLUB_W = "minmax(96px, 180px)";
-const TOTAL_W = "76px";
+const TOTAL_W = "68px";
 const REMARK_W = "24px";
 
 const NOC_ONLY_LEVELS = new Set(["world", "olympic", "continental"]);
@@ -237,7 +237,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
   const columns = buildColumns(sorted);
   const hasDetail = columns.length > 0;
 
-  const SERIES_COL_W = "56px";
+  const SERIES_COL_W = "52px";
   const isNocOnly = NOC_ONLY_LEVELS.has(competitionLevel ?? "");
   const clubColW = isNocOnly ? NOC_W : CLUB_W;
   const headerGroups = groupColumnHeaders(columns.map((col) => localizeSeriesLabel(col.header, locale)));
@@ -245,8 +245,8 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
     .filter(Boolean)
     .join(" ");
   const mobileGridTemplateColumns = hasDetail
-    ? "40px 36px minmax(110px, 1fr) minmax(48px, 80px) 64px 14px 18px"
-    : "40px 36px minmax(110px, 1fr) minmax(48px, 80px) 64px 14px";
+    ? "40px 36px minmax(110px, 1fr) fit-content(80px) 60px 14px 18px"
+    : "40px 36px minmax(110px, 1fr) fit-content(80px) 60px 14px";
 
   const allExpanded = hasDetail && sorted.every((r) => expanded.has(r.id));
   const toggleAll = () => {
@@ -286,7 +286,6 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
             <div role="columnheader" className={headerCellCls} aria-hidden="true" />
             <div role="columnheader" className={headerCellCls}>{en ? "Shooter" : "Strelac"}</div>
             <div role="columnheader" className={headerCellCls}>{clubHeaderLabel}</div>
-            {hasDetail && <div role="columnheader" className={`${narrowHeaderCellCls} sm:hidden`} aria-hidden="true" />}
             {hasDetail && headerGroups.map((group, i) => (
               <div
                 key={i}
@@ -301,6 +300,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
               {isHitCountFinal ? (en ? "Hits" : "Hitovi") : "Σ"}
             </div>
             <div role="columnheader" className={narrowHeaderCellCls} aria-hidden="true" />
+            {hasDetail && <div role="columnheader" className={`${narrowHeaderCellCls} sm:hidden`} aria-hidden="true" />}
           </div>
 
           {sorted.map((r, idx) => {
@@ -363,7 +363,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                   </div>
 
                   {/* Club / NOC */}
-                  <div className={`${cellCls} min-w-0 group-hover:bg-[var(--surface-2)]`}>
+                  <div className={`${cellCls} max-sm:!px-1.5 min-w-0 group-hover:bg-[var(--surface-2)]`}>
                     <div className="flex items-center gap-2 min-w-0">
                       {r.nationality && (() => {
                         const noc = displayNoc(r.nationality);
@@ -394,7 +394,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                   {hasDetail && seriesCells(columns, r).map((cell, i) => (
                     <div
                       key={i}
-                      className={`hidden sm:flex ${cellCls} flex-col items-end justify-center gap-0.5 group-hover:bg-[var(--surface-2)]`}
+                      className={`hidden sm:flex ${cellCls} !px-1.5 flex-col items-end justify-center gap-0.5 group-hover:bg-[var(--surface-2)]`}
                     >
                       <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">{cell.sub}</span>
                       <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]">{cell.main}</span>
@@ -402,7 +402,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                   ))}
 
                   {/* Final total */}
-                  <div className={`${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`}>
+                  <div className={`${cellCls} max-sm:!px-1.5 justify-end font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`}>
                     {r.finalTotal ?? (
                       <span className="font-normal text-[var(--subtle)]">—</span>
                     )}

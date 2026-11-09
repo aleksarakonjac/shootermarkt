@@ -187,6 +187,13 @@ export default async function CompetitionPage({ params }: Props) {
     }
   }
 
+  // Slika i godište članova mixed timova (SIUS ih ne nosi) — iz naše tabele strelaca, kad je profil povezan.
+  const mixedProfileIds = [...new Set(mixedResults.flatMap((r) => [r.shooter1Id, r.shooter2Id]).filter((id): id is number => id != null))];
+  const mixedProfiles = mixedProfileIds.length
+    ? await db.select({ id: shooters.id, avatarUrl: shooters.avatarUrl, birthYear: shooters.birthYear }).from(shooters).where(inArray(shooters.id, mixedProfileIds))
+    : [];
+  const mixedProfileById = new Map(mixedProfiles.map((p) => [p.id, p]));
+
   const scheduleSlots: ScheduleSlot[] = scheduleRows.map((r) => ({
     id: r.id,
     disciplineCode: r.disciplineCode,
@@ -206,14 +213,16 @@ export default async function CompetitionPage({ params }: Props) {
 
   // Group mixed team results by discipline code
   const mixedGroupOrder: string[] = [];
-  const mixedGroupMap = new Map<string, { code: string; category: typeof mixedResults[number]["category"]; name: string; apparatus: string | null; date: string | null; teams: typeof mixedResults }>();
+  const mixedGroupMap = new Map<string, { code: string; category: typeof mixedResults[number]["category"]; name: string; apparatus: string | null; date: string | null; teams: Array<typeof mixedResults[number] & { shooter1AvatarUrl: string | null; shooter2AvatarUrl: string | null; shooter1BirthYear: number | null; shooter2BirthYear: number | null }> }>();
   for (const r of mixedResults) {
     const key = `${r.disciplineCode}|${r.category}`;
     if (!mixedGroupMap.has(key)) {
       mixedGroupOrder.push(key);
       mixedGroupMap.set(key, { code: r.disciplineCode, category: r.category, name: r.disciplineName, apparatus: r.apparatus, date: scheduledDate.get(key) ?? null, teams: [] });
     }
-    mixedGroupMap.get(key)!.teams.push(r);
+    const p1 = r.shooter1Id != null ? mixedProfileById.get(r.shooter1Id) : undefined;
+    const p2 = r.shooter2Id != null ? mixedProfileById.get(r.shooter2Id) : undefined;
+    mixedGroupMap.get(key)!.teams.push({ ...r, shooter1AvatarUrl: p1?.avatarUrl ?? null, shooter2AvatarUrl: p2?.avatarUrl ?? null, shooter1BirthYear: p1?.birthYear ?? null, shooter2BirthYear: p2?.birthYear ?? null });
   }
   const mixedGroups = mixedGroupOrder.map((key) => mixedGroupMap.get(key)!);
 

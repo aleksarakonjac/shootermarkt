@@ -7,6 +7,10 @@ import { Link } from "@/i18n/navigation";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 import { displayNoc } from "@shootermarkt/db/noc-list";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { NocChip, SheetCells, SheetFrame, SheetStats } from "./ResultSheet";
+import { ShooterAvatar } from "./ShooterAvatar";
+import { QualifiedBadge, SeriesBox, seriesGridStyle } from "./CompetitionQualTable";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import { useRowFlash } from "./useRowFlash";
 import { isUnrankedRemark, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
@@ -14,6 +18,7 @@ import { isUnrankedRemark, type RemarkDetails } from "@shootermarkt/db/pdf-impor
 export type MixedTeamRow = {
   id: number; nocCode: string; teamNumber: number; shooter1Id: number | null; shooter2Id: number | null;
   shooter1Name: string | null; shooter2Name: string | null;
+  shooter1AvatarUrl?: string | null; shooter2AvatarUrl?: string | null; shooter1BirthYear?: number | null; shooter2BirthYear?: number | null;
   shooter1Detail: { series: number[]; inners?: number | null; total: number } | null; shooter2Detail: { series: number[]; inners?: number | null; total: number } | null;
   shooter1FinalDetail?: { series: number[] } | null; shooter2FinalDetail?: { series: number[] } | null;
   qualRank: number | null; qualTotal: string | null; qualInners: number | null; qualRemark: string | null; qualified: boolean | null; finalRank: number | null; finalTotal: string | null; finalRemark: string | null; remarkDetails?: RemarkDetails | null;
@@ -41,12 +46,12 @@ function ChevronIcon({ open }: { open: boolean }) {
   return <svg width="10" height="10" viewBox="0 0 14 14" fill="none" aria-hidden="true" className="shrink-0 text-[var(--subtle)]" style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform 180ms ease" }}><path d="M2.5 5l4.5 4 4.5-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
-function TeamMember({ id, name }: { id: number | null; name: string | null }) {
+function TeamMember({ id, name, onOpen }: { id: number | null; name: string | null; onOpen?: () => void }) {
   // Prezime istaknuto, ime tanje i prigušeno — kao u pojedinačnim rezultatima. Prezime se ne skraćuje zarad imena: kad nema mesta, skraćuje se ime.
   const { lastName, firstName } = name ? splitDisplayName(name) : { lastName: "—", firstName: "" };
   const content = <><span className="max-w-full shrink-0 truncate font-medium text-[var(--ink)] transition-colors group-hover/name:text-[var(--brand-primary)]">{lastName}</span>{firstName && <span className="min-w-0 truncate text-[var(--muted)]">{firstName}</span>}</>;
   const cls = "group/name flex min-w-0 items-baseline gap-1.5";
-  return id ? <Link href={`/strelci/${id}`} onClick={(event) => event.stopPropagation()} className={cls}>{content}</Link> : <span className={cls}>{content}</span>;
+  return id ? <Link href={`/strelci/${id}`} onClick={(event) => { event.stopPropagation(); if (onOpen && window.matchMedia("(max-width: 639px)").matches) { event.preventDefault(); onOpen(); } }} className={cls}>{content}</Link> : <span className={cls}>{content}</span>;
 }
 
 /** Finala do 2025: Gold/Bronze Medal Match na poene (do 16–17), ne zbir krugova — ukupno je broj poena meča. */
@@ -80,6 +85,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const en = useLocale() === "en";
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
+  const [sheetId, setSheetId] = useState<number | null>(null);
   const isFinal = stage === "final";
   const rank = (team: MixedTeamRow) => isFinal ? team.finalRank : team.qualRank;
   const total = (team: MixedTeamRow) => isFinal ? team.finalTotal : team.qualTotal;
@@ -117,7 +123,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
   const SERIES_COL_W = "64px";
   const mobileColumns = ["40px", "0px", "minmax(56px, 72px)", "minmax(0, 1fr)", "44px", "60px", "minmax(20px, max-content)", hasSeries ? "16px" : ""].filter(Boolean).join(" ");
   // Imena strelaca dobijaju slobodan prostor (ne kolona ukupnog), da serije budu odmah uz NOC/imena.
-  const desktopColumns = ["32px", "minmax(90px, 200px)", "80px", "minmax(140px, 1fr)", ...seriesHeaders.map(() => SERIES_COL_W), "72px", "max-content", "minmax(28px, max-content)", "28px"].join(" ");
+  const desktopColumns = ["32px", "fit-content(200px)", "72px", "minmax(220px, 1fr)", ...seriesHeaders.map(() => SERIES_COL_W), "72px", "max-content", "minmax(28px, max-content)", "28px"].join(" ");
   const header = "flex items-center border-b border-[var(--border)] bg-[var(--surface-2)] px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-3";
 
   if (!sorted.length) return <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center"><p className="text-sm text-[var(--muted)]">{isFinal ? (en ? "No final results." : "Nema finalnih rezultata.") : (en ? "No results for this event." : "Nema rezultata za ovu disciplinu.")}</p></div>;
@@ -163,23 +169,91 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
               <span className="hidden sm:inline min-w-0 truncate text-sm text-[var(--ink)]">{nocEntry?.name && noc !== "AIN" ? nocEntry.name : noc} {team.teamNumber}</span>
             </div>
             <div className={`${cell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
-              <span className="flex shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">{alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }} />}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setSheetId(team.id); }} aria-label={`${en ? "Details" : "Detalji"}: ${noc} ${team.teamNumber}`} className="flex min-h-11 items-center sm:hidden"><span className="flex shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">{alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }} />}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span></button>
+              <span className="hidden shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)] sm:flex">{alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }} />}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span>
             </div>
-            <div className={`${memberCell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}><TeamMember id={team.shooter1Id} name={team.shooter1Name} /></div>
+            <div className={`${memberCell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}><TeamMember id={team.shooter1Id} name={team.shooter1Name} onOpen={() => setSheetId(team.id)} /></div>
             {hasSeries && seriesHeaders.map((_, i) => { const s1 = detail1(team)?.series; const v = s1?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s1 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}
             <div className={subtotalCell} style={{ gridRow: r1, background: rowBg }}>{shooterTotal1(team) != null ? fmt(shooterTotal1(team)!) : <span className="text-[var(--subtle)]">—</span>}</div>
             <div className={`${cell} justify-end gap-1 font-[family-name:var(--font-jetbrains-mono)] text-lg font-bold tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{status && !hasTotal ? statusBadge("") : <span className="flex flex-col items-end leading-tight">{status && statusBadge("!text-[0.6rem] !leading-none mb-0.5")}<span className="flex items-center gap-1">{total(team) != null ? <>{isMatch ? Math.round(Number(total(team))) : fmt(Number(total(team)))}{showInners && team.qualInners != null && <span className="text-xs font-normal text-[var(--muted)]">{team.qualInners}<span className="text-[0.6rem]">×</span></span>}</> : <span className="font-normal text-[var(--subtle)]">—</span>}</span></span>}</div>
             <div className={`${cell} justify-start !pl-1.5 !pr-2 sm:!pl-2 sm:!pr-3 font-[family-name:var(--font-jetbrains-mono)] text-base font-bold text-[var(--success)] group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{status ? null : remark(team) ? <RemarkBadge remark={remark(team)!} code={remarkCodes[index]} details={stageDetails(team)} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className="" /> : <span className="flex items-center gap-1.5">{!isFinal && team.qualified ? "Q" : null}{remarkLabel(null, stageDetails(team), remarkCodes[index]) && <RemarkBadge remark={remarkLabel(null, stageDetails(team), remarkCodes[index])!} code={remarkCodes[index]} details={stageDetails(team)} label={`${team.shooter1Name ?? ""} / ${team.shooter2Name ?? ""}`} className="" />}</span>}</div>
             <div className={`${cell} hidden justify-center !px-0.5 group-hover:bg-[var(--surface-2)] sm:flex`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{isMatch && hasSeries && <ChevronIcon open={isExpanded} />}</div>
             {hasSeries && <div className={`${cell} justify-center group-hover:bg-[var(--surface-2)] sm:hidden`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}><ChevronIcon open={isExpanded} /></div>}
-            <div className={`${memberCell} ${!isLast || isExpanded ? "border-b border-[var(--border)]" : ""} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r2, background: rowBg }}><TeamMember id={team.shooter2Id} name={team.shooter2Name} /></div>
+            <div className={`${memberCell} ${!isLast || isExpanded ? "border-b border-[var(--border)]" : ""} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r2, background: rowBg }}><TeamMember id={team.shooter2Id} name={team.shooter2Name} onOpen={() => setSheetId(team.id)} /></div>
             {hasSeries && seriesHeaders.map((_, i) => { const s2 = detail2(team)?.series; const v = s2?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r2, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s2 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}
             <div className={subtotalCell} style={{ gridRow: r2, background: rowBg }}>{shooterTotal2(team) != null ? fmt(shooterTotal2(team)!) : <span className="text-[var(--subtle)]">—</span>}</div>
           </div>
-          <AnimatePresence initial={false}>{hasSeries && isExpanded && <motion.div role="row" initial={reducedMotion ? false : { height: 0, opacity: 0, y: -4 }} animate={{ height: "auto", opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { height: 0, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : 0.2 }} style={{ gridColumn: "1 / -1", gridRow: accordionRow, background: rowBg }} className={`min-h-0 overflow-hidden px-3 ${isMatch ? "" : "sm:hidden"} ${isLast ? "" : "border-b border-[var(--border)]"}`}>{rounds ? <MatchRoundsGrid rows={[{ name: team.shooter1Name, shots: detail1(team)?.series ?? [] }, { name: team.shooter2Name, shots: detail2(team)?.series ?? [] }]} sums={rounds.sums} won={rounds.won} fmt={fmt} /> : <div className="flex flex-col gap-1.5 py-2">{[{ name: team.shooter1Name, detail: detail1(team) }, { name: team.shooter2Name, detail: detail2(team) }].map(({ name, detail }) => detail?.series.length ? <div key={name} className="flex min-w-0 items-center gap-3"><span className="w-24 shrink-0 truncate text-xs font-semibold text-[var(--ink)]">{name?.split(/\s+/)[0] ?? "—"}</span><div className="flex flex-wrap gap-x-2 gap-y-1 font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums">{detail.series.map((value, seriesIndex) => <span key={seriesIndex} className={!isFinal && value === Math.max(...detail.series) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(value)}</span>)}</div></div> : null)}</div>}</motion.div>}</AnimatePresence>
+          <AnimatePresence initial={false}>{hasSeries && isExpanded && <motion.div role="row" initial={reducedMotion ? false : { height: 0, opacity: 0, y: -4 }} animate={{ height: "auto", opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { height: 0, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : 0.2 }} style={{ gridColumn: "1 / -1", gridRow: accordionRow, background: rowBg }} className={`min-h-0 overflow-hidden px-3 ${isMatch ? "" : "sm:hidden"} ${isLast ? "" : "border-b border-[var(--border)]"}`}>{rounds ? <MatchRoundsGrid rows={[{ name: team.shooter1Name, shots: detail1(team)?.series ?? [] }, { name: team.shooter2Name, shots: detail2(team)?.series ?? [] }]} sums={rounds.sums} won={rounds.won} fmt={fmt} /> : <div className="flex flex-col gap-2 py-2.5">{[{ name: team.shooter1Name, detail: detail1(team) }, { name: team.shooter2Name, detail: detail2(team) }].map(({ name, detail }, memberIndex) => detail?.series.length ? <div key={memberIndex} className="flex min-w-0 flex-col gap-1"><span className="truncate text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{name ?? "—"}</span><div className="grid gap-1.5" style={seriesGridStyle(seriesLen)}>{detail.series.map((value, seriesIndex) => <SeriesBox key={seriesIndex} text={fmt(value)} best={!isFinal && value === Math.max(...detail.series)} onSurface={index % 2 === 1} />)}</div></div> : null)}</div>}</motion.div>}</AnimatePresence>
         </div>;
       })}
     </div></div>
     <RemarkLegend items={remarkLegend} />
+    {(() => {
+      const si = sheetId == null ? -1 : sorted.findIndex((t) => t.id === sheetId);
+      const st = si >= 0 ? sorted[si] : null;
+      if (!st) return <BottomSheet open={false} onClose={() => setSheetId(null)} label="">{null}</BottomSheet>;
+      const stNoc = displayNoc(st.nocCode); const stCountry = NOC_LIST.find((c) => c.noc === stNoc)?.name; const title = `${stCountry && stNoc !== "AIN" ? stCountry : stNoc} ${st.teamNumber}`;
+      const stRank = isUnranked(st) ? null : rank(st); const stMark = remark(st) ?? remarkLabel(null, stageDetails(st), remarkCodes[si]);
+      const stRounds = isMatch ? roundOutcomes(st) : null; const label = `${st.shooter1Name ?? ""} / ${st.shooter2Name ?? ""}`;
+      const members = [
+        { id: st.shooter1Id, name: st.shooter1Name, avatar: st.shooter1AvatarUrl, birthYear: st.shooter1BirthYear, detail: detail1(st), total: shooterTotal1(st), inners: st.shooter1Detail?.inners },
+        { id: st.shooter2Id, name: st.shooter2Name, avatar: st.shooter2AvatarUrl, birthYear: st.shooter2BirthYear, detail: detail2(st), total: shooterTotal2(st), inners: st.shooter2Detail?.inners },
+      ];
+      const qualified = !isFinal && st.qualified === true;
+      const marks = (
+        <span className="flex flex-wrap items-center justify-center gap-x-2">
+          {qualified && <QualifiedBadge size="lg" />}
+          {stMark ? <RemarkBadge size="lg" remark={stMark} code={remarkCodes[si]} details={stageDetails(st)} label={label} className="" /> : !qualified && "—"}
+        </span>
+      );
+      return (
+        <BottomSheet open onClose={() => setSheetId(null)} label={title}>
+          <SheetFrame en={en} onPrev={si > 0 ? () => setSheetId(sorted[si - 1].id) : undefined} onNext={si < sorted.length - 1 ? () => setSheetId(sorted[si + 1].id) : undefined}>
+            <div className="pr-10">
+              <h2 aria-live="polite" className="text-xl font-semibold leading-tight text-[var(--ink)] break-words">{title}</h2>
+              <p className="mt-1 flex items-center gap-2 text-base text-[var(--muted)]"><NocChip nationality={st.nocCode} /></p>
+            </div>
+            <SheetStats items={[
+              { label: en ? "Rank" : "Mesto", value: stRank ?? "—" },
+              { label: en ? "Total" : "Ukupno", value: total(st) != null ? (isMatch ? Math.round(Number(total(st))) : fmt(Number(total(st)))) : "—" },
+              showInners ? { label: en ? "Inner 10s" : "Desetke", value: st.qualInners ?? "—" } : { label: en ? "Remark" : "Napomena", value: marks },
+            ]} />
+            {showInners && (qualified || stMark) && <div className="mt-3 flex justify-center">{marks}</div>}
+            {members.map((m, mi) => {
+              const series = m.detail?.series ?? [];
+              const best = !isFinal && series.length ? Math.max(...series) : null;
+              const person = m.name ? splitDisplayName(m.name) : { lastName: "—", firstName: "" };
+              const cells = [
+                ...series.map((v, i) => ({ label: isMatch ? `R${i + 1}` : `S${i + 1}`, main: fmt(v), best: best != null && v === best })),
+                ...(m.total != null ? [{ label: "Σ", main: fmt(m.total), sub: m.inners != null ? `${m.inners}×` : undefined, best: true }] : []),
+              ];
+              return (
+                <div key={mi} className="mt-6">
+                  <div className="flex items-center gap-3">
+                    <ShooterAvatar firstName={person.firstName} lastName={person.lastName} avatarUrl={m.avatar} size="md" />
+                    <div className="min-w-0">
+                      <h3 className="text-lg font-semibold leading-tight text-[var(--ink)] break-words">{person.lastName} {person.firstName}{m.birthYear != null && <span className="ml-2 text-base font-normal text-[var(--muted)]">{m.birthYear}</span>}</h3>
+                      {m.id && (
+                        <Link href={`/strelci/${m.id}`} className="inline-flex min-h-11 items-center gap-1 text-base font-semibold text-[var(--brand-primary)] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]">
+                          {en ? "Shooter profile" : "Profil strelca"}
+                          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 15L15 5M7 5h8v8" /></svg>
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                  {cells.length > 0 && <div className="mt-2"><SheetCells cells={cells} /></div>}
+                </div>
+              );
+            })}
+            {stRounds && stRounds.sums.length > 0 && (
+              <div className="mt-6">
+                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{en ? "Team total per round" : "Zbir tima po rundi"}</h3>
+                <SheetCells cells={stRounds.sums.map((sum, i) => ({ label: `R${i + 1}`, main: sum != null ? fmt(sum) : "—", best: stRounds.won[i] }))} />
+              </div>
+            )}
+          </SheetFrame>
+        </BottomSheet>
+      );
+    })()}
   </div>;
 }
