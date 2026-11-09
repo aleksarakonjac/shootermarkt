@@ -97,6 +97,15 @@ function MedalOrRank({ rank, locale }: { rank: number | null; locale: string }) 
     : <span className="text-[0.65rem] text-[var(--subtle)]">#{rank}</span>;
 }
 
+/** ESC Solo: 1 hit, 2–4 hita, 5+ hitova (21 hit, 22 hita…). */
+function hitsLabel(n: number, en: boolean): string {
+  if (en) return n === 1 ? "hit" : "hits";
+  const d = n % 10, dd = n % 100;
+  if (d === 1 && dd !== 11) return "hit";
+  if (d >= 2 && d <= 4 && (dd < 12 || dd > 14)) return "hita";
+  return "hitova";
+}
+
 function SeriesLine({ label, series, total, inners }: { label: string; series: number[]; total: number | null; inners?: number | null }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -225,7 +234,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                               </span>
                               <span className="order-2 flex items-baseline justify-end gap-1 whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] tabular-nums sm:order-3">
                                 {r.qualTotal != null
-                                  ? <span className="font-semibold text-[var(--ink)]">{isSolo ? `${fmtQual(r.qualTotal)} ${en ? "hits" : "pog."}` : fmtQual(r.qualTotal)}{showInners && r.qualInners != null && <span className="ml-0.5 text-[0.65rem] font-normal text-[var(--muted)]">{r.qualInners}×</span>}</span>
+                                  ? <span className="font-semibold text-[var(--ink)]">{isSolo ? `${fmtQual(r.qualTotal)} ${hitsLabel(Math.round(parseFloat(r.qualTotal)), en)}` : fmtQual(r.qualTotal)}{showInners && r.qualInners != null && <span className="ml-0.5 text-[0.65rem] font-normal text-[var(--muted)]">{r.qualInners}×</span>}</span>
                                   : showElimInsteadOfQual
                                     ? <span className="font-semibold text-[var(--ink)]">{Math.round(r.elimTotal!)}<span className="ml-1 inline-flex rounded bg-amber-100 px-1 py-px font-[family-name:var(--font-barlow-condensed)] text-[0.6rem] font-bold leading-none text-amber-800">E</span></span>
                                     : <span className="text-[var(--subtle)]">—</span>}

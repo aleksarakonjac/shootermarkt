@@ -97,7 +97,7 @@ describe("ResultsHistoryTable", () => {
 
   it("shows placement for a Solo shooter out after qualification 1", () => {
     render(<ResultsHistoryTable results={[SOLO_OUT]} locale="sr" />);
-    expect(screen.getByText(/27 pog\./)).toBeInTheDocument();
+    expect(screen.getByText(/27 hitova/)).toBeInTheDocument();
     expect(screen.getByText(/18\. mesto/)).toBeInTheDocument();
   });
 
@@ -106,6 +106,12 @@ describe("ResultsHistoryTable", () => {
     render(<ResultsHistoryTable results={[tied]} locale="sr" />);
     expect(screen.getByText("QG")).toBeInTheDocument();
     expect(screen.getByText(/meč 12 : 12 SO/)).toBeInTheDocument();
+  });
+
+  it("uses Serbian plural forms for Solo hits", () => {
+    render(<ResultsHistoryTable results={[{ ...SOLO_OUT, qualTotal: "21" }, { ...SOLO_OUT, id: 5, rowKey: "r:5", qualTotal: "52" }]} locale="sr" />);
+    expect(screen.getByText(/21 hit(?!a|o)/)).toBeInTheDocument();
+    expect(screen.getByText(/52 hita/)).toBeInTheDocument();
   });
 
   it("expands a mixed team row with both members' series", () => {
