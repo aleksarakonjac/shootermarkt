@@ -348,7 +348,7 @@ async function seed() {
       ...(["SOLOARM", "SOLOARW", "SOLOAPM", "SOLOAPW"] as const).map((code) => ({
         disciplineId: byCode[code],
         code: `${code.toLowerCase()}-esc`,
-        name: "ESC Solo 60 hitaca (pogoci)",
+        name: "ESC Solo 60 hitaca (hitovi)",
         totalShots: 60,
         maxScore: "60",
         hasDecimals: false,
