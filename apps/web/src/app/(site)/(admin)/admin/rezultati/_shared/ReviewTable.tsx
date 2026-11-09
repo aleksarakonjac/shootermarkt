@@ -192,7 +192,7 @@ function FinalsTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: P
   const isHitCountFinal = isSportPistolCode(rows[0]?.row.disciplineCode);
   const finalValues = (row: ReviewRow) => row.finalCumulative ?? row.finalSeries ?? [];
   const intermediateCount = Math.max(...rows.map(({ row }) => Math.max(row.finalCumulative?.length ?? 0, row.finalSeries?.length ?? 0)));
-  const intermediateLabel = isHitCountFinal ? "Gore: ukupno pogodaka. Dole: pogodaka u seriji." : rows.some(({ row }) => row.finalCumulative?.length) ? "Tok finala" : "Međuserije";
+  const intermediateLabel = isHitCountFinal ? "Gore: ukupno hitova. Dole: hitova u seriji." : rows.some(({ row }) => row.finalCumulative?.length) ? "Tok finala" : "Međuserije";
 
   return (
     <div className="border-t border-[var(--border)] bg-[var(--surface)]">
@@ -208,7 +208,7 @@ function FinalsTable({ rows, onRowChange }: { rows: IndexedRow[]; onRowChange: P
             <th className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Kval. ukupno</th>
             {Array.from({ length: intermediateCount }, (_, index) => <th key={index} className="px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]" title={intermediateLabel}>{rows[0]?.row.finalSeriesLabels?.[index] ?? `F${index + 1}`}</th>)}
             {!isHitCountFinal ? <th className="px-3 py-2.5 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]">Hici</th> : null}
-            <th className={`${stickyHeader} ${stickyDivider} right-0 w-24 px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]`}>{isHitCountFinal ? "Pogoci" : "Final ukupno"}</th>
+            <th className={`${stickyHeader} ${stickyDivider} right-0 w-24 px-3 py-2.5 text-right text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)]`}>{isHitCountFinal ? "Hitovi" : "Final ukupno"}</th>
           </tr></thead>
           <tbody className="divide-y divide-[var(--border)]">
             {[...rows].sort((a, b) => (a.row.finalRank ?? 99) - (b.row.finalRank ?? 99)).map(({ row, index }) => {

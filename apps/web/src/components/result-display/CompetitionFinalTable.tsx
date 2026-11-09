@@ -314,7 +314,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
               </div>
             ))}
             <div role="columnheader" className={`${headerCellCls} justify-end whitespace-nowrap`}>
-              {isHitCountFinal ? (en ? "Hits" : "Pogoci") : "Σ"}
+              {isHitCountFinal ? (en ? "Hits" : "Hitovi") : "Σ"}
             </div>
             <div role="columnheader" className={narrowHeaderCellCls} aria-hidden="true" />
           </div>
