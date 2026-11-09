@@ -241,11 +241,16 @@ export async function autoLinkShooter(s: { id: number; firstName: string; lastNa
 /**
  * Strelci kojima refresh može nešto da donese: bez issfId (auto-link) ili sa
  * praznim poljem koje ISSF popunjava. Popunjeni se preskaču — fill-only-null.
- * `before`: ne diraj one koji su već obrađeni posle početka ovog job-a.
+ * Nikad sinhronizovani (npr. novi iz live crona) idu odmah; već pokušani tek posle
+ * ISSF_RETRY_DAYS — ISSF za većinu stranih strelaca nikad ne popuni prazna polja, a
+ * nedeljni pun prolaz (~27k strelaca → ~15 izmena) je trošio najveći deo Vercel CPU-a.
+ * `before`: početak job-a; obrađeni u ovom job-u dobijaju novije issfSyncedAt i ispadaju.
  */
+const ISSF_RETRY_DAYS = 90;
 export function needsIssfRefresh(before: Date): SQL {
+  const retryBefore = new Date(before.getTime() - ISSF_RETRY_DAYS * 24 * 60 * 60 * 1000);
   return and(
-    or(isNull(shooters.issfSyncedAt), lt(shooters.issfSyncedAt, before)),
+    or(isNull(shooters.issfSyncedAt), lt(shooters.issfSyncedAt, retryBefore)),
     or(isNull(shooters.issfId), isNull(shooters.avatarUrl), isNull(shooters.birthDate), isNull(shooters.apparatus), isNull(shooters.gender)),
   )!;
 }
