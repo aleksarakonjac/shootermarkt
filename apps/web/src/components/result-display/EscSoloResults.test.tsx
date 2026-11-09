@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { mergeEscSoloPhases, type SiusLiveResult } from "@shootermarkt/adapters/sius/public-adapter";
@@ -43,8 +43,17 @@ describe("EscSoloResults", () => {
     expect(within(screen.getByTestId("gold-match")).getByText("12 : 10")).toBeInTheDocument();
     expect(within(screen.getByTestId("bronze-match")).getByText("11 : 9")).toBeInTheDocument();
     expect(within(screen.getByTestId("qual2")).getAllByRole("row")).toHaveLength(18 + 1);
-    expect(within(screen.getByTestId("qual1")).getAllByRole("row")).toHaveLength(31 + 1);
     expect(within(screen.getByTestId("qual2")).getAllByText("QG")).toHaveLength(2);
+    // Kvalifikacije su tabovi: K2 podrazumevano, K1 na klik
+    expect(screen.queryByTestId("qual1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Kvalifikacija 1" }));
+    expect(within(screen.getByTestId("qual1")).getAllByRole("row")).toHaveLength(31 + 1);
+    expect(screen.queryByTestId("qual2")).not.toBeInTheDocument();
+  });
+
+  it("marks the fourth place in the bronze match", () => {
+    render(<EscSoloResults results={VROCLAV_ROWS} disciplineCode="SOLOARM" locale="sr" />);
+    expect(within(screen.getByTestId("bronze-match")).getByText("4")).toBeInTheDocument();
   });
 
   it("marks a shoot-off even when only the loser row carries it", () => {
