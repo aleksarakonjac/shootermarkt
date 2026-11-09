@@ -97,6 +97,17 @@ function MedalOrRank({ rank, locale }: { rank: number | null; locale: string }) 
     : <span className="text-[0.65rem] text-[var(--subtle)]">#{rank}</span>;
 }
 
+/** Kratak niz za red istorije: serije kvalifikacije, K1/K2 za Solo, sopstvene serije za mix. Stringovi su oznake. */
+function rowSeries(r: ResultRowData): (number | string)[] {
+  if (r.kind === "mixed") return r.mixedDetail?.own?.series ?? [];
+  const d = r.qualDetail;
+  if (!d) return [];
+  if ("format" in d) return ["K1", d.part1.total ?? "—", ...(d.part2 ? ["K2", d.part2.total ?? "—"] : [])];
+  if ("series" in d) return d.series;
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  return [...d.kneeling.series, ...d.prone.series, ...d.standing.series].map(sum);
+}
+
 /** ESC Solo: 1 hit, 2–4 hita, 5+ hitova (21 hit, 22 hita…). */
 function hitsLabel(n: number, en: boolean): string {
   if (en) return n === 1 ? "hit" : "hits";
@@ -200,6 +211,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                     const finalDecimals = !isSolo && (r.disciplineCode.startsWith("AR") || r.disciplineCode.startsWith("R3P") || r.disciplineCode.startsWith("AP"));
                     const showInners = !isSolo && r.disciplineCode !== "ARM" && r.disciplineCode !== "ARW" && r.disciplineCode !== "ARMT";
                     const fmtQual = (v: string) => qualDecimals ? parseFloat(v).toFixed(1) : Math.round(parseFloat(v)).toString();
+                    const fmtSeries = (v: number) => (qualDecimals && !isSolo ? v.toFixed(1) : Math.round(v).toString());
                     const fmtFinal = (v: string) => finalDecimals ? parseFloat(v).toFixed(1) : Math.round(parseFloat(v)).toString();
                     const showElimInsteadOfQual = r.qualTotal == null && r.elimTotal != null;
                     const categoryLabel = r.category && r.category !== "senior" ? (en ? CATEGORY_LABEL_EN[r.category as AgeCategory] : CATEGORY_LABEL[r.category as AgeCategory]) ?? null : null;
@@ -226,12 +238,16 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                               disabled={!canExpand}
                               onClick={canExpand ? () => setExpanded(isExpanded ? null : r.rowKey) : undefined}
                               aria-expanded={canExpand ? isExpanded : undefined}
-                              className={`grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5 rounded-md px-1.5 py-1.5 text-left transition-colors sm:grid-cols-[minmax(0,1fr)_minmax(0,11rem)_7.5rem_8.5rem] sm:px-2 ${canExpand ? "cursor-pointer hover:bg-[var(--surface-2)]" : "cursor-default"} ${isExpanded ? "bg-[var(--surface-2)]" : ""}`}
+                              className={`grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5 rounded-md px-1.5 py-1.5 text-left transition-colors sm:grid-cols-[minmax(0,1fr)_minmax(0,11rem)_7.5rem_8.5rem] sm:px-2 lg:grid-cols-[minmax(0,13.5rem)_minmax(0,7.5rem)_minmax(0,1fr)_9rem_8.5rem] lg:gap-x-5 lg:py-2 ${canExpand ? "cursor-pointer hover:bg-[var(--surface-2)]" : "cursor-default"} ${isExpanded ? "bg-[var(--surface-2)]" : ""}`}
                             >
                               <span className="order-1 min-w-0 font-medium leading-snug text-[var(--ink)]">{rowName(r, locale)}</span>
                               <span className="order-3 min-w-0 truncate text-[0.7rem] text-[var(--muted)] sm:order-2 sm:text-xs">
                                 {[extra, categoryLabel].filter(Boolean).join(" · ")}
                                 {r.eventName && <span className="ml-1 font-semibold text-[var(--brand-primary)]" title={r.eventName}>{localizeMatchName(r.eventName, locale)}</span>}
+                              </span>
+                              {/* Desktop: serije kvalifikacije u sredini reda umesto praznog prostora */}
+                              <span data-testid="row-series" className="hidden min-w-0 items-baseline gap-x-2 truncate font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--subtle)] lg:order-2 lg:flex">
+                                {rowSeries(r).map((v, i) => <span key={i} className={typeof v === "string" && isNaN(Number(v)) ? "text-[0.6rem] font-semibold uppercase tracking-wide" : ""}>{typeof v === "string" && isNaN(Number(v)) ? v : fmtSeries(Number(v))}</span>)}
                               </span>
                               <span className="order-2 flex items-baseline justify-end gap-1 whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] tabular-nums sm:order-3">
                                 {r.qualTotal != null

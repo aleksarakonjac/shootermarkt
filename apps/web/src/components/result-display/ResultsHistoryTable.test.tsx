@@ -114,6 +114,18 @@ describe("ResultsHistoryTable", () => {
     expect(screen.getByText(/52 hita/)).toBeInTheDocument();
   });
 
+  it("shows qualification series inline for wide screens", () => {
+    render(<ResultsHistoryTable results={[
+      { ...result, qualDetail: { series: [105.3, 104.8, 105, 104.1, 105.6, 105.2] } },
+      { ...SOLO, competitionId: 2, competitionName: "EP" },
+      { ...MIXED, competitionId: 3, competitionName: "Kup" },
+    ]} locale="sr" />);
+    const lines = screen.getAllByTestId("row-series").map((el) => [...el.children].map((c) => c.textContent).join(" "));
+    expect(lines).toContain("105.3 104.8 105.0 104.1 105.6 105.2");
+    expect(lines).toContain("K1 26 K2 52");
+    expect(lines).toContain("105.1");
+  });
+
   it("expands a mixed team row with both members' series", () => {
     render(<ResultsHistoryTable results={[MIXED]} locale="sr" />);
     fireEvent.click(screen.getByText("10m vazdušna puška miks"));
