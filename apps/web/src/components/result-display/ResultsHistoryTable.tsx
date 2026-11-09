@@ -255,7 +255,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                                   : showElimInsteadOfQual
                                     ? <span className="font-semibold text-[var(--ink)]">{Math.round(r.elimTotal!)}<span className="ml-1 inline-flex rounded bg-amber-100 px-1 py-px font-[family-name:var(--font-barlow-condensed)] text-[0.6rem] font-bold leading-none text-amber-800">E</span></span>
                                     : <span className="text-[var(--subtle)]">—</span>}
-                                <span className="text-[0.65rem] text-[var(--subtle)]">{r.qualRank != null ? `#${r.qualRank}` : r.elimRank != null ? `#${r.elimRank}` : ""}</span>
+                                <span className="text-[0.65rem] text-[var(--subtle)]">{isSolo && r.finalRank == null ? "" /* ispao pre meča: plasman stoji kao "N. mesto" */ : r.qualRank != null ? `#${r.qualRank}` : r.elimRank != null ? `#${r.elimRank}` : ""}</span>
                                 {soloMark && <span className="text-[0.65rem] font-bold text-[var(--brand-primary)]">{soloMark}</span>}
                                 {canExpand && !hasLine2 && <ChevronDown size={14} className={`shrink-0 self-center text-[var(--muted)] transition-transform duration-200 sm:hidden ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true" />}
                               </span>
