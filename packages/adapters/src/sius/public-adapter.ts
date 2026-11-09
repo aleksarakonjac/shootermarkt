@@ -1,4 +1,5 @@
 import { normalizeNoc } from "@shootermarkt/db/name-match";
+import { canonicalSiusEventCode } from "./event-code-alias";
 import type { EscSoloPart } from "@shootermarkt/db/schema";
 const SIUS_PUB = "https://shootingsportscloud.com:8594/api/v1/pub";
 
@@ -104,7 +105,7 @@ export async function fetchSiusEvents(compUuid: string): Promise<SiusEvent[]> {
   );
   return data.map((e) => ({
     runningId: e.RunningId,
-    eventCode: e.CompetitionEventType?.EventCode ?? "",
+    eventCode: canonicalSiusEventCode(e.CompetitionEventType?.EventCode ?? ""),
     name: e.CompetitionEventType?.Name ?? "",
     state: e.State,
     startDate: e.Startdate,
