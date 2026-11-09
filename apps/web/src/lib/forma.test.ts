@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeForma } from "./forma";
+import { computeForma, countFormaAppearances } from "./forma";
 
 describe("computeForma", () => {
   it("reduces the influence of lower age-category results without changing their score", () => {
@@ -43,5 +43,22 @@ describe("computeForma v2", () => {
     const clean = computeForma(series([620, 621, 620, 622, 621, 620]), { code: "ARM" });
     const withBad = computeForma(series([620, 621, 600, 622, 621, 620]), { code: "ARM" });
     expect(clean.forma! - withBad.forma!).toBeLessThan(2);
+  });
+});
+
+describe("countFormaAppearances", () => {
+  it("counts only results that feed forma, one per match", () => {
+    const rows = [
+      { disciplineCode: "ARM", date: "2026-01-10", qualTotal: "630.1", qualRemark: null },
+      // isti meč na senior + junior listi → jedan nastup
+      { disciplineCode: "ARM", date: "2026-01-10", qualTotal: "630.1", qualRemark: null },
+      { disciplineCode: "ARM", date: "2026-02-10", qualTotal: "120.0", qualRemark: "DNF" },
+      { disciplineCode: "ARM", date: "2026-03-10", qualTotal: "0", qualRemark: null },
+      { disciplineCode: "ARM", date: "2026-03-11", qualTotal: null, qualRemark: "DNS" },
+      { disciplineCode: "SOLOARM", date: "2026-04-10", qualTotal: "52", qualRemark: null },
+      { disciplineCode: "RPRM", date: "2026-04-10", qualTotal: "620.0", qualRemark: null },
+      { disciplineCode: "APM", date: "2026-01-10", qualTotal: "630.1", qualRemark: null },
+    ];
+    expect(countFormaAppearances(rows)).toBe(2);
   });
 });

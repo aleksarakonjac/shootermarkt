@@ -26,6 +26,8 @@ function formatCompetitionDate(date: string, dateEnd: string | null) {
   return `${day}.${month}.${year}.-${endDay}.${endMonth}.${endYear}.`;
 }
 
+type MixedSlot = { series: number[]; inners?: number | null; total: number };
+
 export type ResultRowData = {
   id: number;
   /** Jedinstven ključ reda: "r:<results.id>" ili "m:<mixed_team_results.id>" (id-jevi iz dve tabele se preklapaju). */
@@ -34,7 +36,7 @@ export type ResultRowData = {
   /** Mešoviti tim: partner ("Ž. Petrović"). */
   partnerName?: string | null;
   /** Mešoviti tim: serije ovog strelca i partnera. */
-  mixedDetail?: { own: { series: number[]; total: number } | null; partner: { series: number[]; total: number } | null } | null;
+  mixedDetail?: { own: MixedSlot | null; partner: MixedSlot | null } | null;
   competitionId: number;
   qualTotal: string | null;
   qualRank: number | null;
@@ -93,12 +95,12 @@ function MedalOrRank({ rank, locale }: { rank: number | null; locale: string }) 
     : <span className="text-[0.65rem] text-[var(--subtle)]">#{rank}</span>;
 }
 
-function SeriesLine({ label, series, total }: { label: string; series: number[]; total: number | null }) {
+function SeriesLine({ label, series, total, inners }: { label: string; series: number[]; total: number | null; inners?: number | null }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <span className="w-24 shrink-0 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{label}</span>
       <span className="flex flex-wrap gap-x-2 font-[family-name:var(--font-jetbrains-mono)] tabular-nums text-[var(--muted)]">{series.map((v, i) => <span key={i}>{v}</span>)}</span>
-      {total != null && <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">{total}</span>}
+      {total != null && <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">{total}{inners != null && <span className="ml-0.5 text-[0.65rem] font-normal text-[var(--muted)]">{inners}×</span>}</span>}
     </div>
   );
 }
@@ -244,8 +246,8 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                                 <div className="overflow-hidden">
                                   {isMixed ? (
                                     <div className="space-y-2 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs">
-                                      {r.mixedDetail?.own && <SeriesLine label={en ? "You" : "Strelac"} series={r.mixedDetail.own.series} total={r.mixedDetail.own.total} />}
-                                      {r.mixedDetail?.partner && <SeriesLine label={r.partnerName ?? (en ? "Partner" : "Partner")} series={r.mixedDetail.partner.series} total={r.mixedDetail.partner.total} />}
+                                      {r.mixedDetail?.own && <SeriesLine label={en ? "You" : "Strelac"} series={r.mixedDetail.own.series} total={r.mixedDetail.own.total} inners={showInners ? r.mixedDetail.own.inners : null} />}
+                                      {r.mixedDetail?.partner && <SeriesLine label={r.partnerName ?? (en ? "Partner" : "Partner")} series={r.mixedDetail.partner.series} total={r.mixedDetail.partner.total} inners={showInners ? r.mixedDetail.partner.inners : null} />}
                                     </div>
                                   ) : isSolo && r.qualDetail && "format" in r.qualDetail ? (
                                     <div className="space-y-2 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs">

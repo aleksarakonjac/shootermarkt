@@ -163,6 +163,26 @@ function dedupeSameMatch(entries: FormaEntry[]): FormaEntry[] {
   return [...byKey.values()];
 }
 
+/** DNF/DNS/DSQ: delimičan ili nepostojeći skor — nije nastup za formu. */
+export const INVALID_REMARKS = ["DNF", "DNS", "DSQ"];
+
+/**
+ * Broj nastupa koji ulaze u formu: forma discipline, skor > 0, bez DNF/DNS/DSQ,
+ * isti skor istog dana u istoj disciplini (senior + junior lista) broji se jednom.
+ */
+export function countFormaAppearances(
+  rows: { disciplineCode: string; date: string; qualTotal: string | number | null; qualRemark: string | null }[],
+): number {
+  const keys = new Set<string>();
+  for (const r of rows) {
+    const score = Number(r.qualTotal);
+    if (!FORMA_DISCIPLINE_CODES.includes(r.disciplineCode) || !(score > 0)) continue;
+    if (r.qualRemark && INVALID_REMARKS.includes(r.qualRemark)) continue;
+    keys.add(`${r.disciplineCode}|${r.date}|${score}`);
+  }
+  return keys.size;
+}
+
 // ── Jezgro ────────────────────────────────────────────────────────────────────
 
 /**

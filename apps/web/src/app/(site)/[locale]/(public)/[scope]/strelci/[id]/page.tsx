@@ -24,7 +24,7 @@ import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 import { ArrowRight } from "lucide-react";
 import { ShooterAvatarLightbox } from "@/components/shooter/ShooterAvatarLightbox";
 import { INVALID_REMARKS } from "@/lib/forma-query";
-import { FORMA_DISCIPLINE_CODES } from "@/lib/forma";
+import { countFormaAppearances, FORMA_DISCIPLINE_CODES } from "@/lib/forma";
 import { getShooterMixedRows } from "@/lib/shooter-mixed-results";
 import { toIndividualHistoryRow } from "@/lib/shooter-results";
 
@@ -135,8 +135,12 @@ export default async function ShooterPage({ params }: Props) {
   const initials = `${shooter.firstName[0]}${shooter.lastName[0]}`;
 
   // ── Quick stats ──────────────────────────────────────────────────────────────
-  // Nastupi: pojedinačni (uključujući ESC Solo) i mešoviti tim.
+  // Redovi istorije (pojedinačni, ESC Solo, mešoviti tim) — za link "svi rezultati".
   const totalAppearances = shooterResults.length + mixedRows.length;
+  // Statistika "Nastupi" = samo nastupi koji ulaze u formu (bez Solo, mix, ležećeg, 300m…).
+  const formaAppearances = countFormaAppearances(
+    shooterResults.map((r) => ({ disciplineCode: r.disciplineCode, date: r.competitionDate, qualTotal: r.qualTotal, qualRemark: r.qualRemark })),
+  );
   // ESC Solo (pogoci) se ne meša sa ISSF finalima ni sa najboljim skorom.
   const finalesCount = shooterResults.filter((r) => r.finalRank != null && !isEscSoloCode(r.disciplineCode)).length;
 
@@ -359,7 +363,7 @@ export default async function ShooterPage({ params }: Props) {
                   {tProfile("statAppearances")}
                 </p>
                 <p className="font-[family-name:var(--font-jetbrains-mono)] font-semibold text-2xl leading-none tabular-nums text-[var(--ink)] mt-0.5">
-                  {totalAppearances}
+                  {formaAppearances > 0 ? formaAppearances : <span className="text-[var(--subtle)]">—</span>}
                 </p>
               </div>
               <div className="bg-[var(--bg)] px-3 py-2">

@@ -5,7 +5,7 @@ import { competitions, countries, disciplines, mixedTeamResults, shooters } from
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 import type { ResultRowData } from "@/components/result-display/ResultsHistoryTable";
 
-type SlotDetail = { series: number[]; total: number } | null;
+type SlotDetail = { series: number[]; inners?: number | null; total: number } | null;
 
 export type MixedRowInput = {
   id: number;
@@ -20,6 +20,7 @@ export type MixedRowInput = {
   shooter1Detail: SlotDetail;
   shooter2Detail: SlotDetail;
   qualTotal: string | null;
+  qualInners: number | null;
   qualRank: number | null;
   qualified: boolean | null;
   finalTotal: string | null;
@@ -67,7 +68,7 @@ export function toMixedHistoryRow(row: MixedRowInput, shooterId: number): Result
     category: row.category,
     qualTotal: row.qualTotal,
     qualRank: row.qualRank,
-    qualInners: null,
+    qualInners: row.qualInners,
     qualified: row.qualified,
     elimTotal: null,
     elimRank: null,
@@ -113,6 +114,7 @@ export async function getShooterMixedRows(shooterId: number, competitionIds?: nu
       shooter1Detail: mixedTeamResults.shooter1Detail,
       shooter2Detail: mixedTeamResults.shooter2Detail,
       qualTotal: mixedTeamResults.qualTotal,
+      qualInners: mixedTeamResults.qualInners,
       qualRank: mixedTeamResults.qualRank,
       qualified: mixedTeamResults.qualified,
       finalTotal: mixedTeamResults.finalTotal,

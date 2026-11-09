@@ -1,10 +1,10 @@
 import { and, eq, gt, gte, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { results, competitions, competitionEvents, disciplines, shooterFormaCache } from "@shootermarkt/db/schema";
-import { FORMA_DISCIPLINE_CODES, RANKING_MIN_SAMPLE, type CompetitionEventType, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
+import { FORMA_DISCIPLINE_CODES, INVALID_REMARKS, RANKING_MIN_SAMPLE, type CompetitionEventType, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 
 /** qual_remark oznake koje znače da rezultat nije ispucan do kraja. */
-export const INVALID_REMARKS = ["DNF", "DNS", "DSQ"];
+export { INVALID_REMARKS };
 
 export type RawFormaEntry = {
   qualTotal: number;

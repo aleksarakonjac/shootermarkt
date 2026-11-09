@@ -7,7 +7,7 @@ const COMP = {
 };
 const BASE: MixedRowInput = {
   id: 5, shooter1Id: 10, shooter2Id: null, shooter1Name: "RAKONJAC Aleksa", shooter2Name: "PETROVIĆ Žaklina",
-  qualTotal: "629.1", qualRank: 6, qualified: false, finalRank: null, finalTotal: null,
+  qualTotal: "629.1", qualInners: null, qualRank: 6, qualified: false, finalRank: null, finalTotal: null,
   shooter1Detail: { series: [105.1], total: 315.2 }, shooter2Detail: { series: [104.9], total: 313.9 },
   shooter1FirstName: "Aleksa", shooter1LastName: "Rakonjac", shooter2FirstName: null, shooter2LastName: null,
   disciplineCode: "ARMT", category: "senior", ...COMP,
@@ -26,6 +26,13 @@ describe("toMixedHistoryRow", () => {
     const row = toMixedHistoryRow({ ...BASE, shooter1Id: 11, shooter2Id: 10, shooter1FirstName: "Marko", shooter1LastName: "Ivić" }, 10);
     expect(row.partnerName).toBe("M. Ivić");
     expect(row.mixedDetail?.own?.total).toBe(313.9);
+  });
+});
+
+describe("toMixedHistoryRow inners", () => {
+  it("keeps APMT team inners — they break qualification ties", () => {
+    const row = toMixedHistoryRow({ ...BASE, disciplineCode: "APMT", qualTotal: "571", qualInners: 14 }, 10);
+    expect(row.qualInners).toBe(14);
   });
 });
 
