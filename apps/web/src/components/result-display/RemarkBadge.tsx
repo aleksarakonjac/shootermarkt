@@ -93,7 +93,10 @@ function RemarkModal({ label, onClose, children }: { label?: string; onClose: ()
 /** `code` (npr. "A1") se prosleđuje samo kad je remark predugačak da stane u
  *  kolonu — tad se prikazuje kao dugme koje na klik otvara modal sa punim tekstom. */
 /** `details` (kazna / shoot-off / rekord iz SIUS-a) čini oznaku klikabilnom — modal prikazuje sve detalje. */
-export function RemarkBadge({ remark, code, label, details, className = "ml-1.5" }: { remark: string; code?: string | null; label?: string; details?: StageRemarks | null; className?: string }) {
+export function RemarkBadge({ remark, code, label, details, className = "ml-1.5", size = "base" }: { remark: string; code?: string | null; label?: string; details?: StageRemarks | null; className?: string; size?: "base" | "lg" }) {
+  // lg: large text for the mobile sheet; interactive badges get a 44px hit area.
+  const sizeCls = size === "lg" ? "text-2xl" : "text-base";
+  const hitCls = size === "lg" ? "min-h-11 min-w-11 inline-flex items-center justify-center" : "";
   const [open, setOpen] = useState(false);
   const en = useUiLocale() === "en";
 
@@ -115,7 +118,7 @@ export function RemarkBadge({ remark, code, label, details, className = "ml-1.5"
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-          className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none underline decoration-dotted underline-offset-2 ${className}`}
+          className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] ${sizeCls} shrink-0 leading-none underline decoration-dotted underline-offset-2 ${hitCls} ${className}`}
           style={{ color: remarkColor(remark) }}
           aria-haspopup="dialog"
           title={en ? "Show details" : "Prikaži detalje"}
@@ -147,7 +150,7 @@ export function RemarkBadge({ remark, code, label, details, className = "ml-1.5"
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-          className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none underline decoration-dotted underline-offset-2 ${className}`}
+          className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] ${sizeCls} shrink-0 leading-none underline decoration-dotted underline-offset-2 ${hitCls} ${className}`}
           style={{ color: "var(--danger)" }}
           title={en ? "Show remark" : "Prikaži napomenu"}
         >
@@ -164,7 +167,7 @@ export function RemarkBadge({ remark, code, label, details, className = "ml-1.5"
 
   return (
     <span
-      className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none ${className}`}
+      className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] ${sizeCls} shrink-0 leading-none ${className}`}
       style={{ color: remarkColor(remark) }}
       title={remark}
     >

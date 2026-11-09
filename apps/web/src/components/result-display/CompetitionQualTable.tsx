@@ -4,6 +4,8 @@ import { useState, type CSSProperties } from "react";
 import { useLocale } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
+import { ShooterAvatar } from "./ShooterAvatar";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 import type { QualDetail, PositionsQualDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
@@ -51,6 +53,7 @@ export type CompResultRow = {
   birthYear: number | null | undefined;
   clubDisplay: string;
   nationality: string | null;
+  avatarUrl?: string | null;
   qualTotal: string | null;
   qualRank: number | null;
   qualInners: number | null;
@@ -62,11 +65,11 @@ export type CompResultRow = {
   apparatus: string | null;
 };
 
-function QualifiedBadge() {
+function QualifiedBadge({ size = "base" }: { size?: "base" | "lg" }) {
   const en = useLocale() === "en";
   return (
     <span
-      className="font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] text-base shrink-0 leading-none"
+      className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] ${size === "lg" ? "text-2xl" : "text-base"} shrink-0 leading-none`}
       style={{ color: "var(--success)" }}
       title={en ? "Qualified for the final" : "Kvalifikovan za finale"}
     >
@@ -107,7 +110,7 @@ const NAME_W = "minmax(140px, 1fr)";
 const NOC_W = "84px";
 const CLUB_W = "minmax(96px, 180px)";
 const TOTAL_W = "92px";
-const REMARK_W = "44px";
+const REMARK_W = "minmax(44px, max-content)";
 
 const headerCellCls = "px-2 py-3 text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--muted)] sm:px-3 flex items-center bg-[var(--surface-2)] border-b border-[var(--border)]";
 
@@ -207,6 +210,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
   const positionLabels: PositionLabels = locale === "en" ? POSITION_LABELS_EN : POSITION_LABELS;
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
+  const [sheetId, setSheetId] = useState<number | null>(null);
 
   if (results.length === 0) {
     return (
@@ -377,7 +381,11 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                   <div className={`${cellCls} min-w-0 group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
                     <Link
                       href={`/strelci/${r.shooterId}`}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Mobile: ime otvara bottom sheet sa detaljima; desktop ostaje običan link.
+                        if (window.matchMedia("(max-width: 639px)").matches) { e.preventDefault(); setSheetId(r.id); }
+                      }}
                       className="flex min-w-0 flex-col leading-tight py-0.5 group/name sm:flex-row sm:items-baseline sm:gap-1.5"
                     >
                       <span className="min-w-0 truncate font-medium text-[var(--ink)] transition-colors group-hover/name:text-[var(--brand-primary)]">
@@ -457,11 +465,11 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                   </div>
 
                   {/* Remark / Q badge — own narrow column, not inline with the total */}
-                  <div className={`${cellCls} justify-center group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
+                  <div className={`${cellCls} max-sm:!px-0 justify-center group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
                     {r.remark ? (
                       <RemarkBadge remark={r.remark} code={remarkCodes[idx]} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />
                     ) : (
-                      <span className="flex items-center gap-1.5">
+                      <span className="flex flex-col items-center gap-1 max-sm:[&_button]:text-xs max-sm:[&_span]:text-xs sm:flex-row sm:gap-1.5">
                         {isTopQual && <QualifiedBadge />}
                         {remarkLabel(null, r.remarkDetails, remarkCodes[idx]) && <RemarkBadge remark={remarkLabel(null, r.remarkDetails, remarkCodes[idx])!} code={remarkCodes[idx]} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />}
                       </span>
@@ -534,6 +542,123 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
         </div>
       </div>
       <RemarkLegend items={remarkLegend} />
+      {(() => {
+        const si = sheetId == null ? -1 : sorted.findIndex((r) => r.id === sheetId);
+        const sr = si >= 0 ? sorted[si] : null;
+        return (
+          <BottomSheet open={sr != null} onClose={() => setSheetId(null)} label={sr ? `${sr.firstName} ${sr.lastName}` : ""}>
+            {sr && (
+              <ShooterSheetBody
+                r={sr}
+                rank={isUnrankedRemark(sr.remark) ? null : sr.qualRank}
+                groups={hasSeriesDetail ? buildDetailGroups(sr, isPositionsType, flatGroups, posSeriesCounts, positionLabels) : []}
+                grouped={isPositionsType || flatGroups != null}
+                fmt={fmt}
+                showInners={showInners}
+                code={remarkCodes[si]}
+                en={en}
+                onPrev={si > 0 ? () => setSheetId(sorted[si - 1].id) : undefined}
+                onNext={si < sorted.length - 1 ? () => setSheetId(sorted[si + 1].id) : undefined}
+              />
+            )}
+          </BottomSheet>
+        );
+      })()}
     </div>
+  );
+}
+
+function ShooterSheetBody({ r, rank, groups, grouped, fmt, showInners, code, en, onPrev, onNext }: {
+  r: CompResultRow; rank: number | null; groups: DetailGroup[]; grouped: boolean; fmt: (v: number) => string;
+  showInners: boolean; code: string | null | undefined; en: boolean; onPrev?: () => void; onNext?: () => void;
+}) {
+  const noc = r.nationality ? displayNoc(r.nationality) : null;
+  const alpha2 = noc ? NOC_LIST.find((n) => n.noc === noc)?.alpha2 : null;
+  const fullName = `${r.firstName} ${r.lastName}`;
+  const remarkMark = r.remark ?? remarkLabel(null, r.remarkDetails, code);
+  const focusCls = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]";
+  const navCls = `flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] text-[var(--ink)] aria-disabled:opacity-30 ${focusCls}`;
+  const chev = (d: string) => <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
+  return (
+    <>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-3 pt-1">
+        <div className="flex items-center gap-4 pr-10">
+          <ShooterAvatar firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} size="lg" />
+          <div className="min-w-0">
+            <h2 aria-live="polite" className="text-xl font-semibold leading-tight text-[var(--ink)] break-words">{r.lastName} {r.firstName}</h2>
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-[var(--muted)]">
+              {r.birthYear != null && <span>{en ? "b." : "god."} {r.birthYear}</span>}
+              {noc && (
+                <span className="flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
+                  {alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "18px", height: "13px", display: "inline-block" }} />}
+                  {noc}
+                </span>
+              )}
+            </p>
+            {r.clubDisplay && <p className="mt-0.5 text-base text-[var(--muted)] break-words">{r.clubDisplay}</p>}
+          </div>
+        </div>
+
+        <dl className="mt-5 grid grid-cols-3 gap-3 text-center">
+          <div className="rounded-xl bg-[var(--surface)] px-2 py-3">
+            <dt className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{en ? "Rank" : "Mesto"}</dt>
+            <dd className="mt-1 text-2xl font-bold tabular-nums text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{rank ?? "—"}</dd>
+          </div>
+          <div className="rounded-xl bg-[var(--surface)] px-2 py-3">
+            <dt className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{en ? "Total" : "Ukupno"}</dt>
+            <dd className="mt-1 text-2xl font-bold tabular-nums text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{r.qualTotal != null ? fmt(parseFloat(r.qualTotal)) : "—"}</dd>
+          </div>
+          <div className="rounded-xl bg-[var(--surface)] px-2 py-3">
+            <dt className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{showInners ? (en ? "Inner 10s" : "Desetke") : (en ? "Remark" : "Napomena")}</dt>
+            <dd className="mt-1 flex items-center justify-center gap-2 text-2xl font-bold tabular-nums text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">
+              {showInners ? (r.qualInners ?? "—") : (
+                <span className="flex flex-wrap items-center justify-center gap-x-2">
+                  {r.qualified === true && <QualifiedBadge size="lg" />}
+                  {remarkMark ? <RemarkBadge size="lg" remark={remarkMark} code={code} details={r.remarkDetails} label={fullName} className="" /> : r.qualified !== true && "—"}
+                </span>
+              )}
+            </dd>
+          </div>
+        </dl>
+
+        {showInners && (r.qualified === true || remarkMark) && (
+          <p className="mt-3 flex flex-wrap items-center gap-x-4">
+            {r.qualified === true && <QualifiedBadge size="lg" />}
+            {remarkMark && <RemarkBadge size="lg" remark={remarkMark} code={code} details={r.remarkDetails} label={fullName} className="" />}
+          </p>
+        )}
+
+        {groups.length > 0 && (
+          <div className="mt-5 space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{en ? "Series" : "Serije"}</h3>
+            {(grouped ? groups : [{ label: "", values: groups.flatMap((g) => g.values), bestValue: groups[0]?.bestValue ?? null }]).map((g, gi) => (
+              <div key={gi}>
+                {grouped && <p className="mb-1 text-sm font-semibold text-[var(--muted)]">{g.label}</p>}
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(4.25rem,1fr))] gap-2">
+                  {g.values.map((v, vi) => (
+                    <div key={vi} className="rounded-lg px-1 py-2 text-center ring-1 ring-[var(--border)]">
+                      {!grouped && <p className="text-sm font-semibold text-[var(--muted)]">{`S${vi + 1}`}</p>}
+                      <p className={`text-lg tabular-nums font-[family-name:var(--font-jetbrains-mono)] ${v != null && v === g.bestValue ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}`}>
+                        {v != null ? fmt(v) : "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-3 border-t border-[var(--border)] px-5 py-3">
+        <button type="button" onClick={onPrev} aria-disabled={!onPrev} aria-label={en ? "Previous shooter" : "Prethodni strelac"} className={navCls}>{chev("M12 4l-6 6 6 6")}</button>
+        <Link
+          href={`/strelci/${r.shooterId}`}
+          className={`flex h-11 flex-1 items-center justify-center rounded-full bg-[var(--brand-primary)] px-4 text-base font-semibold text-white ${focusCls}`}
+        >
+          {en ? "Shooter profile" : "Profil strelca"}
+        </Link>
+        <button type="button" onClick={onNext} aria-disabled={!onNext} aria-label={en ? "Next shooter" : "Sledeći strelac"} className={navCls}>{chev("M8 4l6 6-6 6")}</button>
+      </div>
+    </>
   );
 }
