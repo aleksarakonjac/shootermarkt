@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 import { useLocale } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
-import { ShooterAvatar } from "./ShooterAvatar";
+import { SheetCells, SheetFrame, SheetPerson, SheetSection, SheetStats } from "./ResultSheet";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import type { QualDetail, PositionsQualDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
@@ -572,93 +572,34 @@ function ShooterSheetBody({ r, rank, groups, grouped, fmt, showInners, code, en,
   r: CompResultRow; rank: number | null; groups: DetailGroup[]; grouped: boolean; fmt: (v: number) => string;
   showInners: boolean; code: string | null | undefined; en: boolean; onPrev?: () => void; onNext?: () => void;
 }) {
-  const noc = r.nationality ? displayNoc(r.nationality) : null;
-  const alpha2 = noc ? NOC_LIST.find((n) => n.noc === noc)?.alpha2 : null;
   const fullName = `${r.firstName} ${r.lastName}`;
   const remarkMark = r.remark ?? remarkLabel(null, r.remarkDetails, code);
-  const focusCls = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]";
-  const navCls = `flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] text-[var(--ink)] aria-disabled:opacity-30 ${focusCls}`;
-  const chev = (d: string) => <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
+  const marks = (
+    <span className="flex flex-wrap items-center justify-center gap-x-2">
+      {r.qualified === true && <QualifiedBadge size="lg" />}
+      {remarkMark ? <RemarkBadge size="lg" remark={remarkMark} code={code} details={r.remarkDetails} label={fullName} className="" /> : r.qualified !== true && "—"}
+    </span>
+  );
+  const seriesGroups = grouped ? groups : [{ label: "", values: groups.flatMap((g) => g.values), bestValue: groups[0]?.bestValue ?? null }];
   return (
-    <>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-3 pt-1">
-        <div className="flex items-center gap-4 pr-10">
-          <ShooterAvatar firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} size="lg" />
-          <div className="min-w-0">
-            <h2 aria-live="polite" className="text-xl font-semibold leading-tight text-[var(--ink)] break-words">{r.lastName} {r.firstName}</h2>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-base text-[var(--muted)]">
-              {r.birthYear != null && <span>{en ? "b." : "god."} {r.birthYear}</span>}
-              {noc && (
-                <span className="flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] font-semibold text-[var(--ink)]">
-                  {alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "18px", height: "13px", display: "inline-block" }} />}
-                  {noc}
-                </span>
-              )}
-            </p>
-            {r.clubDisplay && <p className="mt-0.5 text-base text-[var(--muted)] break-words">{r.clubDisplay}</p>}
-          </div>
-        </div>
-
-        <dl className="mt-5 grid grid-cols-3 gap-3 text-center">
-          <div className="rounded-xl bg-[var(--surface)] px-2 py-3">
-            <dt className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{en ? "Rank" : "Mesto"}</dt>
-            <dd className="mt-1 text-2xl font-bold tabular-nums text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{rank ?? "—"}</dd>
-          </div>
-          <div className="rounded-xl bg-[var(--surface)] px-2 py-3">
-            <dt className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{en ? "Total" : "Ukupno"}</dt>
-            <dd className="mt-1 text-2xl font-bold tabular-nums text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">{r.qualTotal != null ? fmt(parseFloat(r.qualTotal)) : "—"}</dd>
-          </div>
-          <div className="rounded-xl bg-[var(--surface)] px-2 py-3">
-            <dt className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{showInners ? (en ? "Inner 10s" : "Desetke") : (en ? "Remark" : "Napomena")}</dt>
-            <dd className="mt-1 flex items-center justify-center gap-2 text-2xl font-bold tabular-nums text-[var(--ink)] font-[family-name:var(--font-jetbrains-mono)]">
-              {showInners ? (r.qualInners ?? "—") : (
-                <span className="flex flex-wrap items-center justify-center gap-x-2">
-                  {r.qualified === true && <QualifiedBadge size="lg" />}
-                  {remarkMark ? <RemarkBadge size="lg" remark={remarkMark} code={code} details={r.remarkDetails} label={fullName} className="" /> : r.qualified !== true && "—"}
-                </span>
-              )}
-            </dd>
-          </div>
-        </dl>
-
-        {showInners && (r.qualified === true || remarkMark) && (
-          <p className="mt-3 flex flex-wrap items-center gap-x-4">
-            {r.qualified === true && <QualifiedBadge size="lg" />}
-            {remarkMark && <RemarkBadge size="lg" remark={remarkMark} code={code} details={r.remarkDetails} label={fullName} className="" />}
-          </p>
-        )}
-
-        {groups.length > 0 && (
-          <div className="mt-5 space-y-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">{en ? "Series" : "Serije"}</h3>
-            {(grouped ? groups : [{ label: "", values: groups.flatMap((g) => g.values), bestValue: groups[0]?.bestValue ?? null }]).map((g, gi) => (
-              <div key={gi}>
-                {grouped && <p className="mb-1 text-sm font-semibold text-[var(--muted)]">{g.label}</p>}
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(4.25rem,1fr))] gap-2">
-                  {g.values.map((v, vi) => (
-                    <div key={vi} className="rounded-lg px-1 py-2 text-center ring-1 ring-[var(--border)]">
-                      {!grouped && <p className="text-sm font-semibold text-[var(--muted)]">{`S${vi + 1}`}</p>}
-                      <p className={`text-lg tabular-nums font-[family-name:var(--font-jetbrains-mono)] ${v != null && v === g.bestValue ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}`}>
-                        {v != null ? fmt(v) : "—"}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-3 border-t border-[var(--border)] px-5 py-3">
-        <button type="button" onClick={onPrev} aria-disabled={!onPrev} aria-label={en ? "Previous shooter" : "Prethodni strelac"} className={navCls}>{chev("M12 4l-6 6 6 6")}</button>
-        <Link
-          href={`/strelci/${r.shooterId}`}
-          className={`flex h-11 flex-1 items-center justify-center rounded-full bg-[var(--brand-primary)] px-4 text-base font-semibold text-white ${focusCls}`}
-        >
-          {en ? "Shooter profile" : "Profil strelca"}
-        </Link>
-        <button type="button" onClick={onNext} aria-disabled={!onNext} aria-label={en ? "Next shooter" : "Sledeći strelac"} className={navCls}>{chev("M8 4l6 6-6 6")}</button>
-      </div>
-    </>
+    <SheetFrame profileHref={`/strelci/${r.shooterId}`} onPrev={onPrev} onNext={onNext} en={en}>
+      <SheetPerson firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} birthYear={r.birthYear} nationality={r.nationality} clubDisplay={r.clubDisplay} en={en} />
+      <SheetStats items={[
+        { label: en ? "Rank" : "Mesto", value: rank ?? "—" },
+        { label: en ? "Total" : "Ukupno", value: r.qualTotal != null ? fmt(parseFloat(r.qualTotal)) : "—" },
+        showInners ? { label: en ? "Inner 10s" : "Desetke", value: r.qualInners ?? "—" } : { label: en ? "Remark" : "Napomena", value: marks },
+      ]} />
+      {showInners && (r.qualified === true || remarkMark) && <div className="mt-3 flex justify-center">{marks}</div>}
+      {groups.length > 0 && (
+        <SheetSection title={en ? "Series" : "Serije"}>
+          {seriesGroups.map((g, gi) => (
+            <div key={gi}>
+              {grouped && <p className="mb-1 text-sm font-semibold text-[var(--muted)]">{g.label}</p>}
+              <SheetCells cells={g.values.map((v, vi) => ({ label: grouped ? undefined : `S${vi + 1}`, main: v != null ? fmt(v) : "\u2014", best: v != null && v === g.bestValue }))} />
+            </div>
+          ))}
+        </SheetSection>
+      )}
+    </SheetFrame>
   );
 }

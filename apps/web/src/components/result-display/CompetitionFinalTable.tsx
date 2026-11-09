@@ -9,6 +9,8 @@ import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
 import { useRowFlash } from "./useRowFlash";
 import { ShooterAvatar } from "./ShooterAvatar";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { SheetCells, SheetFrame, SheetPerson, SheetSection, SheetStats } from "./ResultSheet";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
@@ -206,6 +208,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
   const clubHeaderLabel = NOC_ONLY_LEVELS.has(competitionLevel ?? "") ? "NOC" : en ? "Club / NOC" : "Klub / NOC";
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
+  const [sheetId, setSheetId] = useState<number | null>(null);
 
   const sorted = [...results]
     .filter((r) => r.finalRank != null || r.finalTotal != null)
@@ -338,7 +341,11 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                   <div className={`${cellCls} min-w-0 group-hover:bg-[var(--surface-2)]`}>
                     <Link
                       href={`/strelci/${r.shooterId}`}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Mobile: ime otvara bottom sheet; desktop ostaje običan link.
+                        if (window.matchMedia("(max-width: 639px)").matches) { e.preventDefault(); setSheetId(r.id); }
+                      }}
                       className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-1.5 leading-tight py-0.5 group/name"
                     >
                       <span className="min-w-0 truncate font-medium text-[var(--ink)] group-hover/name:text-[var(--brand-primary)] transition-colors">
@@ -450,6 +457,32 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
         </div>
       </div>
       <RemarkLegend items={remarkLegend} />
+      {(() => {
+        const si = sheetId == null ? -1 : sorted.findIndex((r) => r.id === sheetId);
+        const sr = si >= 0 ? sorted[si] : null;
+        const mark = sr ? remarkLabel(sr.remark, sr.remarkDetails, remarkCodes[si]) : null;
+        return (
+          <BottomSheet open={sr != null} onClose={() => setSheetId(null)} label={sr ? `${sr.firstName} ${sr.lastName}` : ""}>
+            {sr && (
+              <SheetFrame profileHref={`/strelci/${sr.shooterId}`} en={en}
+                onPrev={si > 0 ? () => setSheetId(sorted[si - 1].id) : undefined}
+                onNext={si < sorted.length - 1 ? () => setSheetId(sorted[si + 1].id) : undefined}>
+                <SheetPerson firstName={sr.firstName} lastName={sr.lastName} avatarUrl={sr.avatarUrl} birthYear={sr.birthYear} nationality={sr.nationality} clubDisplay={sr.clubDisplay} en={en} />
+                <SheetStats items={[
+                  { label: en ? "Rank" : "Mesto", value: sr.finalRank ?? "—" },
+                  { label: isHitCountFinal ? (en ? "Hits" : "Hitovi") : (en ? "Total" : "Ukupno"), value: sr.finalTotal ?? "—" },
+                  ...(mark ? [{ label: en ? "Remark" : "Napomena", value: <RemarkBadge size="lg" remark={mark} code={remarkCodes[si]} details={sr.remarkDetails} label={`${sr.firstName} ${sr.lastName}`} className="" /> }] : []),
+                ]} />
+                {hasDetail && (
+                  <SheetSection title={en ? "Series" : "Serije"}>
+                    <SheetCells cells={seriesCells(columns, sr).filter((c) => c.main).map((c) => ({ label: localizeSeriesLabel(c.header, locale), main: c.main, sub: c.sub || undefined, best: false }))} />
+                  </SheetSection>
+                )}
+              </SheetFrame>
+            )}
+          </BottomSheet>
+        );
+      })()}
     </div>
   );
 }
