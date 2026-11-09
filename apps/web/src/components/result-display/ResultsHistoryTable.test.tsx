@@ -99,6 +99,8 @@ describe("ResultsHistoryTable", () => {
     render(<ResultsHistoryTable results={[SOLO_OUT]} locale="sr" />);
     expect(screen.getByText(/27 hitova/)).toBeInTheDocument();
     expect(screen.getByText(/18\. mesto/)).toBeInTheDocument();
+    // plasman je isti broj — ne ponavlja se kao "#18"
+    expect(screen.queryByText("#18")).not.toBeInTheDocument();
   });
 
   it("shows the Solo qualification mark and a shoot-off on the match", () => {
