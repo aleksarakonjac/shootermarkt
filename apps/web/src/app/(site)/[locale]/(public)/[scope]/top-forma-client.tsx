@@ -88,8 +88,9 @@ function RollingNumber({ value, animate }: { value: number; animate: boolean }) 
 function TriggerLabel({ tab, en }: { tab: (typeof TABS)[number]; en: boolean }) {
   return (
     <>
-      <span className="inline-flex h-4 min-w-9 shrink-0 items-center justify-center rounded-[3px] bg-[var(--brand-primary)] px-1 text-[11px] leading-none font-[family-name:var(--font-jetbrains-mono)] font-bold text-white">{tab.code}</span>
-      <span className="min-w-0 truncate font-medium">{en ? tab.en : tab.sr}</span>
+      <span className="inline-flex h-4 min-w-9 max-w-[2.75rem] shrink-0 grow items-center justify-center rounded-[3px] bg-[var(--brand-primary)] px-1 text-xs sm:text-[11px] leading-none font-[family-name:var(--font-jetbrains-mono)] font-bold text-white">{tab.code}</span>
+      <span aria-hidden="true" className="h-0 min-w-1.5 max-w-4 grow" />
+      <span className="min-w-0 truncate text-[13px] leading-none sm:text-xs font-medium">{en ? tab.en : tab.sr}</span>
     </>
   );
 }
@@ -155,15 +156,15 @@ function DisciplineSelect({ tabs, active, locale, label, onSelect, onOpen }: {
           aria-expanded={open}
           aria-label={label}
           onClick={() => { if (!open) onOpen(); setOpen((o) => !o); }}
-          className="flex h-6 w-full items-center gap-1.5 pl-1 pr-1.5 text-left text-xs font-semibold"
+          className="flex h-6 w-full items-center gap-1.5 pl-1 pr-1.5 text-left text-[13px] sm:text-xs font-semibold"
         >
           <span className="grid h-4 min-w-0 flex-1 overflow-hidden">
             {prevTab && (
-              <span key={`out-${prevTab.code}`} aria-hidden="true" className="tf-slide-out col-start-1 row-start-1 flex min-w-0 items-center gap-1.5">
+              <span key={`out-${prevTab.code}`} aria-hidden="true" className="tf-slide-out col-start-1 row-start-1 flex min-w-0 items-center">
                 <TriggerLabel tab={prevTab} en={en} />
               </span>
             )}
-            <span key={current.code} className={`${prevTab ? "tf-slide-in " : ""}col-start-1 row-start-1 flex min-w-0 items-center gap-1.5`}>
+            <span key={current.code} className={`${prevTab ? "tf-slide-in " : ""}col-start-1 row-start-1 flex min-w-0 items-center`}>
               <TriggerLabel tab={current} en={en} />
             </span>
           </span>
@@ -183,9 +184,9 @@ function DisciplineSelect({ tabs, active, locale, label, onSelect, onOpen }: {
                     data-disc-option
                     aria-current={selected ? "true" : undefined}
                     onClick={() => { onSelect(tab.code); setOpen(false); triggerRef.current?.focus(); }}
-                    className={`flex min-h-10 w-full items-center gap-2 py-1.5 pl-1 pr-2 text-left text-xs transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] ${selected ? "bg-black/[0.05] font-semibold" : "font-medium"}`}
+                    className={`flex min-h-10 w-full items-center gap-2 py-1.5 pl-1 pr-2 text-left text-[13px] sm:text-xs transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] ${selected ? "bg-black/[0.05] font-semibold" : "font-medium"}`}
                   >
-                    <span className="inline-flex h-4 min-w-9 shrink-0 items-center justify-center rounded-[3px] bg-[var(--brand-primary)] px-1 font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold leading-none text-white">{tab.code}</span>
+                    <span className="inline-flex h-4 min-w-9 shrink-0 items-center justify-center rounded-[3px] bg-[var(--brand-primary)] px-1 font-[family-name:var(--font-jetbrains-mono)] text-xs sm:text-[11px] font-bold leading-none text-white">{tab.code}</span>
                     <span className="min-w-0 flex-1 leading-tight">{en ? tab.en : tab.sr}</span>
                   </button>
                 </li>
