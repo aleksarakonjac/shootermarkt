@@ -19,7 +19,9 @@ import type { HomepageMainData } from "@/lib/homepage-data";
 
 type ResultPlace = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null; rpo?: boolean };
 
-function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveToggleSpace = false, collapsed = false, href, toggle }: { entries: ResultPlace[]; score: (entry: ResultPlace) => number | null; decimals: number; prefix?: ReactNode; renderAff: (entry: ResultPlace) => ReactNode; reserveToggleSpace?: boolean; collapsed?: boolean; href: string; toggle?: ReactNode }) {
+const MEDAL_COLOR = ["oklch(0.75 0.14 85)", "oklch(0.75 0.01 85)", "oklch(0.60 0.10 55)"];
+
+function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveToggleSpace = false, collapsed = false, href, toggle, medals = false }: { entries: ResultPlace[]; score: (entry: ResultPlace) => number | null; decimals: number; prefix?: ReactNode; renderAff: (entry: ResultPlace) => ReactNode; reserveToggleSpace?: boolean; collapsed?: boolean; href: string; toggle?: ReactNode; medals?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const allPlacesRef = useRef<HTMLDivElement>(null);
   const firstSecondRef = useRef<HTMLDivElement>(null);
@@ -31,7 +33,9 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
     const lead = index === 0;
     const value = score(entry);
     return <span key={index} className={`inline-flex items-center gap-1 whitespace-nowrap ${lead ? "min-w-0" : ""}`}>
-      <span className={lead ? "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[13px] sm:text-sm font-bold text-[var(--ink)] tabular-nums" : "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs sm:text-sm font-semibold text-[var(--muted)] tabular-nums"}>{index + 1}.</span>
+      {medals && index < 3
+        ? <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-bold text-white" style={{ background: MEDAL_COLOR[index] }} aria-label={`${index + 1}.`}>{index + 1}</span>
+        : <span className={lead ? "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[13px] sm:text-sm font-bold text-[var(--ink)] tabular-nums" : "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs sm:text-sm font-semibold text-[var(--muted)] tabular-nums"}>{index + 1}.</span>}
       <span className={lead ? "min-w-0 truncate text-[13px] sm:text-sm font-semibold text-[var(--ink)]" : "text-xs sm:text-[13px] text-[var(--muted)]"}>{entry.firstName ? `${entry.lastName} ${entry.firstName.charAt(0)}.` : entry.lastName}{entry.rpo && <span title="RPO" aria-label="RPO">*</span>}</span>
       {renderAff(entry)}
       {value != null && <span className={lead ? "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[13px] sm:text-sm font-bold text-[var(--ink)] tabular-nums" : "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs sm:text-sm font-semibold text-[var(--muted)] tabular-nums"}>{value.toFixed(decimals)}</span>}
@@ -313,7 +317,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
 
   type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null; rpo?: boolean };
   type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
-  type Phase = { stage: string; elimRound?: number | null; category: string; isLive: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
+  type Phase = { stage: string; elimRound?: number | null; category: string; isLive: boolean; awardsMedals: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
   type DiscResult = { discCode: string; isLive: boolean; isJunior: boolean; category: string; phases: Phase[] };
 
   function renderDiscResults(discResults: DiscResult[], level: string, competitionId: number) {
@@ -386,7 +390,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                 return (
                   <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className={flashKeys.has(phaseRowKey(competitionId, disc.discCode, disc.isJunior, phase)) ? "w-full live-flash" : "w-full"} data-phase-row>
                     <div className="min-w-0 w-fit max-w-full">
-                      {phase.qualTop3.length > 0 && <InlinePlaces href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} toggle={qualToggle} entries={phase.qualTop3} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} reserveToggleSpace={qualToggle != null} collapsed={isCollapsibleQual && !qualExpanded} />}
+                      {phase.qualTop3.length > 0 && <InlinePlaces href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} toggle={qualToggle} entries={phase.qualTop3} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} medals={phase.awardsMedals} reserveToggleSpace={qualToggle != null} collapsed={isCollapsibleQual && !qualExpanded} />}
                     </div>
                     {phase.srbHighlights.length > 0 && (
                       <ScopedLink href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} className="block no-underline hover:opacity-80 transition-opacity">

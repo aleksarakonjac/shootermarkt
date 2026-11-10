@@ -5,6 +5,7 @@ import { isEscSoloCode, isSportPistolCode, qualHasDecimals } from "@shootermarkt
 import { effectiveFocusPriority } from "@/lib/competition-priority";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
+import { medalStage } from "@/lib/medal-phase";
 import { getTickerSlotEnd, isTickerSlotLive } from "@/lib/ticker-schedule";
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
@@ -484,6 +485,15 @@ export async function getHomepageMain(scope: Scope) {
       // Once qualification results exist, elimination is redundant except for a
       // Serbian shooter who appeared in E but has no qualification result.
       const visiblePhases = selectHomepageDisplayPhases(group.phases, scope);
+      const stateOf = (phase?: (typeof group.phases)[number]) => phase && { isLive: phase.isLive, hasResults: phase.top3.length > 0 };
+      const medal = medalStage({
+        discCode: group.discCode,
+        level: competition.level,
+        competitionOver: (competition.dateEnd ?? competition.date) < today,
+        finalScheduled: effectiveSlots.some((s) => s.discCode === group.discCode && s.category === group.category && s.stage === "final"),
+        final: stateOf(group.phases.find((p) => p.stage === "final")),
+        qual: stateOf(group.phases.find((p) => p.stage.startsWith("qual"))),
+      });
       return {
       discCode: group.discCode,
       isJunior: group.isJunior,
@@ -494,6 +504,7 @@ export async function getHomepageMain(scope: Scope) {
         elimRound: phase.elimRound,
         category: phase.category,
         isLive: phase.isLive,
+        awardsMedals: medal != null && (phase.stage === "final" ? medal === "final" : phase.stage.startsWith("qual") && medal === "qual"),
         qualTop3: phase.top3.map(({ firstName, lastName, clubName, nationality, countryCode2, total, rank, rpo }) => ({ firstName, lastName, clubName, nationality, countryCode2, qualTotal: total, qualRank: rank, rpo, finalTotal: null, finalRank: null })),
         srbHighlights: phase.srbHighlights.map(({ firstName, lastName, clubName, total, rank }) => ({ firstName, lastName, clubName, qualRank: rank, qualTotal: total, finalRank: null, finalTotal: null })),
       })),
