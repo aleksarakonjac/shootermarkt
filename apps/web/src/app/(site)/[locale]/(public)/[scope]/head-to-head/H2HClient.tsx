@@ -52,11 +52,14 @@ function ShooterInlineSearch({
       setLoading(true);
       try {
         const res = await fetch(`/api/cms/shooters-search?q=${encodeURIComponent(q)}`);
+        if (!res.ok) throw new Error("Shooter search failed");
         const data: ShooterOption[] = await res.json();
         if (!cancelled) {
           setResults(data.filter((s) => s.id !== excludeId));
           setFocusedIdx(0);
         }
+      } catch {
+        if (!cancelled) setResults([]);
       } finally {
         if (!cancelled) setLoading(false);
       }

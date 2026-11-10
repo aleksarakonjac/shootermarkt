@@ -87,7 +87,8 @@ export default async function VestiPage({ params, searchParams }: Props) {
   }));
 
   const [articles, tags, upcoming, topShooters] = await Promise.all([
-    getPublishedArticles(activeCategory ? { category: activeCategory } : undefined).catch(() => []),
+    // Bez .catch: ako CMS/baza padne, render pukne i ISR zadrži poslednju dobru verziju umesto prazne liste.
+    getPublishedArticles(activeCategory ? { category: activeCategory } : undefined),
     getAllPublishedTags().catch(() => []),
     getUpcomingCompetitions(6).catch(() => []),
     getTopShootersByDiscipline().catch(() => ({})),
