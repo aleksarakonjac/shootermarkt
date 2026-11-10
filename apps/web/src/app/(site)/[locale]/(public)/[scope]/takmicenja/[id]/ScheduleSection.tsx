@@ -137,11 +137,12 @@ function fmtPillDate(key: string, locale: string): string {
   });
 }
 
-export function todayKey(): string {
-  return localDateKey(new Date().toISOString());
+/** Današnji datum; sa timezone-om (zona takmičenja) isti je za svakog posetioca. */
+export function todayKey(timezone?: string): string {
+  return localDateKey(new Date().toISOString(), timezone);
 }
 
-function pickDefaultDay(dateKeys: string[], byDate: Map<string, ScheduleSlot[]>, now: Date): string {
+function pickDefaultDay(dateKeys: string[], byDate: Map<string, ScheduleSlot[]>, now: Date, timezone?: string): string {
   // Prefer first day with active or upcoming slot
   for (const dk of dateKeys) {
     if (byDate.get(dk)!.some((s) => {
@@ -150,7 +151,7 @@ function pickDefaultDay(dateKeys: string[], byDate: Map<string, ScheduleSlot[]>,
     })) return dk;
   }
   // Else today if it's in the list
-  const today = todayKey();
+  const today = todayKey(timezone);
   if (dateKeys.includes(today)) return today;
   // Else first future day
   for (const dk of dateKeys) {
@@ -190,7 +191,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
 
   // Raspored je uvek zatvoren dok ga korisnik ne otvori (i kad je faza u toku).
   const [open, setOpen] = useState(false);
-  const [selectedDay, setSelectedDay] = useState(() => pickDefaultDay(dateKeys, byDate, now));
+  const [selectedDay, setSelectedDay] = useState(() => pickDefaultDay(dateKeys, byDate, now, timezone));
 
   // Measure whichever panel (preview or full schedule) is currently visible
   // so the wrapper animates height to it directly, instead of two competing
@@ -373,7 +374,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
           >
             {dateKeys.length > 1 && previewDayKey && (
               <div className="mb-2 text-sm font-bold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide text-[var(--muted)]">
-                {previewDayKey === todayKey()
+                {previewDayKey === todayKey(timezone)
                   ? (locale === "sr" ? "Danas" : "Today")
                   : fmtPillDate(previewDayKey, locale)}
               </div>

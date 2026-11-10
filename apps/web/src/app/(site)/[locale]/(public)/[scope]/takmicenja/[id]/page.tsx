@@ -423,7 +423,7 @@ export default async function CompetitionPage({ params }: Props) {
         >
           {t("detail.results")}
         </h2>
-        <CompetitionResultsClient groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} />
+        <CompetitionResultsClient groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} timezone={comp.timezone ?? undefined} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} />
       </div>
 
       <RelatedNewsSection type="competition" refId={compId} locale={locale} />

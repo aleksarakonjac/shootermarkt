@@ -108,6 +108,8 @@ interface Props {
   competitionId: number;
   locale: string;
   competitionLevel?: string;
+  /** IANA zona takmičenja — "Danas" se računa po njoj. */
+  timezone?: string;
   /** Satnica finala (disciplina + kategorija) — medalje se prikazuju tek kad je finale gotovo. */
   finalSlots?: Array<FinalSlot & { disciplineCode: string; category: string }>;
 }
@@ -212,7 +214,7 @@ function CompetitionResultsWithSearch(props: Props) {
   return <CompetitionResultsView {...props} search={useSearchParams().toString()} />;
 }
 
-function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, competitionLevel, finalSlots = [], search }: Props & { search: string }) {
+function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, competitionLevel, timezone, finalSlots = [], search }: Props & { search: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const detailRef = useRef<HTMLDivElement>(null);
@@ -345,6 +347,7 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
           overviewScroll.current = null;
         }}>
           <CompetitionOverview
+            timezone={timezone}
             groups={groups}
             mixedGroups={mixedGroups}
             locale={locale}
@@ -392,12 +395,14 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
 // ── Overview ──────────────────────────────────────────────────────────────────
 
 function CompetitionOverview({
+  timezone,
   groups,
   mixedGroups,
   locale,
   onSelectIndividual,
   onSelectMixed,
 }: {
+  timezone?: string;
   groups: DisciplineGroup[];
   mixedGroups: MixedTeamGroup[];
   locale: string;
@@ -408,7 +413,7 @@ function CompetitionOverview({
   const reduceMotion = useReducedMotion();
   // Lokalni "danas" tek posle hidratacije (server ne zna vremensku zonu posetioca)
   const [today, setToday] = useState<string | null>(null);
-  useEffect(() => setToday(todayKey()), []);
+  useEffect(() => setToday(todayKey(timezone)), [timezone]);
   // Današnji chip centriran u redu prečica (samo vodoravno, stranica se ne pomera)
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
