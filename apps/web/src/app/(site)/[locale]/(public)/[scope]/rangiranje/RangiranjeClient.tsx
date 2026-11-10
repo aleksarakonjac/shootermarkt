@@ -30,7 +30,7 @@ import { FormaScoreMark } from "@/components/shooter/FormaScoreMark";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type DiscCode = "ARM" | "ARW" | "APM" | "APW";
+type DiscCode = "ARM" | "ARW" | "APM" | "APW" | "R3PM" | "R3PW" | "SPW" | "RFPM";
 type ViewKey = "forma" | "peak" | "best3" | "seasonavg" | "recent3" | "improved";
 
 export type RangiranjeShooter = {

@@ -24,13 +24,17 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   };
 }
 
-type DiscCode = "ARM" | "ARW" | "APM" | "APW";
+type DiscCode = "ARM" | "ARW" | "APM" | "APW" | "R3PM" | "R3PW" | "SPW" | "RFPM";
 
 const TABS: { code: DiscCode; label: string; labelEn: string }[] = [
   { code: "ARM", label: "10m puška M",    labelEn: "10m Air Rifle Men" },
   { code: "ARW", label: "10m puška Ž",    labelEn: "10m Air Rifle Women" },
   { code: "APM", label: "10m pištolj M",  labelEn: "10m Air Pistol Men" },
   { code: "APW", label: "10m pištolj Ž",  labelEn: "10m Air Pistol Women" },
+  { code: "R3PM", label: "Puška trostav M", labelEn: "Rifle 3 Positions Men" },
+  { code: "R3PW", label: "Puška trostav Ž", labelEn: "Rifle 3 Positions Women" },
+  { code: "SPW",  label: "Sport pištolj Ž", labelEn: "25m Sport Pistol Women" },
+  { code: "RFPM", label: "Brzometni pištolj M", labelEn: "25m Rapid Fire Pistol Men" },
 ];
 
 type Props = {
@@ -49,7 +53,7 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
   const { disciplina } = await searchParams;
   const validCode = TABS.find((tab) => tab.code === disciplina?.toUpperCase())?.code;
   const activeCode: DiscCode = validCode ?? "ARM";
-  const isAP = activeCode.startsWith("AP");
+  const isAP = activeCode !== "ARM" && activeCode !== "ARW"; // celobrojni skor + inners kolona
 
   const discipline = await db.query.disciplines.findFirst({
     where: eq(disciplines.code, activeCode),

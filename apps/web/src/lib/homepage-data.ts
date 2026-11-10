@@ -10,7 +10,8 @@ import { getTickerSlotEnd, isTickerSlotLive } from "@/lib/ticker-schedule";
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
-const FORMA_DISC_CODES = ["ARM", "ARW", "APM", "APW"] as const;
+// Olimpijske pojedinačne discipline; redosled = redosled u dropdown-u i rotaciji.
+const FORMA_DISC_CODES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "SPW", "RFPM"] as const;
 
 type HomepagePhaseCandidate = {
   discCode: string;
@@ -515,7 +516,7 @@ export async function getHomepageMain(scope: Scope) {
   });
   const scores = groupTopFormaScores(scoreRows);
   const map = (row: (typeof cacheRows)[number]) => ({ shooterId: row.shooterId, firstName: row.firstName, lastName: row.lastName, nationality: row.nationality, countryCode2: row.countryCode2, formaScore: Number(row.forma), trend: row.trend ?? "stable", peak: row.peakCareer == null ? null : Number(row.peakCareer), entriesCount: row.sampleSize, recentScores: scores.get(`${row.shooterId}:${row.discCode}`) ?? [] });
-  return { recent, upcoming, topForma: { ARM: topByDisc.ARM.map(map), ARW: topByDisc.ARW.map(map), APM: topByDisc.APM.map(map), APW: topByDisc.APW.map(map) } };
+  return { recent, upcoming, topForma: Object.fromEntries(FORMA_DISC_CODES.map((code) => [code, topByDisc[code].map(map)])) as Record<typeof FORMA_DISC_CODES[number], ReturnType<typeof map>[]> };
 }
 
 export type HomepageMainData = Awaited<ReturnType<typeof getHomepageMain>>;

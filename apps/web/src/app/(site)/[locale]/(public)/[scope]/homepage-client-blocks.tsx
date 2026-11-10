@@ -216,7 +216,8 @@ function CompetitionPlace({ location, countryCode2, nocCode, className = "", dis
   return (
     <span className={`flex items-center gap-2 text-[var(--ink)] ${display ? "font-[family-name:var(--font-barlow-condensed)] text-base sm:text-xl font-semibold uppercase leading-none" : "text-sm font-semibold"} ${className}`}>
       <span className={`w-0.5 shrink-0 bg-[var(--brand-primary)] ${display ? "h-5" : "h-4"}`} aria-hidden="true" />
-      {location && <span className="truncate">{location}</span>}
+      {/* Barlow Condensed caps sit ~0.05em below the line-box center; pb nudges the label up so it centers with the badge. */}
+      {location && <span className={`truncate ${display ? "pb-[0.1em]" : ""}`}>{location}</span>}
       {countryCode2 && (
         <span className="inline-flex shrink-0 items-center gap-1 rounded border border-[var(--border-strong)] bg-[var(--bg)] px-1.5 py-0.5 dark:bg-[var(--surface-2)]">
           <span className={`fi fi-${countryCode2.toLowerCase()}`} style={{ fontSize: 11, borderRadius: 2 }} aria-hidden="true" />
@@ -441,7 +442,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
         const leadLevelLabel = tComp.has(levelKey) ? tComp(levelKey) : lead.level;
         const leadLevelStyle = LEVEL_STYLE[lead.level.toLowerCase()] ?? FALLBACK_LEVEL_STYLE;
         return (
-          <div className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-4 hover:border-[var(--brand-primary)] transition-colors">
+          <div className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 pb-0.5 pt-4 hover:border-[var(--brand-primary)] transition-colors">
             <ScopedLink href={`/takmicenja/${lead.id}`} className="block no-underline">
               <div className="flex items-center gap-2 flex-nowrap">
                 {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-xs font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}

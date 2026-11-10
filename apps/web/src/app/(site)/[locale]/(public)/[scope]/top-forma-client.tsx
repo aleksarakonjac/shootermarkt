@@ -152,7 +152,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
             className="tf-pill pointer-events-none absolute top-0 bottom-0 left-0 rounded"
             style={{
               width: `${100 / TABS.length}%`,
-              background: "var(--bg)",
+              background: "#fff",
               transform: `translateX(${activeIndex * 100}%)`,
             }}
           />

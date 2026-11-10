@@ -577,7 +577,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center justify-between gap-1 pt-2 border-t border-[var(--border)]">
+        <div className="flex min-w-0 items-center justify-between gap-x-1 pt-2 border-t border-[var(--border)]">
           {[
             { label: t("legend.world"),       color: LEVEL_DOT_COLOR["world"] },
             { label: t("legend.continental"), color: LEVEL_DOT_COLOR["continental"] },
@@ -585,12 +585,12 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
             { label: t("legend.national"),    color: LEVEL_DOT_COLOR["national"] },
             { label: t("legend.other"),       color: LEVEL_DOT_COLOR["regional"] },
           ].map((l) => (
-            <div key={l.label} className="flex items-center gap-1 whitespace-nowrap">
+            <div key={l.label} className="flex items-center gap-[3px] whitespace-nowrap">
               <span
-                className="w-2 h-2 rounded-full shrink-0"
+                className="h-1.5 w-1.5 rounded-full shrink-0"
                 style={{ background: l.color }}
               />
-              <span className="text-xs leading-none text-[var(--muted)] font-semibold">
+              <span className="text-[0.62rem] min-[420px]:text-[0.7rem] leading-none text-[var(--muted)] font-semibold">
                 {l.label}
               </span>
             </div>
