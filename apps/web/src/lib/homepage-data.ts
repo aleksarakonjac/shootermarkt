@@ -110,6 +110,20 @@ export function groupTopFormaScores(rows: Array<{ shooterId: number; discCode: s
 type TickerScheduleSlot = { discCode: string; stage: string; startTime: Date; endTime: Date | null };
 export type TickerStatus = "LIVE" | "USKORO" | "NEXT" | "NEUTRAL" | "REVIEW";
 
+/**
+ * Je li elim runda `index` (0-based, od `count` rundi izvedenih iz rezultata) uživo?
+ * ISSF raspored ima poseban red po eliminacionoj rundi: kad se broj redova poklapa sa brojem rundi,
+ * i-ti red (po startTime) pripada i-toj rundi i runda je LIVE samo u svom terminu.
+ * Inače (jedan red za više rundi) uživo je samo najnovija runda kad je faza u toku.
+ */
+export function isElimRoundLive(elimSlots: TickerScheduleSlot[] | null, index: number, count: number, groupLive: boolean, now: Date) {
+  if (elimSlots && elimSlots.length === count) {
+    const own = [...elimSlots].sort((a, b) => a.startTime.getTime() - b.startTime.getTime())[index];
+    return isTickerSlotLive(own, now);
+  }
+  return groupLive && index === count - 1;
+}
+
 export function getTickerScheduleState<T extends TickerScheduleSlot>(slots: T[], now: Date) {
   const active = slots.filter((slot) => isTickerSlotLive(slot, now)).sort((a, b) => b.startTime.getTime() - a.startTime.getTime())[0] ?? null;
   const next = slots.filter((slot) => slot.startTime > now).sort((a, b) => a.startTime.getTime() - b.startTime.getTime())[0] ?? null;
@@ -389,10 +403,13 @@ export async function getHomepageMain(scope: Scope) {
     }
     const nowForSlots = new Date();
     const dedupedSlots = [...slotGroups.values()].map((group) => {
-      if (group.length === 1) return { ...group[0], isLive: isTickerSlotLive(group[0], nowForSlots) };
+      // Elim redovi se čuvaju pojedinačno: svaki je termin jedne runde (vidi isElimRoundLive).
+      const elimSlots = group[0].stage === "elimination" ? group : null;
+      if (group.length === 1) return { ...group[0], elimSlots, isLive: isTickerSlotLive(group[0], nowForSlots) };
       const ends = group.map((s) => getTickerSlotEnd(s));
       return {
         ...group[0],
+        elimSlots,
         startTime: new Date(Math.min(...group.map((s) => s.startTime.getTime()))),
         endTime: ends.some((e) => e == null) ? null : new Date(Math.max(...ends.map((e) => e!.getTime()))),
         isLive: group.some((s) => isTickerSlotLive(s, nowForSlots)),
@@ -425,7 +442,7 @@ export async function getHomepageMain(scope: Scope) {
       // shooters), so every relay becomes its own phase instead of one merged list.
       const eliminationRounds = [...new Set(individual.map((e) => e.round))].sort((a, b) => (a ?? 0) - (b ?? 0));
       const rounds = stageKind === "elimination" && eliminationRounds.length ? eliminationRounds : [null];
-      return rounds.flatMap((round) => {
+      return rounds.flatMap((round, roundIndex) => {
       const entries = [...individual.filter((e) => e.round === round), ...mixed].sort((a, b) => a.rank - b.rank);
       // Faza u toku se prikazuje i bez rezultata (klijent pokazuje "LIVE · rezultati uskoro");
       // faza koja nije u toku samo ako ima uvezene rezultate (npr. prva partija gotova, druga tek sledi).
@@ -433,10 +450,9 @@ export async function getHomepageMain(scope: Scope) {
       const top3 = entries.slice(0, 3);
       const shown = new Set(top3.map((entry) => entry.id));
       const srbHighlights = showSrbHighlight ? entries.filter((entry) => entry.nationality === "SRB" && !shown.has(entry.id)) : [];
-      // Elim runde dele jedan slot u rasporedu, pa bi sve dobile LIVE; uživo je samo najnovija runda
-      // (ranije runde su završene jer već postoji sledeća).
-      const phaseLive = isLive && (stageKind !== "elimination" || round === rounds[rounds.length - 1]);
-      return [{ ...slot, isLive: phaseLive, hasSrb: entries.some((entry) => entry.nationality === "SRB"), discCode: slot.discCode, stage: slot.stage, elimRound: round, isJunior: slot.category !== "senior", top3, srbHighlights }];
+      const phaseLive = stageKind === "elimination" ? isElimRoundLive(slot.elimSlots, roundIndex, rounds.length, isLive, nowForSlots) : isLive;
+      const { elimSlots: _elimSlots, ...phaseSlot } = slot;
+      return [{ ...phaseSlot, isLive: phaseLive, hasSrb: entries.some((entry) => entry.nationality === "SRB"), discCode: slot.discCode, stage: slot.stage, elimRound: round, isJunior: slot.category !== "senior", top3, srbHighlights }];
       });
     });
 

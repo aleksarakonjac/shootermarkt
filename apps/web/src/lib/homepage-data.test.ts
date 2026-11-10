@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { effectiveFocusPriority } from "./competition-priority";
-import { formatTickerNextTime, selectHomepageFocusCompetitions, getTickerScheduleState, getTickerScheduleStatus, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectHomepageDisplayPhases, selectTickerCompletedSlots, selectTickerUpcoming } from "./homepage-data";
+import { formatTickerNextTime, isElimRoundLive,selectHomepageFocusCompetitions, getTickerScheduleState, getTickerScheduleStatus, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectHomepageDisplayPhases, selectTickerCompletedSlots, selectTickerUpcoming } from "./homepage-data";
 import { getTickerSlotEnd, isTickerSlotLive } from "./ticker-schedule";
 
 describe("selectTickerUpcoming", () => {
@@ -118,6 +118,31 @@ describe("formatTickerNextTime", () => {
     const now = new Date("2026-07-21T10:00:00Z");
     expect(formatTickerNextTime(new Date("2026-07-22T08:00:00Z"), now, "sr")).toMatch(/^sutra u /);
     expect(formatTickerNextTime(new Date("2026-07-30T08:00:00Z"), now, "sr")).toMatch(/jul/);
+  });
+});
+
+describe("isElimRoundLive", () => {
+  const e1 = { discCode: "R3PM", stage: "elimination", startTime: new Date("2026-11-10T06:15:00Z"), endTime: new Date("2026-11-10T08:00:00Z") };
+  const e2 = { discCode: "R3PM", stage: "elimination", startTime: new Date("2026-11-10T08:45:00Z"), endTime: new Date("2026-11-10T10:30:00Z") };
+
+  it("marks only the round whose own slot is running (E1 done, E2 live)", () => {
+    const now = new Date("2026-11-10T09:00:00Z");
+    // groupLive je true jer je E2 slot u toku; redosled redova ne sme da bude bitan
+    expect(isElimRoundLive([e2, e1], 0, 2, true, now)).toBe(false);
+    expect(isElimRoundLive([e2, e1], 1, 2, true, now)).toBe(true);
+  });
+
+  it("marks E1 live while E2 has not started", () => {
+    const now = new Date("2026-11-10T07:00:00Z");
+    expect(isElimRoundLive([e1, e2], 0, 2, true, now)).toBe(true);
+    expect(isElimRoundLive([e1, e2], 1, 2, true, now)).toBe(false);
+  });
+
+  it("falls back to newest-round-only when slot count differs from round count", () => {
+    const now = new Date("2026-11-10T09:00:00Z");
+    expect(isElimRoundLive([e1], 0, 2, true, now)).toBe(false);
+    expect(isElimRoundLive([e1], 1, 2, true, now)).toBe(true);
+    expect(isElimRoundLive(null, 1, 2, false, now)).toBe(false);
   });
 });
 
