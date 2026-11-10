@@ -1,4 +1,4 @@
-export const revalidate = 300;
+export const revalidate = 86400;
 
 import { db } from "@shootermarkt/db";
 import {

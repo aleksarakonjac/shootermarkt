@@ -21,7 +21,13 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       { userAgent: AI_BOTS, disallow: "/" },
-      { userAgent: "*", allow: "/", disallow: ["/admin", "/api/"], crawlDelay: 5 },
+      {
+        userAgent: "*",
+        allow: "/",
+        // Profil strelca je isti u oba scope-a (canonical → /srb/); issf kopija samo duplira ISR writes.
+        disallow: ["/admin", "/api/", "/*/issf/strelci/"],
+        crawlDelay: 5,
+      },
     ],
   };
 }

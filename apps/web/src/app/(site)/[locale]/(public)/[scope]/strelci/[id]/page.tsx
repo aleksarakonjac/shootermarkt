@@ -1,4 +1,7 @@
-export const revalidate = 300;
+// ~39k strelaca × 2 jezika × 2 scope-a = stotine hiljada ISR stranica koje crawleri obilaze;
+// svaki regen je ISR write (free tier 200k). Admin/import upisi ionako brišu keš odmah
+// (revalidatePublicSite), pa je dnevni revalidate samo sigurnosna mreža.
+export const revalidate = 86400;
 
 import { countryNameSql } from "@/lib/country-name";
 import { localizeMatchName } from "@/lib/match-name";
@@ -40,13 +43,13 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id, scope } = await pageParams(params);
+  const { id } = await pageParams(params);
   const [shooter, locale] = await Promise.all([
     // Nenumerički id (npr. /strelci/abc) ide pravo na "nije pronađen" umesto greške u upitu.
     /^\d{1,9}$/.test(id) ? getShooter(parseInt(id)) : undefined,
     getLocale(),
   ]);
-  const alternates = buildAlternates(locale, scope, `/strelci/${id}`);
+  const alternates = buildAlternates(locale, "srb", `/strelci/${id}`);
   if (!shooter) {
     const t = await getTranslations("shooters.profile");
     // Status ostaje 200 (loading.tsx počne streaming pre notFound()), pa noindex sprečava soft-404 u pretrazi.

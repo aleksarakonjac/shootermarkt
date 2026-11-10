@@ -11,7 +11,10 @@ import { HeaderLiveTicker, TopOfPageTicker } from "./components/HeaderLiveTicker
 import { TickerDataProvider } from "./components/live-ticker-data";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-export const revalidate = 300;
+// ~39k strelaca × 2 jezika × 2 scope-a = stotine hiljada ISR stranica koje crawleri obilaze;
+// svaki regen je ISR write (free tier 200k). Admin/import upisi ionako brišu keš odmah
+// (revalidatePublicSite), pa je dnevni revalidate samo sigurnosna mreža.
+export const revalidate = 86400;
 
 type Props = {
   children: React.ReactNode;

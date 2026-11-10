@@ -25,12 +25,12 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id, scope } = await pageParams(params);
+  const { id } = await pageParams(params);
   const [shooter, locale] = await Promise.all([
     /^\d{1,9}$/.test(id) ? getShooter(Number(id)) : undefined,
     getLocale(),
   ]);
-  const alternates = buildAlternates(locale, scope, `/strelci/${id}/rezultati`);
+  const alternates = buildAlternates(locale, "srb", `/strelci/${id}/rezultati`);
   const resultsTitle = locale === "en" ? "Results" : "Rezultati";
   if (!shooter) return { title: resultsTitle, alternates, robots: { index: false } };
   return { title: `${shooter.lastName} ${shooter.firstName} — ${resultsTitle}`, alternates };
