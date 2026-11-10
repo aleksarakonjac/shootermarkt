@@ -5,7 +5,8 @@ import "../globals.css";
 import { Suspense } from "react";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { PullToRefresh, PULL_CONTENT_ID } from "@/components/PullToRefresh";
-import { SpeedInsights } from '@vercel/speed-insights/next';
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
@@ -59,6 +60,7 @@ export default function RootLayout({
         <PullToRefresh />
         <div id={PULL_CONTENT_ID} className="flex flex-1 flex-col">{children}</div>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
