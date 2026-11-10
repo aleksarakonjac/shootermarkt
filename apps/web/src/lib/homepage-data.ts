@@ -431,7 +431,10 @@ export async function getHomepageMain(scope: Scope) {
       const top3 = entries.slice(0, 3);
       const shown = new Set(top3.map((entry) => entry.id));
       const srbHighlights = showSrbHighlight ? entries.filter((entry) => entry.nationality === "SRB" && !shown.has(entry.id)) : [];
-      return [{ ...slot, isLive, hasSrb: entries.some((entry) => entry.nationality === "SRB"), discCode: slot.discCode, stage: slot.stage, elimRound: round, isJunior: slot.category !== "senior", top3, srbHighlights }];
+      // Elim runde dele jedan slot u rasporedu, pa bi sve dobile LIVE; uživo je samo najnovija runda
+      // (ranije runde su završene jer već postoji sledeća).
+      const phaseLive = isLive && (stageKind !== "elimination" || round === rounds[rounds.length - 1]);
+      return [{ ...slot, isLive: phaseLive, hasSrb: entries.some((entry) => entry.nationality === "SRB"), discCode: slot.discCode, stage: slot.stage, elimRound: round, isJunior: slot.category !== "senior", top3, srbHighlights }];
       });
     });
 
