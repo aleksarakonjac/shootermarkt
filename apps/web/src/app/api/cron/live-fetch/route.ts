@@ -264,8 +264,9 @@ async function processCompetition(
   const qualRows = dedupedRows.filter((r) => r.elimRound == null);
   const elimRowsToInsert = dedupedRows.filter((r) => r.elimRound != null);
 
+  const changed = new Set<number>();
   if (qualRows.length > 0) {
-    await db
+    const written = await db
       .insert(results)
       .values(qualRows)
       .onConflictDoUpdate({
@@ -288,13 +289,16 @@ async function processCompetition(
           finalRemark: sql`coalesce(excluded.final_remark, ${results.finalRemark})`,
           remarkDetails: mergeRemarks(results.remarkDetails),
         },
-      });
+      })
+      // Trigger z_suppress_redundant_updates preskače nepromenjene redove → RETURNING vraća samo izmenjene.
+      .returning({ shooterId: results.shooterId });
+    for (const r of written) changed.add(r.shooterId);
   }
 
   // Elim rows: upsert by (shooter, comp, disc, cat) — elim_round stored on the existing row
   // Each shooter appears in exactly one elim round so this updates the single row.
   for (const row of elimRowsToInsert) {
-    await db
+    const written = await db
       .insert(results)
       .values(row)
       .onConflictDoUpdate({
@@ -308,13 +312,15 @@ async function processCompetition(
           elimRemark: sql`coalesce(excluded.elim_remark, ${results.elimRemark})`,
           remarkDetails: mergeRemarks(results.remarkDetails),
         },
-      });
+      })
+      .returning({ shooterId: results.shooterId });
+    for (const r of written) changed.add(r.shooterId);
   }
 
-  await recomputeFormaCache([...new Set(dedupedRows.map((row) => row.shooterId))]);
+  if (changed.size) await recomputeFormaCache([...changed]);
   lastWritten.set(snapshotKey, snapshot);
 
-  return dedupedRows.length + mixedUpserted;
+  return changed.size + mixedUpserted;
 }
 
 // ── Mixed team (ARMT / APMT) ─────────────────────────────────────────────────
@@ -411,7 +417,7 @@ async function processMixedTeamSlots(
   const snapshot = JSON.stringify(dedupedRows);
   if (lastWritten.get(snapshotKey) === snapshot) return 0;
 
-  await db
+  const written = await db
     .insert(mixedTeamResults)
     .values(dedupedRows)
     .onConflictDoUpdate({
@@ -435,10 +441,11 @@ async function processMixedTeamSlots(
         finalRemark: sql`coalesce(excluded.final_remark, ${mixedTeamResults.finalRemark})`,
         remarkDetails: mergeRemarks(mixedTeamResults.remarkDetails),
       },
-    });
+    })
+    .returning({ id: mixedTeamResults.id });
   lastWritten.set(snapshotKey, snapshot);
 
-  return dedupedRows.length;
+  return written.length;
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────

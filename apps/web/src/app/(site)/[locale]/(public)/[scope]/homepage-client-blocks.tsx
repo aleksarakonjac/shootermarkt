@@ -8,7 +8,6 @@ import { NewsSection } from "../components/NewsSection";
 import { useParams } from "next/navigation";
 import { Ticker } from "../ticker";
 import { useTickerData } from "../components/live-ticker-data";
-import { createClient } from "@/lib/supabase/client";
 import { UpcomingEvents } from "../components/UpcomingEvents";
 import { ScopedLink } from "../components/ScopedLink";
 import { TopFormaClient } from "./top-forma-client";
@@ -283,24 +282,14 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
     return () => window.clearTimeout(timeout);
   }, [data]);
 
-  // Realtime samo dok je neko takmičenje u toku: svaka pretplata drži Supabase Realtime da čita WAL,
-  // a van takmičenja se rezultati ne menjaju uživo.
+  // Samo poll dok je takmičenje u toku: /api/homepage/main je CDN keširan (s-maxage=60), pa posetioci ne
+  // diraju bazu. Realtime pretplata na celu `results` tabelu je svakom posetiocu slala svaki upisani red
+  // (sa JSONB detaljima) — to je bio glavni Supabase egress.
   const hasLive = data?.recent.some((competition) => competition.isLive) ?? false;
   useEffect(() => {
     if (!hasLive) return;
-    // Import upisuje mnogo redova odjednom — spoji događaje u jedno osvežavanje.
-    let timer: number | undefined;
-    const debouncedRefresh = () => { window.clearTimeout(timer); timer = window.setTimeout(refresh, 1_500); };
-    const supabase = createClient();
-    const channel = supabase
-      .channel("live-results-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "results" }, debouncedRefresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "mixed_team_results" }, debouncedRefresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, debouncedRefresh)
-      .subscribe();
-    // Rezervno osvežavanje: ako Realtime ne radi (publikacija/RLS/prekid veze), live kartica se svejedno menja.
     const poll = window.setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 30_000);
-    return () => { window.clearTimeout(timer); window.clearInterval(poll); supabase.removeChannel(channel); };
+    return () => window.clearInterval(poll);
   }, [hasLive, refresh]);
 
   if (state === "loading") return <MainSkeleton />;
