@@ -452,7 +452,7 @@ export function CalendarModule({ competitions }: CalendarModuleProps) {
             <button
               type="button"
               onClick={goToCurrent}
-              className="rounded border border-white/60 px-2 py-px text-[11px] font-semibold uppercase leading-4 tracking-wide text-white transition-colors hover:bg-white/15"
+              className="rounded border border-white/60 px-2 py-px text-xs font-semibold uppercase leading-4 tracking-wide text-white transition-colors hover:bg-white/15"
             >
               {locale === "en" ? "Today" : "Danas"}
             </button>

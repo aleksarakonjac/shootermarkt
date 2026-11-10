@@ -33,7 +33,7 @@ function ShooterSearch({ label, excludedId, onSelect }: { label: string; exclude
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">{label}</label>
+      <label className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">{label}</label>
       <div className="relative">
         <input
           value={query}

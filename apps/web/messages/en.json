@@ -234,6 +234,7 @@
     }
   },
   "common": {
+    "skipToContent": "Skip to main content",
     "soon": "Soon",
     "admin": "Admin",
     "scopeLabel": "Data scope",
@@ -260,6 +261,7 @@
     "world": "World"
   },
   "home": {
+    "pageHeading": "Shooting results, form and rankings",
     "recentCompetitions": "In focus",
     "topForm": "Top FORMAScore",
     "topFormSubtitle": "Shooters with the highest form score by discipline",

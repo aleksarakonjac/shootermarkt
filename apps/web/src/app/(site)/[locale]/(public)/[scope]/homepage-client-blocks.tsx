@@ -34,7 +34,7 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
     const value = score(entry);
     return <span key={index} className={`inline-flex items-center gap-1 whitespace-nowrap ${lead ? "min-w-0" : ""}`}>
       {medals && index < 3
-        ? <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-bold text-white" style={{ background: MEDAL_COLOR[index] }} aria-label={`${index + 1}.`}>{index + 1}</span>
+        ? <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-white" style={{ background: MEDAL_COLOR[index] }} aria-label={`${index + 1}.`}>{index + 1}</span>
         : <span className={lead ? "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[13px] sm:text-sm font-bold text-[var(--ink)] tabular-nums" : "shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs sm:text-sm font-semibold text-[var(--muted)] tabular-nums"}>{index + 1}.</span>}
       <span className={lead ? "min-w-0 truncate text-[13px] sm:text-sm font-semibold text-[var(--ink)]" : "text-xs sm:text-[13px] text-[var(--muted)]"}>{entry.firstName ? `${entry.lastName} ${entry.firstName.charAt(0)}.` : entry.lastName}{entry.rpo && <span title="RPO" aria-label="RPO">*</span>}</span>
       {renderAff(entry)}
@@ -66,15 +66,15 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
   const useFallback = !singleRow && entries.length === 3 && pairFirstSecond;
   const firstRow = singleRow ? entries : useFallback ? entries.slice(0, 2) : entries.slice(0, 1);
   const secondRow = singleRow ? [] : useFallback ? entries.slice(2) : entries.slice(1);
-  return <div ref={containerRef} className="relative overflow-clip">
+  return <div ref={containerRef} className="relative overflow-x-clip">
     <div className="flex items-center">
-      <ScopedLink href={href} className="flex min-w-0 flex-nowrap items-center gap-x-2 sm:gap-x-3 no-underline hover:opacity-80 transition-opacity">{prefix}{firstRow.map(place)}</ScopedLink>
+      <ScopedLink href={href} className="relative flex min-w-0 flex-nowrap items-center gap-x-2 sm:gap-x-3 no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-2.5 after:inset-x-0 after:content-['']">{prefix}{firstRow.map(place)}</ScopedLink>
       {toggle}
     </div>
     {secondRow.length > 0 && (
       <div className={`grid transition-[grid-template-rows] duration-200 ease-[var(--ease-out)] motion-reduce:transition-none ${collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
         <div className={`overflow-hidden ${collapsed ? "[contain:inline-size]" : ""}`}>
-          <ScopedLink href={href} tabIndex={collapsed ? -1 : undefined} className={`mt-1 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 no-underline hover:opacity-80 transition-opacity duration-150 motion-reduce:transition-none ${collapsed ? "opacity-0" : "opacity-100 delay-75"}`}>
+          <ScopedLink href={href} tabIndex={collapsed ? -1 : undefined} className={`-my-0.5 py-1.5 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 no-underline hover:opacity-80 transition-opacity duration-150 motion-reduce:transition-none ${collapsed ? "opacity-0" : "opacity-100 delay-75"}`}>
             {secondRow.map((entry, index) => place(entry, useFallback ? index + 2 : index + 1))}
           </ScopedLink>
         </div>
@@ -185,7 +185,7 @@ function HomepageError({ retry, compact = false }: { retry: () => void; compact?
   return (
     <div className={compact ? "flex h-10 items-center justify-center gap-3 bg-[var(--surface)] text-xs" : "flex h-48 flex-col items-center justify-center gap-3 rounded-xl bg-[var(--surface)] text-sm"} role="alert">
       <span className="text-[var(--muted)]">{common("error")}</span>
-      <button type="button" onClick={retry} className="font-semibold text-[var(--brand-primary)] hover:underline">
+      <button type="button" onClick={retry} className="font-semibold text-[var(--rank-accent)] hover:underline">
         {common("retry")}
       </button>
     </div>
@@ -219,7 +219,7 @@ function CompetitionPlace({ location, countryCode2, nocCode, className = "", dis
       {countryCode2 && (
         <span className="inline-flex shrink-0 items-center gap-1 rounded border border-[var(--border-strong)] bg-[var(--bg)] px-1.5 py-0.5 dark:bg-[var(--surface-2)]">
           <span className={`fi fi-${countryCode2.toLowerCase()}`} style={{ fontSize: 11, borderRadius: 2 }} aria-hidden="true" />
-          {nocCode && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-extrabold tracking-wide text-[var(--ink)]">{nocCode}</span>}
+          {nocCode && <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-extrabold tracking-wide text-[var(--ink)]">{nocCode}</span>}
         </span>
       )}
     </span>
@@ -329,7 +329,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
       return (
         <span className="shrink-0 flex items-center gap-0.5">
           {e.countryCode2 && <span className={`fi fi-${e.countryCode2.toLowerCase()}`} style={{ fontSize: 11 }} aria-hidden="true" />}
-          <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] sm:text-xs font-bold text-[var(--muted)]">{e.nationality}</span>
+          <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--muted)]">{e.nationality}</span>
         </span>
       );
     };
@@ -340,17 +340,17 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
             .filter((p) => p.qualTop3.length > 0 || p.srbHighlights.length > 0 || p.isLive)
             .toSorted((a, b) => Number(b.stage === "final") - Number(a.stage === "final"));
           if (shownPhases.length === 0) return null;
-          const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-barlow-condensed)] text-[15px] font-bold uppercase tracking-[0.04em] text-[var(--muted)]">{DISC_FULL_NAMES[disc.discCode]?.[locale === "en" ? "en" : "sr"] ?? disc.discCode}</span>;
+          const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-barlow-condensed)] text-[17px] font-bold uppercase tracking-[0.04em] text-[var(--ink)]">{DISC_FULL_NAMES[disc.discCode]?.[locale === "en" ? "en" : "sr"] ?? disc.discCode}</span>;
           const categoryLabel = CATEGORY_BADGE[disc.category]?.[locale === "en" ? 0 : 1] ?? null;
-          const junBadge = categoryLabel ? <span className="shrink-0 text-[11px] font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>{categoryLabel}</span> : null;
-          const liveBadge = disc.isLive ? <LiveBadge className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white">LIVE</LiveBadge> : null;
+          const junBadge = categoryLabel ? <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>{categoryLabel}</span> : null;
+          const liveBadge = disc.isLive ? <LiveBadge className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-xs font-extrabold uppercase tracking-wider text-white">LIVE</LiveBadge> : null;
           return (
             <div key={`${disc.discCode}:${disc.category}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
               {/* Naziv discipline vodi na prvu prikazanu fazu (finale ako postoji, inače kvalifikacije). */}
-              <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="flex w-fit items-center gap-1 no-underline hover:opacity-80 transition-opacity">{discBadge}{junBadge}</ScopedLink>
+              <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="relative flex w-fit items-center gap-1 no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']">{discBadge}{junBadge}</ScopedLink>
               {shownPhases.map((phase) => {
                 const decimals = phase.stage === "elimination" || (!qualHasDecimals(disc.discCode) && phase.stage !== "final") || isSportPistolCode(disc.discCode) ? 0 : 1;
-                const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? `E${phase.elimRound ?? ""}` : phase.stage === "final" ? "F" : "Q"}</span>;
+                const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? `E${phase.elimRound ?? ""}` : phase.stage === "final" ? "F" : "Q"}</span>;
                 const hasFinal = shownPhases.some((item) => item.stage === "final");
                 const qualKey = `${competitionId}:${disc.discCode}:${phase.category}:qual`;
                 const qualExpanded = expandedQual.has(qualKey);
@@ -362,7 +362,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                     onClick={() => toggleQual(qualKey)}
                     aria-expanded={qualExpanded}
                     aria-label={qualExpanded ? t("showLessQualificationResults") : t("showMoreQualificationResults", { count: extraQualificationResults })}
-                    className="-my-3 flex min-h-11 shrink-0 items-center px-2 text-[11px] font-semibold text-[var(--brand-primary)] hover:underline"
+                    className="-my-3 flex min-h-11 min-w-11 shrink-0 items-center justify-center px-2 text-xs font-semibold text-[var(--rank-accent)] hover:underline"
                   >
                     <span className="flex items-center gap-0.5 leading-none">
                     <span>{qualExpanded ? t("showLess") : `+${extraQualificationResults}`}</span>
@@ -393,7 +393,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                       {phase.qualTop3.length > 0 && <InlinePlaces href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} toggle={qualToggle} entries={phase.qualTop3} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} medals={phase.awardsMedals} reserveToggleSpace={qualToggle != null} collapsed={isCollapsibleQual && !qualExpanded} />}
                     </div>
                     {phase.srbHighlights.length > 0 && (
-                      <ScopedLink href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} className="block no-underline hover:opacity-80 transition-opacity">
+                      <ScopedLink href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} className="relative block no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-1 after:inset-x-0 after:content-['']">
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           {phase.srbHighlights.map((h, i) => {
                             const isFinalRow = h.finalRank != null && h.finalTotal != null;
@@ -402,13 +402,13 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                             return (
                               <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-primary)]/[0.08] pl-1.5 pr-2 py-0.5">
                                 {/* Srbin iz elim bez kvalifikacija: oznaka runde da se zna da plasman nije iz kvalifikacija. */}
-                                {phase.stage === "elimination" && phase.qualTop3.length === 0 && <span className="shrink-0 rounded bg-[var(--surface-2)] px-1 font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--ink)]">{`E${h.round ?? ""}`}</span>}
+                                {phase.stage === "elimination" && phase.qualTop3.length === 0 && <span className="shrink-0 rounded bg-[var(--surface-2)] px-1 font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--ink)]">{`E${h.round ?? ""}`}</span>}
                                 <span className="fi fi-rs shrink-0" style={{ fontSize: 10 }} aria-hidden="true" />
-                                <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold text-[var(--brand-primary)] tabular-nums">
+                                <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--rank-accent)] tabular-nums">
                                   {rank != null ? `${rank}.` : "—"}
                                 </span>
                                 <span className="text-xs font-semibold text-[var(--ink)]">{h.firstName ? `${h.lastName} ${h.firstName.charAt(0)}.` : h.lastName}</span>
-                                <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--brand-primary)] tabular-nums">{total.toFixed(decimals)}</span>
+                                <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--rank-accent)] tabular-nums">{total.toFixed(decimals)}</span>
                               </span>
                             );
                           })}
@@ -429,7 +429,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="font-[family-name:var(--font-barlow-condensed)] text-2xl sm:text-3xl font-bold uppercase leading-none tracking-wider">{t("recentCompetitions")}</h2>
-        <ScopedLink href="/takmicenja" className="text-sm font-semibold text-[var(--brand-primary)] hover:underline">{t("allCompsLink")}</ScopedLink>
+        <ScopedLink href="/takmicenja" className="-my-3 inline-flex min-h-11 items-center text-sm font-semibold text-[var(--rank-accent)] hover:underline">{t("allCompsLink")}</ScopedLink>
       </div>
 
       {!lead ? (
@@ -443,8 +443,8 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
           <div className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-4 hover:border-[var(--brand-primary)] transition-colors">
             <ScopedLink href={`/takmicenja/${lead.id}`} className="block no-underline">
               <div className="flex items-center gap-2 flex-nowrap">
-                {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
-                <span className="shrink-0 text-[11px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
+                {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-xs font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
+                <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
                   {leadLevelLabel}
                 </span>
                 <span className="flex-1 min-w-0 truncate text-sm font-semibold text-[var(--muted)]">
@@ -459,7 +459,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
               </div>
             </ScopedLink>
             {renderDiscResults(lead.discResults, lead.level, lead.id)}
-            <ScopedLink href={`/takmicenja/${lead.id}`} className="mt-4 pt-3 border-t border-[var(--border)] text-sm font-semibold text-[var(--brand-primary)] hover:underline flex no-underline">
+            <ScopedLink href={`/takmicenja/${lead.id}`} className="mt-4 min-h-11 items-center border-t border-[var(--border)] text-sm font-semibold text-[var(--rank-accent)] hover:underline flex no-underline">
               {t("viewResults")} →
             </ScopedLink>
           </div>
@@ -481,8 +481,8 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   aria-expanded={isExpanded}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--surface-2)] active:bg-[var(--surface-2)] active:scale-[0.995] motion-reduce:active:scale-100 transition-[background-color,transform] duration-150 ease-[var(--ease-out)]"
                 >
-                  {item.isLive && <span className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
-                  <span className="hidden sm:block shrink-0 text-[11px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={rowLevelStyle}>
+                  {item.isLive && <span className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-xs font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
+                  <span className="hidden sm:block shrink-0 text-xs font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={rowLevelStyle}>
                     {rowLevelLabel}
                   </span>
                   {/* Mobilni: naziv u prvom redu, mesto + datum u drugom; sm+: sve u jednom redu. */}
@@ -510,7 +510,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                       {renderDiscResults(item.discResults, item.level, item.id)}
                       <ScopedLink
                         href={`/takmicenja/${item.id}`}
-                        className="mt-4 pt-3 border-t border-[var(--border)] text-sm font-semibold text-[var(--brand-primary)] hover:underline flex no-underline"
+                        className="mt-4 min-h-11 items-center border-t border-[var(--border)] text-sm font-semibold text-[var(--rank-accent)] hover:underline flex no-underline"
                       >
                         {t("viewResults")} →
                       </ScopedLink>

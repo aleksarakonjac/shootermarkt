@@ -175,13 +175,13 @@ export function UpcomingEvents({ competitions }: UpcomingEventsProps) {
                     </div>
                     <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                       <span
-                        className="text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded self-start"
+                        className="text-xs font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded self-start"
                         style={{ background: levelStyle.background, color: levelStyle.color }}
                         title={levelLabel}
                       >
                         {levelLabel}
                       </span>
-                      <span className="text-[11px] text-[var(--muted)] font-semibold uppercase tracking-wider pl-1.5">
+                      <span className="text-xs text-[var(--muted)] font-semibold uppercase tracking-wider pl-1.5">
                         {date.weekday} · {date.year}
                       </span>
                       {countdown && (

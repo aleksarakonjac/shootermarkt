@@ -31,6 +31,7 @@ export default async function PublicLayout({ children, params }: Props) {
 
   return (
     <TickerDataProvider>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[var(--z-modal)] focus:rounded-lg focus:bg-[var(--brand-primary)] focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-white">{tCommon("skipToContent")}</a>
       <SiteHeader>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {/* Na mobilnom se red sužava pri skrolovanju (SiteHeader postavlja data-compact). */}
@@ -74,7 +75,7 @@ export default async function PublicLayout({ children, params }: Props) {
 
       <TopOfPageTicker />
 
-      <main className="flex-1">{children}</main>
+      <main id="main-content" tabIndex={-1} className="flex-1 outline-none">{children}</main>
 
       <footer className="border-t border-[var(--border)] bg-[var(--surface)]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -146,7 +147,7 @@ export default async function PublicLayout({ children, params }: Props) {
                   </li>
                   <li className="flex items-center gap-1.5">
                     <span className="text-sm text-[var(--subtle)]">{t("clubLeaderboard")}</span>
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.55rem] text-[var(--subtle)]">{tCommon("soon")}</span>
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--subtle)]">{tCommon("soon")}</span>
                   </li>
                 </ul>
               </div>
@@ -175,7 +176,7 @@ export default async function PublicLayout({ children, params }: Props) {
 
           {/* Bottom bar */}
           <div className="border-t border-[var(--border)] py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-            <p className="text-xs text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">
+            <p className="text-xs text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)]">
               © {new Date().getFullYear()} <Link href="/admin" className="hover:text-[var(--ink)] transition-colors">Shootermarkt</Link>
             </p>
           </div>

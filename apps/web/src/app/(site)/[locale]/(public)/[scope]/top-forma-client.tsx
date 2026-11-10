@@ -29,7 +29,7 @@ interface ShooterFormRow {
 const Affil = ({ r }: { r: ShooterFormRow }) => r.nationality ? (
   <span className="inline-flex shrink-0 items-center gap-1">
     {r.countryCode2 && <span className={`fi fi-${r.countryCode2.toLowerCase()}`} style={{ fontSize: 11 }} aria-hidden="true" />}
-    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold text-[var(--muted)]">{r.nationality}</span>
+    <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold text-[var(--muted)]">{r.nationality}</span>
   </span>
 ) : null;
 
@@ -194,7 +194,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
             className="tf-row flex min-h-14 items-center gap-2 px-3 py-2"
             style={{ "--i": i } as React.CSSProperties}
           >
-            <span className="w-5 text-right font-[family-name:var(--font-barlow-condensed)] text-lg font-bold text-[var(--subtle)]">{i + 1}</span>
+            <span className="w-5 text-right font-[family-name:var(--font-barlow-condensed)] text-lg font-bold text-[var(--muted)]">{i + 1}</span>
             <TransitionLink transitionName="shooter-name" href={scopedHref(`/strelci/${r.shooterId}`)} className="min-w-0 flex-1 truncate font-semibold text-[var(--ink)] hover:underline">
               {r.lastName} {r.firstName}
             </TransitionLink>
@@ -225,7 +225,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
                   className="tf-row hover:bg-[var(--surface)] transition-colors"
                   style={{ "--i": i } as React.CSSProperties}
                 >
-                  <td className="w-10 px-3 py-2.5 text-right font-[family-name:var(--font-barlow-condensed)] font-bold text-base text-[var(--subtle)]">
+                  <td className="w-10 px-3 py-2.5 text-right font-[family-name:var(--font-barlow-condensed)] font-bold text-base text-[var(--muted)]">
                     {i + 1}
                   </td>
                   <td className="px-3 py-2.5">

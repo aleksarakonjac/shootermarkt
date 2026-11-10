@@ -402,7 +402,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
 
 
   return (
-    <main className="_strelci-page mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+    <div className="_strelci-page mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
       <style>{`
         @keyframes _strelci-page-in {
           from { opacity: 0.84; transform: translateY(6px); }
@@ -725,6 +725,6 @@ export default async function StrelciPage({ params, searchParams }: Props) {
         </div>
       )}
 
-    </main>
+    </div>
   );
 }

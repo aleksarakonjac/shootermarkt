@@ -65,7 +65,7 @@ function buildNav(t: TFn): NavGroup[] {
 
 function SoonBadge({ label }: { label: string }) {
   return (
-    <span className="ml-auto shrink-0 text-[0.55rem] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--subtle)] border border-[var(--border)]">
+    <span className="ml-auto shrink-0 text-xs font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-[var(--surface-2)] text-[var(--subtle)] border border-[var(--border)]">
       {label}
     </span>
   );

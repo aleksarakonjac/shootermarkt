@@ -88,9 +88,9 @@ export function RegionSelector({ compact = false, placement = "bottom", small = 
         onClick={handleTriggerClick}
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label={`Opseg: ${scopeLabel(scope)}`}
+        aria-label={`${t("scopeLabel")}: ${scopeLabel(scope)}`}
         className={`flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-xs font-semibold text-[var(--ink)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] ${
-          small ? "h-8 py-0" : "min-h-11 py-1.5 lg:min-h-8"
+          small ? "h-8 py-0 relative after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-['']" : "min-h-11 py-1.5 lg:min-h-8"
         } ${
           open ? "border-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]" : ""
         }`}

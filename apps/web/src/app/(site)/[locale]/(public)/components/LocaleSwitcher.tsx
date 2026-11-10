@@ -33,7 +33,7 @@ function LocaleSwitcherInner() {
         role="group"
         aria-label={t("label")}
         title={t("label")}
-        className="flex h-8 items-center gap-2 rounded-md pl-1.5 text-[0.7rem] font-bold font-[family-name:var(--font-jetbrains-mono)]"
+        className="relative flex h-8 items-center gap-2 rounded-md pl-1.5 after:absolute after:-inset-y-1.5 after:inset-x-0 after:content-[''] text-xs font-bold font-[family-name:var(--font-jetbrains-mono)]"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--muted)]" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
@@ -47,7 +47,7 @@ function LocaleSwitcherInner() {
               disabled={isPending}
               aria-pressed={locale === l}
               aria-label={l === "sr" ? t("switchToSr") : t("switchToEn")}
-              className={`flex items-center rounded-md px-2 uppercase transition-colors disabled:opacity-40 ${
+              className={`relative flex items-center rounded-md px-2 uppercase after:absolute after:-inset-y-2.5 after:inset-x-0 after:content-[''] transition-colors disabled:opacity-40 ${
                 locale === l
                   ? "bg-[var(--brand-primary)] text-white"
                   : "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"

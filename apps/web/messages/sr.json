@@ -234,6 +234,7 @@
     }
   },
   "common": {
+    "skipToContent": "Pređi na glavni sadržaj",
     "soon": "Uskoro",
     "admin": "Admin",
     "scopeLabel": "Opseg podataka",
@@ -260,6 +261,7 @@
     "world": "Svetski"
   },
   "home": {
+    "pageHeading": "Rezultati, forma i rangiranje strelaca",
     "recentCompetitions": "Aktuelno",
     "topForm": "Top forma",
     "topFormSubtitle": "Strelci sa najboljim FORMAScore-om po disciplini",
