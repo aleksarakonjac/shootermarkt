@@ -95,8 +95,8 @@ function RemarkModal({ label, onClose, children }: { label?: string; onClose: ()
 /** `details` (kazna / shoot-off / rekord iz SIUS-a) čini oznaku klikabilnom — modal prikazuje sve detalje. */
 export function RemarkBadge({ remark, code, label, details, className = "ml-1.5", size = "base" }: { remark: string; code?: string | null; label?: string; details?: StageRemarks | null; className?: string; size?: "base" | "lg" }) {
   // lg: large text for the mobile sheet; interactive badges get a 44px hit area.
-  const sizeCls = size === "lg" ? "text-2xl" : "text-base";
-  const hitCls = size === "lg" ? "min-h-11 min-w-11 inline-flex items-center justify-center" : "";
+  const sizeCls = size === "lg" ? "text-xl" : "text-base";
+  const hitCls = size === "lg" ? "min-h-11 min-w-11 -my-3 inline-flex items-center justify-center" : "";
   const [open, setOpen] = useState(false);
   const en = useUiLocale() === "en";
 

@@ -12,6 +12,8 @@ export type RawFormaEntry = {
   level: CompetitionLevel | null;
   eventType: CompetitionEventType;
   category: ResultCategory;
+  /** Samo za prikaz (grafik u detail sheet-u); forma ih ne koristi. */
+  competition?: { name: string; nameSr: string | null; nameEn: string | null; location: string | null; locationSr: string | null; locationEn: string | null };
 };
 
 export type FormaEntryGroup = {
@@ -59,6 +61,8 @@ export async function getFormaEntriesByDiscipline(
       eventType: competitions.eventType,
       category: results.category,
       disciplineCode: disciplines.code,
+      compName: competitions.name, compNameSr: competitions.nameSr, compNameEn: competitions.nameEn,
+      compLocation: competitions.location, compLocationSr: competitions.locationSr, compLocationEn: competitions.locationEn,
     })
     .from(results)
     .innerJoin(competitions, eq(results.competitionId, competitions.id))
@@ -86,6 +90,7 @@ export async function getFormaEntriesByDiscipline(
       level: r.level as CompetitionLevel | null,
       eventType: r.eventType,
       category: r.category as ResultCategory,
+      competition: { name: r.compName, nameSr: r.compNameSr, nameEn: r.compNameEn, location: r.compLocation, locationSr: r.compLocationSr, locationEn: r.compLocationEn },
     });
   }
   return groups;

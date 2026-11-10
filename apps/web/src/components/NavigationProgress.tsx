@@ -101,7 +101,8 @@ export const finishNavigationProgress = finish;
 function isTrackedClick(event: MouseEvent) {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
   const anchor = (event.target as Element | null)?.closest?.("a");
-  if (!anchor || !anchor.href || anchor.hasAttribute("download")) return false;
+  // data-no-progress: linkovi koje sami preuzimaju klik (npr. otvaraju panel) — navigacije nema, traka bi visila do timeout-a.
+  if (!anchor || !anchor.href || anchor.hasAttribute("download") || anchor.hasAttribute("data-no-progress")) return false;
   const target = anchor.getAttribute("target");
   if (target && target !== "_self") return false;
   const url = new URL(anchor.href, window.location.href);

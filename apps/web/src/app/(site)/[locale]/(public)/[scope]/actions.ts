@@ -4,7 +4,7 @@ import { db } from "@shootermarkt/db";
 import { shooters, results, disciplines } from "@shootermarkt/db/schema";
 import { ESC_SOLO_CODES } from "@shootermarkt/db/pdf-import-types";
 import { eq, and, isNotNull, notInArray, sql } from "drizzle-orm";
-import { computeFormaFromEntries } from "@/lib/forma";
+import { computeFormaFromEntries, rollingForma } from "@/lib/forma";
 import { getFormaEntriesForShooter } from "@/lib/forma-query";
 
 export interface ShooterCompareStats {
@@ -116,4 +116,24 @@ export async function compareShooters(idA: number, idB: number): Promise<Compari
     shooterB,
     h2hRecord: { winsA, winsB, draws, total },
   };
+}
+
+
+export type FormaHistoryPoint = { date: string; score: number; forma: number; name: string | null; location: string | null };
+
+/** Poslednjih `limit` nastupa strelca u disciplini sa rolling formom na svakom — za grafik u detail sheet-u. */
+export async function getFormaHistory(shooterId: number, disciplineCode: string, locale: string, limit = 10): Promise<FormaHistoryPoint[]> {
+  if (!Number.isInteger(shooterId) || !/^[A-Z0-9]{2,10}$/.test(disciplineCode)) return [];
+  const group = (await getFormaEntriesForShooter(shooterId)).find((g) => g.disciplineCode === disciplineCode);
+  if (!group) return [];
+  const entries = [...group.entries]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((e) => ({ score: e.qualTotal, date: e.date, level: e.level, eventType: e.eventType, category: e.category, competition: e.competition }));
+  const rolling = rollingForma(entries, { code: disciplineCode });
+  const en = locale === "en";
+  return entries.map((e, i) => ({
+    date: e.date, score: e.score, forma: rolling[i].forma,
+    name: (en ? e.competition?.nameEn : e.competition?.nameSr) ?? e.competition?.name ?? null,
+    location: (en ? e.competition?.locationEn : e.competition?.locationSr) ?? e.competition?.location ?? null,
+  })).slice(-limit);
 }

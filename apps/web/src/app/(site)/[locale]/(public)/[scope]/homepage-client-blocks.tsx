@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowUpRight } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { unstable_catchError, type ErrorInfo } from "next/error";
@@ -347,7 +348,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
           return (
             <div key={`${disc.discCode}:${disc.category}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
               {/* Naziv discipline vodi na prvu prikazanu fazu (finale ako postoji, inače kvalifikacije). */}
-              <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="relative flex w-fit items-center gap-1 no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']">{discBadge}{junBadge}</ScopedLink>
+              <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="relative flex w-fit items-center gap-1 no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']">{discBadge}{junBadge}<ArrowUpRight size={15} strokeWidth={2.25} aria-hidden="true" className="shrink-0 text-[var(--muted)]" /></ScopedLink>
               {shownPhases.map((phase) => {
                 const decimals = phase.stage === "elimination" || (!qualHasDecimals(disc.discCode) && phase.stage !== "final") || isSportPistolCode(disc.discCode) ? 0 : 1;
                 const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? `E${phase.elimRound ?? ""}` : phase.stage === "final" ? "F" : "Q"}</span>;

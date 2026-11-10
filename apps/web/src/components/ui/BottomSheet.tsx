@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useDragControls, useReducedMotion } from "framer-motion";
+import { AnimatePresence, animate, motion, useDragControls, useMotionValue, useReducedMotion } from "framer-motion";
 import { useUiLocale } from "@/hooks/use-ui-locale";
 
 const FOCUSABLE = 'a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -18,6 +18,7 @@ export function BottomSheet({ open, onClose, label, children }: { open: boolean;
   onCloseRef.current = onClose;
   const reduced = useReducedMotion();
   const dragControls = useDragControls();
+  const y = useMotionValue(0);
   const en = useUiLocale() === "en";
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -62,6 +63,57 @@ export function BottomSheet({ open, onClose, label, children }: { open: boolean;
     };
   }, [open]);
 
+  // Pull-down from the content: when the scrolled body is at the very top, a downward swipe drags the whole
+  // sheet (same dismiss rule as the handle). Native scrolling is untouched until that moment.
+  useEffect(() => {
+    if (!open) return;
+    const dialog = ref.current;
+    if (!dialog) return;
+    let startY = 0, startT = 0, scroller: HTMLElement | null = null, mode: "idle" | "pull" | "scroll" = "idle";
+    const scrollParent = (el: EventTarget | null) => {
+      let n = el as HTMLElement | null;
+      while (n && n !== dialog) {
+        if (n.scrollHeight > n.clientHeight && /(auto|scroll)/.test(getComputedStyle(n).overflowY)) return n;
+        n = n.parentElement;
+      }
+      return null;
+    };
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || (e.target as Element).closest("[data-dot-popover],[data-dot-btn]")) { mode = "scroll"; return; }
+      startY = e.touches[0].clientY; startT = e.timeStamp;
+      scroller = scrollParent(e.target);
+      mode = "idle";
+    };
+    const onMove = (e: TouchEvent) => {
+      if (mode === "scroll") return;
+      const dy = e.touches[0].clientY - startY;
+      if (mode === "idle") {
+        if (Math.abs(dy) < 6) return;
+        if (dy < 0 || (scroller && scroller.scrollTop > 0)) { mode = "scroll"; return; }
+        mode = "pull";
+      }
+      e.preventDefault();
+      y.set(Math.max(0, dy - 6));
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (mode !== "pull") return;
+      mode = "idle";
+      const dist = parseFloat(String(y.get())) || 0, vel = dist / Math.max(1, e.timeStamp - startT);
+      if (dist > 100 || vel > 0.6) onCloseRef.current();
+      else animate(y, 0, { duration: 0.2, ease: [0.22, 1, 0.36, 1] });
+    };
+    dialog.addEventListener("touchstart", onStart, { passive: true });
+    dialog.addEventListener("touchmove", onMove, { passive: false });
+    dialog.addEventListener("touchend", onEnd);
+    dialog.addEventListener("touchcancel", onEnd);
+    return () => {
+      dialog.removeEventListener("touchstart", onStart);
+      dialog.removeEventListener("touchmove", onMove);
+      dialog.removeEventListener("touchend", onEnd);
+      dialog.removeEventListener("touchcancel", onEnd);
+    };
+  }, [open, y]);
+
   if (!mounted) return null;
   return createPortal(
     <AnimatePresence>
@@ -82,7 +134,7 @@ export function BottomSheet({ open, onClose, label, children }: { open: boolean;
             aria-label={label}
             tabIndex={-1}
             className="relative flex max-h-[88dvh] w-full flex-col rounded-t-2xl border-t border-[var(--border)] bg-[var(--bg)] shadow-lg outline-none"
-            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+            style={{ y, paddingBottom: "env(safe-area-inset-bottom)" }}
             initial={reduced ? false : { y: "100%" }}
             animate={{ y: 0 }}
             exit={reduced ? undefined : { y: "100%" }}
@@ -106,7 +158,7 @@ export function BottomSheet({ open, onClose, label, children }: { open: boolean;
               type="button"
               onClick={onClose}
               aria-label={en ? "Close" : "Zatvori"}
-              className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full text-[var(--muted)] hover:text-[var(--ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand-primary)]"
+              className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-lg text-[var(--muted)] hover:text-[var(--ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand-primary)]"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                 <path d="M5 5l10 10M15 5L5 15" />

@@ -26,7 +26,9 @@ import {
 import { startNavigationProgress, finishNavigationProgress } from "@/components/NavigationProgress";
 import { shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
 import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
+import { categoryLabel } from "@/lib/match-name";
 import { todayKey } from "./ScheduleSection";
+import { SheetInsightsProvider, type SheetForma, type SheetOtherResult } from "@/components/result-display/SheetInsights";
 
 export type DisciplineGroup = {
   /** Jedinstven id bloka (ključ + kategorija kad je disciplina podeljena po mečevima) */
@@ -112,6 +114,8 @@ interface Props {
   timezone?: string;
   /** Satnica finala (disciplina + kategorija) — medalje se prikazuju tek kad je finale gotovo. */
   finalSlots?: Array<FinalSlot & { disciplineCode: string; category: string }>;
+  /** Forma po strelcu i disciplini ("shooterId|CODE") za detail sheet. */
+  formaByKey?: Record<string, SheetForma>;
 }
 
 // ── Fade variants ─────────────────────────────────────────────────────────────
@@ -203,10 +207,31 @@ function eliminationRoundLabel(round: number, locale: string): string {
 // useSearchParams na ISR stranici traži Suspense. Fallback je isti prikaz bez izbora iz URL-a,
 // pa tabela ostaje u statičkom HTML-u; izbor iz URL-a se primeni posle hidratacije.
 export function CompetitionResultsClient(props: Props) {
+  const { groups, locale, formaByKey } = props;
+  const insights = useMemo(() => {
+    const en = locale === "en";
+    // Svi nastupi svakog strelca na ovom takmičenju — sheet prikazuje one koji nisu otvoreni red.
+    const byShooter = new Map<number, SheetOtherResult[]>();
+    for (const g of groups) {
+      const name = disciplineName(g.code, locale);
+      for (const c of g.categories) {
+        for (const r of c.results) {
+          const label = [name, g.label, c.category !== "senior" ? categoryLabel(c.category, CATEGORY_LABEL[c.category], locale) : null].filter(Boolean).join(" · ");
+          const entry: SheetOtherResult | null =
+            r.finalRank != null || r.finalTotal != null ? { id: r.id, label: `${label} · ${en ? "Final" : "Finale"}`, total: r.finalTotal, rank: r.finalRank, stage: "final" }
+            : r.qualTotal != null ? { id: r.id, label, total: r.qualTotal, rank: r.qualRank, stage: "qual" } : null;
+          if (entry) byShooter.set(r.shooterId, [...(byShooter.get(r.shooterId) ?? []), entry]);
+        }
+      }
+    }
+    return { forma: formaByKey ?? {}, othersFor: (shooterId: number, excludeId: number) => (byShooter.get(shooterId) ?? []).filter((o) => o.id !== excludeId) };
+  }, [groups, locale, formaByKey]);
   return (
-    <Suspense fallback={<CompetitionResultsView {...props} search="" />}>
-      <CompetitionResultsWithSearch {...props} />
-    </Suspense>
+    <SheetInsightsProvider value={insights}>
+      <Suspense fallback={<CompetitionResultsView {...props} search="" />}>
+        <CompetitionResultsWithSearch {...props} />
+      </Suspense>
+    </SheetInsightsProvider>
   );
 }
 
@@ -760,9 +785,9 @@ function RefreshButton({ onRefresh, refreshing, locale }: { onRefresh: () => voi
       disabled={refreshing}
       aria-label={label}
       title={label}
-      className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition-colors duration-150 hover:text-[var(--ink)] disabled:cursor-default"
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition-colors duration-150 hover:text-[var(--ink)] disabled:cursor-default"
     >
-      <RefreshCw size={13} aria-hidden="true" className={refreshing ? "animate-spin" : undefined} />
+      <RefreshCw size={16} aria-hidden="true" className={refreshing ? "animate-spin" : undefined} />
     </button>
   );
 }
@@ -949,6 +974,7 @@ function CompetitionDetail({
         finalTotal: r.finalTotal,
         finalRank: r.finalRank,
         finalDetail: r.finalDetail,
+        disciplineCode: group?.code ?? "",
         remark: r.finalRemark,
         remarkDetails: r.remarkDetails?.final ?? null,
       })) ?? [];
@@ -1009,13 +1035,13 @@ function CompetitionDetail({
             {disciplineName(group?.code ?? selection.disciplineCode, locale)}
           </h3>
           {group?.label && (
-            <span className="text-[0.72rem] font-semibold text-[var(--brand-primary)]">{group.label}</span>
+            <span className="text-sm font-semibold text-[var(--brand-primary)]">{group.label}</span>
           )}
           {group?.date && (
-            <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">{ddmm(group.date)}</span>
+            <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-medium text-[var(--muted)]">{ddmm(group.date)}</span>
           )}
           {showCategory && (
-            <span className="text-[0.72rem] font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <span className="text-sm font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
               {CATEGORY_LABEL[selection.category]}
             </span>
           )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useLocale } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
@@ -10,7 +10,9 @@ import { displayNoc } from "@shootermarkt/db/noc-list";
 import { useRowFlash } from "./useRowFlash";
 import { ShooterAvatar } from "./ShooterAvatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-import { SheetCells, SheetFrame, SheetPerson, SheetSection, SheetStats } from "./ResultSheet";
+import { SheetGapLine, SheetInsights } from "./SheetInsights";
+import { SheetCells, SheetFrame, SheetPanelSlot, SheetPerson, SheetPersonDesktop, SheetSection, SheetStats } from "./ResultSheet";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
@@ -26,6 +28,7 @@ export type FinalResultRow = {
   finalTotal: string | null;
   finalRank: number | null;
   finalDetail: FinalDetail | null;
+  disciplineCode?: string;
   remark: string | null | undefined;
   remarkDetails?: StageRemarks | null;
 };
@@ -188,14 +191,16 @@ function buildColumns(rows: FinalResultRow[]): Column[] {
 
 // Fixed pixel widths — see CompetitionQualTable for why CSS Grid (not a real
 // <table>) is required.
-const RANK_W = "40px";
+const RANK_W = "44px";
+/** Panel otvoren: uža kolona ranka (nema avatara između ranka i imena). */
+const PANEL_RANK_W = "36px";
 const AVATAR_W = "40px";
 // Ime dobija sav slobodan prostor; klub/NOC je uzak, da ne pravi prazan razmak do serija.
 const NAME_W = "minmax(160px, 1fr)";
 const NOC_W = "72px";
 const CLUB_W = "minmax(96px, 180px)";
 const TOTAL_W = "68px";
-const REMARK_W = "24px";
+const REMARK_W = "32px";
 
 const NOC_ONLY_LEVELS = new Set(["world", "olympic", "continental"]);
 
@@ -209,6 +214,24 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
   const [sheetId, setSheetId] = useState<number | null>(null);
+  const desktop = useIsDesktop();
+  // Širina kartice tabele — kad je panel otvoren, kolone serija se računaju tako da stanu bez horizontalnog skrola.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [cardW, setCardW] = useState(0);
+  const panelWanted = desktop && sheetId != null;
+  useEffect(() => {
+    if (!panelWanted) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSheetId(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [panelWanted]);
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || !panelWanted) return;
+    const ro = new ResizeObserver(([entry]) => setCardW(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [panelWanted]);
 
   const sorted = [...results]
     .filter((r) => r.finalRank != null || r.finalTotal != null)
@@ -236,12 +259,19 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
   const isHitCountFinal = sorted.some((result) => result.finalDetail?.format === "bulletin" && result.finalDetail.scoring === "hit_count");
   const columns = buildColumns(sorted);
   const hasDetail = columns.length > 0;
+  const panelOpen = desktop && sheetId != null && sorted.some((r) => r.id === sheetId);
+  const inlineColumns = columns;
 
-  const SERIES_COL_W = "52px";
+  // Panel otvoren: fiksni delovi (rank, ime ≥100, zbir, remark) pa ostatak ravnomerno na serije — do 38px, uz sitniji font.
+  const fitW = panelOpen && cardW > 0 && inlineColumns.length ? Math.floor((cardW - 36 - 100 - 68 - 32) / inlineColumns.length) : 46;
+  const seriesW = panelOpen ? Math.max(38, Math.min(46, fitW)) : 52;
+  const compactSeries = panelOpen && seriesW < 46;
+  const SERIES_COL_W = `${seriesW}px`;
   const isNocOnly = NOC_ONLY_LEVELS.has(competitionLevel ?? "");
   const clubColW = isNocOnly ? NOC_W : CLUB_W;
-  const headerGroups = groupColumnHeaders(columns.map((col) => localizeSeriesLabel(col.header, locale)));
-  const gridTemplateColumns = [RANK_W, AVATAR_W, NAME_W, clubColW, ...columns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W]
+  const headerGroups = groupColumnHeaders(inlineColumns.map((col) => localizeSeriesLabel(col.header, locale)));
+  // Panel otvoren: tabela je uža, pa avatar i klub/NOC (panel ih već prikazuje) nestaju, a Σ i remark ostaju zalepljeni desno.
+  const gridTemplateColumns = (panelOpen ? [PANEL_RANK_W, "minmax(100px, 1fr)", ...inlineColumns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W] : [RANK_W, AVATAR_W, NAME_W, clubColW, ...inlineColumns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W])
     .filter(Boolean)
     .join(" ");
   const mobileGridTemplateColumns = hasDetail
@@ -261,8 +291,47 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
     });
   };
 
+  const sheet = (() => {
+    const si = sheetId == null ? -1 : sorted.findIndex((r) => r.id === sheetId);
+    const sr = si >= 0 ? sorted[si] : null;
+    const mark = sr ? remarkLabel(sr.remark, sr.remarkDetails, remarkCodes[si]) : null;
+    // Referenca za liniju razlike: pobednik, a pobedniku drugi — kumulativi su poravnati po koloni.
+    const gapRef = sr ? sorted.find((x) => x.id !== sr.id && x.finalRank === (sr.finalRank === 1 ? 2 : 1) && x.finalDetail) ?? null : null;
+    const cum = (row: FinalResultRow) => seriesCells(columns, row).map((c) => parseFloat(c.sub));
+    const gapPoints: number[] = [];
+    if (sr && gapRef) {
+      const a = cum(sr), b = cum(gapRef);
+      for (let i = 0; i < Math.min(a.length, b.length) && !Number.isNaN(a[i]) && !Number.isNaN(b[i]); i++) gapPoints.push(Math.round((a[i] - b[i]) * 10) / 10);
+    }
+    const body = sr && (
+      <SheetFrame profileHref={`/strelci/${sr.shooterId}`} en={en} headerSpace={44} header={<SheetPersonDesktop firstName={sr.firstName} lastName={sr.lastName} avatarUrl={sr.avatarUrl} birthYear={sr.birthYear} nationality={sr.nationality} clubDisplay={sr.clubDisplay} en={en} />}
+                onPrev={si > 0 ? () => setSheetId(sorted[si - 1].id) : undefined}
+                onNext={si < sorted.length - 1 ? () => setSheetId(sorted[si + 1].id) : undefined}>
+                <div className="sm:hidden"><SheetPerson firstName={sr.firstName} lastName={sr.lastName} avatarUrl={sr.avatarUrl} birthYear={sr.birthYear} nationality={sr.nationality} clubDisplay={sr.clubDisplay} en={en} /></div>
+                <SheetStats items={[
+                  { label: en ? "Rank" : "Mesto", value: sr.finalRank ?? "—" },
+                  { label: isHitCountFinal ? (en ? "Hits" : "Hitovi") : (en ? "Total" : "Ukupno"), value: sr.finalTotal ?? "—" },
+                  ...(mark ? [{ label: en ? "Remark" : "Napomena", value: <RemarkBadge size="lg" remark={mark} code={remarkCodes[si]} details={sr.remarkDetails} label={`${sr.firstName} ${sr.lastName}`} className="" /> }] : []),
+                ]} />
+                {hasDetail && (
+                  <SheetSection>
+                    <SheetCells cells={seriesCells(columns, sr).filter((c) => c.main).map((c) => ({ label: localizeSeriesLabel(c.header, locale), main: c.main, sub: c.sub || undefined, best: false }))} />
+                  </SheetSection>
+                )}
+                {hasDetail && gapRef && gapPoints.length >= 3 && (
+                  <SheetSection title={en ? "Gap through the final" : "Razlika kroz finale"}>
+                    <SheetGapLine points={gapPoints} refName={gapRef.lastName} en={en} />
+                  </SheetSection>
+                )}
+                {sr.disciplineCode && <SheetInsights shooterId={sr.shooterId} code={sr.disciplineCode} resultId={sr.id} en={en} />}
+              </SheetFrame>
+    );
+    return { sr, body };
+  })();
+
   return (
-    <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+    <div className="flex items-start">
+    <div ref={cardRef} className={`min-w-0 flex-1 rounded-xl border border-[var(--border)] ${panelOpen ? "overflow-x-auto" : "overflow-hidden"}`}>
       {hasDetail && (
         <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border)] bg-[var(--surface)] sm:hidden">
           <button
@@ -278,28 +347,28 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
       <div>
         <div
           role="table"
-          className="text-sm grid [grid-template-columns:var(--mobile-grid)] sm:[grid-template-columns:var(--desktop-grid)]"
+          className={`text-sm grid [grid-template-columns:var(--mobile-grid)] sm:[grid-template-columns:var(--desktop-grid)] ${panelOpen ? "w-max min-w-full" : ""}`}
           style={{ "--mobile-grid": mobileGridTemplateColumns, "--desktop-grid": gridTemplateColumns } as CSSProperties}
         >
           <div role="row" style={{ display: "contents" }}>
             <div role="columnheader" className={`${headerCellCls} justify-center`}>#</div>
-            <div role="columnheader" className={headerCellCls} aria-hidden="true" />
+            <div role="columnheader" className={`${headerCellCls} ${panelOpen ? "hidden" : ""}`} aria-hidden="true" />
             <div role="columnheader" className={headerCellCls}>{en ? "Shooter" : "Strelac"}</div>
-            <div role="columnheader" className={headerCellCls}>{clubHeaderLabel}</div>
+            <div role="columnheader" className={`${headerCellCls} ${panelOpen ? "hidden" : "!pl-5"}`}>{clubHeaderLabel}</div>
             {hasDetail && headerGroups.map((group, i) => (
               <div
                 key={i}
                 role="columnheader"
-                className={`hidden sm:flex ${headerCellCls} ${group.span > 1 ? "justify-center" : "justify-end"} whitespace-nowrap`}
+                className={`hidden sm:flex ${headerCellCls} ${group.span > 1 ? "justify-center !pl-5 !pr-1.5" : "justify-end !pl-1.5 !pr-0.5"} whitespace-nowrap`}
                 style={group.span > 1 ? { gridColumn: `span ${group.span}` } : undefined}
               >
                 {group.label}
               </div>
             ))}
-            <div role="columnheader" className={`${headerCellCls} justify-end whitespace-nowrap`}>
+            <div role="columnheader" className={`${headerCellCls} justify-end whitespace-nowrap ${panelOpen ? "sticky right-8 z-[1]" : ""}`}>
               {isHitCountFinal ? (en ? "Hits" : "Hitovi") : "Σ"}
             </div>
-            <div role="columnheader" className={narrowHeaderCellCls} aria-hidden="true" />
+            <div role="columnheader" className={`${narrowHeaderCellCls} ${panelOpen ? "sticky right-0 z-[1]" : ""}`} aria-hidden="true" />
             {hasDetail && <div role="columnheader" className={`${narrowHeaderCellCls} sm:hidden`} aria-hidden="true" />}
           </div>
 
@@ -313,12 +382,13 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
               <div key={r.id} role="rowgroup" style={{ display: "contents" }}>
                 <div
                   role="row"
-                  className={`group ${hasDetail ? "cursor-pointer sm:cursor-default" : ""} ${flashing.has(r.id) ? "result-row-flash" : ""}`}
+                  data-sel={panelOpen && sheetId === r.id}
+                  className={`group ${hasDetail || desktop ? "cursor-pointer" : ""} ${flashing.has(r.id) ? "result-row-flash" : ""}`}
                   style={{ display: "contents" }}
-                  onClick={hasDetail ? () => toggleRow(r.id) : undefined}
+                  onClick={desktop ? () => setSheetId(sheetId === r.id ? null : r.id) : hasDetail ? () => toggleRow(r.id) : undefined}
                 >
                   {/* Rank */}
-                  <div className={`${cellCls} max-sm:!px-1 justify-center font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`}>
+                  <div className={`${cellCls} max-sm:!px-1 ${panelOpen ? "sm:!px-0.5" : "sm:!px-1.5"} justify-center font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
                     {r.finalRank != null ? (
                       showMedals && MEDAL_COLOR[r.finalRank] ? (
                         <MedalIcon rank={r.finalRank} />
@@ -331,39 +401,53 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                   </div>
 
                   {/* Avatar */}
-                  <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)]`}>
+                  <div className={`${narrowCellCls} ${panelOpen ? "hidden" : ""} justify-center group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
                     <ShooterAvatar firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} />
                   </div>
 
                   {/* Name — mobile: last name and first name each fixed to their own
                       line, so every row is exactly 2 lines regardless of name length.
                       Desktop has room to run it all inline. */}
-                  <div className={`${cellCls} min-w-0 group-hover:bg-[var(--surface-2)]`}>
+                  <div className={`${cellCls} ${panelOpen ? "sm:!pl-1" : ""} min-w-0 group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
                     <Link
                       href={`/strelci/${r.shooterId}`}
+                      data-no-progress
                       onClick={(e) => {
                         e.stopPropagation();
                         // Mobile: ime otvara bottom sheet; desktop ostaje običan link.
-                        if (window.matchMedia("(max-width: 639px)").matches) { e.preventDefault(); setSheetId(r.id); }
+                        if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) { e.preventDefault(); setSheetId(desktop && sheetId === r.id ? null : r.id); }
                       }}
-                      className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-1.5 leading-tight py-0.5 group/name"
+                      className={`flex min-w-0 flex-col ${panelOpen ? "" : "sm:flex-row sm:items-center sm:gap-1.5"} leading-tight py-0.5 group/name`}
                     >
-                      <span className="min-w-0 truncate font-medium text-[var(--ink)] group-hover/name:text-[var(--brand-primary)] transition-colors">
-                        {r.lastName}
-                      </span>
-                      <span className="flex min-w-0 items-center gap-1.5 truncate text-sm text-[var(--muted)]">
-                        <span className="truncate">{r.firstName}</span>
-                        {r.birthYear != null && (
-                          <span className="shrink-0 text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] tabular-nums">
-                            {r.birthYear}
+                      {panelOpen ? (
+                        // Panel otvoren: godište ispod imena, da kolona imena bude uža.
+                        <>
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="max-w-full shrink-0 truncate font-medium text-[var(--ink)] group-hover/name:text-[var(--brand-primary)] transition-colors">{r.lastName}</span>
+                            <span className="min-w-0 truncate text-sm text-[var(--muted)]">{r.firstName}</span>
                           </span>
-                        )}
-                      </span>
+                          {r.birthYear != null && <span className="text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] tabular-nums">{r.birthYear}</span>}
+                        </>
+                      ) : (
+                        <>
+                          <span className="max-w-full shrink-0 truncate font-medium text-[var(--ink)] group-hover/name:text-[var(--brand-primary)] transition-colors">
+                            {r.lastName}
+                          </span>
+                          <span className="flex min-w-0 items-center gap-1.5 truncate text-sm text-[var(--muted)]">
+                            <span className="truncate">{r.firstName}</span>
+                            {r.birthYear != null && (
+                              <span className="shrink-0 text-[0.65rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] tabular-nums">
+                                {r.birthYear}
+                              </span>
+                            )}
+                          </span>
+                        </>
+                      )}
                     </Link>
                   </div>
 
                   {/* Club / NOC */}
-                  <div className={`${cellCls} max-sm:!px-1.5 min-w-0 group-hover:bg-[var(--surface-2)]`}>
+                  <div className={`${cellCls} ${panelOpen ? "hidden" : ""} max-sm:!px-1.5 min-w-0 group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
                     <div className="flex items-center gap-2 min-w-0">
                       {r.nationality && (() => {
                         const noc = displayNoc(r.nationality);
@@ -390,32 +474,32 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                   </div>
 
                   {/* Series values — desktop only; row fits every series in-line so no expand is needed.
-                      Cumulative running total stacked above each series value, widening the row. */}
+                      Cumulative running total stacked below each series value, widening the row. */}
                   {hasDetail && seriesCells(columns, r).map((cell, i) => (
                     <div
                       key={i}
-                      className={`hidden sm:flex ${cellCls} !px-1.5 flex-col items-end justify-center gap-0.5 group-hover:bg-[var(--surface-2)]`}
+                      className={`hidden sm:flex ${cellCls} ${compactSeries ? "!px-0.5" : "!px-1.5"} flex-col items-end justify-center gap-0.5 group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}
                     >
-                      <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--subtle)]">{cell.sub}</span>
-                      <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums text-[var(--muted)]">{cell.main}</span>
+                      <span className={`font-[family-name:var(--font-jetbrains-mono)] tabular-nums text-[var(--muted)] ${compactSeries ? "text-xs" : "text-sm"}`}>{cell.main}</span>
+                      <span className={`font-[family-name:var(--font-jetbrains-mono)] tabular-nums text-[var(--subtle)] ${compactSeries ? "text-[0.65rem]" : "text-xs"}`}>{cell.sub}</span>
                     </div>
                   ))}
 
                   {/* Final total */}
-                  <div className={`${cellCls} max-sm:!px-1.5 justify-end font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)]`}>
+                  <div className={`${cellCls} sm:!pr-1 ${panelOpen ? "sticky right-8 z-[1] bg-[var(--bg)] shadow-[-8px_0_8px_-8px_oklch(0_0_0/0.18)]" : ""} max-sm:!px-1.5 justify-end font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
                     {r.finalTotal ?? (
                       <span className="font-normal text-[var(--subtle)]">—</span>
                     )}
                   </div>
 
                   {/* Remark — e.g. SO (shoot-off decided who's out of the final) */}
-                  <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)]`}>
+                  <div className={`${narrowCellCls} ${panelOpen ? "sticky right-0 z-[1] bg-[var(--bg)]" : ""} justify-center group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
                     {remarkLabel(r.remark, r.remarkDetails, remarkCodes[idx]) && <RemarkBadge remark={remarkLabel(r.remark, r.remarkDetails, remarkCodes[idx])!} code={remarkCodes[idx]} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />}
                   </div>
 
                   {/* Expand chevron — mobile only, rightmost column; desktop shows series inline instead */}
                   {hasDetail && (
-                    <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)] sm:hidden`}>
+                    <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))] sm:hidden`}>
                       <ChevronIcon open={isExpanded} />
                     </div>
                   )}
@@ -457,32 +541,11 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
         </div>
       </div>
       <RemarkLegend items={remarkLegend} />
-      {(() => {
-        const si = sheetId == null ? -1 : sorted.findIndex((r) => r.id === sheetId);
-        const sr = si >= 0 ? sorted[si] : null;
-        const mark = sr ? remarkLabel(sr.remark, sr.remarkDetails, remarkCodes[si]) : null;
-        return (
-          <BottomSheet open={sr != null} onClose={() => setSheetId(null)} label={sr ? `${sr.firstName} ${sr.lastName}` : ""}>
-            {sr && (
-              <SheetFrame profileHref={`/strelci/${sr.shooterId}`} en={en}
-                onPrev={si > 0 ? () => setSheetId(sorted[si - 1].id) : undefined}
-                onNext={si < sorted.length - 1 ? () => setSheetId(sorted[si + 1].id) : undefined}>
-                <SheetPerson firstName={sr.firstName} lastName={sr.lastName} avatarUrl={sr.avatarUrl} birthYear={sr.birthYear} nationality={sr.nationality} clubDisplay={sr.clubDisplay} en={en} />
-                <SheetStats items={[
-                  { label: en ? "Rank" : "Mesto", value: sr.finalRank ?? "—" },
-                  { label: isHitCountFinal ? (en ? "Hits" : "Hitovi") : (en ? "Total" : "Ukupno"), value: sr.finalTotal ?? "—" },
-                  ...(mark ? [{ label: en ? "Remark" : "Napomena", value: <RemarkBadge size="lg" remark={mark} code={remarkCodes[si]} details={sr.remarkDetails} label={`${sr.firstName} ${sr.lastName}`} className="" /> }] : []),
-                ]} />
-                {hasDetail && (
-                  <SheetSection title={en ? "Series" : "Serije"}>
-                    <SheetCells cells={seriesCells(columns, sr).filter((c) => c.main).map((c) => ({ label: localizeSeriesLabel(c.header, locale), main: c.main, sub: c.sub || undefined, best: false }))} />
-                  </SheetSection>
-                )}
-              </SheetFrame>
-            )}
-          </BottomSheet>
-        );
-      })()}
+      <BottomSheet open={sheet.sr != null && !desktop} onClose={() => setSheetId(null)} label={sheet.sr ? `${sheet.sr.firstName} ${sheet.sr.lastName}` : ""}>
+        {sheet.body}
+      </BottomSheet>
+    </div>
+    <SheetPanelSlot open={panelOpen && sheet.sr != null} label={sheet.sr ? `${sheet.sr.firstName} ${sheet.sr.lastName}` : ""} onClose={() => setSheetId(null)} en={en}>{sheet.body}</SheetPanelSlot>
     </div>
   );
 }

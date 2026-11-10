@@ -9,6 +9,7 @@ import {
   disciplines,
   mixedTeamResults,
   competitionSchedule,
+  shooterFormaCache,
 } from "@shootermarkt/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -193,6 +194,23 @@ export default async function CompetitionPage({ params }: Props) {
     ? await db.select({ id: shooters.id, avatarUrl: shooters.avatarUrl, birthYear: shooters.birthYear }).from(shooters).where(inArray(shooters.id, mixedProfileIds))
     : [];
   const mixedProfileById = new Map(mixedProfiles.map((p) => [p.id, p]));
+
+  // Forma/peak/sezonski prosek iz keša — jedan upit za sve strelce takmičenja, za detail sheet.
+  const shooterIds = [...new Set(compResults.map((r) => r.shooterId))];
+  const formaRows = shooterIds.length
+    ? await db.select({
+        shooterId: shooterFormaCache.shooterId, code: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend,
+        peak: shooterFormaCache.peakCareer, seasonAvg: shooterFormaCache.seasonAvg, seasonCount: shooterFormaCache.seasonCount, careerCount: shooterFormaCache.careerCount,
+      }).from(shooterFormaCache).where(inArray(shooterFormaCache.shooterId, shooterIds))
+    : [];
+  const formaByKey = Object.fromEntries(formaRows.map((f) => [`${f.shooterId}|${f.code}`, {
+    forma: f.forma != null ? Number(f.forma) : null,
+    trend: (f.trend as "up" | "down" | "stable" | null) ?? null,
+    peak: f.peak != null ? Number(f.peak) : null,
+    seasonAvg: f.seasonAvg != null ? Number(f.seasonAvg) : null,
+    seasonCount: f.seasonCount,
+    careerCount: f.careerCount,
+  }]));
 
   const scheduleSlots: ScheduleSlot[] = scheduleRows.map((r) => ({
     id: r.id,
@@ -423,7 +441,7 @@ export default async function CompetitionPage({ params }: Props) {
         >
           {t("detail.results")}
         </h2>
-        <CompetitionResultsClient groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} timezone={comp.timezone ?? undefined} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} />
+        <CompetitionResultsClient formaByKey={formaByKey} groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} timezone={comp.timezone ?? undefined} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} />
       </div>
 
       <RelatedNewsSection type="competition" refId={compId} locale={locale} />

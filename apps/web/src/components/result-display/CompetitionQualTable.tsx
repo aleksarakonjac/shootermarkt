@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useLocale } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
-import { SheetCells, SheetFrame, SheetPerson, SheetSection, SheetStats } from "./ResultSheet";
+import { SheetCells, SheetDots, SheetFacts, SheetFrame, SheetGroup, SheetPanelSlot, SheetPerson, SheetPersonDesktop, SheetSection, SheetStats } from "./ResultSheet";
+import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { SheetInsights } from "./SheetInsights";
+import { ShooterAvatar } from "./ShooterAvatar";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import type { QualDetail, PositionsQualDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
@@ -69,7 +72,7 @@ export function QualifiedBadge({ size = "base" }: { size?: "base" | "lg" }) {
   const en = useLocale() === "en";
   return (
     <span
-      className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] ${size === "lg" ? "text-2xl" : "text-base"} shrink-0 leading-none`}
+      className={`font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)] ${size === "lg" ? "text-xl" : "text-base"} shrink-0 leading-none`}
       style={{ color: "var(--success)" }}
       title={en ? "Qualified for the final" : "Kvalifikovan za finale"}
     >
@@ -104,7 +107,7 @@ const NOC_ONLY_LEVELS = new Set(["world", "olympic", "continental"]);
 
 // Fixed pixel widths for the (now few) non-flexible columns — a CSS Grid
 // track's size is authoritative, unlike a real <table> under table-layout:auto.
-const RANK_W = "32px";
+const RANK_W = "52px";
 // Ime dobija sav slobodan prostor; klub/NOC je uzak, da ne pravi prazan razmak do serija.
 const NAME_W = "minmax(140px, 1fr)";
 const NOC_W = "84px";
@@ -213,6 +216,14 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const reducedMotion = useReducedMotion();
   const [sheetId, setSheetId] = useState<number | null>(null);
+  const desktop = useIsDesktop();
+  const panelWanted = desktop && sheetId != null;
+  useEffect(() => {
+    if (!panelWanted) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSheetId(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [panelWanted]);
 
   if (results.length === 0) {
     return (
@@ -267,8 +278,10 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
     .map((r, idx) => (remarkCodes[idx] ? { code: remarkCodes[idx]!, remark: remarkText(r.remark, r.remarkDetails)!, label: `${r.lastName} ${r.firstName}` } : null))
     .filter((item): item is RemarkLegendItem => item != null);
 
+  // Desktop: klik na red otvara sticky panel desno; tabela se sužava pa serije (koje panel već prikazuje) nestaju iz redova.
+  const panelOpen = desktop && sheetId != null && sorted.some((r) => r.id === sheetId);
   const seriesHeaders = hasSeriesDetail ? buildSeriesHeaders(sorted, isPositionsType, flatGroups, posSeriesCounts) : [];
-  const SERIES_COL_W = "60px";
+  const SERIES_COL_W = panelOpen ? "50px" : "60px";
   const isNocOnly = NOC_ONLY_LEVELS.has(competitionLevel ?? "");
   // Desktop zaglavlje: trostav i grupisane discipline dobijaju jedan naslov preko svojih kolona
   // (Klečeći / Ležeći / Stojeći), umesto K1, K2, L1…; obične serije ostaju S1, S2…
@@ -300,8 +313,35 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
     });
   };
 
+  const sheet = (() => {
+    const si = sheetId == null ? -1 : sorted.findIndex((r) => r.id === sheetId);
+    const sr = si >= 0 ? sorted[si] : null;
+    const ranked = sorted.filter((x) => !isUnrankedRemark(x.remark) && x.qualTotal != null);
+    const leaderTotal = ranked.length ? Math.max(...ranked.map((x) => parseFloat(x.qualTotal!))) : null;
+    const qualifiedTotals = ranked.filter((x) => x.qualified === true).map((x) => parseFloat(x.qualTotal!));
+    const cutoffTotal = qualifiedTotals.length ? Math.min(...qualifiedTotals) : null;
+    const body = sr && (
+      <ShooterSheetBody
+        r={sr}
+        leaderTotal={leaderTotal}
+        cutoffTotal={cutoffTotal}
+        rank={isUnrankedRemark(sr.remark) ? null : sr.qualRank}
+        groups={hasSeriesDetail ? buildDetailGroups(sr, isPositionsType, flatGroups, posSeriesCounts, positionLabels) : []}
+        grouped={isPositionsType || flatGroups != null}
+        fmt={fmt}
+        showInners={showInners}
+        code={remarkCodes[si]}
+        en={en}
+        onPrev={si > 0 ? () => setSheetId(sorted[si - 1].id) : undefined}
+        onNext={si < sorted.length - 1 ? () => setSheetId(sorted[si + 1].id) : undefined}
+      />
+    );
+    return { sr, body };
+  })();
+
   return (
-    <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+    <div className="flex items-start">
+    <div className={`min-w-0 flex-1 rounded-xl border border-[var(--border)] ${panelOpen ? "overflow-x-auto" : "overflow-hidden"}`}>
       {hasSeriesDetail && (
         <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border)] bg-[var(--surface)] sm:hidden">
           <button
@@ -346,7 +386,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
             const isOddRow = idx % 2 === 1;
             const isExpanded = expanded.has(r.id);
             const isLastRow = idx === sorted.length - 1;
-            const rowBg = isOddRow ? "var(--surface)" : "var(--bg)";
+            const rowBg = panelOpen && sheetId === r.id ? "color-mix(in oklch, var(--brand-primary) 8%, var(--bg))" : isOddRow ? "var(--surface)" : "var(--bg)";
             const showBottomBorder = !isLastRow || isExpanded;
             const cellCls = `px-2 py-2.5 text-sm sm:px-3 flex items-center transition-colors ${showBottomBorder ? "border-b border-[var(--border)]" : ""}`;
             const allGroups = hasSeriesDetail ? buildDetailGroups(r, isPositionsType, flatGroups, posSeriesCounts, positionLabels) : [];
@@ -358,9 +398,9 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
               <div key={r.id} role="rowgroup" style={{ display: "contents" }}>
                 <div
                   role="row"
-                  className={`group ${hasSeriesDetail ? "cursor-pointer sm:cursor-default" : ""} ${flashing.has(r.id) ? "result-row-flash" : ""}`}
+                  className={`group ${hasSeriesDetail || desktop ? "cursor-pointer" : ""} ${flashing.has(r.id) ? "result-row-flash" : ""}`}
                   style={{ display: "contents" }}
-                  onClick={hasSeriesDetail ? () => toggleRow(r.id) : undefined}
+                  onClick={desktop ? () => setSheetId(sheetId === r.id ? null : r.id) : hasSeriesDetail ? () => toggleRow(r.id) : undefined}
                 >
                   {/* Rank */}
                   <div
@@ -383,14 +423,15 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                   <div className={`${cellCls} min-w-0 group-hover:bg-[var(--surface-2)]`} style={{ background: rowBg }}>
                     <Link
                       href={`/strelci/${r.shooterId}`}
+                      data-no-progress
                       onClick={(e) => {
                         e.stopPropagation();
-                        // Mobile: ime otvara bottom sheet sa detaljima; desktop ostaje običan link.
-                        if (window.matchMedia("(max-width: 639px)").matches) { e.preventDefault(); setSheetId(r.id); }
+                        // Ime otvara detalje (mobilni sheet / desktop panel); profil je u njima. Cmd/Ctrl-klik i dalje otvara profil.
+                        if (!(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) { e.preventDefault(); setSheetId(desktop && sheetId === r.id ? null : r.id); }
                       }}
-                      className="flex min-w-0 flex-col leading-tight py-0.5 group/name sm:flex-row sm:items-baseline sm:gap-1.5"
+                      className="flex min-w-0 flex-col leading-tight py-0.5 group/name sm:flex-row sm:items-center sm:gap-1.5"
                     >
-                      <span className="min-w-0 truncate font-medium text-[var(--ink)] transition-colors group-hover/name:text-[var(--brand-primary)]">
+                      <span className="max-w-full shrink-0 truncate font-medium text-[var(--ink)] transition-colors group-hover/name:text-[var(--brand-primary)]">
                         {r.lastName}
                       </span>
                       <span className="flex min-w-0 items-center gap-1.5 truncate text-sm text-[var(--muted)]">
@@ -471,7 +512,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                     {r.remark ? (
                       <RemarkBadge remark={r.remark} code={remarkCodes[idx]} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />
                     ) : (
-                      <span className="flex flex-col items-center gap-1 max-sm:[&_button]:text-xs max-sm:[&_span]:text-xs sm:flex-row sm:gap-1.5">
+                      <span className={`flex flex-col items-center gap-1 max-sm:[&_button]:text-xs max-sm:[&_span]:text-xs ${panelOpen ? "" : "sm:flex-row sm:gap-1.5"}`}>
                         {isTopQual && <QualifiedBadge />}
                         {remarkLabel(null, r.remarkDetails, remarkCodes[idx]) && <RemarkBadge remark={remarkLabel(null, r.remarkDetails, remarkCodes[idx])!} code={remarkCodes[idx]} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />}
                       </span>
@@ -544,34 +585,17 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
         </div>
       </div>
       <RemarkLegend items={remarkLegend} />
-      {(() => {
-        const si = sheetId == null ? -1 : sorted.findIndex((r) => r.id === sheetId);
-        const sr = si >= 0 ? sorted[si] : null;
-        return (
-          <BottomSheet open={sr != null} onClose={() => setSheetId(null)} label={sr ? `${sr.firstName} ${sr.lastName}` : ""}>
-            {sr && (
-              <ShooterSheetBody
-                r={sr}
-                rank={isUnrankedRemark(sr.remark) ? null : sr.qualRank}
-                groups={hasSeriesDetail ? buildDetailGroups(sr, isPositionsType, flatGroups, posSeriesCounts, positionLabels) : []}
-                grouped={isPositionsType || flatGroups != null}
-                fmt={fmt}
-                showInners={showInners}
-                code={remarkCodes[si]}
-                en={en}
-                onPrev={si > 0 ? () => setSheetId(sorted[si - 1].id) : undefined}
-                onNext={si < sorted.length - 1 ? () => setSheetId(sorted[si + 1].id) : undefined}
-              />
-            )}
-          </BottomSheet>
-        );
-      })()}
+      <BottomSheet open={sheet.sr != null && !desktop} onClose={() => setSheetId(null)} label={sheet.sr ? `${sheet.sr.firstName} ${sheet.sr.lastName}` : ""}>
+        {sheet.body}
+      </BottomSheet>
+    </div>
+    <SheetPanelSlot open={panelOpen && sheet.sr != null} label={sheet.sr ? `${sheet.sr.firstName} ${sheet.sr.lastName}` : ""} onClose={() => setSheetId(null)} en={en}>{sheet.body}</SheetPanelSlot>
     </div>
   );
 }
 
-function ShooterSheetBody({ r, rank, groups, grouped, fmt, showInners, code, en, onPrev, onNext }: {
-  r: CompResultRow; rank: number | null; groups: DetailGroup[]; grouped: boolean; fmt: (v: number) => string;
+function ShooterSheetBody({ r, leaderTotal, cutoffTotal, rank, groups, grouped, fmt, showInners, code, en, onPrev, onNext }: {
+  r: CompResultRow; leaderTotal: number | null; cutoffTotal: number | null; rank: number | null; groups: DetailGroup[]; grouped: boolean; fmt: (v: number) => string;
   showInners: boolean; code: string | null | undefined; en: boolean; onPrev?: () => void; onNext?: () => void;
 }) {
   const fullName = `${r.firstName} ${r.lastName}`;
@@ -583,25 +607,45 @@ function ShooterSheetBody({ r, rank, groups, grouped, fmt, showInners, code, en,
     </span>
   );
   const seriesGroups = grouped ? groups : [{ label: "", values: groups.flatMap((g) => g.values), bestValue: groups[0]?.bestValue ?? null }];
+  const allValues = groups.flatMap((g) => g.values).filter((v): v is number => v != null);
+  const total = r.qualTotal != null ? parseFloat(r.qualTotal) : null;
+  const gap = (d: number) => (d === 0 ? "0" : `${d > 0 ? "+" : "\u2212"}${fmt(Math.abs(d))}`);
+  const analysis = [
+    { label: en ? "Avg" : "Prosek", value: allValues.length ? (allValues.reduce((a, b) => a + b, 0) / allValues.length).toFixed(1) : "\u2014" },
+    ...(total != null && leaderTotal != null ? [{ label: en ? "To 1st" : "Do prvog", value: total === leaderTotal ? "\u2014" : gap(total - leaderTotal) }] : []),
+    ...(total != null && cutoffTotal != null ? [{ label: en ? "To final" : "Do finala", value: gap(total - cutoffTotal) }] : []),
+  ];
   return (
-    <SheetFrame profileHref={`/strelci/${r.shooterId}`} onPrev={onPrev} onNext={onNext} en={en}>
-      <SheetPerson firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} birthYear={r.birthYear} nationality={r.nationality} clubDisplay={r.clubDisplay} en={en} />
+    <SheetFrame profileHref={`/strelci/${r.shooterId}`} onPrev={onPrev} onNext={onNext} en={en} headerSpace={44} header={<SheetPersonDesktop firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} birthYear={r.birthYear} nationality={r.nationality} clubDisplay={r.clubDisplay} en={en} />}>
+      <div className="sm:hidden">
+        <SheetPerson firstName={r.firstName} lastName={r.lastName} avatarUrl={r.avatarUrl} birthYear={r.birthYear} nationality={r.nationality} clubDisplay={r.clubDisplay} en={en} />
+      </div>
       <SheetStats items={[
         { label: en ? "Rank" : "Mesto", value: rank ?? "—" },
         { label: en ? "Total" : "Ukupno", value: r.qualTotal != null ? fmt(parseFloat(r.qualTotal)) : "—" },
-        showInners ? { label: en ? "Inner 10s" : "Desetke", value: r.qualInners ?? "—" } : { label: en ? "Remark" : "Napomena", value: marks },
+        ...(showInners ? [{ label: "10×", value: r.qualInners ?? "—" }] : []),
+        ...(r.qualified === true || remarkMark ? [{ label: showInners ? (en ? "Rem." : "Nap.") : en ? "Remark" : "Napomena", value: marks }] : []),
       ]} />
-      {showInners && (r.qualified === true || remarkMark) && <div className="mt-3 flex justify-center">{marks}</div>}
       {groups.length > 0 && (
-        <SheetSection title={en ? "Series" : "Serije"}>
-          {seriesGroups.map((g, gi) => (
-            <div key={gi}>
-              {grouped && <p className="mb-1 text-sm font-semibold text-[var(--muted)]">{g.label}</p>}
-              <SheetCells cells={g.values.map((v, vi) => ({ label: grouped ? undefined : `S${vi + 1}`, main: v != null ? fmt(v) : "\u2014", best: v != null && v === g.bestValue }))} />
-            </div>
-          ))}
+        <SheetSection>
+          {seriesGroups.map((g, gi) => {
+            const filled = g.values.filter((v): v is number => v != null);
+            const subtotal = grouped && filled.length ? fmt(Math.round(filled.reduce((a, b) => a + b, 0) * 10) / 10) : undefined;
+            return (
+              <SheetGroup key={gi} label={grouped ? g.label : undefined} subtotal={subtotal}>
+                <SheetCells cells={g.values.map((v, vi) => ({ label: grouped ? undefined : `S${vi + 1}`, main: v != null ? fmt(v) : "\u2014", best: v != null && v === g.bestValue }))} />
+              </SheetGroup>
+            );
+          })}
         </SheetSection>
       )}
+      {allValues.length >= 2 && (
+        <SheetSection title={en ? "Series trend" : "Tok serija"}>
+          <SheetDots values={allValues} ariaLabel={en ? `Series values: ${allValues.map(fmt).join(", ")}` : `Vrednosti serija: ${allValues.map(fmt).join(", ")}`} />
+          <SheetFacts items={analysis} />
+        </SheetSection>
+      )}
+      {r.disciplineCode && <SheetInsights shooterId={r.shooterId} code={r.disciplineCode} resultId={r.id} total={total} en={en} />}
     </SheetFrame>
   );
 }
