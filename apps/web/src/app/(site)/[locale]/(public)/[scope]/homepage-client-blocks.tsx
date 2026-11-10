@@ -316,7 +316,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
   };
 
   type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null; rpo?: boolean };
-  type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null };
+  type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null; round?: number | null };
   type Phase = { stage: string; elimRound?: number | null; category: string; isLive: boolean; awardsMedals: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
   type DiscResult = { discCode: string; isLive: boolean; isJunior: boolean; category: string; phases: Phase[] };
 
@@ -401,6 +401,8 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                             const total = isFinalRow ? h.finalTotal! : h.qualTotal;
                             return (
                               <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[var(--brand-primary)]/[0.08] pl-1.5 pr-2 py-0.5">
+                                {/* Srbin iz elim bez kvalifikacija: oznaka runde da se zna da plasman nije iz kvalifikacija. */}
+                                {phase.stage === "elimination" && phase.qualTop3.length === 0 && <span className="shrink-0 rounded bg-[var(--surface-2)] px-1 font-[family-name:var(--font-jetbrains-mono)] text-[10px] font-bold text-[var(--ink)]">{`E${h.round ?? ""}`}</span>}
                                 <span className="fi fi-rs shrink-0" style={{ fontSize: 10 }} aria-hidden="true" />
                                 <span className="font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold text-[var(--brand-primary)] tabular-nums">
                                   {rank != null ? `${rank}.` : "—"}

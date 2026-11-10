@@ -506,7 +506,7 @@ export async function getHomepageMain(scope: Scope) {
         isLive: phase.isLive,
         awardsMedals: medal != null && (phase.stage === "final" ? medal === "final" : phase.stage.startsWith("qual") && medal === "qual"),
         qualTop3: phase.top3.map(({ firstName, lastName, clubName, nationality, countryCode2, total, rank, rpo }) => ({ firstName, lastName, clubName, nationality, countryCode2, qualTotal: total, qualRank: rank, rpo, finalTotal: null, finalRank: null })),
-        srbHighlights: phase.srbHighlights.map(({ firstName, lastName, clubName, total, rank }) => ({ firstName, lastName, clubName, qualRank: rank, qualTotal: total, finalRank: null, finalTotal: null })),
+        srbHighlights: phase.srbHighlights.map(({ firstName, lastName, clubName, total, rank, round }) => ({ firstName, lastName, clubName, qualRank: rank, qualTotal: total, finalRank: null, finalTotal: null, round })),
       })),
       };
     });
