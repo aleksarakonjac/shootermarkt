@@ -33,21 +33,22 @@ const Affil = ({ r }: { r: ShooterFormRow }) => r.nationality ? (
   </span>
 ) : null;
 
-interface TopFormaClientProps {
-  initialData: {
-    ARM: ShooterFormRow[];
-    ARW: ShooterFormRow[];
-    APM: ShooterFormRow[];
-    APW: ShooterFormRow[];
-  };
-}
-
 const TABS = [
-  { code: "ARM", name: "Rifle Men" },
-  { code: "ARW", name: "Rifle Women" },
-  { code: "APM", name: "Pistol Men" },
-  { code: "APW", name: "Pistol Women" },
+  { code: "ARM", sr: "10m puška M", en: "Air Rifle M" },
+  { code: "ARW", sr: "10m puška Ž", en: "Air Rifle W" },
+  { code: "APM", sr: "10m pištolj M", en: "Air Pistol M" },
+  { code: "APW", sr: "10m pištolj Ž", en: "Air Pistol W" },
+  { code: "R3PM", sr: "50m puška M", en: "Rifle 3x20 M" },
+  { code: "R3PW", sr: "50m puška Ž", en: "Rifle 3x20 W" },
+  { code: "SPW", sr: "25m pištolj Ž", en: "25m Pistol W" },
+  { code: "RFPM", sr: "25m Rapid Fire M", en: "25m Rapid Fire M" },
 ] as const;
+
+type TabCode = (typeof TABS)[number]["code"];
+
+interface TopFormaClientProps {
+  initialData: Record<TabCode, ShooterFormRow[]>;
+}
 
 const ROLL_DURATION = 450;
 
@@ -84,8 +85,124 @@ function RollingNumber({ value, animate }: { value: number; animate: boolean }) 
   return <span className="tabular-nums">{shown.toFixed(1)}</span>;
 }
 
+function TriggerLabel({ tab, en }: { tab: (typeof TABS)[number]; en: boolean }) {
+  return (
+    <>
+      <span className="inline-flex h-4 min-w-9 shrink-0 items-center justify-center rounded-[3px] bg-[var(--brand-primary)] px-1 text-[11px] leading-none font-[family-name:var(--font-jetbrains-mono)] font-bold text-white">{tab.code}</span>
+      <span className="min-w-0 truncate font-medium">{en ? tab.en : tab.sr}</span>
+    </>
+  );
+}
+
+function DisciplineSelect({ tabs, active, locale, label, onSelect, onOpen }: {
+  tabs: readonly (typeof TABS)[number][];
+  active: TabCode;
+  locale: string;
+  label: string;
+  onSelect: (code: TabCode) => void;
+  onOpen: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const en = locale === "en";
+  const current = tabs.find((tab) => tab.code === active) ?? tabs[0];
+
+  // Klizanje: prethodna disciplina izlazi nagore dok nova ulazi odozdo (rotacija i ručni izbor).
+  const [slide, setSlide] = useState<{ cur: TabCode; prev: TabCode | null }>({ cur: current.code, prev: null });
+  if (slide.cur !== current.code) setSlide({ cur: current.code, prev: slide.cur });
+  const prevTab = slide.prev ? TABS.find((tab) => tab.code === slide.prev) : undefined;
+  useEffect(() => {
+    if (!slide.prev) return;
+    const timer = setTimeout(() => setSlide((cur) => ({ ...cur, prev: null })), 320);
+    return () => clearTimeout(timer);
+  }, [slide]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  function onKeyDown(event: React.KeyboardEvent) {
+    if (event.key === "Escape" && open) {
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
+    if ((event.key === "ArrowDown" || event.key === "ArrowUp") && open) {
+      event.preventDefault();
+      const items = Array.from(rootRef.current?.querySelectorAll<HTMLButtonElement>("[data-disc-option]") ?? []);
+      const at = items.indexOf(document.activeElement as HTMLButtonElement);
+      const next = event.key === "ArrowDown" ? at + 1 : at - 1;
+      items[(next + items.length) % items.length]?.focus();
+    }
+  }
+
+  const ink = "text-[oklch(0.22_0.012_28)]";
+  return (
+    // Wrapper rezerviše mesto trigera (24px); bela kartica iznad njega raste naniže i sadrži i trigger i listu.
+    <div ref={rootRef} className={`relative ml-auto h-6 min-w-0 flex-1 sm:flex-none max-w-[10.5rem] sm:w-[10.5rem]`} onKeyDown={onKeyDown}>
+      <div
+        className={`absolute right-0 top-0 z-30 w-full overflow-hidden rounded bg-white transition-shadow duration-200 ease-out ${ink} ${open ? "shadow-lg shadow-black/25" : ""}`}
+      >
+        <button
+          ref={triggerRef}
+          type="button"
+          aria-haspopup="true"
+          aria-expanded={open}
+          aria-label={label}
+          onClick={() => { if (!open) onOpen(); setOpen((o) => !o); }}
+          className="flex h-6 w-full items-center gap-1.5 pl-1 pr-1.5 text-left text-xs font-semibold"
+        >
+          <span className="grid h-4 min-w-0 flex-1 overflow-hidden">
+            {prevTab && (
+              <span key={`out-${prevTab.code}`} aria-hidden="true" className="tf-slide-out col-start-1 row-start-1 flex min-w-0 items-center gap-1.5">
+                <TriggerLabel tab={prevTab} en={en} />
+              </span>
+            )}
+            <span key={current.code} className={`${prevTab ? "tf-slide-in " : ""}col-start-1 row-start-1 flex min-w-0 items-center gap-1.5`}>
+              <TriggerLabel tab={current} en={en} />
+            </span>
+          </span>
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className={`shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}>
+            <path d="M1.5 3.5 5 7l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        {/* grid-rows 0fr→1fr = animirana visina; invisible kad je zatvoreno da opcije ne primaju fokus */}
+        <div className={`tf-menu grid transition-[grid-template-rows,visibility] duration-200 ease-out ${open ? "grid-rows-[1fr]" : "invisible grid-rows-[0fr]"}`}>
+          <ul className="min-h-0 overflow-hidden border-t border-black/10">
+            {tabs.map((tab) => {
+              const selected = tab.code === active;
+              return (
+                <li key={tab.code}>
+                  <button
+                    type="button"
+                    data-disc-option
+                    aria-current={selected ? "true" : undefined}
+                    onClick={() => { onSelect(tab.code); setOpen(false); triggerRef.current?.focus(); }}
+                    className={`flex min-h-10 w-full items-center gap-2 py-1.5 pl-1 pr-2 text-left text-xs transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] ${selected ? "bg-black/[0.05] font-semibold" : "font-medium"}`}
+                  >
+                    <span className="inline-flex h-4 min-w-9 shrink-0 items-center justify-center rounded-[3px] bg-[var(--brand-primary)] px-1 font-[family-name:var(--font-jetbrains-mono)] text-[11px] font-bold leading-none text-white">{tab.code}</span>
+                    <span className="min-w-0 flex-1 leading-tight">{en ? tab.en : tab.sr}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TopFormaClient({ initialData }: TopFormaClientProps) {
-  const [activeTab, setActiveTab] = useState<keyof typeof initialData>("ARM");
+  // Samo discipline sa podacima; ako nijedna nema, prikaži sve (empty state).
+  const populated = TABS.filter((tab) => (initialData[tab.code]?.length ?? 0) > 0);
+  const tabs = populated.length ? populated : TABS;
+  const [activeTab, setActiveTab] = useState<TabCode>(tabs[0].code);
   const [userSelected, setUserSelected] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -102,11 +219,11 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
   useEffect(() => {
     if (!rotating) return;
     const interval = setInterval(() => {
-      setActiveTab((cur) => TABS[(TABS.findIndex((tab) => tab.code === cur) + 1) % TABS.length].code);
+      setActiveTab((cur) => tabs[(tabs.findIndex((tab) => tab.code === cur) + 1) % tabs.length].code);
       setSwitched(true);
     }, ROTATE_INTERVAL);
     return () => clearInterval(interval);
-  }, [rotating]);
+  }, [rotating, tabs]);
 
   const holdRotation = useCallback(() => {
     setUserSelected(true);
@@ -116,19 +233,18 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
 
   useEffect(() => () => { if (resumeTimer.current) clearTimeout(resumeTimer.current); }, []);
 
-  function handleTabClick(code: keyof typeof initialData) {
+  function handleTabClick(code: TabCode) {
     setActiveTab(code);
     setSwitched(true);
     holdRotation();
   }
 
   const rows = initialData[activeTab];
-  const isAP = activeTab.startsWith("AP");
-  const activeIndex = TABS.findIndex((t) => t.code === activeTab);
+  const isAP = activeTab !== "ARM" && activeTab !== "ARW"; // celobrojni skorovi
 
   return (
     <div
-      className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden"
+      className="rounded-xl border border-[var(--border)] bg-[var(--bg)]"
       onPointerEnter={(event) => { if (event.pointerType === "mouse") setHovered(true); }}
       onPointerLeave={() => setHovered(false)}
       onFocusCapture={() => setFocused(true)}
@@ -136,41 +252,16 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
       onTouchStart={holdRotation}
     >
       {/* Widget Header with Tabs */}
-      <div className="relative flex flex-nowrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--brand-primary)] px-4 py-1.5">
+      <div className="relative flex flex-nowrap items-center justify-between gap-2 rounded-t-[calc(0.75rem-1px)] border-b border-[var(--border)] bg-[var(--brand-primary)] px-4 py-1.5">
         <h3 className="flex min-h-8 shrink-0 items-center gap-1.5 leading-none font-[family-name:var(--font-barlow-condensed)] text-base font-bold uppercase tracking-wider text-white sm:text-lg">
           <span>Top</span>
           <span className="inline-flex h-6 items-center gap-1 rounded bg-white/95 px-1.5" style={{ "--ink": "oklch(0.22 0.012 28)" } as React.CSSProperties}>
-            <FormaScoreMark size="md" />
+            <FormaScoreMark size="md" style={{ display: "inline-block", transform: "translateY(-2px)" }} />
             <FormaScoreInfo locale={locale} buttonMarginTop={0} />
           </span>
         </h3>
 
-        <div className="relative flex shrink-0 overflow-hidden rounded bg-[rgba(255,255,255,0.1)]" role="group" aria-label={t("topForm")}>
-          {/* Sliding pill indicator */}
-          <span
-            aria-hidden="true"
-            className="tf-pill pointer-events-none absolute top-0 bottom-0 left-0 rounded"
-            style={{
-              width: `${100 / TABS.length}%`,
-              background: "#fff",
-              transform: `translateX(${activeIndex * 100}%)`,
-            }}
-          />
-          {TABS.map((tab) => {
-            const active = activeTab === tab.code;
-            return (
-              <button
-                key={tab.code}
-                onClick={() => handleTabClick(tab.code)}
-                aria-pressed={active}
-                className="relative z-10 min-h-8 flex-1 rounded px-2.5 py-1 text-xs font-semibold uppercase transition-[color,transform] duration-150 active:scale-95"
-                style={{ color: active ? "var(--brand-primary)" : "rgba(255,255,255,0.85)" }}
-              >
-                {tab.code}
-              </button>
-            );
-          })}
-        </div>
+        <DisciplineSelect tabs={tabs} active={activeTab} locale={locale} label={t("topForm")} onSelect={handleTabClick} onOpen={holdRotation} />
 
         {rotating && (
           <span
@@ -259,7 +350,7 @@ export function TopFormaClient({ initialData }: TopFormaClientProps) {
       </div>
       </>}
       
-      <div className="bg-[var(--surface)] px-4 py-2.5 text-right border-t border-[var(--border)]">
+      <div className="rounded-b-[calc(0.75rem-1px)] bg-[var(--surface)] px-4 py-2.5 text-right border-t border-[var(--border)]">
         <Link
           href={scopedHref(`/rangiranje?disciplina=${activeTab.toLowerCase()}`)}
           className="text-xs font-semibold text-[var(--brand-primary)] hover:underline"

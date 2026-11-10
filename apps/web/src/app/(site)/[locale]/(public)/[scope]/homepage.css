@@ -36,7 +36,10 @@
   transform-origin: left;
   animation: tf-progress var(--tf-interval, 9000ms) linear 1 forwards;
 }
-.tf-pill { transition: transform 250ms var(--ease-out); }
+.tf-slide-in { animation: tf-slide-in 280ms var(--ease-out); }
+.tf-slide-out { animation: tf-slide-out 280ms var(--ease-out) forwards; }
+@keyframes tf-slide-in { from { transform: translateY(100%); opacity: 0; } }
+@keyframes tf-slide-out { to { transform: translateY(-100%); opacity: 0; } }
 
 /* Sparkline se crta sleva udesno; tačka sa najnovijom vrednošću se pojavi na kraju. */
 @keyframes sp-draw {
@@ -79,7 +82,9 @@
 @media (prefers-reduced-motion: reduce) {
   .tf-row { animation: none; }
   .tf-progress { animation: none; display: none; }
-  .tf-pill { transition: none; }
+  .tf-slide-in { animation: none; }
+  .tf-menu { transition: none; }
+  .tf-slide-out { display: none; }
   .sp-draw-line, .sp-draw-dot { animation: none; }
   /* Obaveštenje o novom rezultatu ostaje, ali bez trajanja koje se oseća kao kretanje: kratak, miran fade. */
   .live-flash { animation-duration: 600ms; }

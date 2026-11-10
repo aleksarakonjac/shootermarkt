@@ -47,7 +47,7 @@ export function FormaScoreInfo({ locale = "sr", inverted = false, heading, descr
       const panel = panelRef.current;
       if (!button || !panel) return;
       const margin = 8;
-      const width = Math.min(288, window.innerWidth - margin * 2);
+      const width = Math.min(window.innerWidth >= 768 ? 380 : 340, window.innerWidth - margin * 2);
       const height = panel.offsetHeight;
       const rect = button.getBoundingClientRect();
       const preferredTop = placement === "top" ? rect.top - height - margin : rect.bottom + margin;
@@ -94,15 +94,15 @@ export function FormaScoreInfo({ locale = "sr", inverted = false, heading, descr
       i
     </button>
 
-    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "fixed", left: panelPosition?.left ?? 0, top: panelPosition?.top ?? 0, width: panelPosition?.width ?? "min(288px, calc(100vw - 1rem))", visibility: panelPosition ? "visible" : "hidden", zIndex: "var(--z-tooltip)", fontFamily: "var(--font-sans)", textTransform: "none" }}>
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3">
-        {heading && <p className="mb-2" style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>{heading}</p>}
-        {!heading && <div className="mb-2 flex items-baseline gap-1">
-          <span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>{locale === "en" ? "What is" : "Šta je"}</span>
-          <FormaScoreMark size="md" />
-          <span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--ink)" }}>?</span>
+    {open && <div ref={panelRef} id={panelId} role="tooltip" style={{ position: "fixed", left: panelPosition?.left ?? 0, top: panelPosition?.top ?? 0, width: panelPosition?.width ?? "min(340px, calc(100vw - 1rem))", visibility: panelPosition ? "visible" : "hidden", zIndex: "var(--z-tooltip)", fontFamily: "var(--font-sans)", textTransform: "none" }}>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] px-5 py-4">
+        {heading && <p className="mb-2.5 text-base font-medium text-[var(--ink)]">{heading}</p>}
+        {!heading && <div className="mb-2.5 flex items-baseline gap-1">
+          <span className="text-base font-medium text-[var(--ink)]">{locale === "en" ? "What is" : "Šta je"}</span>
+          <FormaScoreMark size="base" />
+          <span className="text-base font-medium text-[var(--ink)]">?</span>
         </div>}
-        <p style={{ color: "var(--ink)", fontSize: "0.8rem", lineHeight: 1.6, fontWeight: 400 }}>{description ?? INFO[locale] ?? INFO.sr}</p>
+        <p className="text-[0.9375rem] font-normal leading-[1.65] text-[var(--ink)]">{description ?? INFO[locale] ?? INFO.sr}</p>
       </div>
     </div>}
   </div>;
