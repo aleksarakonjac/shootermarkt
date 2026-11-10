@@ -348,7 +348,7 @@ export default async function CompetitionPage({ params }: Props) {
       </nav>
 
       {/* ── Competition header ────────────────────────────────────── */}
-      <div className="mb-8 pb-8 border-b border-[var(--border)]">
+      <div className="mb-6 pb-5 border-b border-[var(--border)]">
         {/* Badges */}
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <span
@@ -363,7 +363,7 @@ export default async function CompetitionPage({ params }: Props) {
         <h1
           className="font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] mb-3"
           style={{
-            fontSize: "clamp(1.5rem, 4vw, 2.5rem)",
+            fontSize: "clamp(1.875rem, 5vw, 2.5rem)",
             letterSpacing: "-0.02em",
             lineHeight: 1.1,
           }}
@@ -371,45 +371,45 @@ export default async function CompetitionPage({ params }: Props) {
           {compName}
         </h1>
 
-        {/* Meta row */}
-        <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-[var(--muted)]">
-          <span className="flex items-center gap-1.5">
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="shrink-0 text-[var(--subtle)]" aria-hidden="true">
+        {/* Identity row: date + place identify a recurring event, so they lead */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[var(--ink)]">
+          <span className="flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 14 14" fill="none" className="shrink-0 text-[var(--muted)]" aria-hidden="true">
               <rect x="1" y="2" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
               <path d="M1 6h12M4.5 1v2M9.5 1v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
             </svg>
-            <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs translate-y-0.5">
+            <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm sm:text-base font-semibold">
               {dateDisplay}
             </span>
           </span>
           {(comp.location || comp.country) && (
-            <span className="flex items-center gap-1.5">
-              <svg width="12" height="13" viewBox="0 0 12 14" fill="none" className="shrink-0 text-[var(--subtle)]" aria-hidden="true">
+            <span className="flex items-center gap-2 text-sm sm:text-base font-semibold">
+              <svg width="16" height="18" viewBox="0 0 12 14" fill="none" className="shrink-0 text-[var(--muted)]" aria-hidden="true">
                 <path d="M6 1C3.79 1 2 2.79 2 5c0 3.25 4 8 4 8s4-4.75 4-8c0-2.21-1.79-4-4-4z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
                 <circle cx="6" cy="5" r="1.3" fill="currentColor"/>
               </svg>
               {comp.country?.code2 && (
                 <span
                   className={`fi fi-${comp.country.code2.toLowerCase()} shrink-0`}
-                  style={{ width: "16px", height: "11px", borderRadius: "2px", display: "inline-block" }}
+                  style={{ width: "22px", height: "15px", borderRadius: "2px", display: "inline-block" }}
                 />
               )}
               {countryName && <span>{countryName}</span>}
               {countryName && comp.location && <span className="text-[var(--subtle)]">·</span>}
-              {comp.location && <span className={countryName ? "text-[var(--subtle)]" : undefined}>{(locale === "en" ? (comp.locationEn ?? comp.location) : (comp.locationSr ?? comp.location))}</span>}
-            </span>
-          )}
-          {groups.length > 0 && (
-            <span className="flex items-center gap-1.5">
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="shrink-0 text-[var(--subtle)]" aria-hidden="true">
-                <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
-                <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.3"/>
-                <circle cx="7" cy="7" r="0.7" fill="currentColor"/>
-              </svg>
-              <span>{[...new Set(groups.map((g) => g.code))].join(" · ")}</span>
+              {comp.location && <span className={countryName ? "text-[var(--muted)]" : undefined}>{(locale === "en" ? (comp.locationEn ?? comp.location) : (comp.locationSr ?? comp.location))}</span>}
             </span>
           )}
         </div>
+        {groups.length > 0 && (
+          <div className="mt-2.5 flex items-center gap-1.5 text-sm text-[var(--muted)]">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="shrink-0 text-[var(--subtle)]" aria-hidden="true">
+              <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
+              <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.3"/>
+              <circle cx="7" cy="7" r="0.7" fill="currentColor"/>
+            </svg>
+            <span>{[...new Set(groups.map((g) => g.code))].join(" · ")}</span>
+          </div>
+        )}
       </div>
 
       {/* ── Schedule ─────────────────────────────────────────────── */}

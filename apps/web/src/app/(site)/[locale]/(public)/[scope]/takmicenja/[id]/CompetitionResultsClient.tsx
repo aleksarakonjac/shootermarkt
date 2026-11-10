@@ -452,7 +452,7 @@ function CompetitionOverview({
               <span className="text-sm font-semibold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
               {g.label && <span className="text-xs font-semibold text-[var(--brand-primary)] truncate">{g.label}</span>}
               {g.date && !byDay && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">{ddmm(g.date)}</span>}
-              <span className="text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
+              <span className="text-[0.8rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
                 {totalShooters} {locale === "en" ? "athletes" : "strelaca"}
               </span>
             </div>
@@ -511,7 +511,7 @@ function CompetitionOverview({
               {g.code}
             </span>
             <span className="text-sm font-semibold text-[var(--ink)]">{disciplineName(g.code, locale)}{g.category !== "senior" && ` · ${CATEGORY_LABEL[g.category]}`}</span>
-            <span className="text-[0.7rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
+            <span className="text-[0.8rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
               {g.teams.length} {locale === "en" ? "teams" : "timova"}
             </span>
           </div>
@@ -588,7 +588,7 @@ function CompetitionOverview({
                 {isDay ? (
                   <>
                     <span className={section === today ? "text-[var(--brand-primary)]" : undefined}>{section === today ? todayLabel : weekday(section, locale)}</span>
-                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.75rem] font-medium text-[var(--muted)] translate-y-px">{ddmm(section)}</span>
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.875rem] font-medium text-[var(--muted)] translate-y-px">{ddmm(section)}</span>
                   </>
                 ) : (
                   <span>{familyLabels[section as Family]}</span>
@@ -810,10 +810,10 @@ function CompetitionDetail({
 
     return (
       <div>
-        <div className="flex items-start gap-3 mb-5">
+        <div className="flex items-center gap-3 mb-5">
           <button
             onClick={onBack}
-            className="mt-0.5 shrink-0 flex items-center gap-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] transition-colors duration-150"
+            className="shrink-0 flex items-center gap-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] transition-colors duration-150"
             aria-label={locale === "en" ? "Back to disciplines" : "Nazad na pregled disciplina"}
           >
             <ChevronLeft size={14} aria-hidden="true" />
@@ -985,10 +985,10 @@ function CompetitionDetail({
   return (
     <div>
       {/* ── Detail header ───────────────────────────────────────── */}
-      <div className="flex items-start gap-3 mb-5">
+      <div className="flex items-center gap-3 mb-5">
         <button
           onClick={onBack}
-          className="mt-0.5 shrink-0 flex items-center gap-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] transition-colors duration-150"
+          className="shrink-0 flex items-center gap-1 text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] transition-colors duration-150"
           aria-label={locale === "en" ? "Back to disciplines" : "Nazad na pregled disciplina"}
         >
           <ChevronLeft size={14} aria-hidden="true" />
