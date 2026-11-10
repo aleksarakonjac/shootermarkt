@@ -20,6 +20,12 @@ const mergeRemarks = (col: typeof results.remarkDetails | typeof mixedTeamResult
 
 export const maxDuration = 30;
 
+// Poslednji upisani snapshot po takmičenju. Cron radi svakog minuta, a SIUS se između dva poziva
+// često ne promeni: isti snapshot → bez upsert-a, preračuna forme i revalidacije stranica
+// (koja bi sledećem posetiocu pokrenula novi render + ISR write).
+// ponytail: memorija po instanci (Fluid je reuse-uje između poziva); nova instanca jednom upiše sve.
+const lastWritten = new Map<string, string>();
+
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
   if (!secret || secret !== process.env.CRON_SECRET) {
@@ -250,6 +256,9 @@ async function processCompetition(
 
   console.log(`[cron] comp ${competitionId}: ${rows.length} rows fetched, ${dedupedRows.length} after dedup`);
   if (dedupedRows.length === 0) return mixedUpserted;
+  const snapshotKey = `results:${competitionId}`;
+  const snapshot = JSON.stringify(dedupedRows);
+  if (lastWritten.get(snapshotKey) === snapshot) return mixedUpserted;
 
   // Qual rows: upsert by (shooter, comp, disc, cat)
   const qualRows = dedupedRows.filter((r) => r.elimRound == null);
@@ -303,6 +312,7 @@ async function processCompetition(
   }
 
   await recomputeFormaCache([...new Set(dedupedRows.map((row) => row.shooterId))]);
+  lastWritten.set(snapshotKey, snapshot);
 
   return dedupedRows.length + mixedUpserted;
 }
@@ -397,6 +407,9 @@ async function processMixedTeamSlots(
   }
   const dedupedRows = [...merged.values()];
   if (dedupedRows.length === 0) return 0;
+  const snapshotKey = `mixed:${competitionId}`;
+  const snapshot = JSON.stringify(dedupedRows);
+  if (lastWritten.get(snapshotKey) === snapshot) return 0;
 
   await db
     .insert(mixedTeamResults)
@@ -423,6 +436,7 @@ async function processMixedTeamSlots(
         remarkDetails: mergeRemarks(mixedTeamResults.remarkDetails),
       },
     });
+  lastWritten.set(snapshotKey, snapshot);
 
   return dedupedRows.length;
 }
