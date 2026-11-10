@@ -207,8 +207,10 @@ export default async function CompetitionPage({ params }: Props) {
   const scheduledDate = new Map<string, string>();
   for (const slot of scheduleRows) {
     const key = `${slot.disciplineCode}|${slot.category}`;
-    const day = slot.startTime.toISOString().slice(0, 10);
-    if (slot.stage.startsWith("qual") && (!scheduledDate.has(key) || day < scheduledDate.get(key)!)) scheduledDate.set(key, day);
+    // dan u vremenskoj zoni takmičenja (UTC bi pomerio kasne/rane termine)
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: comp?.timezone ?? "UTC", year: "numeric", month: "2-digit", day: "2-digit" }).format(slot.startTime);
+    // prvi termin koji nije finale: kvalifikacije ili eliminacije (eliminacije mogu biti dan pre kvalifikacija)
+    if (slot.stage !== "final" && (!scheduledDate.has(key) || day < scheduledDate.get(key)!)) scheduledDate.set(key, day);
   }
 
   // Group mixed team results by discipline code

@@ -413,8 +413,11 @@ function CompetitionOverview({
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const nav = navRef.current;
-    const chip = today && nav?.querySelector<HTMLElement>(`a[href="#sekcija-${today}"]`);
-    if (!nav || !chip) return;
+    if (!nav || !today) return;
+    // Danas, a ako takmičenje nema današnji dan: prvi sledeći, inače poslednji dan
+    const days = Array.from(nav.querySelectorAll<HTMLElement>('a[href^="#sekcija-2"]'));
+    const chip = days.find((a) => a.getAttribute("href")!.slice(9) >= today) ?? days[days.length - 1];
+    if (!chip) return;
     const navRect = nav.getBoundingClientRect();
     const chipRect = chip.getBoundingClientRect();
     nav.scrollLeft += chipRect.left - navRect.left - (navRect.width - chipRect.width) / 2;
