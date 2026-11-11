@@ -17,7 +17,7 @@ describe("OlympicQuotaNote", () => {
   it("names the country in Serbian", () => {
     params.locale = "sr";
     render(<OlympicQuotaNote name="Ana Kovac" noc="SRB" />);
-    expect(screen.getByText(/Kvota države Srbija osvojena:/)).toBeInTheDocument();
+    expect(screen.getByText(/Osvojena kvota za Srbiju:/)).toBeInTheDocument();
   });
 
   it("keeps AIN as the code in both languages", () => {
@@ -27,6 +27,6 @@ describe("OlympicQuotaNote", () => {
     unmount();
     params.locale = "sr";
     render(<OlympicQuotaNote name="Ivan Petrov" noc="AIN" />);
-    expect(screen.getByText(/Kvota države AIN osvojena:/)).toBeInTheDocument();
+    expect(screen.getByText(/Osvojena kvota za AIN:/)).toBeInTheDocument();
   });
 });

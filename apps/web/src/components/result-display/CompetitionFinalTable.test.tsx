@@ -34,7 +34,7 @@ describe("CompetitionFinalTable — olympic quota marker", () => {
 
     fireEvent.click(marks[0]);
     expect(screen.getByRole("dialog")).toHaveTextContent("Osvojena kvota za LA 2028");
-    expect(screen.getByRole("dialog")).toHaveTextContent("Kvota države Srbija osvojena: Ana KOVAC (ARW)");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Osvojena kvota za Srbiju: Ana KOVAC (ARW)");
   });
 
   it("closing the quota message does not expand the row underneath", () => {

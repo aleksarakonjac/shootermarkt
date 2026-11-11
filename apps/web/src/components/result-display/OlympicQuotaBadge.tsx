@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { useUiLocale } from "@/hooks/use-ui-locale";
 import { NOC_LIST } from "@shootermarkt/db/noc-list";
+import { serbianAccusative } from "@/lib/sr-accusative";
 import { RemarkModal } from "./RemarkBadge";
 
-/** Naziv države na jeziku sajta (Intl iz alpha-2 koda). Neutralni sportisti (AIN) i šifre bez države ostaju kod NOC-a. */
+/** Naziv države na jeziku sajta (Intl iz alpha-2 koda; na srpskom u akuzativu). Neutralni sportisti (AIN) i šifre bez države ostaju kod NOC-a. */
 function countryName(noc: string | null, en: boolean): string | null {
   const entry = NOC_LIST.find((n) => n.noc === noc);
   if (!entry || noc === "AIN") return noc;
   try {
-    return new Intl.DisplayNames([en ? "en" : "sr-Latn"], { type: "region" }).of(entry.alpha2) ?? noc;
+    const name = new Intl.DisplayNames([en ? "en" : "sr-Latn"], { type: "region" }).of(entry.alpha2);
+    // Srpski: akuzativ ("kvota za Srbiju"); engleski: bez zagrade u nazivu ("Myanmar (Burma)").
+    return name ? (en ? name.replace(/\s*\(.*\)\s*$/, "") : serbianAccusative(name)) : noc;
   } catch {
     return noc;
   }
@@ -49,7 +52,7 @@ function QuotaMessage({ name, noc, disciplineCode }: QuotaProps) {
         <p className="text-base font-semibold text-[var(--ink)]">{en ? "Quota place won for LA 2028" : "Osvojena kvota za LA 2028"}</p>
       </div>
       <p className="text-sm text-[var(--ink)]">
-        {country && (en ? `Quota for ${country} won by ` : `Kvota države ${country} osvojena: `)}
+        {country && (en ? `Quota for ${country} won by ` : `Osvojena kvota za ${country}: `)}
         <span className="font-semibold">{name}</span>
         {disciplineCode && <span className="text-[var(--muted)]"> ({disciplineCode})</span>}
       </p>
