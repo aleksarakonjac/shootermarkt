@@ -5,14 +5,14 @@ import { useUiLocale } from "@/hooks/use-ui-locale";
 import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { RemarkModal } from "./RemarkBadge";
 
-/** Naziv države na jeziku sajta (Intl iz alpha-2 koda); za neutralne/istorijske NOC-ove naziv iz liste. */
+/** Naziv države na jeziku sajta (Intl iz alpha-2 koda). Neutralni sportisti (AIN) i šifre bez države ostaju kod NOC-a. */
 function countryName(noc: string | null, en: boolean): string | null {
   const entry = NOC_LIST.find((n) => n.noc === noc);
-  if (!entry) return noc;
+  if (!entry || noc === "AIN") return noc;
   try {
-    return new Intl.DisplayNames([en ? "en" : "sr-Latn"], { type: "region" }).of(entry.alpha2) ?? entry.name;
+    return new Intl.DisplayNames([en ? "en" : "sr-Latn"], { type: "region" }).of(entry.alpha2) ?? noc;
   } catch {
-    return entry.name;
+    return noc;
   }
 }
 
@@ -92,9 +92,13 @@ export function OlympicQuotaBadge(props: QuotaProps) {
         <OlympicRings />
       </button>
       {open && (
-        <RemarkModal label={en ? "Olympic quota" : "Olimpijska kvota"} onClose={() => setOpen(false)}>
-          <QuotaMessage {...props} />
-        </RemarkModal>
+        // Modal je portal, ali React događaji i dalje idu kroz stablo komponenti: bez ovoga klik na "✕" ili pozadinu
+        // stiže do klika reda tabele i otvara/zatvara red.
+        <span onClick={(e) => e.stopPropagation()}>
+          <RemarkModal label={en ? "Olympic quota" : "Olimpijska kvota"} onClose={() => setOpen(false)}>
+            <QuotaMessage {...props} />
+          </RemarkModal>
+        </span>
       )}
     </>
   );

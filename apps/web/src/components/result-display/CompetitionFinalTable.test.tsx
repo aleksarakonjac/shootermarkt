@@ -36,4 +36,16 @@ describe("CompetitionFinalTable — olympic quota marker", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("Osvojena kvota za LA 2028");
     expect(screen.getByRole("dialog")).toHaveTextContent("Kvota države Srbija osvojena: Ana KOVAC (ARW)");
   });
+
+  it("closing the quota message does not expand the row underneath", () => {
+    const [detail] = buildSiusFinalDetails("R3PM", [{ series: [104.3, 104.9] }]);
+    const row = { ...base, id: 3, finalRank: 1, finalDetail: detail, olympicQuota: true } as FinalResultRow;
+    render(<CompetitionFinalTable results={[row]} competitionLevel="world" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /kvota za LA 2028/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Zatvori" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Prikaži sve serije")).toBeInTheDocument();
+  });
 });

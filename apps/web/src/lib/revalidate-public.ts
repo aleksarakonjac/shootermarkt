@@ -9,7 +9,7 @@ const PUBLIC_ROOT = "/(site)/[locale]/(public)/[scope]";
 // Sve javne stranice osim profila strelaca. Profila ima ~39k × 2 jezika × 2 scope-a × 2 stranice (profil + rezultati):
 // brisanje celog keša posle svake admin izmene teralo je crawlere da ponovo renderuju ~300k stranica
 // (Active CPU + ISR writes, oba su probila Hobby limit). Profili se brišu ciljano — revalidateShooterPages.
-const PUBLIC_PAGES = ["", "/rangiranje", "/head-to-head", "/kalendar", "/vesti", "/vesti/[slug]", "/strelci", "/takmicenja", "/takmicenja/[id]"];
+const PUBLIC_PAGES = ["", "/rangiranje", "/head-to-head", "/kalendar", "/vesti", "/vesti/[slug]", "/strelci", "/takmicenja", "/takmicenja/[id]", "/olimpijske-igre"];
 
 /** Javni sajt bez profila strelaca. Za admin, import i CMS upise. */
 export function revalidatePublicSite() {

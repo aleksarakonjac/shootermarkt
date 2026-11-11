@@ -53,6 +53,12 @@ function buildNav(t: TFn): NavGroup[] {
       items: [],
     },
     {
+      key: "olimpijske-igre",
+      label: t("olympicQuotas"),
+      directHref: "/olimpijske-igre",
+      items: [],
+    },
+    {
       key: "vesti",
       label: t("news"),
       directHref: "/vesti",

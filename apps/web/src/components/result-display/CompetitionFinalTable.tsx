@@ -277,9 +277,10 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
   const gridTemplateColumns = (panelOpen ? [PANEL_RANK_W, "minmax(100px, 1fr)", ...inlineColumns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W] : [RANK_W, AVATAR_W, NAME_W, clubColW, ...inlineColumns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W])
     .filter(Boolean)
     .join(" ");
+  // Kolona remarka (28px) drži i dug remark ("WR WRJ") u dva reda; kolona imena ostaje 110px+.
   const mobileGridTemplateColumns = hasDetail
-    ? "40px 36px minmax(110px, 1fr) fit-content(80px) 60px 14px 18px"
-    : "40px 36px minmax(110px, 1fr) fit-content(80px) 60px 14px";
+    ? "36px 36px minmax(110px, 1fr) fit-content(80px) 56px 28px 16px"
+    : "36px 36px minmax(110px, 1fr) fit-content(80px) 56px 28px";
 
   const allExpanded = hasDetail && sorted.every((r) => expanded.has(r.id));
   const toggleAll = () => {
@@ -452,7 +453,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                   </div>
 
                   {/* Club / NOC */}
-                  <div className={`${cellCls} ${panelOpen ? "hidden" : ""} max-sm:!px-1.5 min-w-0 group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
+                  <div className={`${cellCls} ${panelOpen ? "hidden" : ""} max-sm:!px-1 min-w-0 group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
                     <div className="flex items-center gap-2 min-w-0">
                       {r.nationality && (() => {
                         const noc = displayNoc(r.nationality);
@@ -491,20 +492,20 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                   ))}
 
                   {/* Final total */}
-                  <div className={`${cellCls} sm:!pr-1 ${panelOpen ? "sticky right-8 z-[1] bg-[var(--bg)] shadow-[-8px_0_8px_-8px_oklch(0_0_0/0.18)]" : ""} max-sm:!px-1.5 justify-end font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
+                  <div className={`${cellCls} sm:!pr-1 ${panelOpen ? "sticky right-8 z-[1] bg-[var(--bg)] shadow-[-8px_0_8px_-8px_oklch(0_0_0/0.18)]" : ""} max-sm:!px-1 justify-end font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
                     {r.finalTotal ?? (
                       <span className="font-normal text-[var(--subtle)]">—</span>
                     )}
                   </div>
 
                   {/* Remark — e.g. SO (shoot-off decided who's out of the final) */}
-                  <div className={`${narrowCellCls} ${panelOpen ? "sticky right-0 z-[1] bg-[var(--bg)]" : ""} justify-center group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
+                  <div className={`${narrowCellCls} max-sm:!px-0.5 max-sm:[&_button]:text-[0.7rem] max-sm:[&_button]:leading-[1.1] max-sm:[&_button]:whitespace-normal max-sm:[&_button]:shrink max-sm:[&_button]:min-w-0 max-sm:[&_button]:max-w-full max-sm:[&_button]:text-center max-sm:[&_span]:text-[0.7rem] max-sm:[&_span]:leading-[1.1] max-sm:[&_span]:whitespace-normal max-sm:[&_span]:shrink max-sm:[&_span]:min-w-0 max-sm:[&_span]:max-w-full max-sm:[&_span]:text-center ${panelOpen ? "sticky right-0 z-[1] bg-[var(--bg)]" : ""} justify-center group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
                     {remarkLabel(r.remark, r.remarkDetails, remarkCodes[idx]) && <RemarkBadge remark={remarkLabel(r.remark, r.remarkDetails, remarkCodes[idx])!} code={remarkCodes[idx]} details={r.remarkDetails} label={`${r.lastName} ${r.firstName}`} className="" />}
                   </div>
 
                   {/* Expand chevron — mobile only, rightmost column; desktop shows series inline instead */}
                   {hasDetail && (
-                    <div className={`${narrowCellCls} justify-center group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))] sm:hidden`}>
+                    <div className={`${narrowCellCls} max-sm:!px-0.5 justify-center group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))] sm:hidden`}>
                       <ChevronIcon open={isExpanded} />
                     </div>
                   )}
