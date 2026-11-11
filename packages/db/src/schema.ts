@@ -14,6 +14,7 @@ import {
   index,
   uniqueIndex,
   unique,
+  check,
   customType,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
@@ -615,7 +616,12 @@ export const olympicQuotaAllocations = pgTable(
   "olympic_quota_allocations",
   {
     id: serial("id").primaryKey(),
-    competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+    // NULL za izvore koji nisu takmičenje (rang-lista, domaćin, univerzalnost).
+    competitionId: integer("competition_id").references(() => competitions.id, { onDelete: "cascade" }),
+    // 'competition' | 'ranking' | 'host' | 'universality'
+    kind: varchar("kind", { length: 14 }).notNull().default("competition"),
+    // Datum izvora kad nije takmičenje (npr. zaključenje olimpijske rang-liste 2028-05-01).
+    date: varchar("date", { length: 10 }),
     disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
     games: varchar("games", { length: 10 }).notNull().default("LA2028"),
     places: smallint("places").notNull(),
@@ -623,7 +629,11 @@ export const olympicQuotaAllocations = pgTable(
     // kad kvotu uzimaju sledeći u kvalifikacijama jer svi iznad već imaju kvote).
     basis: varchar("basis", { length: 14 }).notNull().default("final"),
   },
-  (t) => [uniqueIndex("olympic_quota_allocations_unique").on(t.competitionId, t.disciplineId, t.games)]
+  (t) => [
+    uniqueIndex("olympic_quota_allocations_unique").on(t.competitionId, t.disciplineId, t.games),
+    // Izvori bez takmičenja: jedan red po vrsti i disciplini.
+    uniqueIndex("olympic_quota_allocations_kind_unique").on(t.kind, t.disciplineId, t.games).where(sql`${t.competitionId} IS NULL`),
+  ]
 );
 
 // ── Olympic Quotas ────────────────────────────────────────────────────────────
@@ -635,11 +645,18 @@ export const olympicQuotas = pgTable(
   "olympic_quotas",
   {
     id: serial("id").primaryKey(),
-    resultId: integer("result_id").notNull().references(() => results.id, { onDelete: "cascade" }),
+    // Kvota osvojena nastupom: rezultat. Kvota bez nastupa (rang-lista, domaćin, univerzalnost): izvor + strelac, ručno.
+    resultId: integer("result_id").references(() => results.id, { onDelete: "cascade" }),
+    allocationId: integer("allocation_id").references(() => olympicQuotaAllocations.id, { onDelete: "cascade" }),
+    shooterId: integer("shooter_id").references(() => shooters.id),
     games: varchar("games", { length: 10 }).notNull().default("LA2028"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("olympic_quotas_result_games_unique").on(t.resultId, t.games)]
+  (t) => [
+    uniqueIndex("olympic_quotas_result_games_unique").on(t.resultId, t.games),
+    uniqueIndex("olympic_quotas_allocation_shooter_unique").on(t.allocationId, t.shooterId),
+    check("olympic_quotas_source_check", sql`${t.resultId} IS NOT NULL OR (${t.allocationId} IS NOT NULL AND ${t.shooterId} IS NOT NULL)`),
+  ]
 );
 
 // ── Mixed Team Results ────────────────────────────────────────────────────────

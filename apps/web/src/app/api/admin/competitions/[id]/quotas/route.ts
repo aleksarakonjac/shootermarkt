@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
 import { disciplines, olympicQuotaAllocations, olympicQuotas, results, shooters } from "@shootermarkt/db/schema";
-import { and, asc, eq, isNotNull, or } from "drizzle-orm";
+import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
 import { assignQuotas, MAX_QUOTAS_PER_NOC, type QuotaBasis } from "@/lib/quota-assign";
 import { requireAdmin } from "@/lib/admin-auth";
 import { revalidatesPublicSite } from "@/lib/revalidate-public";
+import { GAMES, NON_OLYMPIC, allHoldings, holdingsFor } from "@/lib/quota-holdings";
 
-const GAMES = "LA2028";
 
-// Discipline koje ne dele olimpijske kvote: ESC solo, 300m, ležeći (prone), standardni pištolj, 25m sportski (SPM) i slobodni pištolj (FPM) za muškarce, mešoviti timovi, juniorske varijante.
-const NON_OLYMPIC = /^(SOLO|R3P300|RPR|STR300|STP|SPM|FPM|ARMT|APMT|R3J)/;
 
 const isBasis = (v: unknown): v is QuotaBasis => v === "final" || v === "qualification";
 const rankColumn = (basis: QuotaBasis) => (basis === "qualification" ? results.qualRank : results.finalRank);
@@ -46,31 +44,6 @@ const parseId = async (ctx: Ctx) => {
   const id = parseInt((await ctx.params).id);
   return isNaN(id) ? null : id;
 };
-
-/** Sve dodeljene kvote (nekoliko stotina redova najviše) sa strelcem, državom, disciplinom i takmičenjem. */
-async function allHoldings() {
-  return db
-    .select({ shooterId: results.shooterId, competitionId: results.competitionId, disciplineId: results.disciplineId, noc: shooters.nationality })
-    .from(olympicQuotas)
-    .innerJoin(results, eq(results.id, olympicQuotas.resultId))
-    .innerJoin(shooters, eq(shooters.id, results.shooterId))
-    .where(eq(olympicQuotas.games, GAMES));
-}
-type Holding = Awaited<ReturnType<typeof allHoldings>>[number];
-
-/** Stanje kvota jedne discipline na jednom takmičenju, izvedeno iz svih dodeljenih kvota. */
-function holdingsFor(all: Holding[], compId: number, disciplineId: number) {
-  const inDiscipline = all.filter((h) => h.disciplineId === disciplineId);
-  const nocCounts = new Map<string, number>();
-  for (const h of inDiscipline) if (h.noc) nocCounts.set(h.noc, (nocCounts.get(h.noc) ?? 0) + 1);
-  const here = inDiscipline.filter((h) => h.competitionId === compId);
-  return {
-    shooterIds: new Set(all.map((h) => h.shooterId)),
-    nocCounts,
-    eventNocs: new Set(here.flatMap((h) => (h.noc ? [h.noc] : []))),
-    used: here.length,
-  };
-}
 
 async function getAllocation(compId: number, disciplineId: number) {
   const [row] = await db
