@@ -10,6 +10,7 @@ import {
   mixedTeamResults,
   competitionSchedule,
   shooterFormaCache,
+  olympicQuotas,
 } from "@shootermarkt/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -71,7 +72,7 @@ export default async function CompetitionPage({ params }: Props) {
   if (!/^\d{1,9}$/.test(id)) notFound();
 
   // Svi upiti zavise samo od compId — idu paralelno umesto jedan za drugim.
-  const [comp, compResults, mixedResults, scheduleRows] = await Promise.all([
+  const [comp, compResults, mixedResults, scheduleRows, quotaRows] = await Promise.all([
     getCompetition(compId),
 
     // Fetch all results for this competition
@@ -167,8 +168,16 @@ export default async function CompetitionPage({ params }: Props) {
       .innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id))
       .where(eq(competitionSchedule.competitionId, compId))
       .orderBy(asc(competitionSchedule.startTime)),
+
+    // Rezultati kojima je osvojena olimpijska kvota (LA 2028)
+    db
+      .select({ resultId: olympicQuotas.resultId })
+      .from(olympicQuotas)
+      .innerJoin(results, eq(results.id, olympicQuotas.resultId))
+      .where(eq(results.competitionId, compId)),
   ]);
   if (!comp) notFound();
+  const quotaResultIds = new Set(quotaRows.map((q) => q.resultId));
 
   // SIUS import often can't match international athletes to an ISSF id at commit time —
   // fall back to a name+nation match against our shooters table so the profile link still works.
@@ -313,6 +322,7 @@ export default async function CompetitionPage({ params }: Props) {
       finalDetail: r.finalDetail,
       finalRemark: r.finalRemark,
       remarkDetails: r.remarkDetails,
+      olympicQuota: quotaResultIds.has(r.id),
     });
   }
 

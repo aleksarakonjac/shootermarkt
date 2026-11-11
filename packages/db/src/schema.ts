@@ -607,6 +607,38 @@ export const results = pgTable(
   ]
 );
 
+// ── Olympic Quota Allocations ─────────────────────────────────────────────────
+// Koliko kvota određeno takmičenje deli u određenoj disciplini (npr. SP Doha 2026: 3 po disciplini).
+// Izvor: zvanični ISSF dokument o kvalifikacionom sistemu. Admin ne može označiti više kvota od `places`.
+
+export const olympicQuotaAllocations = pgTable(
+  "olympic_quota_allocations",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+    disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
+    games: varchar("games", { length: 10 }).notNull().default("LA2028"),
+    places: smallint("places").notNull(),
+  },
+  (t) => [uniqueIndex("olympic_quota_allocations_unique").on(t.competitionId, t.disciplineId, t.games)]
+);
+
+// ── Olympic Quotas ────────────────────────────────────────────────────────────
+// Rezultat (finale) kojim je osvojena olimpijska kvota. Kvota formalno pripada NOC-u, ne strelcu —
+// red samo beleži nastup koji ju je doneo. Admin unosi ručno; zvanična lista je ISSF-ova.
+// `games` omogućava kasnije cikluse (npr. 'BRI2032') bez nove tabele.
+
+export const olympicQuotas = pgTable(
+  "olympic_quotas",
+  {
+    id: serial("id").primaryKey(),
+    resultId: integer("result_id").notNull().references(() => results.id, { onDelete: "cascade" }),
+    games: varchar("games", { length: 10 }).notNull().default("LA2028"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("olympic_quotas_result_games_unique").on(t.resultId, t.games)]
+);
+
 // ── Mixed Team Results ────────────────────────────────────────────────────────
 
 export const mixedTeamResults = pgTable(

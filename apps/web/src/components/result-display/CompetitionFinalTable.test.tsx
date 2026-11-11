@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { buildSiusFinalDetails } from "@/lib/final-detail";
@@ -19,5 +19,21 @@ describe("CompetitionFinalTable — 3P final in progress (SIUS position totals)"
     for (const header of ["Klečeći", "Ležeći"]) expect(screen.getAllByText(header).length).toBeGreaterThan(0);
     expect(screen.getAllByText("104.3").length).toBeGreaterThan(0);
     expect(screen.getAllByText("209.2").length).toBeGreaterThan(0);
+  });
+});
+
+describe("CompetitionFinalTable — olympic quota marker", () => {
+  const base = { shooterId: 1, firstName: "Ana", lastName: "KOVAC", birthYear: null, avatarUrl: null, clubDisplay: "SRB", nationality: "SRB", finalTotal: "250.0", finalDetail: null, remark: null, disciplineCode: "ARW" };
+  const rows = [{ ...base, id: 1, finalRank: 1, olympicQuota: true }, { ...base, id: 2, shooterId: 2, lastName: "NOVAK", finalRank: 2 }] as FinalResultRow[];
+
+  it("marks only the quota winner, and a click explains the quota", () => {
+    render(<CompetitionFinalTable results={rows} competitionLevel="world" />);
+
+    const marks = screen.getAllByRole("button", { name: /kvota za LA 2028/i });
+    expect(marks).toHaveLength(1);
+
+    fireEvent.click(marks[0]);
+    expect(screen.getByRole("dialog")).toHaveTextContent("Osvojena kvota za LA 2028");
+    expect(screen.getByRole("dialog")).toHaveTextContent("SRB, ARW");
   });
 });

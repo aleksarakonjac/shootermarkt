@@ -60,7 +60,7 @@ export function assignRemarkCodes(remarks: Array<string | null | undefined>): Ar
   return remarks.map((remark) => (remark && remark.length > 3 ? `A${++n}` : null));
 }
 
-function RemarkModal({ label, onClose, children }: { label?: string; onClose: () => void; children: React.ReactNode }) {
+export function RemarkModal({ label, onClose, children }: { label?: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();

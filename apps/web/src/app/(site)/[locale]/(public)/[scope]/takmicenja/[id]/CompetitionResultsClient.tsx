@@ -71,6 +71,7 @@ export type DisciplineGroup = {
       finalDetail: FinalDetail | null;
       finalRemark: string | null;
       remarkDetails: RemarkDetails | null;
+      olympicQuota?: boolean;
     }>;
   }>;
 };
@@ -964,6 +965,7 @@ function CompetitionDetail({
         disciplineCode: group?.code ?? "",
         remark: r.finalRemark,
         remarkDetails: r.remarkDetails?.final ?? null,
+        olympicQuota: r.olympicQuota,
       })) ?? [];
   // Stara finala (samo zbirovi serija) → isti prikaz kao live: Klečeći/Ležeći… ili S1, S2, 11–12…
   const finalRowsByRank = [...rawFinalRows].sort((a, b) => (a.finalRank ?? Infinity) - (b.finalRank ?? Infinity));

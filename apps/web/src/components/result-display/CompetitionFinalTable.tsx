@@ -13,6 +13,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SheetGapLine, SheetInsights } from "./SheetInsights";
 import { SheetCells, SheetFrame, SheetPanelSlot, SheetPerson, SheetPersonDesktop, SheetSection, SheetStats } from "./ResultSheet";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { OlympicQuotaBadge } from "./OlympicQuotaBadge";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
@@ -31,6 +32,8 @@ export type FinalResultRow = {
   disciplineCode?: string;
   remark: string | null | undefined;
   remarkDetails?: StageRemarks | null;
+  /** Finalom osvojena olimpijska kvota (LA 2028). */
+  olympicQuota?: boolean;
 };
 
 interface Props {
@@ -444,6 +447,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                         </>
                       )}
                     </Link>
+                    {r.olympicQuota && <OlympicQuotaBadge name={`${r.firstName} ${r.lastName}`} noc={r.nationality ? displayNoc(r.nationality) : null} disciplineCode={r.disciplineCode} />}
                   </div>
 
                   {/* Club / NOC */}
