@@ -9,6 +9,7 @@ import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity,
 import { ensureCompetitionEvent, matchEventName } from "@/lib/competition-events";
 import { buildIssfFinalDetails, buildSiusFinalDetails } from "@/lib/final-detail";
 import { recomputeFormaCache } from "@/lib/forma-cache";
+import { FORMA_DISCIPLINE_CODES } from "@/lib/forma";
 import { loadShooterRoster, type ShooterRoster } from "@/lib/live-shooter-roster";
 import { stageRemarks } from "@/lib/sius-merge";
 import { isUnrankedRemark } from "@shootermarkt/db/pdf-import-types";
@@ -25,6 +26,8 @@ export const maxDuration = 30;
 // (koja bi sledećem posetiocu pokrenula novi render + ISR write).
 // ponytail: memorija po instanci (Fluid je reuse-uje između poziva); nova instanca jednom upiše sve.
 const lastWritten = new Map<string, string>();
+// Kvalifikacije za koje je forma već preračunata posle kraja meča (ista ponytail granica: nova instanca preračuna jednom više).
+const formaFinalized = new Set<string>();
 
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
@@ -45,6 +48,7 @@ export async function GET(req: NextRequest) {
       siusId: competitions.siusId,
       disciplineCode: disciplines.code,
       startTime: competitionSchedule.startTime,
+      endTime: competitionSchedule.endTime,
     })
     .from(competitionSchedule)
     .innerJoin(competitions, eq(competitionSchedule.competitionId, competitions.id))
@@ -104,7 +108,7 @@ export async function GET(req: NextRequest) {
 
 async function processCompetition(
   competitionId: number,
-  slots: Array<{ competitionId: number; disciplineId: number; stage: string; category: AgeCategory; issfId: string | null; siusId: string | null; disciplineCode: string; startTime: Date }>,
+  slots: Array<{ competitionId: number; disciplineId: number; stage: string; category: AgeCategory; issfId: string | null; siusId: string | null; disciplineCode: string; startTime: Date; endTime: Date | null }>,
   roster: ShooterRoster,
 ): Promise<number> {
   const { siusId, issfId } = slots[0];
@@ -256,9 +260,36 @@ async function processCompetition(
 
   console.log(`[cron] comp ${competitionId}: ${rows.length} rows fetched, ${dedupedRows.length} after dedup`);
   if (dedupedRows.length === 0) return mixedUpserted;
+
+  // Forma zavisi samo od kvalifikacija: tokom meča se skor menja svakog minuta, a elim/finale ne ulaze u formu.
+  // Zato se forma računa tek kad se kvalifikacija završi — jednom za sve strelce tog meča, a posle samo za izmenjene (ispravke).
+  const now = new Date();
+  const qualKey = (r: { disciplineId: number; category?: AgeCategory; competitionEventId?: number | null }) => `${r.disciplineId}|${r.category}|${r.competitionEventId ?? ""}`;
+  const isQualRow = (r: typeof results.$inferInsert) => r.qualTotal !== undefined; // samo qual grana postavlja qualTotal
+  const finishedQual = new Set(
+    dedupedRows.filter(isQualRow).map(qualKey).filter((key) => {
+      const [disciplineId, category] = key.split("|");
+      const qualSlots = slots.filter((s) => s.stage.startsWith("qual") && String(s.disciplineId) === disciplineId && s.category === category);
+      // SPW precizna+brza: gotovo tek kad se završi poslednji termin.
+      // ponytail: bez end_time (neki SPW/RFP termini) uzima start + 3h; cron prozor ionako traje 4h.
+      // Discipline bez forme (300m, ležeći, standard…) nikad ne pokreću preračun.
+      return qualSlots.length > 0 && FORMA_DISCIPLINE_CODES.includes(qualSlots[0].disciplineCode) && qualSlots.every((s) => (s.endTime ?? new Date(s.startTime.getTime() + 3 * 3600_000)) <= now);
+    }),
+  );
+  const formaIds = new Set<number>();
+  const newlyFinalized = [...finishedQual].map((key) => `${competitionId}|${key}`).filter((k) => !formaFinalized.has(k));
+  for (const r of dedupedRows) if (isQualRow(r) && newlyFinalized.includes(`${competitionId}|${qualKey(r)}`)) formaIds.add(r.shooterId);
+  const recomputeForma = async () => {
+    if (formaIds.size) await recomputeFormaCache([...formaIds]);
+    for (const k of newlyFinalized) formaFinalized.add(k);
+  };
+
   const snapshotKey = `results:${competitionId}`;
   const snapshot = JSON.stringify(dedupedRows);
-  if (lastWritten.get(snapshotKey) === snapshot) return mixedUpserted;
+  if (lastWritten.get(snapshotKey) === snapshot) {
+    await recomputeForma();
+    return mixedUpserted;
+  }
 
   // Qual rows: upsert by (shooter, comp, disc, cat)
   const qualRows = dedupedRows.filter((r) => r.elimRound == null);
@@ -291,8 +322,11 @@ async function processCompetition(
         },
       })
       // Trigger z_suppress_redundant_updates preskače nepromenjene redove → RETURNING vraća samo izmenjene.
-      .returning({ shooterId: results.shooterId });
-    for (const r of written) changed.add(r.shooterId);
+      .returning({ shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, competitionEventId: results.competitionEventId });
+    for (const r of written) {
+      changed.add(r.shooterId);
+      if (finishedQual.has(qualKey(r))) formaIds.add(r.shooterId);
+    }
   }
 
   // Elim rows: upsert by (shooter, comp, disc, cat) — elim_round stored on the existing row
@@ -317,7 +351,7 @@ async function processCompetition(
     for (const r of written) changed.add(r.shooterId);
   }
 
-  if (changed.size) await recomputeFormaCache([...changed]);
+  await recomputeForma();
   lastWritten.set(snapshotKey, snapshot);
 
   return changed.size + mixedUpserted;
