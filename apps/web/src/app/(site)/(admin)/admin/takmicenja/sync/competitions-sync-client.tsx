@@ -173,7 +173,8 @@ function RowStatus({ e, hasSourceTag, linked }: { e: SyncEvent; hasSourceTag: bo
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
+// Do 2 godine unapred (ISSF kalendar objavljuje buduće godine) i 5 unazad.
+const YEARS = Array.from({ length: 8 }, (_, i) => CURRENT_YEAR + 2 - i);
 
 const ALL_SOURCES = ["issf", "sss", "esc"] as const;
 type Source = typeof ALL_SOURCES[number];

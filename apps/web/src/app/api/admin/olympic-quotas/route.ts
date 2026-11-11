@@ -18,7 +18,6 @@ export type ManualAllocation = {
   code: string;
   name: string;
   places: number;
-  date: string | null;
   holders: Array<{ quotaId: number; shooterId: number; firstName: string; lastName: string; nationality: string | null }>;
 };
 
@@ -36,7 +35,6 @@ export async function GET() {
         kind: olympicQuotaAllocations.kind,
         disciplineId: olympicQuotaAllocations.disciplineId,
         places: olympicQuotaAllocations.places,
-        date: olympicQuotaAllocations.date,
         code: disciplines.code,
         name: disciplines.name,
       })
@@ -76,15 +74,14 @@ async function awardedCount(allocationId: number) {
   return rows.length;
 }
 
-/** Postavlja broj mesta izvora u disciplini ({ kind, disciplineId, places, date? }). Broj ne može ispod već dodeljenih. */
+/** Postavlja broj mesta izvora u disciplini ({ kind, disciplineId, places }). Broj ne može ispod već dodeljenih. */
 export const PUT = revalidatesPublicSite(async (req: NextRequest) => {
   const denied = await requireAdmin();
   if (denied) return denied;
 
-  const body = (await req.json().catch(() => null)) as { kind?: unknown; disciplineId?: unknown; places?: unknown; date?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as { kind?: unknown; disciplineId?: unknown; places?: unknown } | null;
   const disciplineId = Number(body?.disciplineId);
   const places = Number(body?.places);
-  const date = typeof body?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : null;
   if (!isKind(body?.kind) || !Number.isInteger(disciplineId) || !Number.isInteger(places) || places < 1 || places > 50) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
@@ -95,9 +92,9 @@ export const PUT = revalidatesPublicSite(async (req: NextRequest) => {
   if (existing) {
     const used = await awardedCount(existing.id);
     if (places < used) return NextResponse.json({ error: `Već je dodeljeno ${used} kvota` }, { status: 409 });
-    await db.update(olympicQuotaAllocations).set({ places, date }).where(eq(olympicQuotaAllocations.id, existing.id));
+    await db.update(olympicQuotaAllocations).set({ places }).where(eq(olympicQuotaAllocations.id, existing.id));
   } else {
-    await db.insert(olympicQuotaAllocations).values({ competitionId: null, kind: body.kind, disciplineId, games: GAMES, places, date });
+    await db.insert(olympicQuotaAllocations).values({ competitionId: null, kind: body.kind, disciplineId, games: GAMES, places });
   }
   return NextResponse.json({ ok: true });
 });

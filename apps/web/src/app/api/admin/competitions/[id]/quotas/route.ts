@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
-import { disciplines, olympicQuotaAllocations, olympicQuotas, results, shooters } from "@shootermarkt/db/schema";
+import { competitions, disciplines, olympicQuotaAllocations, olympicQuotas, results, shooters } from "@shootermarkt/db/schema";
 import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
-import { assignQuotas, MAX_QUOTAS_PER_NOC, type QuotaBasis } from "@/lib/quota-assign";
+import { assignQuotas, candidateRank, MAX_QUOTAS_PER_NOC, maxQuotasPerNocAtEvent, meetsMqs, MQS, rankInfo, type QuotaBasis } from "@/lib/quota-assign";
 import { requireAdmin } from "@/lib/admin-auth";
 import { revalidatesPublicSite } from "@/lib/revalidate-public";
 import { GAMES, NON_OLYMPIC, allHoldings, holdingsFor } from "@/lib/quota-holdings";
@@ -10,7 +10,6 @@ import { GAMES, NON_OLYMPIC, allHoldings, holdingsFor } from "@/lib/quota-holdin
 
 
 const isBasis = (v: unknown): v is QuotaBasis => v === "final" || v === "qualification";
-const rankColumn = (basis: QuotaBasis) => (basis === "qualification" ? results.qualRank : results.finalRank);
 
 export type QuotaCandidateRow = {
   resultId: number;
@@ -18,7 +17,12 @@ export type QuotaCandidateRow = {
   lastName: string;
   nationality: string | null;
   rank: number | null;
+  /** Plasman je iz kvalifikacija (strelac nije bio u finalu, ili je osnova deobe kvalifikacije). */
+  fromQualification: boolean;
   quota: boolean;
+  /** Rezultat kvalifikacija i da li je ispod MQS-a discipline (takav rezultat ne daje kvotu). */
+  qualTotal: number | null;
+  belowMqs: boolean;
 };
 
 export type QuotaDiscipline = {
@@ -44,6 +48,12 @@ const parseId = async (ctx: Ctx) => {
   const id = parseInt((await ctx.params).id);
   return isNaN(id) ? null : id;
 };
+
+/** Najviše kvota jedne države u disciplini na ovom takmičenju: 1 na svetskom prvenstvu, 2 na ostalim. */
+async function maxPerEventFor(compId: number) {
+  const [c] = await db.select({ level: competitions.level, eventType: competitions.eventType }).from(competitions).where(eq(competitions.id, compId));
+  return c ? maxQuotasPerNocAtEvent(c.level, c.eventType) : 1;
+}
 
 async function getAllocation(compId: number, disciplineId: number) {
   const [row] = await db
@@ -77,6 +87,7 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
         nationality: shooters.nationality,
         finalRank: results.finalRank,
         qualRank: results.qualRank,
+        qualTotal: results.qualTotal,
         quotaId: olympicQuotas.id,
       })
       .from(results)
@@ -101,9 +112,14 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
         basis,
         candidates: rows
           .filter((r) => r.disciplineId === a.disciplineId)
-          .map((r) => ({ resultId: r.resultId, firstName: r.firstName, lastName: r.lastName, nationality: r.nationality, rank: basis === "qualification" ? r.qualRank : r.finalRank, quota: r.quotaId != null }))
+          .map((r) => {
+            const qualTotal = r.qualTotal != null ? Number(r.qualTotal) : null;
+            const info = rankInfo(basis, r.finalRank, r.qualRank);
+            return { resultId: r.resultId, firstName: r.firstName, lastName: r.lastName, nationality: r.nationality, rank: info.rank, fromQualification: info.stage === "qualification", quota: r.quotaId != null, qualTotal, belowMqs: !meetsMqs(a.code, qualTotal) };
+          })
           .filter((r) => r.rank != null || r.quota)
-          .sort((x, y) => (x.rank ?? Infinity) - (y.rank ?? Infinity)),
+          // Finalisti po plasmanu u finalu, pa ostali po plasmanu u kvalifikacijama.
+          .sort((x, y) => Number(x.fromQualification) - Number(y.fromQualification) || (x.rank ?? Infinity) - (y.rank ?? Infinity)),
         nocCounts: nocCounts.sort((x, y) => y.count - x.count || x.noc.localeCompare(y.noc)),
       };
     }),
@@ -128,9 +144,10 @@ export const POST = revalidatesPublicSite(async (req: NextRequest, ctx: Ctx) => 
   }
 
   const [row] = await db
-    .select({ disciplineId: results.disciplineId, shooterId: results.shooterId, noc: shooters.nationality })
+    .select({ disciplineId: results.disciplineId, shooterId: results.shooterId, noc: shooters.nationality, qualTotal: results.qualTotal, code: disciplines.code })
     .from(results)
     .innerJoin(shooters, eq(shooters.id, results.shooterId))
+    .innerJoin(disciplines, eq(disciplines.id, results.disciplineId))
     .where(and(eq(results.id, resultId), eq(results.competitionId, compId)));
   if (!row) return NextResponse.json({ error: "Rezultat ne pripada ovom takmičenju" }, { status: 404 });
 
@@ -142,11 +159,13 @@ export const POST = revalidatesPublicSite(async (req: NextRequest, ctx: Ctx) => 
   const allocation = await getAllocation(compId, row.disciplineId);
   if (!allocation) return NextResponse.json({ error: "Ova disciplina nema alokaciju kvota na ovom takmičenju" }, { status: 409 });
 
+  const maxPerEvent = await maxPerEventFor(compId);
   const h = holdingsFor(await allHoldings(), compId, row.disciplineId);
   const conflict =
     h.used >= allocation.places ? `Sva mesta (${allocation.places}) su već dodeljena`
+    : !meetsMqs(row.code, row.qualTotal != null ? Number(row.qualTotal) : null) ? `Rezultat kvalifikacija (${row.qualTotal ?? "nema"}) je ispod MQS-a ${MQS[row.code]}`
     : h.shooterIds.has(row.shooterId) ? "Strelac već ima olimpijsku kvotu"
-    : row.noc && h.eventNocs.has(row.noc) ? `${row.noc} već ima kvotu u ovoj disciplini na ovom takmičenju`
+    : row.noc && (h.eventNocCounts.get(row.noc) ?? 0) >= maxPerEvent ? `${row.noc} već ima ${maxPerEvent} ${maxPerEvent === 1 ? "kvotu" : "kvote"} u ovoj disciplini na ovom takmičenju`
     : row.noc && (h.nocCounts.get(row.noc) ?? 0) >= MAX_QUOTAS_PER_NOC ? `${row.noc} već ima ${MAX_QUOTAS_PER_NOC} kvote u ovoj disciplini`
     : null;
   if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
@@ -214,28 +233,34 @@ export const PATCH = revalidatesPublicSite(async (_req: NextRequest, ctx: Ctx) =
   if (compId == null) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
   const allocations = await db
-    .select({ disciplineId: olympicQuotaAllocations.disciplineId, places: olympicQuotaAllocations.places, basis: olympicQuotaAllocations.basis })
+    .select({ disciplineId: olympicQuotaAllocations.disciplineId, places: olympicQuotaAllocations.places, basis: olympicQuotaAllocations.basis, code: disciplines.code })
     .from(olympicQuotaAllocations)
     .innerJoin(disciplines, eq(disciplines.id, olympicQuotaAllocations.disciplineId))
     .where(and(eq(olympicQuotaAllocations.competitionId, compId), eq(olympicQuotaAllocations.games, GAMES)))
     .orderBy(asc(disciplines.code));
 
+  const maxPerEvent = await maxPerEventFor(compId);
   let assigned = 0;
   for (const a of allocations) {
     // Stanje se čita ponovo po disciplini: strelac koji je upravo dobio kvotu ne sme dobiti drugu.
     const h = holdingsFor(await allHoldings(), compId, a.disciplineId);
-    const rank = rankColumn(a.basis as QuotaBasis);
     const rows = await db
-      .select({ resultId: results.id, shooterId: results.shooterId, nationality: shooters.nationality, rank })
+      .select({ resultId: results.id, shooterId: results.shooterId, nationality: shooters.nationality, finalRank: results.finalRank, qualRank: results.qualRank, qualTotal: results.qualTotal })
       .from(results)
       .innerJoin(shooters, eq(shooters.id, results.shooterId))
-      .where(and(eq(results.competitionId, compId), eq(results.disciplineId, a.disciplineId), eq(results.category, "senior"), isNotNull(rank)));
+      .where(and(eq(results.competitionId, compId), eq(results.disciplineId, a.disciplineId), eq(results.category, "senior"), or(isNotNull(results.finalRank), isNotNull(results.qualRank))));
 
     const won = assignQuotas({
       places: a.places - h.used,
-      candidates: rows.map((r) => ({ ...r, rank: r.rank! })),
+      // Prvo finalisti, pa (ako ostane slobodnih mesta) najbolje plasirani iz kvalifikacija.
+      candidates: rows.flatMap((r) => {
+        const rank = candidateRank(a.basis as QuotaBasis, r.finalRank, r.qualRank);
+        return rank == null ? [] : [{ resultId: r.resultId, shooterId: r.shooterId, nationality: r.nationality, rank, qualTotal: r.qualTotal != null ? Number(r.qualTotal) : null }];
+      }),
+      minScore: MQS[a.code],
       shooterIds: h.shooterIds,
-      eventNocs: h.eventNocs,
+      eventNocCounts: h.eventNocCounts,
+      maxPerNocAtEvent: maxPerEvent,
       nocCounts: h.nocCounts,
     });
     if (won.length) {

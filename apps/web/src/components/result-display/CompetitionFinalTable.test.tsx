@@ -49,3 +49,22 @@ describe("CompetitionFinalTable — olympic quota marker", () => {
     expect(screen.getByText("Prikaži sve serije")).toBeInTheDocument();
   });
 });
+
+describe("CompetitionFinalTable — rapid fire pistol final", () => {
+  it("shows hits as whole numbers with series labels, even when the source marked the scoring as decimal", () => {
+    const row = {
+      id: 1, shooterId: 1, firstName: "Vladyslav", lastName: "MEDUSHEVSKYI", birthYear: null, avatarUrl: null, clubDisplay: "UKR", nationality: "UKR",
+      finalTotal: "28.0", finalRank: 1, remark: null, disciplineCode: "RFPM",
+      finalDetail: { format: "bulletin", scoring: "decimal", cumulative: [3, 8, 12], ranks: [1, 1, 1] },
+    } as FinalResultRow;
+    render(<CompetitionFinalTable results={[row]} competitionLevel="continental" />);
+
+    expect(screen.getAllByText("Hitovi").length).toBeGreaterThan(0);
+    // ISSF prikaz: Faza 1 (prve dve serije) i Faza 2 – eliminacija, umesto zasebnih naslova serija.
+    expect(screen.getAllByText("Faza 1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Faza 2 – eliminacija").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("28").length).toBeGreaterThan(0);
+    expect(screen.queryByText("28.0")).not.toBeInTheDocument();
+  });
+});
+

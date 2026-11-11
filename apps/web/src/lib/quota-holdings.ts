@@ -35,7 +35,7 @@ export function holdingsFor(all: Holding[], compId: number, disciplineId: number
   return {
     shooterIds: new Set(all.map((h) => h.shooterId)),
     nocCounts,
-    eventNocs: new Set(here.flatMap((h) => (h.noc ? [h.noc] : []))),
+    eventNocCounts: here.reduce((m, h) => (h.noc ? m.set(h.noc, (m.get(h.noc) ?? 0) + 1) : m), new Map<string, number>()),
     used: here.length,
   };
 }

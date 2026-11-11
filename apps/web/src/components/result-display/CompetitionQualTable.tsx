@@ -33,6 +33,11 @@ const FLAT_GROUPS_BY_DISCIPLINE: Array<{ match: (code: string) => boolean; group
     { label: "Ležeći", count: 2 },
     { label: "Stojeći", count: 2 },
   ] },
+  // RFPM (ISSF prikaz): dve faze po tri serije (8 s, 6 s, 4 s).
+  { match: (code) => code === "RFPM", groups: [
+    { label: "Faza 1 · 8–6–4 s", count: 3 },
+    { label: "Faza 2 · 8–6–4 s", count: 3 },
+  ] },
   { match: isSportPistolCode, groups: [
     { label: "Precizno", count: 3 },
     { label: "Brzo", count: 3 },
@@ -41,6 +46,7 @@ const FLAT_GROUPS_BY_DISCIPLINE: Array<{ match: (code: string) => boolean; group
 
 const FLAT_LABELS_EN: Record<string, string> = {
   "Klečeći": "Kneeling", "Ležeći": "Prone", "Stojeći": "Standing", "Precizno": "Precision", "Brzo": "Rapid",
+  "Faza 1 · 8–6–4 s": "Stage 1 · 8–6–4 s", "Faza 2 · 8–6–4 s": "Stage 2 · 8–6–4 s",
 };
 
 function getFlatGroups(code: string | undefined, en = false): FlatGroup[] | null {

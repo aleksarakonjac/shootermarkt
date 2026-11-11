@@ -1,9 +1,12 @@
 import { db } from "@shootermarkt/db";
-import { competitions, disciplines, olympicQuotaAllocations, olympicQuotas, results, shooters } from "@shootermarkt/db/schema";
+import { competitions, countries, disciplines, olympicQuotaAllocations, olympicQuotas, results, shooters } from "@shootermarkt/db/schema";
 import { DISCIPLINE_DISPLAY_ORDER } from "@shootermarkt/db/discipline-names";
 import { asc, eq, isNotNull } from "drizzle-orm";
+import { candidateRank, rankInfo } from "@/lib/quota-assign";
 
 const GAMES = "LA2028";
+/** Olimpijska rang-lista se zaključuje 1. maja 2028. (poznato unapred, ne unosi se). */
+const RANKING_CLOSES = "2028-05-01";
 
 /** Odakle dolaze kvote: takmičenje (osvaja se nastupom) ili izvori koji se dodeljuju ručno kad se saznaju. */
 export type QuotaSourceKind = "competition" | "ranking" | "host" | "universality";
@@ -14,8 +17,10 @@ export type QuotaHolder = {
   lastName: string;
   nationality: string | null;
   avatarUrl: string | null;
-  /** Plasman po kom je kvota osvojena (u finalu ili u kvalifikacijama, prema osnovi deobe); null kod ručno dodeljenih. */
+  /** Plasman po kom je kvota osvojena (u finalu ili u kvalifikacijama); null kod ručno dodeljenih. */
   rank: number | null;
+  /** Da li je `rank` plasman u finalu ili u kvalifikacijama (strelac van finala dobija kvotu po kvalifikacijama). */
+  rankStage: "final" | "qualification";
 };
 
 /** Jedno mesto (kvota) jednog izvora u jednoj disciplini; `holder` je null dok nije dodeljeno. */
@@ -32,6 +37,8 @@ export type QuotaSource = {
   location: string | null;
   locationSr: string | null;
   locationEn: string | null;
+  /** ISO alpha-2 države održavanja (zastava), kad je poznata. */
+  countryCode2: string | null;
   level: string | null;
   /** Početak takmičenja ili datum izvora (npr. zaključenje rang-liste); null za domaćina i univerzalna mesta. */
   date: string | null;
@@ -42,7 +49,13 @@ export type QuotaSource = {
 export type QuotaDiscipline = { code: string; name: string; places: number; awarded: number; slots: QuotaSlot[] };
 
 /** Kvote jedne države: ukupno i po disciplini. */
-export type QuotaCountry = { nationality: string; total: number; byDiscipline: Array<{ code: string; count: number }> };
+export type QuotaCountry = {
+  nationality: string;
+  total: number;
+  byDiscipline: Array<{ code: string; count: number }>;
+  /** Strelci koji su osvojili kvotu za državu, sa disciplinom i izvorom. */
+  holders: Array<{ holder: QuotaHolder; code: string; slot: QuotaSlot }>;
+};
 
 export type QuotaOverview = {
   /** Takmičenja po datumu, pa rang-lista, domaćin, univerzalnost. */
@@ -62,7 +75,6 @@ export async function getQuotaOverview(): Promise<QuotaOverview> {
       .select({
         allocationId: olympicQuotaAllocations.id,
         kind: olympicQuotaAllocations.kind,
-        allocationDate: olympicQuotaAllocations.date,
         competitionId: competitions.id,
         name: competitions.name,
         nameSr: competitions.nameSr,
@@ -72,6 +84,7 @@ export async function getQuotaOverview(): Promise<QuotaOverview> {
         location: competitions.location,
         locationSr: competitions.locationSr,
         locationEn: competitions.locationEn,
+        countryCode2: countries.code2,
         level: competitions.level,
         code: disciplines.code,
         disciplineName: disciplines.name,
@@ -81,6 +94,7 @@ export async function getQuotaOverview(): Promise<QuotaOverview> {
       })
       .from(olympicQuotaAllocations)
       .leftJoin(competitions, eq(competitions.id, olympicQuotaAllocations.competitionId))
+      .leftJoin(countries, eq(countries.id, competitions.countryId))
       .innerJoin(disciplines, eq(disciplines.id, olympicQuotaAllocations.disciplineId))
       .where(eq(olympicQuotaAllocations.games, GAMES))
       .orderBy(asc(competitions.date)),
@@ -126,12 +140,15 @@ export async function getQuotaOverview(): Promise<QuotaOverview> {
       holders = resultAwards
         .filter((w) => w.competitionId === a.competitionId && w.disciplineId === a.disciplineId)
         // Najbolje plasirani prvi (plasman u finalu, pa u kvalifikacijama).
-        .sort((x, y) => (x.rank ?? x.qualRank ?? Infinity) - (y.rank ?? y.qualRank ?? Infinity))
-        .map((h) => ({ shooterId: h.shooterId, firstName: h.firstName, lastName: h.lastName, nationality: h.nationality, avatarUrl: h.avatarUrl, rank: (basis === "qualification" ? h.qualRank : h.rank) ?? null }));
+        .sort((x, y) => (candidateRank(basis, x.rank, x.qualRank) ?? Infinity) - (candidateRank(basis, y.rank, y.qualRank) ?? Infinity))
+        .map((h) => {
+          const info = rankInfo(basis, h.rank, h.qualRank);
+          return { shooterId: h.shooterId, firstName: h.firstName, lastName: h.lastName, nationality: h.nationality, avatarUrl: h.avatarUrl, rank: info.rank, rankStage: info.stage };
+        });
     } else {
       holders = manualAwards
         .filter((w) => w.allocationId === a.allocationId)
-        .map((h) => ({ shooterId: h.shooterId, firstName: h.firstName, lastName: h.lastName, nationality: h.nationality, avatarUrl: h.avatarUrl, rank: null }));
+        .map((h) => ({ shooterId: h.shooterId, firstName: h.firstName, lastName: h.lastName, nationality: h.nationality, avatarUrl: h.avatarUrl, rank: null, rankStage: "final" as const }));
     }
     const awarded = Math.min(holders.length, a.places);
     const slots: QuotaSlot[] = Array.from({ length: a.places }, (_, i) => ({ sourceKey: key, basis, holder: holders[i] ?? null }));
@@ -140,12 +157,11 @@ export async function getQuotaOverview(): Promise<QuotaOverview> {
       sourceMap.set(key, {
         key, kind, competitionId: a.competitionId,
         name: a.name, nameSr: a.nameSr, nameEn: a.nameEn,
-        location: a.location, locationSr: a.locationSr, locationEn: a.locationEn,
-        level: a.level, date: a.date ?? a.allocationDate, dateEnd: a.dateEnd, disciplines: [],
+        location: a.location, locationSr: a.locationSr, locationEn: a.locationEn, countryCode2: a.countryCode2,
+        level: a.level, date: kind === "ranking" ? RANKING_CLOSES : a.date, dateEnd: a.dateEnd, disciplines: [],
       });
     }
     const src = sourceMap.get(key)!;
-    if (!src.date && a.allocationDate) src.date = a.allocationDate;
     src.disciplines.push({ code: a.code, places: a.places, awarded, slots });
 
     const d = disciplineMap.get(a.code) ?? { code: a.code, name: a.disciplineName, places: 0, awarded: 0, slots: [] };
@@ -167,8 +183,9 @@ export async function getQuotaOverview(): Promise<QuotaOverview> {
     for (const slot of d.slots) {
       const nat = slot.holder?.nationality;
       if (!nat) continue;
-      const c = countryMap.get(nat) ?? { nationality: nat, total: 0, byDiscipline: [] };
+      const c = countryMap.get(nat) ?? { nationality: nat, total: 0, byDiscipline: [], holders: [] };
       c.total++;
+      c.holders.push({ holder: slot.holder!, code: d.code, slot });
       const entry = c.byDiscipline.find((x) => x.code === d.code);
       if (entry) entry.count++;
       else c.byDiscipline.push({ code: d.code, count: 1 });

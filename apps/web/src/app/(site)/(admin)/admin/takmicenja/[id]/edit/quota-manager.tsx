@@ -56,7 +56,7 @@ export function QuotaManager({ competitionId }: { competitionId: number }) {
     <div className="mt-8 rounded-xl border border-[var(--border)] p-5">
       <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Olimpijske kvote · LA 2028</h2>
       <p className="text-xs text-[var(--muted)] mb-4">
-        Podesi koliko kvota koja disciplina deli i po kom plasmanu (iz ISSF dokumenta). Strelac može osvojiti jednu kvotu, država jednu po disciplini na takmičenju i najviše {MAX_QUOTAS_PER_NOC} po disciplini ukupno.
+        Podesi koliko kvota koja disciplina deli i po kom plasmanu (iz ISSF dokumenta). Strelac može osvojiti jednu kvotu. Država može imati jednu po disciplini na svetskom prvenstvu, a do dve na ostalim takmičenjima, i najviše {MAX_QUOTAS_PER_NOC} po disciplini ukupno. Rezultat kvalifikacija mora biti jednak MQS-u ili veći.
       </p>
 
       {error && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
@@ -117,12 +117,14 @@ export function QuotaManager({ competitionId }: { competitionId: number }) {
                         <input
                           type="checkbox" className="h-4 w-4"
                           checked={f.quota}
-                          disabled={busy || (!f.quota && used >= d.places)}
+                          disabled={busy || (!f.quota && (used >= d.places || f.belowMqs))}
                           onChange={(e) => send("POST", { resultId: f.resultId, quota: e.target.checked })}
                         />
-                        <span className="w-6 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)]">{f.rank ?? "—"}</span>
+                        <span className="w-8 text-right font-[family-name:var(--font-jetbrains-mono)] text-[var(--muted)]">{f.rank == null ? "—" : f.fromQualification ? `Q${f.rank}` : f.rank}</span>
                         <span className="text-[var(--ink)]">{f.lastName} {f.firstName}</span>
                         {f.nationality && <span className="text-xs text-[var(--muted)]">{f.nationality}</span>}
+                        {f.qualTotal != null && <span className="ml-auto font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{f.qualTotal}</span>}
+                        {f.belowMqs && <span className={`${f.qualTotal == null ? "ml-auto " : ""}text-xs font-semibold text-red-600`}>ispod MQS</span>}
                       </label>
                     </li>
                   ))}

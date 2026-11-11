@@ -82,7 +82,25 @@ function ChevronIcon({ open }: { open: boolean }) {
 }
 
 // cumulative: vrednost kolone je već zbir do te serije (SIUS/ISSF finale), ne rezultat same serije.
-type Column = { header: string; getValue: (r: FinalResultRow) => number | null; fmt: (v: number) => string; cumulative?: boolean };
+type Column = { header: string; getValue: (r: FinalResultRow) => number | null; fmt: (v: number) => string; cumulative?: boolean; /** Faza finala; kolone iste faze dobijaju jedan naslov u zaglavlju (desktop). */ group?: "stage1" | "stage2" };
+
+const STAGE_LABELS: Record<string, Record<"stage1" | "stage2", string>> = {
+  sr: { stage1: "Faza 1", stage2: "Faza 2 – eliminacija" },
+  en: { stage1: "Stage 1", stage2: "Stage 2 – Elimination" },
+};
+
+/** Kolone iste faze spajaju se u jedan naslov preko svih svojih kolona (npr. RFPM: Faza 1 = S1–S2, Faza 2 = ostale). */
+function groupColumnsByStage(columns: Column[], locale: string): Array<{ label: string; span: number }> {
+  const labels = STAGE_LABELS[locale] ?? STAGE_LABELS.en;
+  const groups: Array<{ label: string; span: number }> = [];
+  for (const col of columns) {
+    const label = labels[col.group!];
+    const last = groups[groups.length - 1];
+    if (last?.label === label) last.span += 1;
+    else groups.push({ label, span: 1 });
+  }
+  return groups;
+}
 
 /**
  * Po koloni: glavna vrednost = rezultat serije (ili hica), pomoćna = kumulativni zbir do tada.
@@ -176,10 +194,12 @@ function buildColumns(rows: FinalResultRow[]): Column[] {
         : null;
   if (!kind) return [];
 
-  const isHitCount = withDetail?.finalDetail?.format === "bulletin" && withDetail.finalDetail.scoring === "hit_count";
+  // 25m brzometni pištolj (RFPM): finale se broji u pogocima (serije od 5 hitaca), iako je izvor označio decimalni zapis.
+  const isRapidFire = rows.some((r) => r.disciplineCode === "RFPM");
+  const isHitCount = isRapidFire || (withDetail?.finalDetail?.format === "bulletin" && withDetail.finalDetail.scoring === "hit_count");
   const fmt = isHitCount ? intFmt : decimalFmt;
   const maxLen = Math.max(0, ...rows.map((r) => (r.finalDetail?.format === "bulletin" ? r.finalDetail[kind]?.length ?? 0 : 0)));
-  const labelPrefix = kind === "shots" ? "H" : kind === "series" ? "S" : "F";
+  const labelPrefix = kind === "shots" ? "H" : kind === "series" || isRapidFire ? "S" : "F";
   const cols: Column[] = [];
   for (let i = 0; i < maxLen; i++) {
     cols.push({
@@ -187,6 +207,8 @@ function buildColumns(rows: FinalResultRow[]): Column[] {
       fmt,
       getValue: (r) => (r.finalDetail?.format === "bulletin" ? r.finalDetail[kind]?.[i] ?? null : null),
       cumulative: kind === "cumulative",
+      // RFPM (ISSF prikaz): Faza 1 su prve dve serije, ostalo je eliminaciona faza.
+      group: isRapidFire ? (i < 2 ? "stage1" : "stage2") : undefined,
     });
   }
   return cols;
@@ -259,7 +281,9 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
     );
   }
 
-  const isHitCountFinal = sorted.some((result) => result.finalDetail?.format === "bulletin" && result.finalDetail.scoring === "hit_count");
+  const isHitCountFinal = sorted.some((result) => result.disciplineCode === "RFPM" || (result.finalDetail?.format === "bulletin" && result.finalDetail.scoring === "hit_count"));
+  /** Pogoci se prikazuju kao ceo broj ("28", ne "28.0"). */
+  const totalText = (total: string | null) => (total != null && isHitCountFinal ? String(Math.round(parseFloat(total))) : total);
   const columns = buildColumns(sorted);
   const hasDetail = columns.length > 0;
   const panelOpen = desktop && sheetId != null && sorted.some((r) => r.id === sheetId);
@@ -272,7 +296,9 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
   const SERIES_COL_W = `${seriesW}px`;
   const isNocOnly = NOC_ONLY_LEVELS.has(competitionLevel ?? "");
   const clubColW = isNocOnly ? NOC_W : CLUB_W;
-  const headerGroups = groupColumnHeaders(inlineColumns.map((col) => localizeSeriesLabel(col.header, locale)));
+  const headerGroups = inlineColumns.some((col) => col.group)
+    ? groupColumnsByStage(inlineColumns, locale)
+    : groupColumnHeaders(inlineColumns.map((col) => localizeSeriesLabel(col.header, locale)));
   // Panel otvoren: tabela je uža, pa avatar i klub/NOC (panel ih već prikazuje) nestaju, a Σ i remark ostaju zalepljeni desno.
   const gridTemplateColumns = (panelOpen ? [PANEL_RANK_W, "minmax(100px, 1fr)", ...inlineColumns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W] : [RANK_W, AVATAR_W, NAME_W, clubColW, ...inlineColumns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W])
     .filter(Boolean)
@@ -314,7 +340,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                 <div className="sm:hidden"><SheetPerson firstName={sr.firstName} lastName={sr.lastName} avatarUrl={sr.avatarUrl} birthYear={sr.birthYear} nationality={sr.nationality} clubDisplay={sr.clubDisplay} en={en} /></div>
                 <SheetStats items={[
                   { label: en ? "Rank" : "Mesto", value: sr.finalRank ?? "—" },
-                  { label: isHitCountFinal ? (en ? "Hits" : "Hitovi") : (en ? "Total" : "Ukupno"), value: sr.finalTotal ?? "—" },
+                  { label: isHitCountFinal ? (en ? "Hits" : "Hitovi") : (en ? "Total" : "Ukupno"), value: totalText(sr.finalTotal) ?? "—" },
                   ...(mark ? [{ label: en ? "Remark" : "Napomena", value: <RemarkBadge size="lg" remark={mark} code={remarkCodes[si]} details={sr.remarkDetails} label={`${sr.firstName} ${sr.lastName}`} className="" /> }] : []),
                 ]} />
                 {sr.olympicQuota && <OlympicQuotaNote name={`${sr.firstName} ${sr.lastName}`} noc={sr.nationality ? displayNoc(sr.nationality) : null} disciplineCode={sr.disciplineCode} />}
@@ -493,7 +519,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
 
                   {/* Final total */}
                   <div className={`${cellCls} sm:!pr-1 ${panelOpen ? "sticky right-8 z-[1] bg-[var(--bg)] shadow-[-8px_0_8px_-8px_oklch(0_0_0/0.18)]" : ""} max-sm:!px-1 justify-end font-[family-name:var(--font-jetbrains-mono)] font-bold text-sm tabular-nums text-[var(--ink)] group-hover:bg-[var(--surface-2)] group-data-[sel=true]:bg-[color-mix(in_oklch,var(--brand-primary)_8%,var(--bg))]`}>
-                    {r.finalTotal ?? (
+                    {totalText(r.finalTotal) ?? (
                       <span className="font-normal text-[var(--subtle)]">—</span>
                     )}
                   </div>

@@ -7,6 +7,7 @@ import { ScopedLink } from "../../components/ScopedLink";
 import { OlympicRings } from "@/components/result-display/OlympicQuotaBadge";
 import { ShooterAvatar } from "@/components/result-display/ShooterAvatar";
 import { QuotaTabs } from "./QuotaTabs";
+import { Disclosure } from "./Disclosure";
 import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { disciplineName } from "@shootermarkt/db/discipline-names";
 import { pageParams } from "@/i18n/page-params";
@@ -25,12 +26,13 @@ const KIND_COLOR: Record<QuotaSourceKind, string> = {
   host: "#009F3D",
   universality: "#DF0024",
 };
-const RING_COLORS = ["#0085C7", "#F4C300", "#111111", "#009F3D", "#DF0024"];
+// Redosled: plavo, crno, crveno, žuto, zeleno. Crna prati boju teksta (--ink) da bude vidljiva i u tamnoj temi.
+const RING_COLORS = ["#0085C7", "#111111", "#DF0024", "#F4C300", "#009F3D"];
+const ringColor = (c: string) => (c === "#111111" ? "var(--ink)" : c);
 
 const TEXT = {
   sr: {
     title: "Olimpijske kvote · LA 2028",
-    lead: "Put do Los Anđelesa: koliko kvota se deli, na kom takmičenju i ko ih je osvojio.",
     note: "Kvota formalno pripada nacionalnom olimpijskom komitetu (NOC). Ova lista je nezvaničnog karaktera.",
     cycle: "Ceo ciklus",
     awardedOf: (a: number, p: number) => `${a} od ${p} mesta dodeljeno`,
@@ -39,7 +41,6 @@ const TEXT = {
     serbia: "Srbija",
     serbiaNone: "Srbija još nema osvojenu kvotu.",
     path: "Put do LA 2028",
-    pathNote: "Svaki red je izvor kvota. Klik na red otvara osvajače po disciplinama.",
     total: "Ukupno",
     disciplines: "Po disciplinama",
     countries: "Po državama",
@@ -56,7 +57,6 @@ const TEXT = {
   },
   en: {
     title: "Olympic quotas · LA 2028",
-    lead: "The road to Los Angeles: how many quota places are awarded, where, and who won them.",
     note: "A quota place formally belongs to the National Olympic Committee (NOC). This list is unofficial.",
     cycle: "Whole cycle",
     awardedOf: (a: number, p: number) => `${a} of ${p} places awarded`,
@@ -65,7 +65,6 @@ const TEXT = {
     serbia: "Serbia",
     serbiaNone: "Serbia has not won a quota place yet.",
     path: "Road to LA 2028",
-    pathNote: "Each row is a source of quota places. Click a row to see who won them, by discipline.",
     total: "Total",
     disciplines: "By discipline",
     countries: "By country",
@@ -89,6 +88,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 const fmtDate = (iso: string) => { const [y, m, d] = iso.split("-"); return `${d}.${m}.${y}.`; };
+/** Ceo opseg takmičenja: "01.11.2026. – 08.11.2026." (jedan dan: samo taj datum). */
+const fmtRange = (from: string, to: string | null) => (to && to !== from ? `${fmtDate(from)} – ${fmtDate(to)}` : fmtDate(from));
 const MONO = "font-[family-name:var(--font-jetbrains-mono)]";
 const DISPLAY = "font-[family-name:var(--font-barlow-condensed)]";
 
@@ -140,15 +141,12 @@ export default async function OlympicQuotasPage({ params }: Props) {
   const t = TEXT[en ? "en" : "sr"];
   const overview = await getQuotaOverview();
   const sourceByKey = new Map(overview.sources.map((s) => [s.key, s]));
-  const today = new Date().toISOString().slice(0, 10);
   const multiSource = overview.sources.length > 1;
 
   const place = (s: QuotaSource) => (en ? (s.locationEn ?? s.location) : (s.locationSr ?? s.location));
   const sourceName = (s: QuotaSource) => (s.kind === "competition" ? (en ? (s.nameEn ?? s.name) : (s.nameSr ?? s.name)) ?? "" : t.kinds[s.kind]);
   /** Izvor uvek sa mestom i godinom održavanja: "ISSF Svetsko prvenstvo Puška / Pištolj · Doha · 2026". */
   const sourceFull = (s: QuotaSource) => (s.kind === "competition" ? [sourceName(s), place(s), s.date?.slice(0, 4)].filter(Boolean).join(" · ") : sourceName(s));
-  /** Kratko, za redove registra gde je ime strelca važnije: "Doha · 2026" (mesto i godina uvek ostaju). */
-  const sourceShort = (s: QuotaSource) => (s.kind === "competition" ? [place(s), s.date?.slice(0, 4)].filter(Boolean).join(" · ") || sourceName(s) : sourceName(s));
 
   // Ukupno po vrsti izvora: za segmentiranu traku ciklusa.
   const byKind = (Object.keys(t.kinds) as QuotaSourceKind[])
@@ -165,53 +163,67 @@ export default async function OlympicQuotasPage({ params }: Props) {
   const codes = overview.disciplines.map((d) => d.code);
   const gridCols = `minmax(0,1fr) repeat(${codes.length}, 3.5rem) 3.75rem`;
 
-  function SlotMeta({ slot, holder, showSource }: { slot: QuotaSlot; holder?: QuotaHolder | null; showSource: boolean }) {
-    const placeTitle = slot.basis === "qualification" ? t.qualPlace : t.finalPlace;
-    const src = sourceByKey.get(slot.sourceKey);
+  /** Plasman osvajača, po finalu ili po kvalifikacijama. */
+  function RankBadge({ slot, holder }: { slot: QuotaSlot; holder?: QuotaHolder | null }) {
+    if (holder?.rank == null) return null;
+    const placeTitle = holder.rankStage === "qualification" ? t.qualPlace : t.finalPlace;
     return (
-      <span className="ml-auto flex min-w-0 shrink items-center gap-3">
-        {showSource && src && (
-          <span className="hidden min-w-0 truncate text-xs text-[var(--muted)] sm:block" title={sourceFull(src)}>{sourceShort(src)}</span>
-        )}
-        {holder?.rank != null && (
-          <span title={placeTitle} aria-label={`${placeTitle}: ${holder.rank}`} className={`shrink-0 text-xs font-semibold tabular-nums text-[var(--muted)] ${MONO}`}>
-            #{holder.rank}
-          </span>
-        )}
+      <span title={placeTitle} aria-label={`${placeTitle}: ${holder.rank}`} className={`ml-auto shrink-0 text-xs font-semibold tabular-nums text-[var(--muted)] ${MONO}`}>
+        {holder.rankStage === "qualification" ? "Q" : "#"}{holder.rank}
       </span>
     );
   }
 
-  /** Mesta jedne discipline: avatar, država i ime osvajača, ili otvoreno mesto. */
-  function DisciplineBlock({ code, awarded, places, slots, showSource }: { code: string; awarded: number; places: number; slots: QuotaSlot[]; showSource: boolean }) {
+  /** Mesta jedne discipline: avatar, država i ime osvajača, a ispod izvor kvote (takmičenje, mesto i godina), ili otvoreno mesto. */
+  function DisciplineBlock({ code, awarded, places, slots, showSource, compact = false, href }: { code: string; awarded: number; places: number; slots: QuotaSlot[]; showSource: boolean; compact?: boolean; href?: string }) {
     return (
       <div className="min-w-0 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)]">
-        <div className="flex items-baseline justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2">
+        <div className={`flex items-baseline justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] py-2 ${compact ? "px-3" : "px-4"}`}>
           <h3 className="min-w-0 truncate text-sm font-semibold text-[var(--ink)]">
-            <span className={MONO}>{code}</span> <span className="font-normal text-[var(--muted)]">· {disciplineLabel(code, en)}</span>
+            {/* Sa takmičenja: naziv discipline otvara rezultate te discipline na tom takmičenju. */}
+            {href ? (
+              <ScopedLink href={href} className="hover:text-[var(--brand-primary)] hover:underline">
+                <span className={MONO}>{code}</span> <span className="font-normal text-[var(--muted)]">· {disciplineLabel(code, en)}</span>
+              </ScopedLink>
+            ) : (
+              <>
+                <span className={MONO}>{code}</span> <span className="font-normal text-[var(--muted)]">· {disciplineLabel(code, en)}</span>
+              </>
+            )}
           </h3>
           <span className={`shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)] ${MONO}`}>{awarded}/{places}</span>
         </div>
         <ul className="divide-y divide-[var(--border)]">
-          {slots.map((s, i) => (
-            <li key={i} className="flex min-w-0 items-center gap-3 px-4 py-2 text-sm">
-              {s.holder ? (
-                <>
-                  <ShooterAvatar firstName={s.holder.firstName} lastName={s.holder.lastName} avatarUrl={s.holder.avatarUrl} />
-                  <NocFlag nationality={s.holder.nationality} />
-                  <ScopedLink href={`/strelci/${s.holder.shooterId}`} className="min-w-0 truncate font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
-                    {s.holder.lastName} {s.holder.firstName}
-                  </ScopedLink>
-                </>
-              ) : (
-                <>
-                  <span aria-hidden="true" className="h-7 w-7 shrink-0 rounded-full border border-dashed border-[var(--border-strong)]" />
-                  <span className="text-[var(--muted)]">{t.open}</span>
-                </>
-              )}
-              <SlotMeta slot={s} holder={s.holder} showSource={showSource} />
-            </li>
-          ))}
+          {slots.map((s, i) => {
+            const src = sourceByKey.get(s.sourceKey);
+            return (
+              <li key={i} className={`flex min-w-0 items-center text-sm ${compact ? "gap-2 px-3 py-1" : "gap-3 px-4 py-2.5"}`}>
+                {s.holder ? (
+                  <>
+                    <ShooterAvatar firstName={s.holder.firstName} lastName={s.holder.lastName} avatarUrl={s.holder.avatarUrl} />
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <NocFlag nationality={s.holder.nationality} />
+                        <ScopedLink href={`/strelci/${s.holder.shooterId}`} className="min-w-0 truncate font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
+                          {s.holder.lastName} {s.holder.firstName}
+                        </ScopedLink>
+                      </div>
+                      {showSource && src && <p className="truncate text-xs text-[var(--muted)]">{sourceFull(src)}</p>}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span aria-hidden="true" className="h-7 w-7 shrink-0 rounded-full border border-dashed border-[var(--border-strong)]" />
+                    <div className="min-w-0">
+                      <p className="text-[var(--muted)]">{t.open}</p>
+                      {showSource && src && <p className="truncate text-xs text-[var(--muted)]">{sourceFull(src)}</p>}
+                    </div>
+                  </>
+                )}
+                <RankBadge slot={s} holder={s.holder} />
+              </li>
+            );
+          })}
         </ul>
       </div>
     );
@@ -245,18 +257,20 @@ export default async function OlympicQuotasPage({ params }: Props) {
           const color = KIND_COLOR[s.kind];
           const awarded = s.disciplines.reduce((n, d) => n + d.awarded, 0);
           const places = s.disciplines.reduce((n, d) => n + d.places, 0);
-          const done = s.date != null && (s.dateEnd ?? s.date) < today;
-          const dateLabel = s.date ? fmtDate(s.date) : null;
+          const dateLabel = s.date ? fmtRange(s.date, s.kind === "competition" ? s.dateEnd : null) : null;
           return (
             <li key={s.key}>
-              {/* Nativni <details>: bez JS-a; sa jednim izvorom je otvoren, sa više njih zatvoren. */}
-              <details open={!multiSource} className="group">
-                <summary className="grid cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 hover:bg-[var(--surface)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand-primary)] sm:items-center sm:gap-3 [&::-webkit-details-marker]:hidden sm:[grid-template-columns:var(--cols)]" style={{ "--cols": `auto ${gridCols}` } as CSSProperties}>
+              {/* Red se širi i skuplja uz animaciju; sa jednim izvorom je otvoren, sa više njih zatvoren. */}
+              <Disclosure
+                defaultOpen={!multiSource}
+                summaryClassName="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 hover:bg-[var(--surface)] sm:items-center sm:gap-3 sm:[grid-template-columns:var(--cols)]"
+                summaryStyle={{ "--cols": `auto ${gridCols}` } as CSSProperties}
+                summary={
+                  <>
                   <span aria-hidden="true" className="flex items-center gap-2">
-                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" className="shrink-0 text-[var(--muted)] transition-transform group-open:rotate-90">
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" className="shrink-0 text-[var(--muted)] transition-transform group-data-[open=true]:rotate-90">
                       <path d="M5 2.5L9.5 7L5 11.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${done || s.kind !== "competition" ? "" : "bg-transparent ring-2"}`} style={done || s.kind !== "competition" ? { background: color } : { boxShadow: `inset 0 0 0 2px ${color}` }} />
                   </span>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -267,7 +281,12 @@ export default async function OlympicQuotasPage({ params }: Props) {
                       {s.kind === "ranking" && <span className="text-xs text-[var(--muted)]">{t.rankingClose}</span>}
                     </div>
                     <p className="font-semibold text-[var(--ink)] [text-wrap:balance]">{sourceName(s)}</p>
-                    {s.kind === "competition" && place(s) && <p className="text-sm text-[var(--muted)]">{place(s)} · {s.date?.slice(0, 4)}</p>}
+                    {s.kind === "competition" && place(s) && (
+                      <p className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+                        {s.countryCode2 && <span aria-hidden="true" className={`fi fi-${s.countryCode2.toLowerCase()} shrink-0`} style={{ width: 16, height: 11, borderRadius: 2, display: "inline-block" }} />}
+                        {place(s)} · {s.date?.slice(0, 4)}
+                      </p>
+                    )}
                   </div>
                   {/* Telefon: ukupno + čipovi disciplina; desktop: poravnate ćelije po kolonama */}
                   <span className={`text-right text-sm font-bold tabular-nums text-[var(--ink)] sm:hidden ${MONO}`}>{awarded}/{places}</span>
@@ -282,11 +301,15 @@ export default async function OlympicQuotasPage({ params }: Props) {
                     </span>
                   ))}
                   <span className={`hidden text-center text-sm font-bold tabular-nums text-[var(--ink)] sm:block ${MONO}`}>{awarded}/{places}</span>
-                </summary>
+                  </>
+                }
+              >
                 <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-4">
-                  <div className="grid gap-4 lg:grid-cols-2">
+                  {/* Tri kolone na širokom ekranu, zbijeniji redovi strelaca. */}
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {s.disciplines.map((d) => (
-                      <DisciplineBlock key={d.code} code={d.code} awarded={d.awarded} places={d.places} slots={d.slots} showSource={false} />
+                      <DisciplineBlock key={d.code} code={d.code} awarded={d.awarded} places={d.places} slots={d.slots} showSource={false} compact
+                        href={s.competitionId != null ? `/takmicenja/${s.competitionId}?result=individual&disc=${d.code}&stage=${d.slots[0]?.basis === "qualification" ? "qual" : "final"}&category=senior` : undefined} />
                     ))}
                   </div>
                   {s.competitionId != null && (
@@ -295,7 +318,7 @@ export default async function OlympicQuotasPage({ params }: Props) {
                     </ScopedLink>
                   )}
                 </div>
-              </details>
+              </Disclosure>
             </li>
           );
         })}
@@ -315,7 +338,7 @@ export default async function OlympicQuotasPage({ params }: Props) {
   const disciplinesPanel = (
     <div className="grid gap-4 lg:grid-cols-2">
       {overview.disciplines.map((d) => (
-        <DisciplineBlock key={d.code} code={d.code} awarded={d.awarded} places={d.places} slots={d.slots} showSource={multiSource} />
+        <DisciplineBlock key={d.code} code={d.code} awarded={d.awarded} places={d.places} slots={d.slots} showSource />
       ))}
     </div>
   );
@@ -325,19 +348,51 @@ export default async function OlympicQuotasPage({ params }: Props) {
       <p className="mb-4 text-sm text-[var(--muted)]">{t.countriesNote}</p>
       <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)]">
         {overview.countries.map((c) => (
-          <li key={c.nationality} className="flex flex-col gap-2 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-            <div className="flex min-w-0 items-center gap-3">
-              <NocFlag nationality={c.nationality} />
-              <span className="min-w-0 truncate text-sm font-medium text-[var(--ink)]">{countryLabel(c.nationality, en)}</span>
-              <span className={`shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)] ${MONO}`} aria-label={`${c.total} ${t.totalLabel}`}>{c.total}</span>
-            </div>
-            <ul className="flex flex-wrap gap-1.5">
-              {c.byDiscipline.map((d) => (
-                <li key={d.code} className={`rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums ring-1 ${MONO} ${d.count >= MAX_QUOTAS_PER_NOC ? "text-[var(--ink)] ring-[var(--ink)]" : "text-[var(--muted)] ring-[var(--border-strong)]"}`}>
-                  {d.code}{d.count > 1 ? ` ×${d.count}` : ""}
-                </li>
-              ))}
-            </ul>
+          <li key={c.nationality}>
+            <Disclosure
+              summaryClassName="flex flex-col gap-2 px-4 py-2.5 hover:bg-[var(--surface)] sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+              summary={
+                <>
+                <div className="flex min-w-0 items-center gap-3">
+                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" className="shrink-0 text-[var(--muted)] transition-transform group-data-[open=true]:rotate-90">
+                    <path d="M5 2.5L9.5 7L5 11.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <NocFlag nationality={c.nationality} />
+                  <span className="min-w-0 truncate text-sm font-medium text-[var(--ink)]">{countryLabel(c.nationality, en)}</span>
+                  <span className={`shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)] ${MONO}`} aria-label={`${c.total} ${t.totalLabel}`}>{c.total}</span>
+                </div>
+                <ul className="flex flex-wrap gap-1.5 pl-6 sm:pl-0">
+                  {c.byDiscipline.map((d) => (
+                    <li key={d.code} className={`rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums ring-1 ${MONO} ${d.count >= MAX_QUOTAS_PER_NOC ? "text-[var(--ink)] ring-[var(--ink)]" : "text-[var(--muted)] ring-[var(--border-strong)]"}`}>
+                      {d.code}{d.count > 1 ? ` ×${d.count}` : ""}
+                    </li>
+                  ))}
+                </ul>
+                </>
+              }
+            >
+              {/* Strelci koji su osvojili kvotu za državu: disciplina i izvor (takmičenje, mesto, godina). */}
+              <ul className="divide-y divide-[var(--border)] border-t border-[var(--border)] bg-[var(--surface)]">
+                {c.holders.map(({ holder, code, slot }) => {
+                  const src = sourceByKey.get(slot.sourceKey);
+                  return (
+                    <li key={`${holder.shooterId}-${code}`} className="flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm">
+                      <ShooterAvatar firstName={holder.firstName} lastName={holder.lastName} avatarUrl={holder.avatarUrl} />
+                      <div className="min-w-0">
+                        <ScopedLink href={`/strelci/${holder.shooterId}`} className="block truncate font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
+                          {holder.lastName} {holder.firstName}
+                        </ScopedLink>
+                        <p className="truncate text-xs text-[var(--muted)]">
+                          <span className={`font-semibold ${MONO}`}>{code}</span> · {disciplineLabel(code, en)}
+                          {src && <> · {sourceFull(src)}</>}
+                        </p>
+                      </div>
+                      <RankBadge slot={slot} holder={holder} />
+                    </li>
+                  );
+                })}
+              </ul>
+            </Disclosure>
           </li>
         ))}
       </ul>
@@ -346,50 +401,43 @@ export default async function OlympicQuotasPage({ params }: Props) {
 
   return (
     <div>
-      {/* Hero: svoj svet stranice. Fiksno tamna podloga u obe teme; --ink se prepisuje da tekst i crni krug budu svetli. */}
-      <section
-        className="relative text-white"
-        style={{ background: "oklch(0.19 0.02 265)", ["--ink" as string]: "oklch(0.98 0 0)", ["--muted" as string]: "oklch(0.78 0.01 265)" } as CSSProperties}
-        aria-labelledby="olympic-title"
-      >
-        <div aria-hidden="true" className="flex h-1.5 w-full">
-          {RING_COLORS.map((c) => <span key={c} className="flex-1" style={{ background: c === "#111111" ? "oklch(0.98 0 0)" : c }} />)}
+      {/* Hero: svetla podloga, olimpijske boje kao veliki motiv (krugovi), široka traka i obojena legenda. */}
+      <section className="relative overflow-hidden border-b border-[var(--border)] bg-[var(--bg)]" aria-labelledby="olympic-title">
+        <div aria-hidden="true" className="flex h-2.5 w-full">
+          {RING_COLORS.map((c) => <span key={c} className="flex-1" style={{ background: ringColor(c) }} />)}
         </div>
-        <div className="mx-auto max-w-6xl px-4 pb-10 pt-9 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <OlympicRings height={34} />
-            <h1 id="olympic-title" className={`${DISPLAY} font-extrabold uppercase`} style={{ fontSize: "clamp(2rem, 6vw, 3.25rem)", letterSpacing: "-0.02em", lineHeight: 1.05 }}>
-              {t.title}
-            </h1>
-          </div>
-          <p className="mt-3 max-w-[60ch] text-base text-[var(--muted)]">{t.lead}</p>
+        <div className="relative mx-auto max-w-6xl px-4 pb-6 pt-6 sm:px-6 lg:px-8">
+          <h1 id="olympic-title" className={`${DISPLAY} flex flex-wrap items-center gap-x-4 gap-y-2 font-extrabold uppercase text-[var(--ink)] lg:max-w-[48rem]`} style={{ fontSize: "clamp(1.75rem, 5vw, 2.75rem)", letterSpacing: "-0.02em", lineHeight: 1.02 }}>
+            <OlympicRings height={26} />
+            {t.title}
+          </h1>
 
           {byKind.length > 0 && (
-            <div className="mt-8" role="img" aria-label={t.awardedOf(overview.awarded, overview.places)}>
+            <div className="mt-5 max-w-[34rem]" role="img" aria-label={t.awardedOf(overview.awarded, overview.places)}>
               <div className="mb-2 flex items-baseline justify-between gap-4">
-                <span className={`${DISPLAY} text-lg font-bold uppercase`}>{t.cycle}</span>
-                <span className={`text-sm tabular-nums ${MONO}`}>{t.awardedOf(overview.awarded, overview.places)}</span>
+                <span className={`${DISPLAY} text-lg font-bold uppercase text-[var(--ink)]`}>{t.cycle}</span>
+                <span className={`text-sm tabular-nums text-[var(--ink)] ${MONO}`}>{t.awardedOf(overview.awarded, overview.places)}</span>
               </div>
               {/* Segmentirana traka: širina = broj mesta izvora, popunjeno = dodeljeno. */}
-              <div className="flex gap-1">
+              <div className="flex gap-1.5">
                 {byKind.map((k) => (
-                  <div key={k.kind} className="h-4 overflow-hidden rounded-sm" style={{ flexGrow: k.places, flexBasis: 0, background: `color-mix(in oklch, ${KIND_COLOR[k.kind]} 28%, transparent)` }}>
+                  <div key={k.kind} className="h-6 overflow-hidden rounded" style={{ flexGrow: k.places, flexBasis: 0, background: `color-mix(in oklch, ${KIND_COLOR[k.kind]} 22%, var(--bg))`, boxShadow: `inset 0 0 0 1.5px ${KIND_COLOR[k.kind]}` }}>
                     <div className="h-full" style={{ width: `${(k.awarded / k.places) * 100}%`, background: KIND_COLOR[k.kind] }} />
                   </div>
                 ))}
               </div>
-              <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5 text-sm">
+              <ul className="mt-3 flex flex-wrap gap-2">
                 {byKind.map((k) => (
-                  <li key={k.kind} className="flex items-center gap-2">
-                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-sm" style={{ background: KIND_COLOR[k.kind] }} />
-                    <span>{t.kinds[k.kind]}</span>
+                  <li key={k.kind} className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-[var(--ink)]" style={{ background: `color-mix(in oklch, ${KIND_COLOR[k.kind]} 16%, var(--bg))`, boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${KIND_COLOR[k.kind]} 55%, transparent)` }}>
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: KIND_COLOR[k.kind] }} />
+                    {t.kinds[k.kind]}
                     <span className={`tabular-nums text-[var(--muted)] ${MONO}`}>{k.awarded}/{k.places}</span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
-          <p className="mt-6 max-w-[65ch] text-xs text-[var(--muted)]">{t.note}</p>
+          <p className="mt-4 max-w-[65ch] text-xs text-[var(--muted)]">{t.note}</p>
         </div>
       </section>
 
@@ -421,7 +469,7 @@ export default async function OlympicQuotasPage({ params }: Props) {
                             <p className="truncate text-sm text-[var(--muted)]">{sourceFull(src)}</p>
                           </div>
                           {holder.rank != null && (
-                            <span className={`ml-auto shrink-0 text-xs font-semibold tabular-nums text-[var(--muted)] ${MONO}`} title={slot.basis === "qualification" ? t.qualPlace : t.finalPlace}>#{holder.rank}</span>
+                            <span className={`ml-auto shrink-0 text-xs font-semibold tabular-nums text-[var(--muted)] ${MONO}`} title={holder.rankStage === "qualification" ? t.qualPlace : t.finalPlace}>{holder.rankStage === "qualification" ? "Q" : "#"}{holder.rank}</span>
                           )}
                         </li>
                       );
@@ -432,7 +480,7 @@ export default async function OlympicQuotasPage({ params }: Props) {
             )}
 
             <section className="mb-12" aria-labelledby="quota-path">
-              <SectionTitle id="quota-path" note={t.pathNote}>{t.path}</SectionTitle>
+              <SectionTitle id="quota-path">{t.path}</SectionTitle>
               {ledger}
             </section>
 

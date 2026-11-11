@@ -1,16 +1,18 @@
 "use client";
 
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 type Tab = { id: string; label: string; count?: number };
 
 /**
- * Prekidač prikaza (po takmičenjima / disciplinama / državama). Sav sadržaj stiže renderovan sa servera;
- * ovde se samo menja koji je panel vidljiv, pa stranica ostaje statična (bez ?tab= u URL-u).
+ * Prekidač prikaza (po disciplinama / državama). Sadržaj stiže renderovan sa servera; aktivni panel ulazi uz kratku
+ * animaciju, a oznaka izabranog taba klizi. Bez ?tab= u URL-u, da stranica ostane statična.
  */
 export function QuotaTabs({ tabs, panels, label }: { tabs: Tab[]; panels: Record<string, ReactNode>; label: string }) {
   const [active, setActive] = useState(tabs[0].id);
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const reduced = useReducedMotion();
 
   function onKeyDown(e: KeyboardEvent) {
     const i = tabs.findIndex((t) => t.id === active);
@@ -37,19 +39,36 @@ export function QuotaTabs({ tabs, panels, label }: { tabs: Tab[]; panels: Record
               tabIndex={selected ? 0 : -1}
               type="button"
               onClick={() => setActive(t.id)}
-              className={`flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)] ${selected ? "bg-[var(--bg)] text-[var(--ink)] shadow-sm ring-1 ring-[var(--border)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
+              className={`relative flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)] ${selected ? "text-[var(--ink)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
             >
-              {t.label}
-              {t.count != null && <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-normal tabular-nums text-[var(--muted)]">{t.count}</span>}
+              {selected && (
+                <motion.span
+                  layoutId="quota-tab-pill"
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-lg bg-[var(--bg)] shadow-sm ring-1 ring-[var(--border)]"
+                  transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 40 }}
+                />
+              )}
+              <span className="relative">{t.label}</span>
+              {t.count != null && <span className="relative font-[family-name:var(--font-jetbrains-mono)] text-xs font-normal tabular-nums text-[var(--muted)]">{t.count}</span>}
             </button>
           );
         })}
       </div>
-      {tabs.map((t) => (
-        <div key={t.id} role="tabpanel" id={`quota-panel-${t.id}`} aria-labelledby={`quota-tab-${t.id}`} hidden={t.id !== active}>
-          {panels[t.id]}
-        </div>
-      ))}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={active}
+          role="tabpanel"
+          id={`quota-panel-${active}`}
+          aria-labelledby={`quota-tab-${active}`}
+          initial={reduced ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduced ? undefined : { opacity: 0, y: -4, transition: { duration: 0.12 } }}
+          transition={{ duration: reduced ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {panels[active]}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

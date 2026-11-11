@@ -90,15 +90,10 @@ export function OtherQuotasManager() {
                       <span className="ml-2 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{a.holders.length}/{a.places}</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      {kind === "ranking" && (
-                        <input type="date" aria-label="Datum zaključenja" defaultValue={a.date ?? ""} disabled={busy}
-                          onBlur={(e) => { if ((e.target.value || null) !== a.date) void send("PUT", { kind, disciplineId: a.disciplineId, places: a.places, date: e.target.value || null }); }}
-                          className={field} />
-                      )}
                       <label className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
                         Mesta
                         <input type="number" min={1} max={50} defaultValue={a.places} disabled={busy}
-                          onBlur={(e) => { const places = Number(e.target.value); if (places !== a.places) void send("PUT", { kind, disciplineId: a.disciplineId, places, date: a.date }); }}
+                          onBlur={(e) => { const places = Number(e.target.value); if (places !== a.places) void send("PUT", { kind, disciplineId: a.disciplineId, places }); }}
                           className={`w-16 ${field}`} />
                       </label>
                       <button type="button" disabled={busy} onClick={() => send("DELETE", { kind, disciplineId: a.disciplineId })} className={`${btn} !text-red-600 !border-red-300`}>Ukloni</button>
