@@ -1,0 +1,1 @@
+ALTER TABLE "olympic_quota_allocations" ADD COLUMN "basis" varchar(14) DEFAULT 'final' NOT NULL;

@@ -2,7 +2,19 @@
 
 import { useState } from "react";
 import { useUiLocale } from "@/hooks/use-ui-locale";
+import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { RemarkModal } from "./RemarkBadge";
+
+/** Naziv države na jeziku sajta (Intl iz alpha-2 koda); za neutralne/istorijske NOC-ove naziv iz liste. */
+function countryName(noc: string | null, en: boolean): string | null {
+  const entry = NOC_LIST.find((n) => n.noc === noc);
+  if (!entry) return noc;
+  try {
+    return new Intl.DisplayNames([en ? "en" : "sr-Latn"], { type: "region" }).of(entry.alpha2) ?? entry.name;
+  } catch {
+    return entry.name;
+  }
+}
 
 // Olimpijski krugovi u originalnim bojama; crni krug prati boju teksta da ostane vidljiv u tamnoj temi.
 // Zamena simbola (ako IOC zatraži) je jedino ovde.
@@ -24,11 +36,46 @@ export function OlympicRings({ height = 14 }: { height?: number }) {
   );
 }
 
-/** Oznaka pored strelca koji je u finalu osvojio olimpijsku kvotu; klik otvara objašnjenje. */
-export function OlympicQuotaBadge({ name, noc, disciplineCode }: { name: string; noc: string | null; disciplineCode?: string }) {
+type QuotaProps = { name: string; noc: string | null; disciplineCode?: string };
+
+/** Objašnjenje osvojene kvote: isti tekst u modalu na klik i u detaljima rezultata (mobilni sheet / desktop panel). */
+function QuotaMessage({ name, noc, disciplineCode }: QuotaProps) {
+  const en = useUiLocale() === "en";
+  const country = countryName(noc, en);
+  return (
+    <>
+      <div className="flex items-center gap-2.5 mb-2">
+        <OlympicRings height={18} />
+        <p className="text-base font-semibold text-[var(--ink)]">{en ? "Quota place won for LA 2028" : "Osvojena kvota za LA 2028"}</p>
+      </div>
+      <p className="text-sm text-[var(--ink)]">
+        {country && (en ? `Quota for ${country} won by ` : `Kvota države ${country} osvojena: `)}
+        <span className="font-semibold">{name}</span>
+        {disciplineCode && <span className="text-[var(--muted)]"> ({disciplineCode})</span>}
+      </p>
+      <p className="mt-2 text-sm text-[var(--muted)]">
+        {en ? "The quota place formally belongs to the National Olympic Committee." : "Kvota formalno pripada nacionalnom olimpijskom komitetu (NOC)."}
+      </p>
+      <p className="mt-3 border-t border-[var(--border)] pt-3 text-xs text-[var(--subtle)]">
+        {en ? "Unofficial marking. This site is not affiliated with the IOC." : "Nezvanična oznaka. Sajt nije povezan sa IOC-om."}
+      </p>
+    </>
+  );
+}
+
+/** Blok sa objašnjenjem u detaljima rezultata strelca koji je osvojio kvotu. */
+export function OlympicQuotaNote(props: QuotaProps) {
+  return (
+    <div className="mt-4 rounded-lg bg-[var(--surface)] p-3 ring-1 ring-[var(--border)]">
+      <QuotaMessage {...props} />
+    </div>
+  );
+}
+
+/** Oznaka pored strelca koji je osvojio olimpijsku kvotu; klik otvara objašnjenje. */
+export function OlympicQuotaBadge(props: QuotaProps) {
   const [open, setOpen] = useState(false);
   const en = useUiLocale() === "en";
-  const detail = [noc, disciplineCode].filter(Boolean).join(", ");
   const title = en ? "Olympic quota place won for LA 2028" : "Osvojena olimpijska kvota za LA 2028";
 
   return (
@@ -46,21 +93,7 @@ export function OlympicQuotaBadge({ name, noc, disciplineCode }: { name: string;
       </button>
       {open && (
         <RemarkModal label={en ? "Olympic quota" : "Olimpijska kvota"} onClose={() => setOpen(false)}>
-          <div className="flex items-center gap-2.5 mb-2">
-            <OlympicRings height={18} />
-            <p className="text-base font-semibold text-[var(--ink)]">{en ? "Quota place won for LA 2028" : "Osvojena kvota za LA 2028"}</p>
-          </div>
-          <p className="text-sm text-[var(--ink)]">
-            {en ? "Won by the performance of " : "Osvojena nastupom: "}
-            <span className="font-semibold">{name}</span>
-            {detail && <span className="text-[var(--muted)]"> ({detail})</span>}
-          </p>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            {en ? "The quota place formally belongs to the National Olympic Committee, not to the shooter." : "Kvota formalno pripada nacionalnom olimpijskom komitetu (NOC), ne strelcu."}
-          </p>
-          <p className="mt-3 border-t border-[var(--border)] pt-3 text-xs text-[var(--subtle)]">
-            {en ? "Unofficial marking. This site is not affiliated with the IOC or the Olympic Committee of Serbia." : "Nezvanična oznaka. Sajt nije povezan sa IOC-om ni sa Olimpijskim komitetom Srbije."}
-          </p>
+          <QuotaMessage {...props} />
         </RemarkModal>
       )}
     </>

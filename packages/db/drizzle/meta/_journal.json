@@ -344,6 +344,13 @@
       "when": 1794417904677,
       "tag": "0048_futuristic_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1794418806815,
+      "tag": "0049_supreme_frightful_four",
+      "breakpoints": true
     }
   ]
 }

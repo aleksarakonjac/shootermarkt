@@ -917,6 +917,7 @@ function CompetitionDetail({
       remarkDetails: r.remarkDetails?.qual ?? null,
       disciplineCode: group?.code ?? "",
       apparatus: group?.apparatus ?? null,
+      olympicQuota: r.olympicQuota,
     })) ?? [];
 
   // Elim rows reuse CompetitionQualTable's row shape so both tables render identically

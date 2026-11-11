@@ -619,6 +619,9 @@ export const olympicQuotaAllocations = pgTable(
     disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
     games: varchar("games", { length: 10 }).notNull().default("LA2028"),
     places: smallint("places").notNull(),
+    // Po kom plasmanu se kvote dele: 'final' (plasman u finalu) ili 'qualification' (plasman u kvalifikacijama,
+    // kad kvotu uzimaju sledeći u kvalifikacijama jer svi iznad već imaju kvote).
+    basis: varchar("basis", { length: 14 }).notNull().default("final"),
   },
   (t) => [uniqueIndex("olympic_quota_allocations_unique").on(t.competitionId, t.disciplineId, t.games)]
 );

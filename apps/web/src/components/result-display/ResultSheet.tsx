@@ -119,7 +119,8 @@ export function SheetCells({ cells, min = "3.5rem" }: { cells: SheetCellData[]; 
       {cells.map((c, i) => (
         <div key={i} className="text-center">
           <div className={`rounded-md bg-[var(--surface)] px-1 py-1.5 sm:px-0.5 ring-1 ${c.best ? "ring-2 ring-[var(--brand-primary)]" : "ring-[var(--border-strong)]"}`}>
-            {c.label && <p className="whitespace-nowrap text-xs font-semibold leading-tight text-[var(--muted)] sm:text-[0.7rem]">{c.label}</p>}
+            {/* <span>, ne <p>: globalno `p { text-wrap: pretty }` (van layer-a) poništava whitespace-nowrap, pa se "Standing 1" lomilo u dva reda. */}
+            {c.label && <span className="block whitespace-nowrap text-xs font-semibold leading-tight text-[var(--muted)] sm:text-[0.7rem]">{c.label}</span>}
             <p className={`text-lg leading-tight tabular-nums text-[var(--ink)] sm:text-base ${MONO} ${c.best ? "font-bold" : "font-medium"}`}>{c.main}</p>
           </div>
           {c.sub && <p className={`mt-1 text-sm font-medium tabular-nums text-[var(--muted)] ${MONO}`}>Σ {c.sub}</p>}

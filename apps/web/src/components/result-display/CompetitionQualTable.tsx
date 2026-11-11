@@ -12,6 +12,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import type { QualDetail, PositionsQualDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
+import { OlympicQuotaBadge, OlympicQuotaNote } from "./OlympicQuotaBadge";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import { useRowFlash } from "./useRowFlash";
 import { isSportPistolCode, isThreePositionCode, isUnrankedRemark, qualHasDecimals, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
@@ -50,6 +51,8 @@ function getFlatGroups(code: string | undefined, en = false): FlatGroup[] | null
 
 export type CompResultRow = {
   id: number;
+  /** Osvojena olimpijska kvota (LA 2028). */
+  olympicQuota?: boolean;
   shooterId: number;
   firstName: string;
   lastName: string;
@@ -443,6 +446,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                         )}
                       </span>
                     </Link>
+                    {r.olympicQuota && <OlympicQuotaBadge name={`${r.firstName} ${r.lastName}`} noc={r.nationality ? displayNoc(r.nationality) : null} disciplineCode={r.disciplineCode} />}
                   </div>
 
                   {/* Club / NOC */}
@@ -626,6 +630,7 @@ function ShooterSheetBody({ r, leaderTotal, cutoffTotal, rank, groups, grouped, 
         ...(showInners ? [{ label: "10×", value: r.qualInners ?? "—" }] : []),
         ...(r.qualified === true || remarkMark ? [{ label: showInners ? (en ? "Rem." : "Nap.") : en ? "Remark" : "Napomena", value: marks }] : []),
       ]} />
+      {r.olympicQuota && <OlympicQuotaNote name={fullName} noc={r.nationality ? displayNoc(r.nationality) : null} disciplineCode={r.disciplineCode ?? undefined} />}
       {groups.length > 0 && (
         <SheetSection>
           {seriesGroups.map((g, gi) => {
