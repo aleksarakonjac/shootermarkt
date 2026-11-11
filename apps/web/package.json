@@ -19,7 +19,8 @@
     "db:backtest-forma": "tsx --env-file=../../.env.local scripts/backtest-forma.ts",
     "db:backfill-country-names": "tsx --env-file=../../.env.local scripts/backfill-country-names.ts",
     "db:tag-event-types": "tsx --env-file=../../.env.local scripts/tag-event-types.ts",
-    "db:seed-ui-demo": "tsx --env-file=../../.env.local scripts/seed-ui-demo.ts"
+    "db:seed-ui-demo": "tsx --env-file=../../.env.local scripts/seed-ui-demo.ts",
+    "db:backfill-avatar-cache": "tsx --env-file=../../.env.local scripts/backfill-avatar-cache.ts"
   },
   "dependencies": {
     "@shootermarkt/adapters": "workspace:*",

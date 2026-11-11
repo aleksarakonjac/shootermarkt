@@ -3,7 +3,7 @@ import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
-import { revalidatesPublicSite } from "@/lib/revalidate-public";
+import { revalidatesShooterRoute } from "@/lib/revalidate-public";
 
 /** Partial update (club, gender, birth year, verified) — the full PATCH overwrites every field. */
 async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,4 +37,4 @@ async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({ ok: true });
 }
 
-export const PATCH = revalidatesPublicSite(handlePATCH);
+export const PATCH = revalidatesShooterRoute(handlePATCH);

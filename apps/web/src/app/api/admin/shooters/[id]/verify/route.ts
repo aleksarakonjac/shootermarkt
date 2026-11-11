@@ -3,7 +3,7 @@ import { shooters } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
-import { revalidatesPublicSite } from "@/lib/revalidate-public";
+import { revalidatesShooterRoute } from "@/lib/revalidate-public";
 
 async function handlePOST(
   _request: Request,
@@ -27,4 +27,4 @@ async function handlePOST(
   return NextResponse.json({ ok: true });
 }
 
-export const POST = revalidatesPublicSite(handlePOST);
+export const POST = revalidatesShooterRoute(handlePOST);

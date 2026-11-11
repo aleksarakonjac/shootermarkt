@@ -441,7 +441,7 @@ export default async function CompetitionPage({ params }: Props) {
         >
           {t("detail.results")}
         </h2>
-        <CompetitionResultsClient formaByKey={formaByKey} groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} timezone={comp.timezone ?? undefined} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} />
+        <CompetitionResultsClient formaByKey={formaByKey} groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} timezone={comp.timezone ?? undefined} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} liveWindows={scheduleSlots} />
       </div>
 
       <RelatedNewsSection type="competition" refId={compId} locale={locale} />

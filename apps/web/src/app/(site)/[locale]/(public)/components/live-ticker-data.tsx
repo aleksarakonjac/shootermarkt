@@ -3,7 +3,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import type { TickerItem } from "../ticker";
 
 /**
@@ -38,8 +37,9 @@ export function TickerDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    // v = 5-sekundni bucket: svi posetioci dele isti CDN odgovor, a osvežavanje ne dobija 60 s star keš.
-    fetch(`/api/homepage/ticker?scope=${scope ?? "srb"}&locale=${locale}&v=${Math.floor(Date.now() / 5_000)}`, { signal: controller.signal })
+    // v = bucket jednak REFRESH_MS: svi posetioci dele isti CDN odgovor (s-maxage=60). Kraći bucket je pravio
+    // novi cache key svakih 5 s, pa je funkcija (i baza) radila 12× češće nego što keš dozvoljava.
+    fetch(`/api/homepage/ticker?scope=${scope ?? "srb"}&locale=${locale}&v=${Math.floor(Date.now() / REFRESH_MS)}`, { signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Ticker request failed")))
       .then((result: TickerApiResponse) => { setData(result); setState("ready"); })
       .catch((error) => {
@@ -51,26 +51,12 @@ export function TickerDataProvider({ children }: { children: ReactNode }) {
   }, [attempt, locale, scope]);
 
   useEffect(() => {
-    const interval = window.setInterval(retry, REFRESH_MS);
+    const interval = window.setInterval(() => { if (document.visibilityState === "visible") retry(); }, REFRESH_MS);
     return () => window.clearInterval(interval);
   }, [retry]);
 
-  // Realtime: odmah osveži kad admin promeni override-e ili raspored — samo dok je nešto LIVE.
-  // Inače je dovoljno osvežavanje na REFRESH_MS (svaka pretplata drži Supabase Realtime da čita WAL).
-  const hasLive = (data?.live.length ?? 0) > 0;
-  useEffect(() => {
-    if (!hasLive) return;
-    let timer: number | undefined;
-    const debouncedRetry = () => { window.clearTimeout(timer); timer = window.setTimeout(retry, 1_500); };
-    const supabase = createClient();
-    const channel = supabase
-      .channel("ticker-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_live_overrides" }, debouncedRetry)
-      .on("postgres_changes", { event: "*", schema: "public", table: "competition_schedule" }, debouncedRetry)
-      .on("postgres_changes", { event: "*", schema: "public", table: "ticker_custom_upcoming" }, debouncedRetry)
-      .subscribe();
-    return () => { window.clearTimeout(timer); supabase.removeChannel(channel); };
-  }, [hasLive, retry]);
+  // Bez Supabase Realtime: svaki posetilac na svakoj javnoj stranici držao je konekciju dok je nešto LIVE
+  // (free tier: 200 istovremenih). Admin izmene stižu kroz poll od REFRESH_MS.
 
   const value = useMemo<TickerData>(() => ({
     state,

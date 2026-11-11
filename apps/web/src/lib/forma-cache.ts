@@ -3,6 +3,7 @@ import { db } from "@shootermarkt/db";
 import { shooterFormaCache } from "@shootermarkt/db/schema";
 import { computeFormaFromEntries, FORMA_DISCIPLINE_CODES } from "@/lib/forma";
 import { getFormaEntriesByDiscipline } from "@/lib/forma-query";
+import { revalidateShooterPages } from "@/lib/revalidate-public";
 import {
   computeAvgOfTopN,
   computeRecentAvg,
@@ -18,6 +19,8 @@ import {
  */
 export async function recomputeFormaCache(shooterIds?: number[]): Promise<void> {
   if (shooterIds && shooterIds.length === 0) return;
+  // Svaka izmena rezultata (import, brisanje, spajanje, live-fetch) prolazi ovuda → profil tih strelaca se odmah osvežava.
+  if (shooterIds) revalidateShooterPages(shooterIds);
   const groups = await getFormaEntriesByDiscipline(shooterIds);
 
   // A deleted result can remove a whole shooter/discipline group. Clear targeted

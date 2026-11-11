@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
 import { competitionSchedule, competitions } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidatePublicSite } from "@/lib/revalidate-public";
 import { requireAdmin } from "@/lib/admin-auth";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,7 +37,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     .where(eq(competitionSchedule.id, parseInt(id)))
     .returning();
 
-  revalidatePath("/", "layout");
+  revalidatePublicSite();
   return NextResponse.json(updated);
 }
 
@@ -47,6 +47,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params;
   await db.delete(competitionSchedule).where(eq(competitionSchedule.id, parseInt(id)));
-  revalidatePath("/", "layout");
+  revalidatePublicSite();
   return NextResponse.json({ ok: true });
 }

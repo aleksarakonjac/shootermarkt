@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useTransition, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
 import { ChevronRight, ChevronLeft, RefreshCw } from "lucide-react";
 import type { QualDetail, FinalDetail, ElimDetail, AgeCategory } from "@shootermarkt/db/schema";
 import { CATEGORY_LABEL, isEscSoloCode, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
@@ -114,6 +113,8 @@ interface Props {
   timezone?: string;
   /** Satnica finala (disciplina + kategorija) — medalje se prikazuju tek kad je finale gotovo. */
   finalSlots?: Array<FinalSlot & { disciplineCode: string; category: string }>;
+  /** Termini satnice (svi stage-ovi): dok neki traje, stranica se osvežava svakih 30 s. */
+  liveWindows?: Array<{ startTime: string; endTime: string | null }>;
   /** Forma po strelcu i disciplini ("shooterId|CODE") za detail sheet. */
   formaByKey?: Record<string, SheetForma>;
 }
@@ -202,6 +203,8 @@ function eliminationRoundLabel(round: number, locale: string): string {
   return `${(PHASE_LABELS[locale] ?? PHASE_LABELS.en).elim} — relay ${round}`;
 }
 
+const NO_WINDOWS: NonNullable<Props["liveWindows"]> = [];
+
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 // useSearchParams na ISR stranici traži Suspense. Fallback je isti prikaz bez izbora iz URL-a,
@@ -239,7 +242,7 @@ function CompetitionResultsWithSearch(props: Props) {
   return <CompetitionResultsView {...props} search={useSearchParams().toString()} />;
 }
 
-function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, competitionLevel, timezone, finalSlots = [], search }: Props & { search: string }) {
+function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel, timezone, finalSlots = [], liveWindows = NO_WINDOWS, search }: Props & { search: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const detailRef = useRef<HTMLDivElement>(null);
@@ -301,7 +304,6 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
     if (refreshing) startNavigationProgress();
     else finishNavigationProgress();
   }, [refreshing]);
-  const refreshTimer = useRef<number | null>(null);
   // router.refresh() ume da vrati stranicu na vrh; pamtimo poziciju i vraćamo je kad osvežavanje završi.
   const savedScroll = useRef<number | null>(null);
   const refreshing_ = useRef(false);
@@ -320,38 +322,23 @@ function CompetitionResultsView({ groups, mixedGroups, competitionId, locale, co
     savedScroll.current = window.scrollY;
     startRefresh(() => router.refresh());
   }, [router]);
-  const retry = useCallback(() => {
-    // Import upisuje mnogo redova odjednom — spoji događaje u jedno osvežavanje.
-    if (refreshTimer.current != null) window.clearTimeout(refreshTimer.current);
-    refreshTimer.current = window.setTimeout(doRefresh, 800);
-  }, [doRefresh]);
-  useEffect(() => () => { if (refreshTimer.current != null) window.clearTimeout(refreshTimer.current); }, []);
-  // Ručno osvežavanje (dugme pored naslova): odmah, bez čekanja da se događaji slegnu.
-  const refreshNow = useCallback(() => {
-    if (refreshTimer.current != null) window.clearTimeout(refreshTimer.current);
-    doRefresh();
-  }, [doRefresh]);
+  // Ručno osvežavanje (dugme pored naslova).
+  const refreshNow = doRefresh;
 
+  // Poll umesto Supabase Realtime: pretplata na `results` je svakom posetiocu slala svaki izmenjeni red
+  // (sa JSONB serijama) — za 60 strelaca i 50 posetilaca to je glavni Supabase egress tokom meča.
+  // Live-fetch cron već briše keš ove stranice kad se rezultati promene, pa refresh dobija sveže iz ISR keša.
   useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`live-results-comp-${competitionId}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "results",
-        filter: `competition_id=eq.${competitionId}`,
-      }, retry)
-      // Miks timovi su u zasebnoj tabeli — bez ovoga se njihovi rezultati ne osvežavaju uživo.
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "mixed_team_results",
-        filter: `competition_id=eq.${competitionId}`,
-      }, retry)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [competitionId, retry]);
+    const windows = liveWindows.map((w) => {
+      const start = Date.parse(w.startTime);
+      return { from: start - 5 * 60_000, to: (w.endTime ? Date.parse(w.endTime) : start + 3 * 3600_000) + 30 * 60_000 };
+    });
+    const poll = window.setInterval(() => {
+      const now = Date.now();
+      if (document.visibilityState === "visible" && windows.some((w) => now >= w.from && now <= w.to)) doRefresh();
+    }, 30_000); // pola ritma crona: novi upis stiže najkasnije ~30 s posle kraja obrade
+    return () => window.clearInterval(poll);
+  }, [liveWindows, doRefresh]);
 
   if (groups.length === 0 && mixedGroups.length === 0) {
     return (

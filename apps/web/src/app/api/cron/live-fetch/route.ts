@@ -3,7 +3,7 @@ import { siusEventCodes } from "@/lib/sius-event-code";
 import { db } from "@shootermarkt/db";
 import { competitions, competitionSchedule, disciplines, mixedTeamResults, results, shooters } from "@shootermarkt/db/schema";
 import type { AgeCategory } from "@shootermarkt/db/schema";
-import { and, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { fetchCompetitionResults, extractMvpEvents, fetchQualResultsFromHtml, fetchElimResultsFromHtml, fetchFinalResultsFromHtml, extractMixedTeamEvents, fetchMixedTeamQualFromHtml, fetchMixedTeamFinalFromHtml } from "@shootermarkt/adapters/issf/adapter";
 import { fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, mixedTeamIdentity, parseSiusMatchKey, MIXED_TEAM_CODES, type SiusLiveData, type SiusTeamResult } from "@shootermarkt/adapters/sius/public-adapter";
 import { ensureCompetitionEvent, matchEventName } from "@/lib/competition-events";
@@ -28,6 +28,10 @@ export const maxDuration = 30;
 const lastWritten = new Map<string, string>();
 // Kvalifikacije za koje je forma već preračunata posle kraja meča (ista ponytail granica: nova instanca preračuna jednom više).
 const formaFinalized = new Set<string>();
+// Van takmičenja cron (svakog minuta, 24/7) ne pita bazu sve do sledećeg termina iz satnice.
+// ponytail: memorija po instanci; plafon IDLE_MAX da se novi termin koji admin unese uhvati najkasnije za 10 min.
+const IDLE_MAX_MS = 10 * 60_000;
+let idleUntil = 0;
 
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("x-cron-secret") ?? req.nextUrl.searchParams.get("secret");
@@ -36,6 +40,7 @@ export async function GET(req: NextRequest) {
   }
 
   const now = new Date();
+  if (now.getTime() < idleUntil) return NextResponse.json({ ok: true, active: 0, upserted: 0, idle: true });
   const windowStart = new Date(now.getTime() - 4 * 60 * 60 * 1000);
 
   const allActiveSlots = await db
@@ -72,6 +77,14 @@ export async function GET(req: NextRequest) {
 
   console.log("[cron] active slots:", JSON.stringify(activeSlots.map((s) => ({ compId: s.competitionId, code: s.disciplineCode, stage: s.stage, siusId: s.siusId?.slice(0, 8), issfId: s.issfId }))));
   if (activeSlots.length === 0) {
+    const [next] = await db
+      .select({ startTime: competitionSchedule.startTime })
+      .from(competitionSchedule)
+      .innerJoin(competitions, eq(competitionSchedule.competitionId, competitions.id))
+      .where(and(or(isNotNull(competitions.issfId), isNotNull(competitions.siusId)), gt(competitionSchedule.startTime, now)))
+      .orderBy(asc(competitionSchedule.startTime))
+      .limit(1);
+    idleUntil = Math.min(next?.startTime.getTime() ?? Infinity, now.getTime() + IDLE_MAX_MS);
     return NextResponse.json({ ok: true, active: 0, upserted: 0 });
   }
 

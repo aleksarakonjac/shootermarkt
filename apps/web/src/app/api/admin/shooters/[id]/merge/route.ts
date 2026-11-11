@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
 import { MERGE_FIELDS, MergeError, mergePreview, mergeShooters, type MergeOptions } from "@/lib/merge-shooters";
 import { recomputeFormaCache } from "@/lib/forma-cache";
-import { revalidatesPublicSite } from "@/lib/revalidate-public";
+import { revalidateShooterPages, revalidatesShooterRoute } from "@/lib/revalidate-public";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -44,6 +44,7 @@ async function handlePOST(req: Request, { params }: Ctx) {
     throw e;
   }
   await recomputeFormaCache([keepId]);
+  revalidateShooterPages([dropId]); // obrisan profil mora odmah da postane 404
   return NextResponse.json({ ok: true });
 }
-export const POST = revalidatesPublicSite(handlePOST);
+export const POST = revalidatesShooterRoute(handlePOST);

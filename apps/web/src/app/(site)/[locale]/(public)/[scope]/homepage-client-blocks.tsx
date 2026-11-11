@@ -146,8 +146,9 @@ function useHomepageData<T>(path: string, refreshMs?: number, initialData?: T) {
   useEffect(() => {
     const controller = new AbortController();
     clearFailure(path);
-    // v = 5-sekundni bucket: svi posetioci dele isti CDN odgovor, a osvežavanje ne dobija 60 s star keš.
-    fetch(`${path}?scope=${scope ?? "srb"}&locale=${locale}&v=${Math.floor(Date.now() / 5_000)}`, { signal: controller.signal })
+    // v = 30-sekundni bucket (= live poll): svi posetioci dele isti CDN odgovor, najviše 30 s star.
+    // 5-sekundni bucket je pravio novi cache key svakih 5 s → funkcija i baza 6× češće bez potrebe.
+    fetch(`${path}?scope=${scope ?? "srb"}&locale=${locale}&v=${Math.floor(Date.now() / 30_000)}`, { signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Homepage request failed")))
       .then((result) => { hasData.current = true; setData(result); setState("ready"); clearFailure(path); })
       .catch((error) => {
@@ -168,7 +169,7 @@ function useHomepageData<T>(path: string, refreshMs?: number, initialData?: T) {
 
   useEffect(() => {
     if (!refreshMs) return;
-    const interval = window.setInterval(() => setAttempt((value) => value + 1), refreshMs);
+    const interval = window.setInterval(() => { if (document.visibilityState === "visible") setAttempt((value) => value + 1); }, refreshMs);
     return () => window.clearInterval(interval);
   }, [refreshMs]);
 
@@ -288,6 +289,8 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
   const hasLive = data?.recent.some((competition) => competition.isLive) ?? false;
   useEffect(() => {
     if (!hasLive) return;
+    // 30 s uz cron od 60 s: upis crona traje nekoliko sekundi i nije u fazi sa poll-om, pa pola minuta
+    // prepolovi kašnjenje novog rezultata (najviše ~90 s umesto ~120 s).
     const poll = window.setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 30_000);
     return () => window.clearInterval(poll);
   }, [hasLive, refresh]);

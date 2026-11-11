@@ -64,10 +64,13 @@ export async function uploadAvatarFromUrl(
     .upload(path, webp, {
       contentType: "image/webp",
       upsert: true,
+      // Godinu dana u browseru i Supabase CDN-u: avatari se retko menjaju, a svaki ponovni fetch je Supabase egress.
+      // Zamena istog fajla dobija novi ?v= u URL-u (dole), pa stari keš ne smeta.
+      cacheControl: "31536000",
     });
 
   if (error) throw new Error(`Storage upload failed: ${error.message}`);
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return `${data.publicUrl}?v=${Date.now()}`;
 }

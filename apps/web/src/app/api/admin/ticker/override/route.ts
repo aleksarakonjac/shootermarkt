@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
 import { tickerLiveOverrides } from "@shootermarkt/db/schema";
-import { revalidatePath } from "next/cache";
+import { revalidatePublicSite } from "@/lib/revalidate-public";
 import { requireAdmin } from "@/lib/admin-auth";
 
 export async function POST(req: NextRequest) {
@@ -21,6 +21,6 @@ export async function POST(req: NextRequest) {
     href:          href ?? null,
   }).returning();
 
-  revalidatePath("/", "layout");
+  revalidatePublicSite();
   return NextResponse.json(override, { status: 201 });
 }

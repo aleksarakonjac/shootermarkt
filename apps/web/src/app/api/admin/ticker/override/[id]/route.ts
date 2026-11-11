@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
 import { tickerLiveOverrides } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidatePublicSite } from "@/lib/revalidate-public";
 import { requireAdmin } from "@/lib/admin-auth";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -25,7 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .where(eq(tickerLiveOverrides.id, parseInt(id)))
     .returning();
 
-  revalidatePath("/", "layout");
+  revalidatePublicSite();
   return NextResponse.json(updated);
 }
 
@@ -35,6 +35,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params;
   await db.delete(tickerLiveOverrides).where(eq(tickerLiveOverrides.id, parseInt(id)));
-  revalidatePath("/", "layout");
+  revalidatePublicSite();
   return NextResponse.json({ ok: true });
 }

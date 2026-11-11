@@ -3,7 +3,7 @@ import { db } from "@shootermarkt/db";
 import { shooters, results, clubMemberships, nationalTeamMemberships } from "@shootermarkt/db/schema";
 import { requireAdmin } from "@/lib/admin-auth";
 import { eq, sql } from "drizzle-orm";
-import { revalidatesPublicSite } from "@/lib/revalidate-public";
+import { revalidatesShooterRoute } from "@/lib/revalidate-public";
 
 async function handlePATCH(
   req: NextRequest,
@@ -68,5 +68,5 @@ async function handleDELETE(
   return NextResponse.json({ ok: true });
 }
 
-export const PATCH = revalidatesPublicSite(handlePATCH);
-export const DELETE = revalidatesPublicSite(handleDELETE);
+export const PATCH = revalidatesShooterRoute(handlePATCH);
+export const DELETE = revalidatesShooterRoute(handleDELETE);
