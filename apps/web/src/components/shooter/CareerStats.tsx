@@ -56,15 +56,15 @@ export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: st
     peak: "The best qualification result achieved in this discipline.",
     best3: "The average of the three best qualification results in this discipline.",
     recent3: "The average of the last three qualification results in this discipline.",
-    season: "The average qualification result in the current season. The number after the slash is the number of starts.",
-    improvement: "The difference between this season's average and the previous season's average.",
+    season: "The average qualification result in the current calendar year. The number after the slash is the number of starts.",
+    improvement: "The difference between this year's average and last year's average.",
   } : {
     form: "FORMAScore je prognoza sledećeg rezultata, zasnovana na novijim nastupima i njihovom trendu.",
     peak: "Najbolji ostvareni kvalifikacioni rezultat u ovoj disciplini.",
     best3: "Prosek tri najbolja kvalifikaciona rezultata u ovoj disciplini.",
     recent3: "Prosek poslednja tri kvalifikaciona rezultata u ovoj disciplini.",
-    season: "Prosek kvalifikacionih rezultata u tekućoj sezoni. Broj posle kose crte je broj nastupa.",
-    improvement: "Razlika između proseka ove i prethodne sezone.",
+    season: "Prosek kvalifikacionih rezultata u tekućoj kalendarskoj godini. Broj posle kose crte je broj nastupa.",
+    improvement: "Razlika između proseka ove i prošle godine.",
   };
 
   return (

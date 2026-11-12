@@ -25,6 +25,18 @@ export function finalSeriesValues(d: FinalDetail): number[] | null {
   return out.length ? out : null;
 }
 
+/** Pojedinačne vrednosti finala + kumulativni zbir posle svake (iz biltena, ili tekući zbir). */
+export function finalSeriesRows(d: FinalDetail): { values: number[]; cumulative: number[] } | null {
+  const round = (n: number) => Math.round(n * 10) / 10;
+  if (d.format === "bulletin" && !d.shots?.length && !d.series?.length && d.cumulative?.length) {
+    return { values: d.cumulative.map((c, i) => round(c - (d.cumulative![i - 1] ?? 0))), cumulative: [...d.cumulative] };
+  }
+  const values = finalSeriesValues(d);
+  if (!values) return null;
+  let run = 0;
+  return { values, cumulative: values.map((v) => (run = round(run + v))) };
+}
+
 interface Props {
   qualDetail: QualDetail | null;
   elimDetail: ElimDetail | null;
@@ -62,7 +74,8 @@ export function ResultDetailPanel({
   qualificationHref,
   finalHref,
 }: Props) {
-  const finalSeries = finalDetail ? finalSeriesValues(finalDetail) : null;
+  const finalRows = finalDetail ? finalSeriesRows(finalDetail) : null;
+  const finalSeries = finalRows?.values ?? null;
   const qualSeries = qualDetail && "series" in qualDetail ? qualDetail.series : null;
   const sharedSeriesCount = elimDetail && qualSeries ? Math.max(elimDetail.series.length, qualSeries.length) : undefined;
   const r3pGroupLabels = isThreePositionCode(disciplineCode) && (sharedSeriesCount ?? qualSeries?.length ?? elimDetail?.series.length) === 6
@@ -130,9 +143,21 @@ export function ResultDetailPanel({
           <p className="mb-1.5 flex items-center justify-between gap-3 text-xs sm:justify-start sm:text-sm font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wider text-[var(--muted)]">
             <span className="flex items-center gap-1">{locale === "en" ? "Final" : "Finale"}{finalRank != null && (MEDAL_COLOR[finalRank] ? <span className="inline-flex size-4 items-center justify-center rounded-full text-[0.55rem] font-bold text-white" style={{ background: MEDAL_COLOR[finalRank] }} aria-label={`${locale === "en" ? "Place" : "Mesto"} ${finalRank}`}>{finalRank}</span> : <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)]">#{finalRank}</span>)}{finalHref && <Link href={finalHref} aria-label={locale === "en" ? "Open final results" : "Otvori rezultate finala"} className="inline-flex size-6 items-center justify-center rounded text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"><ArrowUpRight size={14} /></Link>}</span><span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold normal-case tabular-nums text-[var(--ink)]">{finalScore}</span>
           </p>
-          <div className="flex flex-nowrap items-center overflow-x-auto font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--muted)] sm:text-xs">
-            {finalSeries.map((value, index) => <span key={index} className={`shrink-0 px-[5px] ${index === 0 ? "pl-0" : ""} ${index < finalSeries.length - 1 ? "border-r border-[var(--border)]" : ""} sm:px-2`}>{finalDetail?.format === "bulletin" && finalDetail.scoring === "hit_count" ? Math.round(value) : value.toFixed(1)}</span>)}
-          </div>
+          {(() => {
+            const hits = finalDetail?.format === "bulletin" && finalDetail.scoring === "hit_count";
+            const fmt = (v: number) => (hits ? Math.round(v) : v.toFixed(1));
+            // Kolona po vrednosti: pojedinačna gore, kumulativni zbir ispod — poravnato.
+            return (
+              <div className="flex flex-nowrap items-stretch overflow-x-auto font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums sm:text-base">
+                {finalSeries.map((value, index) => (
+                  <div key={index} className={`flex shrink-0 flex-col px-[5px] sm:px-2 ${index === 0 ? "pl-0 sm:pl-0" : ""} ${index < finalSeries.length - 1 ? "border-r border-[var(--border)]" : ""}`}>
+                    <span className="text-[var(--muted)]">{fmt(value)}</span>
+                    <span className="font-semibold text-[var(--ink)]">{fmt(finalRows!.cumulative[index])}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

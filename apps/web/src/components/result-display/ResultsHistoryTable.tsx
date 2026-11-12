@@ -10,6 +10,7 @@ import { DISCIPLINE_DISPLAY_ORDER, disciplineName } from "@shootermarkt/db/disci
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useScopedHref } from "@/hooks/use-scoped-href";
 import { ResultDetailPanel, finalSeriesValues } from "./ResultDetailPanel";
+import { RemarkBadge } from "./RemarkBadge";
 
 const MEDAL_COLOR: Record<number, string> = {
   1: "oklch(0.75 0.14 85)",
@@ -41,6 +42,8 @@ export type ResultRowData = {
   qualTotal: string | null;
   qualRank: number | null;
   qualInners: number | null;
+  /** Status napomena kvalifikacija (DSQ/DNS/DNF…). */
+  qualRemark?: string | null;
   qualified: boolean | null;
   elimTotal: number | null;
   elimRank: number | null;
@@ -119,10 +122,10 @@ function hitsLabel(n: number, en: boolean): string {
 
 function SeriesLine({ label, series, total, inners }: { label: string; series: number[]; total: number | null; inners?: number | null }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <span className="w-24 shrink-0 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{label}</span>
-      <span className="flex flex-wrap gap-x-2 font-[family-name:var(--font-jetbrains-mono)] tabular-nums text-[var(--muted)]">{series.map((v, i) => <span key={i}>{v}</span>)}</span>
-      {total != null && <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">{total}{inners != null && <span className="ml-0.5 text-[0.65rem] font-normal text-[var(--muted)]">{inners}×</span>}</span>}
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+      <span className="w-24 shrink-0 sm:w-36 font-[family-name:var(--font-barlow-condensed)] text-xs font-semibold uppercase tracking-wider text-[var(--muted)] sm:text-sm">{label}</span>
+      <span className="flex flex-wrap gap-x-3 font-[family-name:var(--font-jetbrains-mono)] text-base tabular-nums text-[var(--muted)] sm:text-lg">{series.map((v, i) => <span key={i}>{v}</span>)}</span>
+      {total != null && <span className="font-[family-name:var(--font-jetbrains-mono)] text-base font-bold tabular-nums text-[var(--ink)] sm:text-lg">{total}{inners != null && <span className="ml-0.5 text-xs font-normal text-[var(--muted)]">{inners}×</span>}</span>}
     </div>
   );
 }
@@ -223,6 +226,8 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                     // Q / QG / QB iz poslednje odstreljane Solo kvalifikacije
                     const soloPart = isSolo && r.qualDetail && "format" in r.qualDetail ? r.qualDetail.part2 ?? r.qualDetail.part1 : null;
                     const soloMark = soloPart?.remark && /^Q[GB]?$/.test(soloPart.remark) ? soloPart.remark : null;
+                    const RowTag = canExpand ? "button" : "div";
+                    const statusMark = r.qualRemark && /^(DSQ|DNS|DNF)$/.test(r.qualRemark) ? r.qualRemark : null;
                     const shootOff = r.remarkDetails?.final?.shootOff ? " SO" : "";
                     // Druga linija na telefonu samo kad ima šta da pokaže (dodatak ili finale/meč).
                     const hasFinalCell = isSolo ? placement != null || r.finalTotal != null : r.finalTotal != null || r.finalRank != null;
@@ -233,12 +238,9 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                       <Fragment key={r.rowKey}>
                         <tr>
                           <td className={`px-1.5 sm:px-2 ${isLast && !isExpanded ? "pb-2.5 sm:pb-3" : ""}`}>
-                            <button
-                              type="button"
-                              disabled={!canExpand}
-                              onClick={canExpand ? () => setExpanded(isExpanded ? null : r.rowKey) : undefined}
-                              aria-expanded={canExpand ? isExpanded : undefined}
-                              className={`grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5 rounded-md px-1.5 py-1.5 text-left transition-colors sm:grid-cols-[minmax(0,1fr)_minmax(0,11rem)_7.5rem_8.5rem] sm:px-2 lg:grid-cols-[minmax(0,13.5rem)_minmax(0,7.5rem)_minmax(0,1fr)_9rem_8.5rem] lg:gap-x-5 lg:py-2 ${canExpand ? "cursor-pointer hover:bg-[var(--surface-2)]" : "cursor-default"} ${isExpanded ? "bg-[var(--surface-2)]" : ""}`}
+                            <RowTag
+                              {...(canExpand ? { type: "button" as const, onClick: () => setExpanded(isExpanded ? null : r.rowKey), "aria-expanded": isExpanded } : {})}
+                              className={`grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5 rounded-md px-1.5 py-1.5 text-left transition-colors sm:grid-cols-[minmax(0,1fr)_minmax(0,9rem)_7.5rem_11rem] sm:px-2 lg:grid-cols-[minmax(0,13.5rem)_minmax(0,7.5rem)_minmax(0,1fr)_9rem_11rem] lg:gap-x-5 lg:py-2 ${canExpand ? "cursor-pointer hover:bg-[var(--surface-2)]" : "cursor-default"} ${isExpanded ? "bg-[var(--surface-2)]" : ""}`}
                             >
                               <span className="order-1 min-w-0 font-medium leading-snug text-[var(--ink)]">{rowName(r, locale)}</span>
                               <span className="order-3 min-w-0 truncate text-[0.7rem] text-[var(--muted)] sm:order-2 sm:text-xs">
@@ -246,7 +248,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                                 {r.eventName && <span className="ml-1 font-semibold text-[var(--brand-primary)]" title={r.eventName}>{localizeMatchName(r.eventName, locale)}</span>}
                               </span>
                               {/* Desktop: serije kvalifikacije u sredini reda umesto praznog prostora */}
-                              <span data-testid="row-series" className="hidden min-w-0 items-baseline gap-x-2 truncate font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--subtle)] lg:order-2 lg:flex">
+                              <span data-testid="row-series" className="hidden min-w-0 items-baseline gap-x-1.5 overflow-hidden whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--subtle)] lg:order-2 lg:flex">
                                 {rowSeries(r).map((v, i) => <span key={i} className={typeof v === "string" && isNaN(Number(v)) ? "text-[0.6rem] font-semibold uppercase tracking-wide" : ""}>{typeof v === "string" && isNaN(Number(v)) ? v : fmtSeries(Number(v))}</span>)}
                               </span>
                               <span className="order-2 flex items-baseline justify-end gap-1 whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] tabular-nums sm:order-3">
@@ -254,7 +256,10 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                                   ? <span className="font-semibold text-[var(--ink)]">{isSolo ? `${fmtQual(r.qualTotal)} ${hitsLabel(Math.round(parseFloat(r.qualTotal)), en)}` : fmtQual(r.qualTotal)}{showInners && r.qualInners != null && <span className="ml-0.5 text-[0.65rem] font-normal text-[var(--muted)]">{r.qualInners}×</span>}</span>
                                   : showElimInsteadOfQual
                                     ? <span className="font-semibold text-[var(--ink)]">{Math.round(r.elimTotal!)}<span className="ml-1 inline-flex rounded bg-amber-100 px-1 py-px font-[family-name:var(--font-barlow-condensed)] text-[0.6rem] font-bold leading-none text-amber-800">E</span></span>
-                                    : <span className="text-[var(--subtle)]">—</span>}
+                                    : statusMark ? null : <span className="text-[var(--subtle)]">—</span>}
+                                {statusMark && (canExpand
+                                  ? <span className={`font-bold uppercase tracking-wide ${statusMark === "DSQ" ? "text-[var(--danger)]" : "text-[var(--muted)]"}`}>{statusMark}</span>
+                                  : <RemarkBadge remark={statusMark} details={r.remarkDetails?.qual} label={r.competitionName} className="text-[0.8rem]" />)}
                                 <span className="text-[0.65rem] text-[var(--subtle)]">{isSolo && r.finalRank == null ? "" /* ispao pre meča: plasman stoji kao "N. mesto" */ : r.qualRank != null ? `#${r.qualRank}` : r.elimRank != null ? `#${r.elimRank}` : ""}</span>
                                 {soloMark && <span className="text-[0.65rem] font-bold text-[var(--brand-primary)]">{soloMark}</span>}
                                 {canExpand && !hasLine2 && <ChevronDown size={14} className={`shrink-0 self-center text-[var(--muted)] transition-transform duration-200 sm:hidden ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true" />}
@@ -269,7 +274,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                                 ) : null}
                                 {canExpand && <ChevronDown size={14} className={`shrink-0 text-[var(--muted)] transition-transform duration-200 ${hasLine2 ? "" : "max-sm:hidden"} ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true" />}
                               </span>
-                            </button>
+                            </RowTag>
                           </td>
                         </tr>
                         {canExpand && (
@@ -278,15 +283,15 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                               <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                                 <div className="overflow-hidden">
                                   {isMixed ? (
-                                    <div className="space-y-2 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs">
+                                    <div className="space-y-2.5 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3.5">
                                       {r.mixedDetail?.own && <SeriesLine label={en ? "You" : "Strelac"} series={r.mixedDetail.own.series} total={r.mixedDetail.own.total} inners={showInners ? r.mixedDetail.own.inners : null} />}
                                       {r.mixedDetail?.partner && <SeriesLine label={r.partnerName ?? (en ? "Partner" : "Partner")} series={r.mixedDetail.partner.series} total={r.mixedDetail.partner.total} inners={showInners ? r.mixedDetail.partner.inners : null} />}
                                     </div>
                                   ) : isSolo && r.qualDetail && "format" in r.qualDetail ? (
-                                    <div className="space-y-2 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-xs">
+                                    <div className="space-y-2.5 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3.5">
                                       <SeriesLine label={en ? "Qual. 1" : "Kval. 1"} series={r.qualDetail.part1.series} total={r.qualDetail.part1.total} />
                                       {r.qualDetail.part2 && <SeriesLine label={en ? "Qual. 2" : "Kval. 2"} series={r.qualDetail.part2.series} total={r.qualDetail.part2.total} />}
-                                      {soloFinal?.series && <SeriesLine label={en ? "Match" : "Meč"} series={soloFinal.series} total={r.finalTotal != null ? Math.round(parseFloat(r.finalTotal)) : null} />}
+                                      {soloFinal?.series && <SeriesLine label={r.finalRank != null && r.finalRank <= 2 ? (en ? "Gold medal match" : "Meč za zlato") : r.finalRank != null && r.finalRank <= 4 ? (en ? "Bronze medal match" : "Meč za bronzu") : en ? "Match" : "Meč"} series={soloFinal.series} total={r.finalTotal != null ? Math.round(parseFloat(r.finalTotal)) : null} />}
                                     </div>
                                   ) : (
                                     <ResultDetailPanel qualDetail={r.qualDetail} elimDetail={r.elimDetail} elimTotal={r.elimTotal} elimRank={r.elimRank} qualRank={r.qualRank} qualScore={r.qualTotal != null ? fmtQual(r.qualTotal) : null} disciplineCode={r.disciplineCode} locale={locale} finalDetail={r.finalDetail} finalScore={r.finalTotal != null ? fmtFinal(r.finalTotal) : null} finalRank={r.finalRank} hasDecimals={qualDecimals} inners={showInners ? r.qualInners : null} eliminationHref={phaseHref("elim")} qualificationHref={phaseHref("qual")} finalHref={phaseHref("final")} />

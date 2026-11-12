@@ -42,7 +42,7 @@ export function SeriesQualDisplay({ detail, hasDecimals = false, inners, total: 
             {displaySeries.map((v, i) => (
               <td
                 key={i}
-                className={`whitespace-nowrap px-1 py-1 text-center font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums border-r border-[var(--border)] last:border-r-0 sm:px-2 sm:text-sm ${
+                className={`whitespace-nowrap px-1 py-1.5 text-center font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums border-r border-[var(--border)] last:border-r-0 sm:px-2 sm:text-base ${
                   v != null && v === bestValue
                     ? "text-[var(--ink)] bg-[var(--surface-2)]"
                     : "text-[var(--muted)]"

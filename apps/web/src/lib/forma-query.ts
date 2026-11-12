@@ -1,7 +1,7 @@
 import { and, eq, gt, gte, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { results, competitions, competitionEvents, disciplines, shooterFormaCache } from "@shootermarkt/db/schema";
-import { FORMA_DISCIPLINE_CODES, INVALID_REMARKS, RANKING_MIN_SAMPLE, type CompetitionEventType, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
+import { FORMA_DISCIPLINE_CODES, FULL_MATCH_MIN_RATIO, INVALID_REMARKS, RANKING_MIN_SAMPLE, type CompetitionEventType, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
 
 /** qual_remark oznake koje znače da rezultat nije ispucan do kraja. */
 export { INVALID_REMARKS };
@@ -37,6 +37,7 @@ export function rankedFormaCacheFilter() {
       where ${results.shooterId} = ${shooterFormaCache.shooterId}
         and ${disciplines.code}::text = ${shooterFormaCache.disciplineCode}
         and ${results.qualTotal} > 0
+        and ${results.qualTotal} >= ${disciplines.maxQualScore} * ${FULL_MATCH_MIN_RATIO}
         and ${competitions.date} >= to_char(current_date - ${RANKING_ACTIVE_DAYS}::int, 'YYYY-MM-DD')
     )`,
   );
@@ -73,6 +74,8 @@ export async function getFormaEntriesByDiscipline(
         shooterIds && shooterIds.length > 0 ? inArray(results.shooterId, shooterIds) : undefined,
         inArray(disciplines.code, FORMA_DISCIPLINE_CODES as (typeof disciplines.code.enumValues)[number][]),
         gt(results.qualTotal, "0"),
+        // kraći mečevi (4 serije…) samo u istoriji, ne u formi
+        sql`${results.qualTotal} >= ${disciplines.maxQualScore} * ${FULL_MATCH_MIN_RATIO}`,
         // DNF/DNS/DSQ: delimičan ili nepostojeći skor — nije nastup za formu
         or(isNull(results.qualRemark), notInArray(results.qualRemark, INVALID_REMARKS)),
       )

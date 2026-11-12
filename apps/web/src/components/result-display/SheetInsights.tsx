@@ -65,7 +65,7 @@ function FormaHistoryChart({ shooterId, code, total, en }: { shooterId: number; 
 const signed = (d: number) => `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d).toFixed(1)}`;
 
 /**
- * Kontekst strelca ispod serija: forma + trend, lični rekord, odnos prema sezonskom proseku,
+ * Kontekst strelca ispod serija: forma + trend, lični rekord, odnos prema proseku kalendarske godine,
  * H2H prečica i ostali nastupi na istom takmičenju. `total` samo za kvalifikacioni sheet —
  * forma i peak se računaju iz kvalifikacionih skorova, pa se u finalu ne poredi.
  */
@@ -105,7 +105,7 @@ export function SheetInsights({ shooterId, code, resultId, total, en }: {
               {vsSeason != null && (
                 <li className="text-[var(--muted)]">
                   <span className={`font-semibold tabular-nums ${MONO}`} style={{ color: vsSeason > 0 ? "var(--success)" : "var(--ink)" }}>{signed(vsSeason)}</span>{" "}
-                  {en ? `vs season average (${f.seasonAvg!.toFixed(1)})` : `u odnosu na sezonski prosek (${f.seasonAvg!.toFixed(1)})`}
+                  {en ? `vs this year's average (${f.seasonAvg!.toFixed(1)})` : `u odnosu na prosek ove godine (${f.seasonAvg!.toFixed(1)})`}
                 </li>
               )}
             </ul>

@@ -27,7 +27,7 @@ import { RelatedNewsSection } from "@/components/RelatedNewsSection";
 import { ArrowRight } from "lucide-react";
 import { ShooterAvatarLightbox } from "@/components/shooter/ShooterAvatarLightbox";
 import { INVALID_REMARKS } from "@/lib/forma-query";
-import { countFormaAppearances, FORMA_DISCIPLINE_CODES } from "@/lib/forma";
+import { countFormaAppearances, FORMA_DISCIPLINE_CODES, FULL_MATCH_MIN_RATIO } from "@/lib/forma";
 import { getShooterMixedRows } from "@/lib/shooter-mixed-results";
 import { toIndividualHistoryRow } from "@/lib/shooter-results";
 
@@ -143,7 +143,7 @@ export default async function ShooterPage({ params }: Props) {
   const totalAppearances = shooterResults.length + mixedRows.length;
   // Statistika "Nastupi" = samo nastupi koji ulaze u formu (bez Solo, mix, ležećeg, 300m…).
   const formaAppearances = countFormaAppearances(
-    shooterResults.map((r) => ({ disciplineCode: r.disciplineCode, date: r.competitionDate, qualTotal: r.qualTotal, qualRemark: r.qualRemark })),
+    shooterResults.map((r) => ({ disciplineCode: r.disciplineCode, date: r.competitionDate, qualTotal: r.qualTotal, qualRemark: r.qualRemark, maxQualScore: r.maxQualScore })),
   );
   // ESC Solo (pogoci) se ne meša sa ISSF finalima ni sa najboljim skorom.
   const finalesCount = shooterResults.filter((r) => r.finalRank != null && !isEscSoloCode(r.disciplineCode)).length;
@@ -176,7 +176,8 @@ export default async function ShooterPage({ params }: Props) {
   // Isti filter kao forma (forma-query): bez nula i DNF/DNS/DSQ — tačke odgovaraju liniji forme.
   const isFormaResult = (r: (typeof shooterResults)[number]) =>
     FORMA_DISCIPLINE_CODES.includes(r.disciplineCode) &&
-    r.qualTotal != null && parseFloat(r.qualTotal) > 0 && !INVALID_REMARKS.includes(r.qualRemark ?? "");
+    r.qualTotal != null && parseFloat(r.qualTotal) > 0 && !INVALID_REMARKS.includes(r.qualRemark ?? "") &&
+    parseFloat(r.qualTotal) >= parseFloat(r.maxQualScore) * FULL_MATCH_MIN_RATIO;
   const chartPoints: ChartPoint[] = shooterResults
     .filter(isFormaResult)
     .map((r) => ({
@@ -409,35 +410,14 @@ export default async function ShooterPage({ params }: Props) {
         <div className="mb-10">
           <FormaScoreHeading locale={locale} />
 
-          {/* Desktop: one chart per discipline, side by side */}
-          <div
-            className="hidden sm:grid gap-4"
-            style={{ gridTemplateColumns: `repeat(${Math.min(chartDisciplines.length, 3)}, 1fr)` }}
-          >
-            {chartDisciplines.map((d) => (
-              <FormaChart
-                key={d.code}
-                points={chartPoints}
-                disciplines={[d]}
-                formaScores={formaScores}
-                locale={locale}
-                noDataLabel={tProfile("noChartData")}
-                today={today}
-              />
-            ))}
-          </div>
-
-          {/* Mobile: tabbed single chart */}
-          <div className="sm:hidden">
-            <FormaChart
-              points={chartPoints}
-              disciplines={chartDisciplines}
-              formaScores={formaScores}
-              locale={locale}
-              noDataLabel={tProfile("noChartData")}
-                today={today}
-            />
-          </div>
+          <FormaChart
+            points={chartPoints}
+            disciplines={chartDisciplines}
+            formaScores={formaScores}
+            locale={locale}
+            noDataLabel={tProfile("noChartData")}
+            today={today}
+          />
         </div>
       )}
 

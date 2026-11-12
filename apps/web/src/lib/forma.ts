@@ -167,16 +167,23 @@ function dedupeSameMatch(entries: FormaEntry[]): FormaEntry[] {
 export const INVALID_REMARKS = ["DNF", "DNS", "DSQ"];
 
 /**
+ * Kraći mečevi (npr. 40 hitaca za U18 ≈ 420 od 630) nisu uporedivi sa punim programom —
+ * ne ulaze u formu, rang ni grafik; ostaju samo u istoriji rezultata.
+ */
+export const FULL_MATCH_MIN_RATIO = 0.8;
+
+/**
  * Broj nastupa koji ulaze u formu: forma discipline, skor > 0, bez DNF/DNS/DSQ,
  * isti skor istog dana u istoj disciplini (senior + junior lista) broji se jednom.
  */
 export function countFormaAppearances(
-  rows: { disciplineCode: string; date: string; qualTotal: string | number | null; qualRemark: string | null }[],
+  rows: { disciplineCode: string; date: string; qualTotal: string | number | null; qualRemark: string | null; maxQualScore?: string | number | null }[],
 ): number {
   const keys = new Set<string>();
   for (const r of rows) {
     const score = Number(r.qualTotal);
     if (!FORMA_DISCIPLINE_CODES.includes(r.disciplineCode) || !(score > 0)) continue;
+    if (r.maxQualScore != null && score < Number(r.maxQualScore) * FULL_MATCH_MIN_RATIO) continue;
     if (r.qualRemark && INVALID_REMARKS.includes(r.qualRemark)) continue;
     keys.add(`${r.disciplineCode}|${r.date}|${score}`);
   }

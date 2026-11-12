@@ -58,6 +58,7 @@ export async function getShooterResultsPage(shooterId: number, cursor?: ResultsC
       qualTotal: results.qualTotal,
       qualRank: results.qualRank,
       qualInners: results.qualInners,
+      qualRemark: results.qualRemark,
       qualified: results.qualified,
       elimTotal: results.elimTotal,
       elimRank: results.elimRank,

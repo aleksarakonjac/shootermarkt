@@ -1,5 +1,6 @@
 import { MainNav } from "./components/MainNav";
 import { GlobalSearch } from "./GlobalSearch";
+import { PwaBackLink } from "./components/PwaBackLink";
 import ThemeToggle from "./components/ThemeToggle";
 import { RegionSelector } from "./components/RegionSelector";
 import { LocaleSwitcher } from "./components/LocaleSwitcher";
@@ -73,7 +74,7 @@ export default async function PublicLayout({ children, params }: Props) {
 
       <TopOfPageTicker />
 
-      <main id="main-content" tabIndex={-1} className="flex-1 outline-none">{children}</main>
+      <main id="main-content" tabIndex={-1} className="flex-1 outline-none"><PwaBackLink label={tCommon("back")} />{children}</main>
 
       <footer className="border-t border-[var(--border)] bg-[var(--surface)]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

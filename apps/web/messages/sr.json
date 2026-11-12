@@ -143,7 +143,7 @@
     "h2hStat_forma": "Forma",
     "h2hStat_peak": "Peak",
     "h2hStat_best3": "Best-3 prosek",
-    "h2hStat_seasonAvg": "Sezona prosek",
+    "h2hStat_seasonAvg": "Prosek godine",
     "h2hStat_recent3": "Poslednja-3 prosek",
     "h2hStat_appearances": "Nastupa",
     "notEnoughSample": "još nema dovoljno rezultata",
@@ -229,12 +229,13 @@
       "allDisciplines": "Sve",
       "statsCareer": "Statistike karijere",
       "statBest3": "Best-3",
-      "statSezonaProsek": "Ova sezona",
+      "statSezonaProsek": "Ova godina",
       "statNapredak": "vs. prošla",
       "statUkupnoNastupa": "Nastupa"
     }
   },
   "common": {
+    "back": "Nazad",
     "skipToContent": "Pređi na glavni sadržaj",
     "soon": "Uskoro",
     "admin": "Admin",

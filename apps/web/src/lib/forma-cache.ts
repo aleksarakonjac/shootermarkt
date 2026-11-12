@@ -31,9 +31,10 @@ export async function recomputeFormaCache(shooterIds?: number[]): Promise<void> 
   // Discipline izbačene iz forme (300m, ležeći, standard…) ne smeju da ostanu u kešu ni kod punog preračuna.
   await db.delete(shooterFormaCache).where(notInArray(shooterFormaCache.disciplineCode, FORMA_DISCIPLINE_CODES));
 
-  const airSeasonYear = currentSeasonStartYear("vazdusna");
-  const seasonWin = seasonWindow("vazdusna", airSeasonYear);
-  const prevSeasonWin = seasonWindow("vazdusna", airSeasonYear - 1);
+  // "Sezona" u kešu = kalendarska godina (poklapa se sa međunarodnim kalendarom).
+  const seasonYear = currentSeasonStartYear("kalendarska");
+  const seasonWin = seasonWindow("kalendarska", seasonYear);
+  const prevSeasonWin = seasonWindow("kalendarska", seasonYear - 1);
 
   for (const { shooterId, disciplineCode, entries } of groups.values()) {
     const f = computeFormaFromEntries(entries, { code: disciplineCode });

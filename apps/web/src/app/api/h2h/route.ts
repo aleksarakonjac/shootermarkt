@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
   const p2 = build(b);
   if (!p1 || !p2) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const seasonLabel = formatSeasonLabel("vazdusna", currentSeasonStartYear("vazdusna"));
+  const seasonLabel = formatSeasonLabel("kalendarska", currentSeasonStartYear("kalendarska"));
 
   return NextResponse.json({ p1, p2, seasonLabel }, {
     headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },

@@ -4,8 +4,12 @@ import { useState, useRef, useEffect, useSyncExternalStore } from "react";
 import { Link } from "@/i18n/navigation";
 import { motion } from "framer-motion";
 import { rollingForma, type CompetitionEventType, type CompetitionLevel, type ResultCategory } from "@/lib/forma";
+import { qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
 import { FormaScoreInfo } from "./FormaScoreHeading";
-import { DisciplineSelector, DISCIPLINE_COLOR } from "./DisciplineSelector";
+import { DisciplineSelector } from "./DisciplineSelector";
+
+// FORMAScore je uvek crven — disciplina se razlikuje selektorom, ne bojom.
+const CHART_COLOR = "#C20000";
 
 export type ChartPoint = {
   date: string;
@@ -78,8 +82,8 @@ function TrendArrow({ trend }: { trend: "up"|"down"|"stable" }) {
 
 // ── Chart geometry ────────────────────────────────────────────────────────────
 
-const H = 180;
-const ML = 48, MR = 28, MT = 12, MB = 28;
+const H = 172;
+const ML = 48, MR = 28, MT = 12, MB = 22;
 const CH = H - MT - MB;
 
 type WindowValues = { forma: number[]; score: number[]; reliability: number[] };
@@ -123,7 +127,8 @@ function buildWindow(data: ChartPoint[], v: WindowValues, CW: number, maxScore: 
     : "";
 
   const range = yMax - yMin;
-  const step = range < 10 ? 1 : range < 20 ? 2 : 5;
+  // Najviše ~6 linija mreže, bez obzira na raspon (outlier ne sme da napuni skalu).
+  const step = [1, 2, 5, 10, 20, 50, 100].find((s) => range / s <= 6) ?? 100;
   const yTicks: number[] = [];
   for (let y = Math.ceil(yMin / step) * step; y <= yMax; y += step) yTicks.push(y);
 
@@ -180,7 +185,7 @@ function ChartLayer({ data, built, chartWidth, color, locale, showLabels, hoverI
         if (i % every !== 0 && i !== data.length - 1) return null;
         const anchor = i === 0 ? "start" : i === data.length - 1 ? "end" : "middle";
         return (
-          <text key={i} x={sx(i).toFixed(1)} y={H - 6} textAnchor={anchor} fill="var(--subtle)" fontSize="11" fontWeight="600">
+          <text key={i} x={sx(i).toFixed(1)} y={H - 5} textAnchor={anchor} fill="var(--subtle)" fontSize="11" fontWeight="600">
             {fmtShort(p.date, locale)}
           </text>
         );
@@ -246,14 +251,13 @@ export function FormaChart({
   }, []);
 
   const maxScore = disciplines.find(d => d.code === disc)?.maxScore ?? 630;
-  const color = DISCIPLINE_COLOR[disc] ?? "#C20000";
+  const color = CHART_COLOR;
   const forma = formaScores[disc];
   const forma_trend_color = forma?.trend === "up" ? "#15803d" : forma?.trend === "down" ? "#C20000" : "#888";
 
   const en = locale === "en";
   const t = {
     reliability: en ? "Prediction confidence range (±)" : "Raspon pouzdanosti prognoze (±)",
-    level:       en ? "Level" : "Nivo",
     peak:        "Peak",
     consistency: (c: number) =>
       c >= 0.75 ? (en ? "Stable" : "Stabilan")
@@ -268,8 +272,8 @@ export function FormaChart({
     lastStart: (months: number) => en ? `Last start ${months} months ago` : `Poslednji nastup pre ${months} mes.`,
     metricsTitle: en ? "What do these metrics mean?" : "Šta znače ove metrike?",
     metricsDescription: en
-      ? "Level is the estimated current level without projecting the trend. Peak shows how close FORMAScore is to the best result, while stability shows how consistent performances are."
-      : "Nivo je procenjeni trenutni nivo bez projekcije trenda. Peak pokazuje koliko je FORMAScore blizu najboljeg rezultata, a stabilnost koliko su nastupi ujednačeni.",
+      ? "Peak shows how close FORMAScore is to the best result, while stability shows how consistent performances are."
+      : "Peak pokazuje koliko je FORMAScore blizu najboljeg rezultata, a stabilnost koliko su nastupi ujednačeni.",
   };
 
   const CW = svgW > 0 ? svgW - ML - MR : 600;
@@ -397,7 +401,7 @@ export function FormaChart({
                 className={compactTooltip ? "mt-1 block" : "shrink-0"}
                 style={{ color: "var(--muted)", fontFamily: "var(--font-jetbrains-mono,monospace)", fontSize: "0.75rem", fontWeight: 700, lineHeight: 1.4 }}
               >
-                {t.legendScore} {hovPt.score % 1 === 0 ? hovPt.score : hovPt.score.toFixed(1)}
+                {t.legendScore} {qualHasDecimals(hovPt.discipline) ? hovPt.score.toFixed(1) : Math.round(hovPt.score)}
               </span>
             </div>
             {(hovPt.location || hovPt.nocCode) && (
@@ -417,29 +421,30 @@ export function FormaChart({
 
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg)] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between gap-1.5 px-3 pt-3 pb-2.5 border-b border-[var(--border)] sm:gap-3 sm:px-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-2 px-3 pt-3 pb-2.5 border-b border-[var(--border)] sm:gap-x-3 sm:px-4">
           <div className="flex gap-1.5 flex-wrap items-center">
 
             {available.length === 1 ? (
               <span
                 className="text-[14px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded font-[family-name:var(--font-barlow-condensed)]"
-                style={{ background: DISCIPLINE_COLOR[available[0].code] ?? "#C20000", color: "#fff" }}
+                style={{ background: CHART_COLOR, color: "#fff" }}
               >
                 {available[0].code}
               </span>
             ) : (
-              <DisciplineSelector options={available} value={disc} onChange={selectDiscipline} locale={locale} />
+              <DisciplineSelector options={available} value={disc} onChange={selectDiscipline} locale={locale} color={CHART_COLOR} />
             )}
           </div>
 
-          {/* Legenda: tačka = nastup, linija = forma */}
-          <div className="flex shrink-0 items-center gap-2.5 text-[0.7rem] font-semibold text-[var(--muted)]" aria-hidden="true">
-            <span className="flex items-center gap-1">
+
+          {/* Legenda u dva reda: tačka = nastup, linija = forma */}
+          <div className="flex shrink-0 flex-col gap-0.5 text-[0.7rem] font-semibold leading-tight text-[var(--muted)]" aria-hidden="true">
+            <span className="flex items-center gap-1.5">
               <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.5" fill="var(--bg)" stroke={color} strokeWidth="2" /></svg>
               {t.legendScore}
             </span>
-            <span className="flex items-center gap-1">
-              <svg width="14" height="10" viewBox="0 0 14 10"><line x1="1" y1="5" x2="13" y2="5" stroke={color} strokeWidth="2.5" strokeLinecap="round" /></svg>
+            <span className="flex items-center gap-1.5">
+              <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="5" x2="10" y2="5" stroke={color} strokeWidth="2.5" strokeLinecap="round" /></svg>
               {t.legendForma}
             </span>
           </div>
@@ -467,15 +472,18 @@ export function FormaChart({
                   <TrendArrow trend={forma.trend} />
                 </span>
               )}
-              {forma.lowConfidence && (
-                <span
-                  title={t.lowConfidence}
-                  className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide"
-                  style={{ background: "var(--surface-2)", color: "var(--muted)" }}
-                >
-                  {t.lowConfidenceBadge}
-                </span>
-              )}
+            </div>
+          )}
+
+          {forma?.lowConfidence && (
+            <div className="flex w-full justify-end">
+              <span
+                title={t.lowConfidence}
+                className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide"
+                style={{ background: "var(--surface-2)", color: "var(--muted)" }}
+              >
+                {t.lowConfidenceBadge}
+              </span>
             </div>
           )}
         </div>
@@ -551,15 +559,8 @@ export function FormaChart({
         {/* Metric strip */}
         {forma && (
           <div className="flex flex-nowrap items-center gap-x-1.5 py-2.5 px-3 text-[0.75rem] border-t border-[var(--border)] bg-[var(--surface-2)] sm:gap-x-3 sm:px-4 sm:text-[0.8125rem]">
-              <span className="flex items-center gap-1">
-                <span className="text-[var(--subtle)]">{t.level}</span>
-                <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
-                  {forma.level.toFixed(1)}
-                </span>
-              </span>
               {forma.peakProximity !== null && (
                 <>
-                  <span className="hidden text-[var(--border-strong)] min-[360px]:inline" aria-hidden="true">·</span>
                   <span className="flex items-center gap-1 sm:gap-1.5">
                     <span className="hidden text-[var(--subtle)] min-[360px]:inline">{t.peak}</span>
                     <span className="relative h-1.5 w-10 rounded-full bg-[var(--border)] overflow-hidden sm:w-14" aria-hidden="true">
@@ -569,14 +570,14 @@ export function FormaChart({
                       />
                     </span>
                     <span className="font-[family-name:var(--font-jetbrains-mono)] font-semibold tabular-nums text-[var(--ink)]">
-                      {Math.round(forma.peakProximity * 100)}%
+                      {(Math.floor(forma.peakProximity * 1000) / 10).toFixed(1)}%
                     </span>
                   </span>
                 </>
               )}
             <span className="flex items-center gap-1 sm:gap-1.5">
-              <span className="text-[var(--ink)] font-medium">{t.consistency(forma.consistency)}</span>
-              <span className="flex items-center gap-0.5" aria-hidden="true">
+              <span className="text-[var(--subtle)]">{en ? "Stability" : "Stabilnost"}</span>
+              <span className="flex items-center gap-0.5" role="img" aria-label={`${en ? "Stability" : "Stabilnost"}: ${t.consistency(forma.consistency)}`} title={t.consistency(forma.consistency)}>
                 {Array.from({ length: 5 }).map((_, i) => {
                   const filled = i < Math.round(forma.consistency * 5);
                   return (

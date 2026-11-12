@@ -143,7 +143,7 @@
     "h2hStat_forma": "Form",
     "h2hStat_peak": "Peak",
     "h2hStat_best3": "Best-3 avg",
-    "h2hStat_seasonAvg": "Season avg",
+    "h2hStat_seasonAvg": "Year avg",
     "h2hStat_recent3": "Last-3 avg",
     "h2hStat_appearances": "Appearances",
     "notEnoughSample": "not enough results yet",
@@ -229,12 +229,13 @@
       "allDisciplines": "All",
       "statsCareer": "Career Statistics",
       "statBest3": "Best-3",
-      "statSezonaProsek": "This season",
+      "statSezonaProsek": "This year",
       "statNapredak": "vs. prior",
       "statUkupnoNastupa": "Appearances"
     }
   },
   "common": {
+    "back": "Back",
     "skipToContent": "Skip to main content",
     "soon": "Soon",
     "admin": "Admin",

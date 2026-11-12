@@ -17,13 +17,17 @@ export function DisciplineSelector({
   onChange,
   locale = "sr",
   showLabel = false,
+  color,
 }: {
   options: Option[];
   value: string;
   onChange: (code: string) => void;
   locale?: string;
   showLabel?: boolean;
+  /** Jedna boja za sve discipline (npr. profil strelca: uvek crvena). */
+  color?: string;
 }) {
+  const dot = (code: string) => color ?? DISCIPLINE_COLOR[code] ?? "#C20000";
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const listboxId = useId();
@@ -57,10 +61,10 @@ export function DisciplineSelector({
         className={`flex items-center gap-1.5 rounded px-2 py-0.5 text-[14px] font-extrabold tracking-wider uppercase transition-colors font-[family-name:var(--font-barlow-condensed)] ${
           showLabel ? "max-w-full bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--border)]" : "text-white"
         }`}
-        style={showLabel ? undefined : { background: DISCIPLINE_COLOR[selected.code] ?? "#C20000" }}
+        style={showLabel ? undefined : { background: dot(selected.code) }}
       >
         {showLabel && (
-          <span className="rounded px-1.5 py-px text-white" style={{ background: DISCIPLINE_COLOR[selected.code] ?? "#C20000" }}>
+          <span className="rounded px-1.5 py-px text-white" style={{ background: dot(selected.code) }}>
             {selected.code}
           </span>
         )}
@@ -79,7 +83,7 @@ export function DisciplineSelector({
                 onClick={() => { onChange(option.code); setOpen(false); }}
                 className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface-2)]"
               >
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: DISCIPLINE_COLOR[option.code] ?? "#C20000" }} aria-hidden="true" />
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dot(option.code) }} aria-hidden="true" />
                 <span className="whitespace-nowrap">{showLabel ? option.label : option.code}</span>
               </button>
             </li>
