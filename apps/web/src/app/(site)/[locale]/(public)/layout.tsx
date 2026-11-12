@@ -1,6 +1,5 @@
 import { MainNav } from "./components/MainNav";
 import { GlobalSearch } from "./GlobalSearch";
-import HeaderHomeLink from "./components/HeaderHomeLink";
 import ThemeToggle from "./components/ThemeToggle";
 import { RegionSelector } from "./components/RegionSelector";
 import { LocaleSwitcher } from "./components/LocaleSwitcher";
@@ -46,7 +45,6 @@ export default async function PublicLayout({ children, params }: Props) {
                 markt
               </span>
             </ScopedLink>
-            <div className="hidden lg:block lg:-mr-3.5"><HeaderHomeLink /></div>
 
             {/* Nav groups (desktop) + hamburger (mobile, inside MainNav) */}
             <div className="order-3 flex items-center lg:order-none lg:flex-1">

@@ -1,5 +1,5 @@
 import { db } from "@shootermarkt/db";
-import { clubs, competitionSchedule, competitions, countries, disciplines, mixedTeamResults, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@shootermarkt/db/schema";
+import { clubs, competitionSchedule, competitions, countries, disciplines, mixedTeamResults, olympicQuotaAllocations, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@shootermarkt/db/schema";
 import { displayNoc, NOC_LIST } from "@shootermarkt/db/noc-list";
 import { isEscSoloCode, isSportPistolCode, qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
 import { effectiveFocusPriority } from "@/lib/competition-priority";
@@ -383,6 +383,9 @@ export async function getHomepageMain(scope: Scope) {
     db.select({ competitionId: results.competitionId, shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRound: results.elimRound, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, qualRemark: results.qualRemark, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(inArray(results.competitionId, recentIds)).orderBy(asc(results.id)),
     db.select({ competitionId: mixedTeamResults.competitionId, disciplineId: mixedTeamResults.disciplineId, category: mixedTeamResults.category, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(inArray(mixedTeamResults.competitionId, recentIds)).orderBy(asc(mixedTeamResults.id)),
   ]) : [[], [], []] as const;
+  // Discipline u kojima takmičenje deli olimpijske kvote (samo te dobijaju krugove na kartici).
+  const quotaRows = recentIds.length ? await db.select({ competitionId: olympicQuotaAllocations.competitionId, disciplineId: olympicQuotaAllocations.disciplineId }).from(olympicQuotaAllocations).where(and(inArray(olympicQuotaAllocations.competitionId, recentIds), eq(olympicQuotaAllocations.games, "LA2028"))) : [];
+  const quotaKeys = new Set(quotaRows.map((row) => `${row.competitionId}:${disciplineCodes.get(row.disciplineId)}`));
   const recent = recentComps.map((competition) => {
     const slots = allSlots.filter((row) => row.competitionId === competition.id);
     // ESC Solo (pogoci) nema mesto u top-3 pored ISSF skorova.
@@ -500,6 +503,7 @@ export async function getHomepageMain(scope: Scope) {
       isJunior: group.isJunior,
       category: group.category,
       isLive: group.isLive,
+      awardsQuota: group.category === "senior" && quotaKeys.has(`${competition.id}:${group.discCode}`),
       phases: visiblePhases.map((phase) => ({
         stage: phase.stage,
         elimRound: phase.elimRound,

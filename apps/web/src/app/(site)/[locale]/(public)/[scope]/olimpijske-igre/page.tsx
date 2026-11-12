@@ -466,7 +466,8 @@ export default async function OlympicQuotasPage({ params }: Props) {
         </div>
         <div className="relative mx-auto max-w-6xl px-4 pb-6 pt-6 sm:px-6 lg:px-8">
           <h1 id="olympic-title" className={`${DISPLAY} flex flex-wrap items-center gap-x-4 gap-y-2 font-extrabold uppercase text-[var(--ink)] lg:max-w-[48rem]`} style={{ fontSize: "clamp(1.75rem, 5vw, 2.75rem)", letterSpacing: "-0.02em", lineHeight: 1.02 }}>
-            <OlympicRings height={26} />
+            {/* Veliko slovo je malo ispod sredine linije, pa se krugovi spuštaju da budu u sredini slova. */}
+            <span className="relative top-[0.04em] inline-flex"><OlympicRings height={32} /></span>
             {t.title}
           </h1>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { usePathname } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
@@ -8,6 +8,7 @@ import ThemeToggle from "./ThemeToggle";
 import { RegionSelector } from "./RegionSelector";
 import { LocaleSwitcher } from "./LocaleSwitcher";
 import { useScopedHref } from "@/hooks/use-scoped-href";
+import { OlympicRings } from "@/components/result-display/OlympicQuotaBadge";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,8 @@ interface NavGroup {
   key: string;
   label: string;
   directHref?: string;
+  /** Izdvojena stavka: olimpijski krugovi i okvir (samo Olimpijske kvote). */
+  featured?: boolean;
   items: NavSubItem[];
 }
 
@@ -43,7 +46,6 @@ function buildNav(t: TFn): NavGroup[] {
       items: [
         { href: "/rangiranje", label: t("ranking"),        desc: t("rankingDesc") },
         { href: "/head-to-head", label: t("h2h"),   desc: t("h2hDesc") },
-        { href: "/klubovi",    label: t("clubLeaderboard"),desc: t("clubLeaderboardDesc"), soon: true },
       ],
     },
     {
@@ -56,6 +58,7 @@ function buildNav(t: TFn): NavGroup[] {
       key: "olimpijske-igre",
       label: t("olympicQuotas"),
       directHref: "/olimpijske-igre",
+      featured: true,
       items: [],
     },
     {
@@ -68,6 +71,19 @@ function buildNav(t: TFn): NavGroup[] {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Olimpijski krugovi; na crvenoj (izabranoj) kutiji sede na beloj podlozi (crni prsten prati --ink, pa ga fiksiramo da bude vidljiv i u tamnoj temi). Padding je isti u oba stanja da kutija ne skače. */
+function FeaturedRings({ height, padY = "py-1", onRed = false }: { height: number; padY?: string; onRed?: boolean }) {
+  return (
+    <span aria-hidden="true" className={`inline-flex shrink-0 rounded px-1.5 ${padY} ${onRed ? "bg-white" : ""}`} style={onRed ? ({ "--ink": "#111111" } as React.CSSProperties) : undefined}>
+      <OlympicRings height={height} />
+    </span>
+  );
+}
+
+/** Otvorena stavka u mobilnom meniju: crvena crta ispod teksta (na crvenoj kutiji bela). */
+const ACTIVE_LABEL = (active: boolean, onRed = false) =>
+  active ? `underline decoration-2 underline-offset-[6px] ${onRed ? "decoration-white" : "decoration-[var(--brand-primary)]"}` : "";
 
 function SoonBadge({ label }: { label: string }) {
   return (
@@ -94,6 +110,33 @@ export function MainNav() {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const lastFocusedElementRef = useRef<HTMLElement | null>(null);
+
+  // Jedna crvena crta klizi ispod otvorene stavke (desktop). Pozicija se meri iz DOM-a, bez animacije pri prvom prikazu.
+  const [indicator, setIndicator] = useState<{ left: number; width: number; visible: boolean } | null>(null);
+  const [indicatorAnimated, setIndicatorAnimated] = useState(false);
+  useLayoutEffect(() => {
+    const nav = desktopNavRef.current;
+    if (!nav) return;
+    const measure = () => {
+      const el = nav.querySelector<HTMLElement>("[data-nav-active]");
+      if (!el) {
+        setIndicator((prev) => (prev ? { ...prev, visible: false } : prev));
+        return;
+      }
+      const inset = 12;
+      setIndicator({ left: el.offsetLeft + inset, width: Math.max(el.offsetWidth - inset * 2, 0), visible: true });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(nav);
+    Array.from(nav.children).forEach((child) => ro.observe(child));
+    return () => ro.disconnect();
+  }, [unscopedPathname]);
+  useEffect(() => {
+    if (indicator === null || indicatorAnimated) return;
+    const id = requestAnimationFrame(() => setIndicatorAnimated(true));
+    return () => cancelAnimationFrame(id);
+  }, [indicator, indicatorAnimated]);
 
   const tSearch = useTranslations("search");
   const tCommon = useTranslations("common");
@@ -196,7 +239,16 @@ export function MainNav() {
   return (
     <>
       {/* ── Desktop nav ──────────────────────────────────────────────── */}
-      <div ref={desktopNavRef} className="hidden lg:flex items-center gap-0.5">
+      <div ref={desktopNavRef} className="relative hidden lg:flex items-center gap-0.5">
+        <Link
+          href={scopedHref("/")}
+          data-nav-active={unscopedPathname === "/" ? "" : undefined}
+          className={`relative rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+            unscopedPathname === "/" ? "text-[var(--ink)]" : "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+          }`}
+        >
+          Home
+        </Link>
         {NAV.map((group) => {
           const active = isGroupActive(group);
           const open = openKey === group.key;
@@ -207,16 +259,19 @@ export function MainNav() {
               <Link
                 key={group.key}
                 href={scopedHref(group.directHref)}
-                className={`relative px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 ${
-                  active
-                    ? "text-[var(--brand-primary)]"
-                    : "text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)]"
+                data-nav-active={active && !group.featured ? "" : undefined}
+                className={`relative ${group.featured ? "rounded-lg" : "rounded-md"} text-sm font-medium transition-colors duration-150 ${
+                  group.featured ? "mx-1 inline-flex items-center gap-2 py-[6.5px] pl-2.5 pr-3" : "px-3 py-2"
+                } ${
+                  group.featured
+                    ? `font-semibold ring-2 ring-inset ring-[var(--brand-primary)] ${active ? "bg-[var(--brand-primary)] text-white" : "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"}`
+                    : active
+                      ? "text-[var(--ink)]"
+                      : "text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)]"
                 }`}
               >
+                {group.featured && <FeaturedRings height={14} padY="py-[4.5px]" onRed={active} />}
                 {group.label}
-                {active && (
-                  <span className="absolute bottom-0.5 left-3 right-3 h-0.5 bg-[var(--brand-primary)] rounded-full" />
-                )}
               </Link>
             );
           }
@@ -225,6 +280,7 @@ export function MainNav() {
             <div
               key={group.key}
               className="relative"
+              data-nav-active={active ? "" : undefined}
               onMouseEnter={() => hoverOpen(group.key)}
               onMouseLeave={hoverClose}
             >
@@ -236,15 +292,11 @@ export function MainNav() {
                   open
                     ? "text-[var(--ink)] bg-[var(--surface-2)]"
                     : active
-                    ? "text-[var(--brand-primary)]"
+                    ? "text-[var(--ink)]"
                     : "text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-2)]"
                 }`}
               >
                 {group.label}
-                {/* Active underline */}
-                {active && !open && (
-                  <span className="absolute bottom-0.5 left-3 right-3 h-0.5 bg-[var(--brand-primary)] rounded-full" />
-                )}
                 {/* Chevron */}
                 <svg
                   width="10" height="10" viewBox="0 0 10 10"
@@ -272,7 +324,7 @@ export function MainNav() {
                   const inner = (
                     <>
                       <div className="flex items-center gap-2">
-                        <span className={`text-sm font-semibold leading-snug ${item.soon ? "text-[var(--muted)]" : itemActive ? "text-[var(--brand-primary)]" : "text-[var(--ink)]"}`}>
+                        <span className={`text-sm font-semibold leading-snug ${item.soon ? "text-[var(--muted)]" : "text-[var(--ink)]"} ${ACTIVE_LABEL(itemActive)}`}>
                           {item.label}
                         </span>
                         {item.soon && <SoonBadge label={tNav("soon")} />}
@@ -307,6 +359,14 @@ export function MainNav() {
             </div>
           );
         })}
+        {/* Klizna crvena crta ispod otvorene stavke */}
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-[var(--brand-primary)] motion-reduce:transition-none ${
+            indicatorAnimated ? "transition-[transform,width,opacity] duration-300 ease-[var(--ease-out)]" : ""
+          }`}
+          style={{ width: indicator?.width ?? 0, transform: `translateX(${indicator?.left ?? 0}px)`, opacity: indicator?.visible ? 1 : 0 }}
+        />
       </div>
 
       {/* ── Mobile hamburger ─────────────────────────────────────────── */}
@@ -365,11 +425,9 @@ export function MainNav() {
           <Link
             href={scopedHref("/")}
             onClick={() => setMobileOpen(false)}
-            className={`block px-4 py-3 text-sm font-semibold transition-colors hover:bg-[var(--surface-2)] ${
-              unscopedPathname === "/" ? "text-[var(--brand-primary)]" : "text-[var(--ink)]"
-            }`}
+            className="block px-4 py-3 text-sm font-semibold text-[var(--ink)] transition-colors hover:bg-[var(--surface-2)]"
           >
-            {tCommon("home")}
+            <span className={ACTIVE_LABEL(unscopedPathname === "/")}>Home</span>
           </Link>
           {NAV.map((group) => {
             if (group.directHref) {
@@ -379,11 +437,14 @@ export function MainNav() {
                   key={group.key}
                   href={scopedHref(group.directHref)}
                   onClick={() => setMobileOpen(false)}
-                  className={`block px-4 py-3 text-sm font-semibold transition-colors hover:bg-[var(--surface-2)] ${
-                    active ? "text-[var(--brand-primary)]" : "text-[var(--ink)]"
+                  className={`text-sm font-semibold transition-colors ${
+                    group.featured
+                      ? `ml-3 my-1.5 flex w-fit min-h-11 items-center gap-2.5 rounded-lg py-1 pl-2 pr-10 ring-2 ring-inset ring-[var(--brand-primary)] ${active ? "bg-[var(--brand-primary)] text-white" : "text-[var(--ink)] hover:bg-[var(--surface-2)]"}`
+                      : "block px-4 py-3 text-[var(--ink)] hover:bg-[var(--surface-2)]"
                   }`}
                 >
-                  {group.label}
+                  {group.featured && <FeaturedRings height={15} padY="py-1.5" onRed={active} />}
+                  <span className={group.featured ? "" : ACTIVE_LABEL(active)}>{group.label}</span>
                 </Link>
               );
             }
@@ -396,12 +457,10 @@ export function MainNav() {
                 {/* Group header */}
                 <button
                   onClick={() => setOpenMobileGroup(isExpanded ? null : group.key)}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-sm font-semibold transition-colors duration-150 ${
-                    active ? "text-[var(--brand-primary)]" : "text-[var(--ink)]"
-                  } hover:bg-[var(--surface-2)]`}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-[var(--ink)] transition-colors duration-150 hover:bg-[var(--surface-2)]"
                   aria-expanded={isExpanded}
                 >
-                  {group.label}
+                  <span className={ACTIVE_LABEL(active)}>{group.label}</span>
                   <svg
                     width="12" height="12" viewBox="0 0 12 12"
                     className={`text-[var(--muted)] transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`}
@@ -423,8 +482,8 @@ export function MainNav() {
                       const inner = (
                         <div className="flex items-center justify-between gap-2 w-full">
                           <div>
-                            <p className={`text-sm font-medium leading-snug ${item.soon ? "text-[var(--muted)]" : itemActive ? "text-[var(--brand-primary)]" : "text-[var(--ink)]"}`}>
-                              {item.label}
+                            <p className={`text-sm font-medium leading-snug ${item.soon ? "text-[var(--muted)]" : "text-[var(--ink)]"}`}>
+                              <span className={ACTIVE_LABEL(itemActive)}>{item.label}</span>
                             </p>
                             <p className="text-xs text-[var(--subtle)] mt-0.5 leading-snug">
                               {item.desc}
