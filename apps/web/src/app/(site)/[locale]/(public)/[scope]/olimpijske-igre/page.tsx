@@ -287,7 +287,7 @@ export default async function OlympicQuotasPage({ params }: Props) {
   function Cell({ d, color }: { d: { awarded: number; places: number } | undefined; color: string }) {
     if (!d) return <span aria-hidden="true" className="text-[var(--border-strong)]">·</span>;
     const full = d.awarded >= d.places;
-    const style: CSSProperties | undefined = full ? { background: `color-mix(in oklch, ${color} 18%, transparent)`, boxShadow: `inset 0 0 0 1.5px ${color}` } : undefined;
+    const style: CSSProperties | undefined = full ? { background: `color-mix(in srgb, ${color} 20%, transparent)`, boxShadow: `inset 0 0 0 1.5px ${color}` } : undefined;
     return (
       <span style={style} className={`rounded-md px-1.5 py-1 text-xs font-semibold tabular-nums ${MONO} ${full ? "text-[var(--ink)]" : d.awarded > 0 ? "text-[var(--ink)] ring-1 ring-[var(--border-strong)]" : "text-[var(--muted)] ring-1 ring-[var(--border)]"}`}>
         {d.awarded}/{d.places}
@@ -479,14 +479,14 @@ export default async function OlympicQuotasPage({ params }: Props) {
               {/* Segmentirana traka: širina = broj mesta izvora, popunjeno = dodeljeno. */}
               <div className="flex gap-1.5">
                 {byKind.map((k) => (
-                  <div key={k.kind} className="h-6 overflow-hidden rounded" style={{ flexGrow: k.places, flexBasis: 0, background: `color-mix(in oklch, ${KIND_COLOR[k.kind]} 22%, var(--bg))`, boxShadow: `inset 0 0 0 1.5px ${KIND_COLOR[k.kind]}` }}>
+                  <div key={k.kind} className="h-6 overflow-hidden rounded" style={{ flexGrow: k.places, flexBasis: 0, background: `color-mix(in srgb, ${KIND_COLOR[k.kind]} 20%, transparent)`, boxShadow: `inset 0 0 0 1.5px ${KIND_COLOR[k.kind]}` }}>
                     <div className="h-full" style={{ width: `${(k.awarded / k.places) * 100}%`, background: KIND_COLOR[k.kind] }} />
                   </div>
                 ))}
               </div>
               <ul className="mt-3 flex flex-wrap gap-1.5 sm:gap-2">
                 {byKind.map((k) => (
-                  <li key={k.kind} className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-medium text-[var(--ink)] sm:gap-2 sm:px-3 sm:text-sm" style={{ background: `color-mix(in oklch, ${KIND_COLOR[k.kind]} 16%, var(--bg))`, boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${KIND_COLOR[k.kind]} 55%, transparent)` }}>
+                  <li key={k.kind} className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-medium text-[var(--ink)] sm:gap-2 sm:px-3 sm:text-sm" style={{ background: `color-mix(in srgb, ${KIND_COLOR[k.kind]} 16%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${KIND_COLOR[k.kind]} 55%, transparent)` }}>
                     <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: KIND_COLOR[k.kind] }} />
                     {t.kinds[k.kind]}
                     <span className={`tabular-nums text-[var(--muted)] ${MONO}`}>{k.awarded}/{k.places}</span>
