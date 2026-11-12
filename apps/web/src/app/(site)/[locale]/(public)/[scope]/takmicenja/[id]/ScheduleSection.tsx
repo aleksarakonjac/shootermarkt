@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, Fragment } from "react";
 import { getTickerSlotEnd } from "@/lib/ticker-schedule";
+import { isOlympicDiscipline } from "@/lib/olympic-disciplines";
 
 export type ScheduleSlot = {
   id: number;
@@ -10,10 +11,24 @@ export type ScheduleSlot = {
   category: string;
   startTime: string; // ISO string (UTC)
   endTime: string | null;
+  /** Stavka van takmičenja (trening, ceremonija, sastanak...): `stage` je njena vrsta, `title` naziv iz satnice. */
+  extra?: boolean;
+  title?: string;
+};
+
+export type ScheduleExtra = {
+  id: number;
+  kind: "training" | "ceremony" | "other";
+  title: string;
+  disciplineCode: string | null;
+  startTime: string;
+  endTime: string | null;
 };
 
 type Props = {
   slots: ScheduleSlot[];
+  /** Treninzi, ceremonije i ostalo; prikazuju se na zahtev. */
+  extras?: ScheduleExtra[];
   locale: string;
   timezone: string; // IANA timezone of the venue, e.g. "Asia/Shanghai"
 };
@@ -25,6 +40,9 @@ const STAGE_LABELS: Record<string, Record<string, string>> = {
     qual_precision: "Precizna proba",
     elimination: "Eliminacije",
     final: "Finale",
+    training: "Trening",
+    ceremony: "Ceremonija",
+    other: "Ostalo",
   },
   en: {
     qual: "Qualification",
@@ -32,6 +50,9 @@ const STAGE_LABELS: Record<string, Record<string, string>> = {
     qual_precision: "Precision",
     elimination: "Elimination",
     final: "Final",
+    training: "Training",
+    ceremony: "Ceremony",
+    other: "Other",
   },
 };
 
@@ -161,8 +182,18 @@ function pickDefaultDay(dateKeys: string[], byDate: Map<string, ScheduleSlot[]>,
   return dateKeys[dateKeys.length - 1];
 }
 
-export function ScheduleSection({ slots, locale, timezone }: Props) {
+export function ScheduleSection({ slots: allSlots, extras: allExtras = [], locale, timezone }: Props) {
   const [now, setNow] = useState<Date>(() => new Date());
+  const [showExtras, setShowExtras] = useState(false);
+  const [showNonOlympic, setShowNonOlympic] = useState(false);
+
+  // Podrazumevano samo olimpijske discipline; neolimpijske na zahtev. Takmičenje bez ijedne olimpijske discipline
+  // prikazuje sve, a prekidača nema.
+  const hasOlympic = allSlots.some((s) => isOlympicDiscipline(s.disciplineCode));
+  const hasNonOlympic = allSlots.some((s) => !isOlympicDiscipline(s.disciplineCode)) || allExtras.some((x) => x.disciplineCode && !isOlympicDiscipline(x.disciplineCode));
+  const filterOn = hasOlympic && !showNonOlympic;
+  const slots = filterOn ? allSlots.filter((s) => isOlympicDiscipline(s.disciplineCode)) : allSlots;
+  const extras = filterOn ? allExtras.filter((x) => !x.disciplineCode || isOlympicDiscipline(x.disciplineCode)) : allExtras;
   const contentRef = useRef<HTMLDivElement>(null);
   const previewInnerRef = useRef<HTMLDivElement>(null);
   const [wrapHeight, setWrapHeight] = useState<number | "auto">("auto");
@@ -172,10 +203,18 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
     return () => clearInterval(id);
   }, []);
 
+  // Stavke van takmičenja ulaze u dane i tabelu samo kad su uključene; preview, "uživo" i sledeći termin gledaju samo termine takmičenja.
+  const displaySlots: ScheduleSlot[] = showExtras
+    ? [
+        ...slots,
+        ...extras.map((x): ScheduleSlot => ({ id: -x.id, disciplineCode: x.disciplineCode ?? "", stage: x.kind, category: "senior", startTime: x.startTime, endTime: x.endTime, extra: true, title: x.title })),
+      ].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+    : slots;
+
   // Group by venue date
   const dateKeys: string[] = [];
   const byDate = new Map<string, ScheduleSlot[]>();
-  for (const slot of slots) {
+  for (const slot of displaySlots) {
     const key = localDateKey(slot.startTime, timezone);
     if (!byDate.has(key)) {
       dateKeys.push(key);
@@ -210,7 +249,7 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
   }, [open]);
 
   // Rani izlaz tek posle svih hook-ova (rules-of-hooks: isti redosled u svakom renderu).
-  if (slots.length === 0) return null;
+  if (allSlots.length === 0) return null;
 
   const lang = STAGE_LABELS[locale] ?? STAGE_LABELS.en;
   const catShort = CATEGORY_SHORT[locale] ?? CATEGORY_SHORT.en;
@@ -228,7 +267,9 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())[0] ?? null;
   const isImminent = !activeSlot && !!nextSlot && slotStatus(nextSlot, now) === "imminent";
 
-  const visibleDays = usePills ? [selectedDay] : dateKeys;
+  // Izabrani dan može da nestane kad se promeni filter: tada važi podrazumevani dan.
+  const activeDay = dateKeys.includes(selectedDay) ? selectedDay : pickDefaultDay(dateKeys, byDate, now, timezone);
+  const visibleDays = usePills ? [activeDay] : dateKeys;
 
   // Collapsed preview: next 2-3 upcoming slots across all days (spills into the
   // next day once today runs out); only falls back to past slots when the
@@ -243,8 +284,12 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
     const stageLabel = lang[slot.stage] ?? slot.stage;
     const catLabel = slot.category !== "senior" ? catShort[slot.category] ?? slot.category : null;
 
+    const isExtra = slot.extra === true;
+    // Trening nosi disciplinu u koloni discipline, a ostalo (ceremonija, sastanak...) svoj naziv iz satnice.
+    const extraLabel = isExtra ? (slot.stage === "training" && slot.disciplineCode ? stageLabel : slot.title ?? stageLabel) : null;
+
     return (
-      <tr key={slot.id} style={{ opacity: st === "past" ? 0.45 : 1 }}>
+      <tr key={slot.id} style={{ opacity: st === "past" ? 0.45 : isExtra ? 0.8 : 1 }}>
         <td className="w-5 py-1 pr-2 align-middle">
           <span className="flex items-center justify-center w-4">
             {st === "active" ? (
@@ -279,8 +324,14 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
           {slot.disciplineCode}
         </td>
         <td className="py-1 align-middle text-[var(--muted)] text-xs">
-          {stageLabel}
-          {catLabel && <span className="ml-1.5 text-[var(--subtle)]">{catLabel}</span>}
+          {isExtra ? (
+            <span className="italic">{extraLabel}</span>
+          ) : (
+            <>
+              {stageLabel}
+              {catLabel && <span className="ml-1.5 text-[var(--subtle)]">{catLabel}</span>}
+            </>
+          )}
           {st === "imminent" && (() => {
             const ms = new Date(slot.startTime).getTime() - now.getTime();
             const cd = fmtCountdown(ms, locale);
@@ -406,12 +457,42 @@ export function ScheduleSection({ slots, locale, timezone }: Props) {
           }}
         >
 
+            {/* Filteri: treninzi i ostalo, neolimpijske discipline (na zahtev) */}
+            {(allExtras.length > 0 || (hasOlympic && hasNonOlympic)) && (
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {allExtras.length > 0 && (
+                  <button
+                    type="button"
+                    aria-pressed={showExtras}
+                    onClick={(e) => { e.stopPropagation(); setShowExtras((v) => !v); }}
+                    className="flex items-center gap-2 rounded-sm px-2.5 py-1 text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide transition-colors"
+                    style={{ background: showExtras ? "var(--ink)" : "var(--surface-2)", color: showExtras ? "var(--surface)" : "var(--muted)" }}
+                  >
+                    <span aria-hidden="true" className="flex h-3 w-3 items-center justify-center rounded-[2px] border border-current text-[0.6rem] leading-none">{showExtras ? "✓" : ""}</span>
+                    {locale === "sr" ? "Treninzi i ostalo" : "Training & other"}
+                  </button>
+                )}
+                {hasOlympic && hasNonOlympic && (
+                  <button
+                    type="button"
+                    aria-pressed={showNonOlympic}
+                    onClick={(e) => { e.stopPropagation(); setShowNonOlympic((v) => !v); }}
+                    className="flex items-center gap-2 rounded-sm px-2.5 py-1 text-xs font-semibold font-[family-name:var(--font-barlow-condensed)] uppercase tracking-wide transition-colors"
+                    style={{ background: showNonOlympic ? "var(--ink)" : "var(--surface-2)", color: showNonOlympic ? "var(--surface)" : "var(--muted)" }}
+                  >
+                    <span aria-hidden="true" className="flex h-3 w-3 items-center justify-center rounded-[2px] border border-current text-[0.6rem] leading-none">{showNonOlympic ? "✓" : ""}</span>
+                    {locale === "sr" ? "Neolimpijske discipline" : "Non-Olympic events"}
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Day selector pills */}
             {usePills && (
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {dateKeys.map((dk) => {
                   const daySlots = byDate.get(dk)!;
-                  const isSelected = dk === selectedDay;
+                  const isSelected = dk === activeDay;
                   const hasActive = daySlots.some((s) => slotStatus(s, now) === "active");
                   const allPast = daySlots.every((s) => slotStatus(s, now) === "past");
 

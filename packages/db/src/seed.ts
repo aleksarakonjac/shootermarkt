@@ -57,6 +57,7 @@ async function seed() {
       { code: "RFPM", name: "25m Rapid Fire Pistol Men",  shortName: "RFP Men",  gender: "M", distance: 25, apparatus: "pistol", maxQualScore: "600"  },
       { code: "SPW",  name: "25m Sport Pistol Women",     shortName: "SP Women", gender: "F", distance: 25, apparatus: "pistol", maxQualScore: "600"  },
       { code: "FPM",  name: "50m Free Pistol Men",        shortName: "FP Men",   gender: "M", distance: 50, apparatus: "pistol", maxQualScore: "600"  },
+      { code: "FPW",  name: "50m Free Pistol Women",      shortName: "FP Women", gender: "F", distance: 50, apparatus: "pistol", maxQualScore: "600"  },
       { code: "STPM", name: "25m Standard Pistol Men",    shortName: "STP Men",   gender: "M", distance: 25, apparatus: "pistol", maxQualScore: "600" },
       { code: "STPW", name: "25m Standard Pistol Women",  shortName: "STP Women", gender: "F", distance: 25, apparatus: "pistol", maxQualScore: "600" },
       // 300m Rifle — celi brojevi, bez finala; STR300 je Open (gender null)

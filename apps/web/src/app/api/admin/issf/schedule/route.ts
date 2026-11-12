@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
-import { competitions, competitionSchedule, disciplines, disciplineCodeEnum } from "@shootermarkt/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { competitions, competitionSchedule, disciplines } from "@shootermarkt/db/schema";
+import { eq } from "drizzle-orm";
 
-type DisciplineCode = typeof disciplineCodeEnum.enumValues[number];
 import { fetchScheduleFromHtml, type ISSFScheduleEntry } from "@shootermarkt/adapters/issf/adapter";
-import { venueLocalToUtc } from "@/lib/timezone";
+import { entriesToExtras, entriesToSlots, replaceExtras } from "@/lib/schedule-sync";
 import { requireAdmin } from "@/lib/admin-auth";
 import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
@@ -43,25 +42,14 @@ async function handlePOST(req: NextRequest) {
     .then((r) => r[0]);
   const timezone = comp?.timezone ?? "UTC";
 
-  // Resolve discipline codes to IDs
-  const codes = [...new Set(entries.map((e) => e.disciplineCode).filter(Boolean))] as DisciplineCode[];
-  const discRows = await db.select({ id: disciplines.id, code: disciplines.code })
-    .from(disciplines)
-    .where(inArray(disciplines.code, codes));
+  // Isti prevod kao u automatskom uvozu (schedule-sync): kategorija iz naslova, treninzi/ceremonije se ne uvoze
+  // kao termini takmičenja (ranije su postajali "kvalifikacije" i dupirali raspored).
+  const discRows = await db.select({ id: disciplines.id, code: disciplines.code }).from(disciplines);
   const codeToId = Object.fromEntries(discRows.map((d) => [d.code, d.id]));
+  const toInsert = entriesToSlots(entries, timezone, codeToId).map((s) => ({ ...s, competitionId: dbCompetitionId }));
+  const extras = entriesToExtras(entries, timezone, codeToId);
 
-  const toInsert = entries
-    .filter((e) => e.disciplineCode && codeToId[e.disciplineCode] && e.startTime)
-    .map((e) => ({
-      competitionId: dbCompetitionId,
-      disciplineId: codeToId[e.disciplineCode!],
-      stage: e.stage === "training" || e.stage === "ceremony" || e.stage === "other" ? "qual" : e.stage,
-      category: "senior" as const,
-      startTime: venueLocalToUtc(e.date, e.startTime, timezone),
-      endTime: e.endTime ? venueLocalToUtc(e.date, e.endTime, timezone) : null,
-    }));
-
-  if (!toInsert.length) {
+  if (!toInsert.length && !extras.length) {
     return NextResponse.json({ error: "No valid entries to import" }, { status: 400 });
   }
 
@@ -81,13 +69,13 @@ async function handlePOST(req: NextRequest) {
     return true;
   });
 
-  if (!fresh.length) return NextResponse.json({ imported: 0, skipped: toInsert.length });
+  const inserted = fresh.length
+    ? await db.insert(competitionSchedule).values(fresh).returning({ id: competitionSchedule.id })
+    : [];
+  // Stavke van takmičenja: isti naslov u isto vreme se preskače (unique indeks), pa je ponovni uvoz bezbedan.
+  await replaceExtras(dbCompetitionId, extras);
 
-  const inserted = await db.insert(competitionSchedule)
-    .values(fresh)
-    .returning({ id: competitionSchedule.id });
-
-  return NextResponse.json({ imported: inserted.length, skipped: toInsert.length - inserted.length });
+  return NextResponse.json({ imported: inserted.length, skipped: toInsert.length - inserted.length, extras: extras.length });
 }
 
 export const POST = revalidatesPublicSite(handlePOST);

@@ -23,6 +23,7 @@ vazdušna puška/pištolj mix team, juniori, pioniri, veterani):
 - SPW = 25m sport pištolj seniorke (ženske)
 - SPM = 25m sport pištolj seniori (muški)
 - FPM = 50m pištolj (slobodni pištolj) seniori (muški)
+- FPW = 50m pištolj (slobodni pištolj) seniorke (žene)
 - RFPM = 25m brzometni pištolj seniori (muški)
 - STPM = 25m standard pištolj seniori (muški)
 - STPW = 25m standard pištolj seniorke (ženske)
@@ -33,7 +34,7 @@ vazdušna puška/pištolj mix team, juniori, pioniri, veterani):
 - STR300 = 300m standard puška 3x20, Open (muški i ženski u istoj listi)
 
 Za svaki event (tabela) u PDF-u izvuci:
-- discipline: kod discipline (ARM/ARW/APM/APW/R3PM/R3PW/RPRM/RPRW/SPW/SPM/FPM/RFPM/STPM/STPW/R3P300M/R3P300W/RPR300M/RPR300W/STR300)
+- discipline: kod discipline (ARM/ARW/APM/APW/R3PM/R3PW/RPRM/RPRW/SPW/SPM/FPM/FPW/RFPM/STPM/STPW/R3P300M/R3P300W/RPR300M/RPR300W/STR300)
 - stage: "qualification" ili "final"
 - category: uzrasna kategorija iz naslova tabele — "cadet" (kadet/U16), "youth_junior" (mlađi junior/U18), "junior" (junior/U21), "u23" (U23), "senior" (seniori/seniorke ili bez oznake). Default "senior".
 - is_international: true ako su prikazane države kao timovi, false ako su klubovi
@@ -67,7 +68,7 @@ Pravila:
   eliminacije 8. i 7. strelca se hici pucaju pojedinačno: samo taj nastavak
   vrati kroz shots; cumulative čuva kumulativne vrednosti koje PDF prikazuje.
 - MK puška ležeći (RPRM/RPRW): 50m, 60 hitaca, decimalni skorovi, 6 serija po 10, ukupno do 654.0
-- Pištolj 50m (FPM): 60 hitaca, celi brojevi, 6 serija, ima inners, ukupno do 600
+- Pištolj 50m (FPM, FPW): 60 hitaca, celi brojevi, 6 serija, ima inners, ukupno do 600
 - Brzometni pištolj (RFPM): 2 poluprograma po 30 hitaca, celi brojevi, ima inners, ukupno do 600.
   series = 6 zbirova redom kako ih bilten prikazuje (8 s, 6 s, 4 s za prvi pa za drugi poluprogram).
   RFPM finale za sada ignoriši (ne vraćaj final event).

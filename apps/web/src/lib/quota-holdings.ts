@@ -6,7 +6,7 @@ import { eq, sql } from "drizzle-orm";
 export const GAMES = "LA2028";
 
 // Discipline koje ne dele olimpijske kvote: ESC solo, 300m, ležeći (prone), standardni pištolj, 25m sportski (SPM) i slobodni pištolj (FPM) za muškarce, mešoviti timovi, juniorske varijante.
-export const NON_OLYMPIC = /^(SOLO|R3P300|RPR|STR300|STP|SPM|FPM|ARMT|APMT|R3J)/;
+export const NON_OLYMPIC = /^(SOLO|R3P300|RPR|STR300|STP|SPM|FP[MW]|ARMT|APMT|R3J)/;
 
 /** Sve dodeljene kvote (nekoliko stotina redova najviše), i one osvojene nastupom i one dodeljene ručno (rang-lista, domaćin, univerzalnost). */
 export async function allHoldings() {

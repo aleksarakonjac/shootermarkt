@@ -13,7 +13,7 @@ import { matchShooter } from "@shootermarkt/db/name-match";
 /** ESC Solo SIUS eventi (juniorske varijante se ne nagađaju dok se ne pojave u podacima). */
 export const ESC_SOLO_EVENT_CODES = ["ARM-ECH-SOLO", "ARW-ECH-SOLO", "APM-ECH-SOLO", "APW-ECH-SOLO"];
 
-const SUPPORTED_CODES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "RFPM", "STPM", "STPW", "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300"] as const;
+const SUPPORTED_CODES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "FPW", "RFPM", "STPM", "STPW", "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300"] as const;
 
 /** SIUS juniorski događaji imaju sufiks J (ARMJ, APMTJ…): osnovna disciplina + kategorija junior (U21). */
 function splitEventCode(eventCode: string): { code: string; category: ReviewRow["category"] } {

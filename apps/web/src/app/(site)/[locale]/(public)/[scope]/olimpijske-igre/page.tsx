@@ -12,7 +12,6 @@ import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { disciplineName } from "@shootermarkt/db/discipline-names";
 import { pageParams } from "@/i18n/page-params";
 import { buildAlternates } from "@/i18n/alternates";
-import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import { MAX_QUOTAS_PER_NOC } from "@/lib/quota-assign";
 import { getQuotaOverview, type QuotaHolder, type QuotaSlot, type QuotaSource, type QuotaSourceKind } from "@/lib/olympic-quotas";
 import type { Scope } from "@/lib/scope";
@@ -48,6 +47,7 @@ const TEXT = {
     openCompetition: "Otvori takmičenje",
     countriesNote: `Država može imati najviše ${MAX_QUOTAS_PER_NOC} kvote po disciplini.`,
     open: "Otvoreno",
+    openPlaces: (n: number) => `${n} ${n === 1 ? "otvoreno mesto" : n < 5 ? "otvorena mesta" : "otvorenih mesta"}`,
     empty: "Podela kvota još nije uneta.",
     places: "mesta",
     finalPlace: "Mesto u finalu",
@@ -72,6 +72,7 @@ const TEXT = {
     openCompetition: "Open competition",
     countriesNote: `A country can hold at most ${MAX_QUOTAS_PER_NOC} quota places per discipline.`,
     open: "Open",
+    openPlaces: (n: number) => `${n} open ${n === 1 ? "place" : "places"}`,
     empty: "No quota allocation has been entered yet.",
     places: "places",
     finalPlace: "Place in the final",
@@ -175,7 +176,90 @@ export default async function OlympicQuotasPage({ params }: Props) {
   }
 
   /** Mesta jedne discipline: avatar, država i ime osvajača, a ispod izvor kvote (takmičenje, mesto i godina), ili otvoreno mesto. */
-  function DisciplineBlock({ code, awarded, places, slots, showSource, compact = false, href }: { code: string; awarded: number; places: number; slots: QuotaSlot[]; showSource: boolean; compact?: boolean; href?: string }) {
+  function DisciplineBlock({ code, awarded, places, slots, showSource, compact = false, href, collapsible = false }: { code: string; awarded: number; places: number; slots: QuotaSlot[]; showSource: boolean; compact?: boolean; href?: string; collapsible?: boolean }) {
+    const renderList = (items: QuotaSlot[]) => (
+      <ul className="divide-y divide-[var(--border)]">
+        {items.map((s, i) => {
+          const src = sourceByKey.get(s.sourceKey);
+          return (
+            <li key={i} className={`flex min-w-0 items-center text-sm ${compact ? "gap-2 px-3 py-1" : "gap-3 px-4 py-2.5"}`}>
+              {s.holder ? (
+                <>
+                  <ShooterAvatar firstName={s.holder.firstName} lastName={s.holder.lastName} avatarUrl={s.holder.avatarUrl} />
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <NocFlag nationality={s.holder.nationality} />
+                      <ScopedLink href={`/strelci/${s.holder.shooterId}`} className="min-w-0 truncate font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
+                        {s.holder.lastName} {s.holder.firstName}
+                      </ScopedLink>
+                    </div>
+                    {showSource && src && <p className="truncate text-xs text-[var(--muted)]">{sourceFull(src)}</p>}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span aria-hidden="true" className="h-7 w-7 shrink-0 rounded-full border border-dashed border-[var(--border-strong)]" />
+                  <div className="min-w-0">
+                    <p className="text-[var(--muted)]">{t.open}</p>
+                    {showSource && src && <p className="truncate text-xs text-[var(--muted)]">{sourceFull(src)}</p>}
+                  </div>
+                </>
+              )}
+              <RankBadge slot={s} holder={s.holder} />
+            </li>
+          );
+        })}
+      </ul>
+    );
+
+    const list = renderList(slots);
+
+    if (collapsible) {
+      // Otvoreno kad ima osvojenih kvota (da se odmah vide); prazna mesta su sabijena u jedan red koji se otvara.
+      const filled = slots.filter((x) => x.holder);
+      const empty = slots.filter((x) => !x.holder);
+      return (
+        <div className="min-w-0 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)]">
+          <Disclosure
+            defaultOpen={filled.length > 0}
+            summaryClassName="flex items-center gap-3 bg-[var(--surface)] px-4 py-2.5 hover:bg-[var(--surface-2)]"
+            summary={
+              <>
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true" className="shrink-0 text-[var(--muted)] transition-transform group-data-[open=true]:rotate-90">
+                  <path d="M5 2.5L9.5 7L5 11.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ink)]">
+                  <span className={MONO}>{code}</span> <span className="font-normal text-[var(--muted)]">· {disciplineLabel(code, en)}</span>
+                </span>
+                <span className={`shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)] ${MONO}`}>{awarded}/{places}</span>
+              </>
+            }
+          >
+            <div className="border-t border-[var(--border)]">
+              {filled.length > 0 && renderList(filled)}
+              {empty.length > 0 && (
+                <div className={filled.length > 0 ? "border-t border-[var(--border)]" : undefined}>
+                  <Disclosure
+                    summaryClassName="flex items-center gap-2 px-4 py-2 text-sm text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"
+                    summary={
+                      <>
+                        <svg width="10" height="10" viewBox="0 0 14 14" fill="none" aria-hidden="true" className="shrink-0 transition-transform group-data-[open=true]:rotate-90">
+                          <path d="M5 2.5L9.5 7L5 11.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        {t.openPlaces(empty.length)}
+                      </>
+                    }
+                  >
+                    <div className="border-t border-[var(--border)]">{renderList(empty)}</div>
+                  </Disclosure>
+                </div>
+              )}
+            </div>
+          </Disclosure>
+        </div>
+      );
+    }
+
     return (
       <div className="min-w-0 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)]">
         <div className={`flex items-baseline justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] py-2 ${compact ? "px-3" : "px-4"}`}>
@@ -193,38 +277,7 @@ export default async function OlympicQuotasPage({ params }: Props) {
           </h3>
           <span className={`shrink-0 text-sm font-semibold tabular-nums text-[var(--ink)] ${MONO}`}>{awarded}/{places}</span>
         </div>
-        <ul className="divide-y divide-[var(--border)]">
-          {slots.map((s, i) => {
-            const src = sourceByKey.get(s.sourceKey);
-            return (
-              <li key={i} className={`flex min-w-0 items-center text-sm ${compact ? "gap-2 px-3 py-1" : "gap-3 px-4 py-2.5"}`}>
-                {s.holder ? (
-                  <>
-                    <ShooterAvatar firstName={s.holder.firstName} lastName={s.holder.lastName} avatarUrl={s.holder.avatarUrl} />
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <NocFlag nationality={s.holder.nationality} />
-                        <ScopedLink href={`/strelci/${s.holder.shooterId}`} className="min-w-0 truncate font-medium text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
-                          {s.holder.lastName} {s.holder.firstName}
-                        </ScopedLink>
-                      </div>
-                      {showSource && src && <p className="truncate text-xs text-[var(--muted)]">{sourceFull(src)}</p>}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <span aria-hidden="true" className="h-7 w-7 shrink-0 rounded-full border border-dashed border-[var(--border-strong)]" />
-                    <div className="min-w-0">
-                      <p className="text-[var(--muted)]">{t.open}</p>
-                      {showSource && src && <p className="truncate text-xs text-[var(--muted)]">{sourceFull(src)}</p>}
-                    </div>
-                  </>
-                )}
-                <RankBadge slot={s} holder={s.holder} />
-              </li>
-            );
-          })}
-        </ul>
+        {list}
       </div>
     );
   }
@@ -263,6 +316,12 @@ export default async function OlympicQuotasPage({ params }: Props) {
               {/* Red se širi i skuplja uz animaciju; sa jednim izvorom je otvoren, sa više njih zatvoren. */}
               <Disclosure
                 defaultOpen={!multiSource}
+                closeLabel={en ? "Close" : "Zatvori"}
+                footer={s.competitionId != null && (
+                  <ScopedLink href={`/takmicenja/${s.competitionId}`} className="text-sm font-semibold text-[var(--brand-primary)] hover:underline">
+                    {t.openCompetition} →
+                  </ScopedLink>
+                )}
                 summaryClassName="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 hover:bg-[var(--surface)] sm:items-center sm:gap-3 sm:[grid-template-columns:var(--cols)]"
                 summaryStyle={{ "--cols": `auto ${gridCols}` } as CSSProperties}
                 summary={
@@ -275,16 +334,13 @@ export default async function OlympicQuotasPage({ params }: Props) {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                       {dateLabel && <span className={`text-xs font-semibold tabular-nums text-[var(--muted)] ${MONO}`}>{dateLabel}</span>}
-                      {s.kind === "competition" && s.level && (
-                        <span className="rounded-md px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide" style={LEVEL_STYLE[s.level]}>{getLevelLabel(s.level, locale)}</span>
-                      )}
                       {s.kind === "ranking" && <span className="text-xs text-[var(--muted)]">{t.rankingClose}</span>}
                     </div>
                     <p className="font-semibold text-[var(--ink)] [text-wrap:balance]">{sourceName(s)}</p>
                     {s.kind === "competition" && place(s) && (
                       <p className="flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
                         {s.countryCode2 && <span aria-hidden="true" className={`fi fi-${s.countryCode2.toLowerCase()} shrink-0`} style={{ width: 16, height: 11, borderRadius: 2, display: "inline-block" }} />}
-                        {place(s)} · {s.date?.slice(0, 4)}
+                        {place(s)}
                       </p>
                     )}
                   </div>
@@ -304,7 +360,7 @@ export default async function OlympicQuotasPage({ params }: Props) {
                   </>
                 }
               >
-                <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+                <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 pb-3 pt-4">
                   {/* Tri kolone na širokom ekranu, zbijeniji redovi strelaca. */}
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {s.disciplines.map((d) => (
@@ -312,11 +368,6 @@ export default async function OlympicQuotasPage({ params }: Props) {
                         href={s.competitionId != null ? `/takmicenja/${s.competitionId}?result=individual&disc=${d.code}&stage=${d.slots[0]?.basis === "qualification" ? "qual" : "final"}&category=senior` : undefined} />
                     ))}
                   </div>
-                  {s.competitionId != null && (
-                    <ScopedLink href={`/takmicenja/${s.competitionId}`} className="mt-4 inline-block text-sm font-semibold text-[var(--brand-primary)] hover:underline">
-                      {t.openCompetition} →
-                    </ScopedLink>
-                  )}
                 </div>
               </Disclosure>
             </li>
@@ -336,9 +387,9 @@ export default async function OlympicQuotasPage({ params }: Props) {
   );
 
   const disciplinesPanel = (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid items-start gap-3 lg:grid-cols-2">
       {overview.disciplines.map((d) => (
-        <DisciplineBlock key={d.code} code={d.code} awarded={d.awarded} places={d.places} slots={d.slots} showSource />
+        <DisciplineBlock key={d.code} code={d.code} awarded={d.awarded} places={d.places} slots={d.slots} showSource collapsible />
       ))}
     </div>
   );
@@ -426,9 +477,9 @@ export default async function OlympicQuotasPage({ params }: Props) {
                   </div>
                 ))}
               </div>
-              <ul className="mt-3 flex flex-wrap gap-2">
+              <ul className="mt-3 flex flex-wrap gap-1.5 sm:gap-2">
                 {byKind.map((k) => (
-                  <li key={k.kind} className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-[var(--ink)]" style={{ background: `color-mix(in oklch, ${KIND_COLOR[k.kind]} 16%, var(--bg))`, boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${KIND_COLOR[k.kind]} 55%, transparent)` }}>
+                  <li key={k.kind} className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-medium text-[var(--ink)] sm:gap-2 sm:px-3 sm:text-sm" style={{ background: `color-mix(in oklch, ${KIND_COLOR[k.kind]} 16%, var(--bg))`, boxShadow: `inset 0 0 0 1px color-mix(in oklch, ${KIND_COLOR[k.kind]} 55%, transparent)` }}>
                     <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ background: KIND_COLOR[k.kind] }} />
                     {t.kinds[k.kind]}
                     <span className={`tabular-nums text-[var(--muted)] ${MONO}`}>{k.awarded}/{k.places}</span>
@@ -479,18 +530,14 @@ export default async function OlympicQuotasPage({ params }: Props) {
               </section>
             )}
 
-            <section className="mb-12" aria-labelledby="quota-path">
-              <SectionTitle id="quota-path">{t.path}</SectionTitle>
-              {ledger}
-            </section>
-
             <QuotaTabs
               label={t.view}
               tabs={[
+                { id: "path", label: t.path, count: overview.sources.length },
                 { id: "disciplines", label: t.disciplines, count: overview.disciplines.length },
                 { id: "countries", label: t.countries, count: overview.countries.length },
               ]}
-              panels={{ disciplines: disciplinesPanel, countries: countriesPanel }}
+              panels={{ path: ledger, disciplines: disciplinesPanel, countries: countriesPanel }}
             />
           </>
         )}

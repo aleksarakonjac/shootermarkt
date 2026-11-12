@@ -11,6 +11,7 @@ import {
   competitionSchedule,
   shooterFormaCache,
   olympicQuotas,
+  competitionScheduleExtras,
 } from "@shootermarkt/db/schema";
 import { eq, asc, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -29,7 +30,7 @@ import { pageParams } from "@/i18n/page-params";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Scope } from "@/lib/scope";
 import { RelatedNewsSection } from "@/components/RelatedNewsSection";
-import { ScheduleSection, type ScheduleSlot } from "./ScheduleSection";
+import { ScheduleSection, type ScheduleExtra, type ScheduleSlot } from "./ScheduleSection";
 import { foldName, foldNameSql, matchShooter } from "@shootermarkt/db/name-match";
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 
@@ -177,6 +178,16 @@ export default async function CompetitionPage({ params }: Props) {
       .where(eq(results.competitionId, compId)),
   ]);
   if (!comp) notFound();
+  // Treninzi, ceremonije i ostalo iz satnice; ako tabela još ne postoji (migracija), stranica radi bez njih.
+  const extraRows = await Promise.resolve(
+    db
+      .select({ id: competitionScheduleExtras.id, kind: competitionScheduleExtras.kind, title: competitionScheduleExtras.title, disciplineCode: disciplines.code, startTime: competitionScheduleExtras.startTime, endTime: competitionScheduleExtras.endTime })
+      .from(competitionScheduleExtras)
+      .leftJoin(disciplines, eq(competitionScheduleExtras.disciplineId, disciplines.id))
+      .where(eq(competitionScheduleExtras.competitionId, compId))
+      .orderBy(asc(competitionScheduleExtras.startTime)),
+  ).catch(() => []);
+  const scheduleExtras: ScheduleExtra[] = extraRows.map((r) => ({ id: r.id, kind: r.kind as ScheduleExtra["kind"], title: r.title, disciplineCode: r.disciplineCode, startTime: r.startTime.toISOString(), endTime: r.endTime?.toISOString() ?? null }));
   const quotaResultIds = new Set(quotaRows.map((q) => q.resultId));
 
   // SIUS import often can't match international athletes to an ISSF id at commit time —
@@ -352,6 +363,10 @@ export default async function CompetitionPage({ params }: Props) {
   const levelStyle = LEVEL_STYLE[comp.level] ?? { background: "#f3f4f6", color: "#4b5563" };
   const levelLabel = getLevelLabel(comp.level, locale);
 
+  // Završeno takmičenje: pregled po puška/pištolj umesto po danima (dan se računa u vremenskoj zoni takmičenja).
+  const todayInComp = new Intl.DateTimeFormat("en-CA", { timeZone: comp.timezone ?? "UTC", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const endedOnServer = todayInComp > (comp.dateEnd ?? comp.date);
+
   const countryName = comp.country && ((locale === "en" ? comp.country.nameEn : comp.country.nameSr) ?? comp.country.name);
 
   // Localized competition name
@@ -441,7 +456,7 @@ export default async function CompetitionPage({ params }: Props) {
       </div>
 
       {/* ── Schedule ─────────────────────────────────────────────── */}
-      <ScheduleSection slots={scheduleSlots} locale={locale} timezone={comp.timezone ?? "UTC"} />
+      <ScheduleSection slots={scheduleSlots} extras={scheduleExtras} locale={locale} timezone={comp.timezone ?? "UTC"} />
 
       {/* ── Results ───────────────────────────────────────────────── */}
       <div>
@@ -451,7 +466,7 @@ export default async function CompetitionPage({ params }: Props) {
         >
           {t("detail.results")}
         </h2>
-        <CompetitionResultsClient formaByKey={formaByKey} groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} timezone={comp.timezone ?? undefined} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} liveWindows={scheduleSlots} />
+        <CompetitionResultsClient formaByKey={formaByKey} groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} timezone={comp.timezone ?? undefined} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} qualSlots={scheduleSlots.filter((slot) => slot.stage === "qual")} dateFrom={comp.date} dateTo={comp.dateEnd} endedOnServer={endedOnServer} liveWindows={scheduleSlots} />
       </div>
 
       <RelatedNewsSection type="competition" refId={compId} locale={locale} />

@@ -13,6 +13,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SheetGapLine, SheetInsights } from "./SheetInsights";
 import { SheetCells, SheetFrame, SheetPanelSlot, SheetPerson, SheetPersonDesktop, SheetSection, SheetStats } from "./ResultSheet";
 import { useIsDesktop } from "@/hooks/use-is-desktop";
+import { MedalIcon, MEDAL_COLOR } from "./MedalIcon";
 import { OlympicQuotaBadge, OlympicQuotaNote } from "./OlympicQuotaBadge";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import type { StageRemarks } from "@shootermarkt/db/pdf-import-types";
@@ -42,27 +43,6 @@ interface Props {
   competitionLevel?: string;
   /** false dok finale traje — prva tri mesta bez zlatnog/srebrnog/bronzanog kruga. */
   showMedals?: boolean;
-}
-
-const MEDAL_COLOR: Record<number, string> = {
-  1: "oklch(0.75 0.14 85)",
-  2: "oklch(0.75 0.01 85)",
-  3: "oklch(0.60 0.10 55)",
-};
-
-function MedalIcon({ rank }: { rank: number }) {
-  const en = useLocale() === "en";
-  const color = MEDAL_COLOR[rank];
-  if (!color) return null;
-  return (
-    <span
-      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[0.65rem] font-bold text-white shrink-0"
-      style={{ background: color }}
-      aria-label={`${en ? "Place" : "Mesto"} ${rank}`}
-    >
-      {rank}
-    </span>
-  );
 }
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -296,11 +276,22 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
   const SERIES_COL_W = `${seriesW}px`;
   const isNocOnly = NOC_ONLY_LEVELS.has(competitionLevel ?? "");
   const clubColW = isNocOnly ? NOC_W : CLUB_W;
-  const headerGroups = inlineColumns.some((col) => col.group)
+  // RFPM: kolone su podeljene u fazu 1 i fazu 2; naslov faze je centriran preko svojih kolona.
+  const stagedColumns = inlineColumns.some((col) => col.group);
+  // Faze: serije unutar faze su zbijenije, a između faze 1 i faze 2 je veći razmak (dodatna širina prve kolone faze 2;
+  // vrednosti su poravnate udesno, pa se višak vidi kao razmak levo od nje).
+  const STAGE_GAP = 20;
+  const stageW = Math.max(34, seriesW - 12);
+  const colWidth = (col: Column, i: number) =>
+    stagedColumns ? `${stageW + (col.group === "stage2" && inlineColumns[i - 1]?.group === "stage1" ? STAGE_GAP : 0)}px` : SERIES_COL_W;
+  // Pomak sredine vrednosti (udesno poravnate) od sredine naslova faze: pola kolone − unutrašnji razmak − pola cifre (+ pola razmaka za fazu 2).
+  const valueCenterShift = (groupIndex: number) =>
+    Math.max(0, Math.round((stagedColumns ? stageW : seriesW) / 2 + (groupIndex > 0 ? STAGE_GAP / 2 : 0) - (compactSeries ? 2 : 6) - 5));
+  const headerGroups = stagedColumns
     ? groupColumnsByStage(inlineColumns, locale)
     : groupColumnHeaders(inlineColumns.map((col) => localizeSeriesLabel(col.header, locale)));
   // Panel otvoren: tabela je uža, pa avatar i klub/NOC (panel ih već prikazuje) nestaju, a Σ i remark ostaju zalepljeni desno.
-  const gridTemplateColumns = (panelOpen ? [PANEL_RANK_W, "minmax(100px, 1fr)", ...inlineColumns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W] : [RANK_W, AVATAR_W, NAME_W, clubColW, ...inlineColumns.map(() => SERIES_COL_W), TOTAL_W, REMARK_W])
+  const gridTemplateColumns = (panelOpen ? [PANEL_RANK_W, "minmax(100px, 1fr)", ...inlineColumns.map(colWidth), TOTAL_W, REMARK_W] : [RANK_W, AVATAR_W, NAME_W, clubColW, ...inlineColumns.map(colWidth), TOTAL_W, REMARK_W])
     .filter(Boolean)
     .join(" ");
   // Kolona remarka (28px) drži i dug remark ("WR WRJ") u dva reda; kolona imena ostaje 110px+.
@@ -390,8 +381,9 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
               <div
                 key={i}
                 role="columnheader"
-                className={`hidden sm:flex ${headerCellCls} ${group.span > 1 ? "justify-center !pl-5 !pr-1.5" : "justify-end !pl-1.5 !pr-0.5"} whitespace-nowrap`}
-                style={group.span > 1 ? { gridColumn: `span ${group.span}` } : undefined}
+                className={`hidden sm:flex ${headerCellCls} ${group.span > 1 ? (stagedColumns ? "justify-center" : "justify-center !pl-5 !pr-1.5") : "justify-end !pl-1.5 !pr-0.5"} whitespace-nowrap`}
+                // Vrednosti u kolonama su poravnate udesno, pa se naslov faze pomera udesno da stoji na sredini vrednosti ispod.
+                style={group.span > 1 ? { gridColumn: `span ${group.span}`, ...(stagedColumns ? { paddingLeft: valueCenterShift(i) * 2, paddingRight: 0 } : {}) } : undefined}
               >
                 {group.label}
               </div>

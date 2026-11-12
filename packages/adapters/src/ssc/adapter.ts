@@ -128,7 +128,7 @@ const DISC_MAP: Record<string, { male: string; female: string }> = {
   "50m Rifle Prone":    { male: "RPRM", female: "RPRW" },
   "25m Pistol":         { male: "SPM", female: "SPW" },
   "25m Sport Pistol":   { male: "SPM", female: "SPW" },
-  "50m Pistol":         { male: "FPM", female: "FPM" },
+  "50m Pistol":         { male: "FPM", female: "FPW" },
   "25m Rapid Fire Pistol": { male: "RFPM", female: "RFPM" },
   "25m Standard Pistol": { male: "STPM", female: "STPW" },
   "300m Rifle 3 Positions": { male: "R3P300M", female: "R3P300W" },

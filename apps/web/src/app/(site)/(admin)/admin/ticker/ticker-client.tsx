@@ -946,7 +946,7 @@ function SlotRow({ slot, timezone, live, onDelete }: { slot: SlotRow; timezone: 
 
 // ── AddSlotForm ───────────────────────────────────────────────────────────────
 
-const TICKER_DISCIPLINE_CODES = new Set(["ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM"]);
+const TICKER_DISCIPLINE_CODES = new Set(["ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "FPW"]);
 
 function AddSlotForm({ disciplines, compDateStart, compDateEnd, timezone, onAdd }: {
   disciplines: DisciplineOption[];

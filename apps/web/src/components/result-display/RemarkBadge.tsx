@@ -74,7 +74,9 @@ export function RemarkModal({ label, onClose, children }: { label?: string; onCl
     <div
       className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center px-4"
       style={{ background: "oklch(0 0 0 / 0.45)", backdropFilter: "blur(3px)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      // Modal je portal, ali React događaji idu kroz stablo komponenti: bez stopPropagation klik u modalu
+      // (zatvaranje, pozadina) stiže do klika reda tabele i otvara panel sa detaljima.
+      onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) onClose(); }}
       role="dialog"
       aria-modal="true"
     >

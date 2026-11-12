@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchElimResultsFromHtml, fetchMixedTeamQualFromHtml, searchAthletes } from "./adapter";
+import { detectStage, fetchElimResultsFromHtml, fetchMixedTeamQualFromHtml, mapTitleToDisciplineCode, searchAthletes } from "./adapter";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -46,4 +46,44 @@ describe("fetchMixedTeamQualFromHtml", () => {
       { mInners: 10, mTotal: 287, fInners: 8, fTotal: 283 },
     ]);
   });
+});
+
+describe("mapTitleToDisciplineCode", () => {
+  it.each([
+    ["10m Air Rifle Men", "ARM"],
+    ["Final 25m Rapid Fire Pistol Men", "RFPM"],
+    ["25m Rapid Fire Pistol Men", "RFPM"],
+    ["25m Standard Pistol Men", "STPM"],
+    ["Final 25m Standard Pistol Women", "STPW"],
+    ["50m Free Pistol Men", "FPM"],
+    ["50m Pistol Men", "FPM"],
+    ["50m Pistol Women", "FPW"],
+    ["50m Free Pistol Women", "FPW"],
+    ["50m Rifle Prone Women", "RPRW"],
+    ["300m Rifle Three Positions Men", "R3P300M"],
+    ["300m Rifle 3 Positions Women", "R3P300W"],
+    ["300m Rifle Prone Men", "RPR300M"],
+    ["300m Standard Rifle", "STR300"],
+  ])("maps %s to %s", (title, code) => expect(mapTitleToDisciplineCode(title)).toBe(code));
+
+  it("does not map a standard pistol event to the sport pistol", () => {
+    expect(mapTitleToDisciplineCode("25m Standard Pistol Women")).not.toBe("SPW");
+  });
+
+  it("ignores events we do not track", () => {
+    expect(mapTitleToDisciplineCode("Trap Men")).toBeNull();
+    expect(mapTitleToDisciplineCode("25m Centre Fire Pistol Men Precision Stage")).toBeNull();
+  });
+});
+
+describe("detectStage", () => {
+  it.each([
+    ["Pre-event Training 10m Air Rifle Men", "ARM", "training"],
+    ["Unofficial Training 50m Pistol Men", "FPM", "training"],
+    ["Medal Ceremony ARM", null, "ceremony"],
+    ["Final 10m Air Rifle Men", "ARM", "final"],
+    ["50m Rifle 3 Positions Men Elimination Relay 1", "R3PM", "elimination"],
+    ["25m Pistol Women Rapid Fire Stage Relay 1 to 3", "SPW", "qual_rapid"],
+    ["10m Air Rifle Men Relay 1", "ARM", "qual"],
+  ] as const)("%s → %s", (title, code, stage) => expect(detectStage(title, code)).toBe(stage));
 });

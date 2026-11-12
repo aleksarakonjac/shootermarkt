@@ -8,11 +8,56 @@ const btn = "rounded-md border border-[var(--border-strong)] px-3 py-1 text-xs f
 const field = "rounded-md border border-[var(--border-strong)] bg-[var(--bg)] px-2 py-1 text-sm text-[var(--ink)]";
 const BASIS_LABEL: Record<QuotaBasis, string> = { final: "po finalu", qualification: "po kvalifikacijama" };
 
+type Candidate = QuotaData["disciplines"][number]["candidates"][number];
+
+/**
+ * Izuzetak: kvota strelcu koji nije bio u finalu (sledeći iz kvalifikacija). Umesto cele liste kvalifikacija —
+ * pretraga po imenu ili državi; prikazuje plasman u kvalifikacijama, rezultat i MQS.
+ */
+function QualificationPicker({ options, disabled, onPick }: { options: Candidate[]; disabled: boolean; onPick: (resultId: number) => void }) {
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const q = query.trim().toLowerCase();
+  const matches = options
+    .filter((o) => !q || `${o.lastName} ${o.firstName} ${o.nationality ?? ""} q${o.rank ?? ""}`.toLowerCase().includes(q))
+    .slice(0, 8);
+  if (options.length === 0) return null;
+  return (
+    <div className="relative border-t border-[var(--border)] px-3 py-2">
+      <input
+        value={query} disabled={disabled} placeholder="Dodaj iz kvalifikacija (ime, država ili plasman)…" aria-label="Dodaj iz kvalifikacija"
+        onChange={(e) => setQuery(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        className={`w-full max-w-sm ${field}`}
+      />
+      {focused && matches.length > 0 && (
+        <ul className="absolute left-3 top-full z-10 mt-0.5 w-full max-w-sm divide-y divide-[var(--border)] overflow-hidden rounded-md border border-[var(--border)] bg-[var(--bg)] shadow-lg">
+          {matches.map((o) => (
+            <li key={o.resultId}>
+              <button
+                type="button" disabled={o.belowMqs}
+                // onMouseDown: izbor se završava pre nego što input izgubi fokus i zatvori listu.
+                onMouseDown={(e) => { e.preventDefault(); onPick(o.resultId); setQuery(""); }}
+                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className="w-9 shrink-0 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">Q{o.rank}</span>
+                <span className="min-w-0 truncate text-[var(--ink)]">{o.lastName} {o.firstName}</span>
+                {o.nationality && <span className="shrink-0 text-xs text-[var(--muted)]">{o.nationality}</span>}
+                <span className="ml-auto shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{o.qualTotal ?? "—"}</span>
+                {o.belowMqs && <span className="shrink-0 text-xs font-semibold text-red-600">ispod MQS</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /**
  * Olimpijske kvote (LA 2028) jednog takmičenja: prvo se podesi koliko kvota koja disciplina deli i po kom plasmanu
  * (finale ili kvalifikacije), pa se kvote dodele automatski ili kvačicama. Pravila sprovodi API.
  */
-export function QuotaManager({ competitionId }: { competitionId: number }) {
+export function QuotaManager({ competitionId, embedded = false, onChanged }: { competitionId: number; /** Unutar liste takmičenja: bez okvira i naslova. */ embedded?: boolean; /** Poziva se posle svake uspešne izmene (npr. osvežavanje zbirova u listi). */ onChanged?: () => void }) {
   const url = `/api/admin/competitions/${competitionId}/quotas`;
   const [data, setData] = useState<QuotaData | null>(null);
   const [busy, setBusy] = useState(false);
@@ -45,6 +90,7 @@ export function QuotaManager({ competitionId }: { competitionId: number }) {
       if (!res.ok) throw new Error(json.error ?? "Greška");
       if (method === "PATCH") setNotice(json.assigned ? `Dodeljeno kvota: ${json.assigned}` : "Nema šta da se dodeli");
       await load();
+      onChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -53,8 +99,8 @@ export function QuotaManager({ competitionId }: { competitionId: number }) {
   }
 
   return (
-    <div className="mt-8 rounded-xl border border-[var(--border)] p-5">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Olimpijske kvote · LA 2028</h2>
+    <div className={embedded ? "" : "mt-8 rounded-xl border border-[var(--border)] p-5"}>
+      {!embedded && <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Olimpijske kvote · LA 2028</h2>}
       <p className="text-xs text-[var(--muted)] mb-4">
         Podesi koliko kvota koja disciplina deli i po kom plasmanu (iz ISSF dokumenta). Strelac može osvojiti jednu kvotu. Država može imati jednu po disciplini na svetskom prvenstvu, a do dve na ostalim takmičenjima, i najviše {MAX_QUOTAS_PER_NOC} po disciplini ukupno. Rezultat kvalifikacija mora biti jednak MQS-u ili veći.
       </p>
@@ -73,6 +119,9 @@ export function QuotaManager({ competitionId }: { competitionId: number }) {
       <div className="space-y-3">
         {data?.disciplines.map((d) => {
           const used = d.candidates.filter((f) => f.quota).length;
+          // Na listi: finalisti i oni koji već imaju kvotu; ostali iz kvalifikacija se dodaju pretragom (izuzetak).
+          const listed = d.candidates.filter((f) => !f.fromQualification || f.quota);
+          const fromQualification = d.candidates.filter((f) => f.fromQualification && !f.quota);
           return (
             <div key={d.disciplineId} className="rounded-lg border border-[var(--border)]">
               <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 bg-[var(--surface-2)] rounded-t-lg">
@@ -107,11 +156,11 @@ export function QuotaManager({ competitionId }: { competitionId: number }) {
                   ))}
                 </p>
               )}
-              {d.candidates.length === 0 ? (
-                <p className="px-3 py-2 text-sm text-[var(--muted)]">Još nema rezultata sa plasmanom {BASIS_LABEL[d.basis]}.</p>
+              {listed.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-[var(--muted)]">{d.candidates.length === 0 ? `Još nema rezultata sa plasmanom ${BASIS_LABEL[d.basis]}.` : d.basis === "final" ? "Još nema finalista." : "Nema dodeljenih kvota; dodaj pretragom ispod."}</p>
               ) : (
                 <ul className="divide-y divide-[var(--border)]">
-                  {d.candidates.map((f) => (
+                  {listed.map((f) => (
                     <li key={f.resultId}>
                       <label className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-[var(--surface)]">
                         <input
@@ -130,6 +179,7 @@ export function QuotaManager({ competitionId }: { competitionId: number }) {
                   ))}
                 </ul>
               )}
+              <QualificationPicker options={fromQualification} disabled={busy || used >= d.places} onPick={(resultId) => send("POST", { resultId, quota: true })} />
             </div>
           );
         })}

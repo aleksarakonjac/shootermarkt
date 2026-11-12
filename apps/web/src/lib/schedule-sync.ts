@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
-import { competitions, competitionSchedule, competitionScheduleChanges, countries, disciplines } from "@shootermarkt/db/schema";
+import { competitions, competitionSchedule, competitionScheduleChanges, competitionScheduleExtras, countries, disciplines } from "@shootermarkt/db/schema";
 import { fetchScheduleFromHtml, type ISSFScheduleEntry } from "@shootermarkt/adapters/issf/adapter";
 import { timezoneForVenue, venueLocalToUtc } from "./timezone";
 
@@ -55,6 +55,65 @@ export function entriesToSlots(entries: ISSFScheduleEntry[], timezone: string, c
     }));
 }
 
+/** Stavka satnice koja nije takmičenje (trening, ceremonija, sastanak, kontrola opreme...). */
+export interface Extra {
+  kind: "training" | "ceremony" | "other";
+  title: string;
+  disciplineId: number | null;
+  startTime: Date;
+  endTime: Date | null;
+}
+
+// Sačmara nas ne zanima (puška/pištolj aplikacija), ni takmičenja ni treninzi.
+const SHOTGUN = /\b(trap|skeet)\b/i;
+
+function extraKind(e: ISSFScheduleEntry): Extra["kind"] {
+  if (e.stage === "ceremony" || /ceremony/i.test(e.eventTitle)) return "ceremony";
+  if (e.stage === "training" || /training/i.test(e.eventTitle)) return "training";
+  return "other";
+}
+
+/**
+ * Stavke koje nisu termin takmičenja: treninzi, ceremonije, tehnički sastanci, kontrola opreme i događaji discipline koju
+ * ne pratimo. Isti naslov u isto vreme je jedna stavka (ponovni uvoz ne duplira).
+ */
+export function entriesToExtras(entries: ISSFScheduleEntry[], timezone: string, codeToId: Record<string, number>): Extra[] {
+  const seen = new Set<string>();
+  const out: Extra[] = [];
+  for (const e of entries) {
+    if (!e.startTime || SHOTGUN.test(e.eventTitle)) continue;
+    const isSlot = e.disciplineCode && codeToId[e.disciplineCode] && !["training", "ceremony", "other"].includes(e.stage);
+    if (isSlot) continue;
+    const startTime = venueLocalToUtc(e.date, e.startTime, timezone);
+    const title = e.eventTitle.trim().slice(0, 200);
+    const key = `${title}|${startTime.getTime()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      kind: extraKind(e),
+      title,
+      disciplineId: e.disciplineCode ? codeToId[e.disciplineCode] ?? null : null,
+      startTime,
+      endTime: e.endTime ? venueLocalToUtc(e.date, e.endTime, timezone) : null,
+    });
+  }
+  return out;
+}
+
+/** Zamenjuje stavke satnice (van takmičenja) jednog takmičenja; bez stavki ne dira ono što već postoji. */
+export async function replaceExtras(competitionId: number, extras: Extra[]) {
+  if (!extras.length) return;
+  try {
+    await db.transaction(async (tx) => {
+      await tx.delete(competitionScheduleExtras).where(eq(competitionScheduleExtras.competitionId, competitionId));
+      await tx.insert(competitionScheduleExtras).values(extras.map((x) => ({ ...x, competitionId }))).onConflictDoNothing();
+    });
+  } catch (e) {
+    // Tabela još ne postoji (migracija nije primenjena): satnica takmičenja se svejedno uvozi.
+    console.error("[schedule-sync] extras skipped", competitionId, e);
+  }
+}
+
 export interface SyncResult { competitionId: number; status: "empty" | "no_tz" | "first" | "unchanged" | "updated" | "error"; changes: number }
 
 export async function syncCompetitionSchedule(comp: {
@@ -85,6 +144,8 @@ export async function syncCompetitionSchedule(comp: {
   const codeToId = Object.fromEntries(discRows.map((d) => [d.code, d.id]));
   const after = entriesToSlots(entries, timezone, codeToId);
   if (!after.length) return { competitionId: comp.id, status: "empty", changes: 0 }; // not published yet — keep what we have
+
+  await replaceExtras(comp.id, entriesToExtras(entries, timezone, codeToId));
 
   const existing = await db.select().from(competitionSchedule).where(eq(competitionSchedule.competitionId, comp.id));
   const before: Slot[] = existing.map((r) => ({

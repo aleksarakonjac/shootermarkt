@@ -38,6 +38,11 @@ const STAGE_COLOR: Record<string, string> = {
   other:       "bg-gray-100 text-gray-500",
 };
 
+// Sačmara nas ne zanima (isto pravilo kao pri uvozu na serveru); stavka bez vremena se ne može uvesti.
+const SHOTGUN = /\b(trap|skeet)\b/i;
+/** Uvozi se sve što ima vreme: termini takmičenja, a treninzi, ceremonije i ostalo idu u "Treninzi i ostalo" satnice. */
+const importable = (e: ISSFScheduleEntry) => !!e.startTime && !SHOTGUN.test(e.eventTitle);
+
 function extractIssfId(input: string): number | null {
   // Accept plain number or URL like .../competitions/3574/schedule
   const numMatch = input.match(/\d{3,6}/);
@@ -51,7 +56,7 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
   const [dbCompId,   setDbCompId]   = useState<number | "">("");
   const [entries,    setEntries]    = useState<ISSFScheduleEntry[] | null>(null);
   const [selected,   setSelected]   = useState<Set<number>>(new Set());
-  const [showAll,    setShowAll]    = useState(false);
+  const [showAll,    setShowAll]    = useState(true);
   const [fetchErr,   setFetchErr]   = useState<string | null>(null);
   const [importMsg,  setImportMsg]  = useState<string | null>(null);
   const [importing,  startImport]   = useTransition();
@@ -67,10 +72,11 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
   }
 
   function toggleAll() {
-    if (selected.size === displayEntries.length) {
+    const all = displayEntries.filter(importable).map((e) => e._idx);
+    if (selected.size === all.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(displayEntries.map((e) => e._idx)));
+      setSelected(new Set(all));
     }
   }
 
@@ -96,9 +102,9 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
       }
       const data: ISSFScheduleEntry[] = await res.json();
       setEntries(data);
-      // Auto-select all discipline-mapped entries by their index in the full array
+      // Izabrano je sve što se uvozi: termini takmičenja i stavke van takmičenja (treninzi, ceremonije...)
       const autoSelected = new Set(
-        data.reduce<number[]>((acc, e, i) => { if (e.disciplineCode) acc.push(i); return acc; }, [])
+        data.reduce<number[]>((acc, e, i) => { if (importable(e)) acc.push(i); return acc; }, [])
       );
       setSelected(autoSelected);
     });
@@ -117,7 +123,7 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
       });
       const data = await res.json();
       if (!res.ok) { setImportMsg(`Greška: ${data.error}`); return; }
-      setImportMsg(`Importovano ${data.imported}, preskočeno (duplikat) ${data.skipped}.`);
+      setImportMsg(`Importovano ${data.imported}, preskočeno (duplikat) ${data.skipped}${data.extras ? `, treninzi i ostalo: ${data.extras}` : ""}.`);
       setSelected(new Set());
     });
   }
@@ -125,7 +131,7 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
   // For the table, we need indexes relative to `entries` for selection tracking
   // Let's simplify: entries have stable indexes from the fetched array
   const displayEntries = entries
-    ? entries.map((e, i) => ({ ...e, _idx: i })).filter((e) => showAll || e.disciplineCode)
+    ? entries.map((e, i) => ({ ...e, _idx: i })).filter((e) => !SHOTGUN.test(e.eventTitle)).filter((e) => showAll || e.disciplineCode)
     : [];
 
   return (
@@ -233,7 +239,7 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
             <div>
               <h2 className="text-sm font-semibold text-[var(--ink)]">2. Pregled i izbor</h2>
               <p className="text-xs text-[var(--muted)] mt-0.5">
-                {entries.filter((e) => e.disciplineCode).length} od {entries.length} unosa se može mapirati u disciplinu
+                {entries.filter((e) => e.disciplineCode).length} unosa je termin discipline, a ostalo su treninzi, ceremonije i slično (sačmara se ne prikazuje)
               </p>
             </div>
             <label className="flex items-center gap-2 text-xs text-[var(--muted)] cursor-pointer">
@@ -243,7 +249,7 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
                 onChange={(e) => setShowAll(e.target.checked)}
                 className="rounded"
               />
-              Prikaži sve unose (uključujući trening, ceremonije…)
+              Prikaži treninge, ceremonije i ostalo
             </label>
           </div>
 
@@ -254,7 +260,7 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
                   <th className="p-3 text-left">
                     <input
                       type="checkbox"
-                      checked={selected.size === displayEntries.length && displayEntries.length > 0}
+                      checked={selected.size > 0 && selected.size === displayEntries.filter(importable).length}
                       onChange={toggleAll}
                       className="rounded"
                     />
@@ -275,7 +281,7 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
                       onClick={() => toggleOne(entry._idx)}
                       className={`border-b border-[var(--border)] cursor-pointer transition-colors last:border-0 ${
                         checked ? "bg-[var(--surface-2)]" : "hover:bg-[var(--surface-2)]/50"
-                      } ${!entry.disciplineCode ? "opacity-40" : ""}`}
+                      } ${!importable(entry) ? "opacity-40" : ""}`}
                     >
                       <td className="p-3">
                         <input
@@ -283,7 +289,7 @@ export function ISSFScheduleImportClient({ competitions, featured, disciplines }
                           checked={checked}
                           onChange={() => toggleOne(entry._idx)}
                           onClick={(e) => e.stopPropagation()}
-                          disabled={!entry.disciplineCode}
+                          disabled={!importable(entry)}
                           className="rounded"
                         />
                       </td>

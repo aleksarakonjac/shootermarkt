@@ -14,6 +14,7 @@ const NAMES: Record<string, { sr: string; en: string }> = {
   SPM: { sr: "25m pištolj", en: "25m Pistol" },
   RFPM: { sr: "25m Rapid Fire pištolj", en: "25m Rapid Fire Pistol" },
   FPM: { sr: "50m pištolj", en: "50m Pistol" },
+  FPW: { sr: "50m pištolj", en: "50m Pistol" },
   STPM: { sr: "25m standard pištolj", en: "25m Standard Pistol" },
   STPW: { sr: "25m standard pištolj", en: "25m Standard Pistol" },
   R3P300M: { sr: "300m puška 3x20", en: "300m Rifle 3x20" },
@@ -30,7 +31,7 @@ const NAMES: Record<string, { sr: string; en: string }> = {
 /** Redosled disciplina u programu takmičenja i u istoriji nastupa. */
 export const DISCIPLINE_DISPLAY_ORDER = [
   "ARM", "ARW", "ARMT", "R3PM", "R3PW", "R3JM", "R3JW", "RPRM", "RPRW",
-  "APM", "APW", "APMT", "SPW", "SPM", "STPW", "STPM", "RFPM", "FPM",
+  "APM", "APW", "APMT", "SPW", "SPM", "STPW", "STPM", "RFPM", "FPM", "FPW",
   "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300",
   "SOLOARM", "SOLOARW", "SOLOAPM", "SOLOAPW",
 ];

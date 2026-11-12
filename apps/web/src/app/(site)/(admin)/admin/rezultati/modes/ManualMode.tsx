@@ -11,11 +11,11 @@ import { LEVEL_LABEL, LEVEL_STYLE } from "@/lib/competition-utils";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ALL_DISCIPLINES: DisciplineCode[] = [
-  "ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "RFPM",
+  "ARM", "ARW", "APM", "APW", "ARMT", "APMT", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "FPW", "RFPM",
   "STPM", "STPW", "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300",
 ];
 
-const MULTI_SERIES = new Set<DisciplineCode>(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "FPM", "RFPM", "STPM", "STPW", "RPR300M", "RPR300W"]);
+const MULTI_SERIES = new Set<DisciplineCode>(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "FPM", "FPW", "RFPM", "STPM", "STPW", "RPR300M", "RPR300W"]);
 const THREE_POS    = new Set<DisciplineCode>(["R3PM", "R3PW", "R3P300M", "R3P300W", "STR300"]);
 const MIXED_TEAM   = new Set<DisciplineCode>(["ARMT", "APMT"]);
 
@@ -44,6 +44,7 @@ const DISC_LABEL: Record<DisciplineCode, string> = {
   SPW:  "25m Sport Pistol Women",
   SPM:  "25m Sport Pistol Men",
   FPM:  "50m Pistol Men",
+  FPW:  "50m Pistol Women",
   RFPM: "25m Rapid Fire Pistol Men",
   STPM: "25m Standard Pistol Men",
   STPW: "25m Standard Pistol Women",

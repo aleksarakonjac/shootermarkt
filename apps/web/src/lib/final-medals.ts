@@ -11,6 +11,13 @@ import type { FinalDetail } from "@shootermarkt/db/schema";
  * 3. Inače (završeno po satnici ili nema satnice) → da.
  */
 
+/**
+ * Discipline bez finala (ležeći, standardni pištolj, 50m slobodni pištolj, 300m): medalje se dodeljuju odmah posle
+ * kvalifikacija, pa se zlato, srebro i bronza prikazuju u tabeli kvalifikacija.
+ */
+const QUAL_ONLY = new Set(["RPRM", "RPRW", "STPM", "STPW", "FPM", "FPW", "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300"]);
+export const isQualOnlyDiscipline = (code: string | null | undefined) => code != null && QUAL_ONLY.has(code);
+
 export type FinalSlot = { startTime: string; endTime: string | null };
 
 const OVERRUN_MS = 10 * 60_000;

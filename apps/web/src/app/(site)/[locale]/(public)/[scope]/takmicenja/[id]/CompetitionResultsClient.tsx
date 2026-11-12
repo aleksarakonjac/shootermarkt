@@ -23,7 +23,8 @@ import {
   type MixedTeamRow,
 } from "@/components/result-display/MixedTeamQualTable";
 import { startNavigationProgress, finishNavigationProgress } from "@/components/NavigationProgress";
-import { shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
+import { isOlympicDiscipline } from "@/lib/olympic-disciplines";
+import { isQualOnlyDiscipline, shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
 import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
 import { categoryLabel } from "@/lib/match-name";
 import { todayKey } from "./ScheduleSection";
@@ -114,6 +115,13 @@ interface Props {
   timezone?: string;
   /** Satnica finala (disciplina + kategorija) — medalje se prikazuju tek kad je finale gotovo. */
   finalSlots?: Array<FinalSlot & { disciplineCode: string; category: string }>;
+  /** Satnica kvalifikacija: za discipline bez finala medalje se prikazuju tek kad su kvalifikacije gotove. */
+  qualSlots?: Array<FinalSlot & { disciplineCode: string; category: string }>;
+  /** Prvi i poslednji dan takmičenja (ISO): dok traje pregled je po danima, posle po puška/pištolj. */
+  dateFrom?: string;
+  dateTo?: string | null;
+  /** Da li je takmičenje završeno u trenutku renderovanja na serveru (klijent posle hidratacije računa po svojoj zoni). */
+  endedOnServer?: boolean;
   /** Termini satnice (svi stage-ovi): dok neki traje, stranica se osvežava svakih 30 s. */
   liveWindows?: Array<{ startTime: string; endTime: string | null }>;
   /** Forma po strelcu i disciplini ("shooterId|CODE") za detail sheet. */
@@ -144,7 +152,8 @@ const DISCIPLINE_NAMES: Record<string, { sr: string; en: string }> = {
   RPRM: { sr: "MK ležeći M",         en: "50m prone M" },
   RPRW: { sr: "MK ležeći Ž",         en: "50m prone W" },
   FPM:  { sr: "Pištolj 50m M",       en: "50m pistol M" },
-  RFPM: { sr: "Brzometni pištolj M", en: "Rapid fire pistol M" },
+  FPW:  { sr: "Pištolj 50m Ž",       en: "50m pistol W" },
+  RFPM: { sr: "Rapid Fire pištolj M", en: "Rapid fire pistol M" },
   STPM: { sr: "Standard pištolj M",  en: "Standard pistol M" },
   STPW: { sr: "Standard pištolj Ž",  en: "Standard pistol W" },
   R3P300M: { sr: "300m 3x20 M",      en: "300m 3x20 M" },
@@ -168,19 +177,19 @@ function disciplineOrder(code: string) {
   return index === -1 ? DISCIPLINE_ORDER.length : index;
 }
 
-// Pregled se deli po danu kad svaka pojedinačna disciplina ima datum, inače po grupi disciplina
-// (oružje + vazdušno/MK), da muški, ženski i miks iste discipline stoje zajedno.
-type Family = "airRifle" | "rifle" | "airPistol" | "pistol";
-const FAMILY_ORDER: Family[] = ["airRifle", "rifle", "airPistol", "pistol"];
+// Dok takmičenje traje, pregled je po danima (discipline bez datuma idu u grupu puška/pištolj posle dana).
+// Kad se završi, grupe su puška i pištolj (muški, ženski i miks iste discipline stoje zajedno), olimpijske prve.
+type Family = "rifle" | "pistol";
+const FAMILY_ORDER: Family[] = ["rifle", "pistol"];
 const FAMILY_LABELS: Record<string, Record<Family, string>> = {
-  sr: { airRifle: "Vazdušna puška", rifle: "MK puška", airPistol: "Vazdušni pištolj", pistol: "MK pištolj" },
-  en: { airRifle: "Air rifle", rifle: "Rifle", airPistol: "Air pistol", pistol: "Pistol" },
+  sr: { rifle: "Puška", pistol: "Pištolj" },
+  en: { rifle: "Rifle", pistol: "Pistol" },
 };
 function disciplineFamily(code: string): Family {
-  if (code.startsWith("SOLOAR")) return "airRifle";
-  if (code.startsWith("SOLOAP")) return "airPistol";
-  return code.startsWith("AR") ? "airRifle" : code.startsWith("AP") ? "airPistol" : code.startsWith("R3") || code.startsWith("RPR") || code === "STR300" ? "rifle" : "pistol";
+  return /^(AR|R3|RPR|STR|SOLOAR)/.test(code) ? "rifle" : "pistol";
 }
+// Olimpijske discipline (uključujući miks timove) idu pre neolimpijskih.
+const nonOlympic = (code: string) => (isOlympicDiscipline(code) ? 0 : 1);
 const ddmm = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
 function weekday(iso: string, locale: string, format: "long" | "short" = "long"): string {
   const [y, m, d] = iso.split("-").map(Number);
@@ -243,7 +252,7 @@ function CompetitionResultsWithSearch(props: Props) {
   return <CompetitionResultsView {...props} search={useSearchParams().toString()} />;
 }
 
-function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel, timezone, finalSlots = [], liveWindows = NO_WINDOWS, search }: Props & { search: string }) {
+function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel, timezone, finalSlots = [], qualSlots = [], liveWindows = NO_WINDOWS, dateFrom, dateTo, endedOnServer = false, search }: Props & { search: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const detailRef = useRef<HTMLDivElement>(null);
@@ -361,6 +370,8 @@ function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel,
         }}>
           <CompetitionOverview
             timezone={timezone}
+            lastDay={dateTo ?? dateFrom ?? null}
+            endedOnServer={endedOnServer}
             groups={groups}
             mixedGroups={mixedGroups}
             locale={locale}
@@ -387,6 +398,7 @@ function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel,
             locale={locale}
             competitionLevel={competitionLevel}
             finalSlots={finalSlots}
+            qualSlots={qualSlots}
             onRefresh={refreshNow}
             refreshing={refreshing}
             onBack={() => {
@@ -409,6 +421,8 @@ function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel,
 
 function CompetitionOverview({
   timezone,
+  lastDay,
+  endedOnServer,
   groups,
   mixedGroups,
   locale,
@@ -416,17 +430,21 @@ function CompetitionOverview({
   onSelectMixed,
 }: {
   timezone?: string;
+  lastDay: string | null;
+  endedOnServer: boolean;
   groups: DisciplineGroup[];
   mixedGroups: MixedTeamGroup[];
   locale: string;
   onSelectIndividual: (code: string, category: AgeCategory, stage: Stage, elimRound?: number) => void;
   onSelectMixed: (code: string, category: AgeCategory, stage: "qual" | "final" | "gold" | "bronze") => void;
 }) {
-  const byDay = groups.length > 0 && groups.every((g) => g.date);
   const reduceMotion = useReducedMotion();
   // Lokalni "danas" tek posle hidratacije (server ne zna vremensku zonu posetioca)
   const [today, setToday] = useState<string | null>(null);
   useEffect(() => setToday(todayKey(timezone)), [timezone]);
+  // Po danima dok takmičenje traje; kad je završeno, po puška/pištolj. Pre hidratacije važi izračun servera.
+  const ended = today != null && lastDay != null ? today > lastDay : endedOnServer;
+  const byDay = !ended && groups.some((g) => g.date);
   // Današnji chip centriran u redu prečica (samo vodoravno, stranica se ne pomera)
   const navRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -550,7 +568,7 @@ function CompetitionOverview({
   ];
 
   // Sekcija: dan (kad je pregled po danima i stavka ima datum), inače grupa disciplina. Unutar sekcije po kodu discipline.
-  const sectionOf = (item: (typeof items)[number]) => (byDay && item.date ? item.date : disciplineFamily(item.code));
+  const sectionOf = (item: (typeof items)[number]): string => (byDay && item.date ? item.date : disciplineFamily(item.code));
   // dani (ISO) hronološki, pa grupe disciplina; "~" je u ASCII posle cifara
   const sectionRank = (key: string) => (/^\d/.test(key) ? key : `~${FAMILY_ORDER.indexOf(key as Family)}`);
   const sections = [...new Set(items.map(sectionOf))].sort((a, b) => (sectionRank(a) < sectionRank(b) ? -1 : 1));
@@ -592,7 +610,8 @@ function CompetitionOverview({
       {sections.map((section) => {
         const sectionItems = items
           .filter((item) => sectionOf(item) === section)
-          .sort((a, b) => disciplineOrder(a.code) - disciplineOrder(b.code));
+          // Olimpijske discipline prve.
+          .sort((a, b) => nonOlympic(a.code) - nonOlympic(b.code) || disciplineOrder(a.code) - disciplineOrder(b.code));
         const isDay = /^\d/.test(section);
         return (
           <section key={section} id={`sekcija-${section}`} className="flex scroll-mt-24 flex-col gap-5" aria-label={isDay ? `${weekday(section, locale)} ${ddmm(section)}` : familyLabels[section as Family]}>
@@ -787,6 +806,7 @@ function CompetitionDetail({
   locale,
   competitionLevel,
   finalSlots,
+  qualSlots,
   onRefresh,
   refreshing,
   onBack,
@@ -798,6 +818,7 @@ function CompetitionDetail({
   locale: string;
   competitionLevel?: string;
   finalSlots: NonNullable<Props["finalSlots"]>;
+  qualSlots: NonNullable<Props["qualSlots"]>;
   onRefresh: () => void;
   refreshing: boolean;
   onBack: () => void;
@@ -981,6 +1002,12 @@ function CompetitionDetail({
     now,
   );
 
+  // Discipline bez finala: medalje u tabeli kvalifikacija, kad su kvalifikacije završene.
+  const qualSlot = selection.kind === "individual"
+    ? qualSlots.find((slot) => slot.disciplineCode === selection.disciplineCode && slot.category === selection.category)
+    : undefined;
+  const showQualMedals = selection.kind === "individual" && isQualOnlyDiscipline(selection.disciplineCode) && shouldShowFinalMedals(qualSlot, [], now);
+
   // Build stage toggle options in correct order: Elim → Qual → Final
   type StageOption = { key: Stage; label: string; shortLabel: string; badge: React.ReactNode };
   const phaseL = PHASE_LABELS[locale] ?? PHASE_LABELS.en;
@@ -1134,7 +1161,7 @@ function CompetitionDetail({
             animate={{ opacity: 1, transition: { duration: 0.22 } }}
             exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
-            <CompetitionQualTable results={qualRows} competitionLevel={competitionLevel} />
+            <CompetitionQualTable results={qualRows} competitionLevel={competitionLevel} showMedals={showQualMedals} />
           </motion.div>
         ) : (
           <motion.div

@@ -12,6 +12,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import type { QualDetail, PositionsQualDetail } from "@shootermarkt/db/schema";
 import { NOC_LIST } from "@/components/ui/NocDropdown";
 import { displayNoc } from "@shootermarkt/db/noc-list";
+import { MedalIcon, MEDAL_COLOR } from "./MedalIcon";
 import { OlympicQuotaBadge, OlympicQuotaNote } from "./OlympicQuotaBadge";
 import { RemarkBadge, RemarkLegend, assignRemarkCodes, remarkLabel, remarkText, type RemarkLegendItem } from "./RemarkBadge";
 import { useRowFlash } from "./useRowFlash";
@@ -32,6 +33,12 @@ const FLAT_GROUPS_BY_DISCIPLINE: Array<{ match: (code: string) => boolean; group
     { label: "Klečeći", count: 2 },
     { label: "Ležeći", count: 2 },
     { label: "Stojeći", count: 2 },
+  ] },
+  // Standardni pištolj: po dve serije na 150 s, 20 s i 10 s.
+  { match: (code) => code === "STPM" || code === "STPW", groups: [
+    { label: "150 s", count: 2 },
+    { label: "20 s", count: 2 },
+    { label: "10 s", count: 2 },
   ] },
   // RFPM (ISSF prikaz): dve faze po tri serije (8 s, 6 s, 4 s).
   { match: (code) => code === "RFPM", groups: [
@@ -108,6 +115,8 @@ function ChevronIcon({ open }: { open: boolean }) {
 
 interface Props {
   results: CompResultRow[];
+  /** Discipline bez finala: prva tri mesta dobijaju zlatni, srebrni i bronzani krug (kad su kvalifikacije gotove). */
+  showMedals?: boolean;
   /** world/olympic/continental (ISSF-level) fields — no clubs, only national teams. */
   competitionLevel?: string;
 }
@@ -218,7 +227,7 @@ export function SeriesBox({ text, best, onSurface }: { text: string; best: boole
   );
 }
 
-export function CompetitionQualTable({ results, competitionLevel }: Props) {
+export function CompetitionQualTable({ results, competitionLevel, showMedals = false }: Props) {
   const locale = useLocale();
   const en = locale === "en";
   const positionLabels: PositionLabels = locale === "en" ? POSITION_LABELS_EN : POSITION_LABELS;
@@ -302,7 +311,17 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
         ? flatGroups.map((g) => ({ label: g.label, span: g.count }))
         : seriesHeaders.map((label) => ({ label, span: 1 }));
   const clubColW = isNocOnly ? NOC_W : CLUB_W;
-  const gridTemplateColumns = [RANK_W, NAME_W, clubColW, ...seriesHeaders.map(() => SERIES_COL_W), TOTAL_W, REMARK_W]
+  // Trostav (klečeći/ležeći/stojeći), sport pištolj (precizno/brzo), standardni pištolj (150/20/10 s) i RFPM (dve faze): serije unutar grupe zbijene, a između grupa veći razmak
+  // (dodatna širina prve kolone sledeće grupe; vrednosti su poravnate udesno, pa se višak vidi kao razmak levo od nje).
+  const isGrouped = hasSeriesDetail && headerGroups.length > 1 && (isPositionsType || flatGroups != null);
+  const GROUP_GAP = 20;
+  const groupW = hasDecimals ? (panelOpen ? 50 : 56) : (panelOpen ? 38 : 42);
+  const groupStarts = new Set<number>();
+  headerGroups.reduce((col, g, gi) => { if (gi > 0) groupStarts.add(col); return col + g.span; }, 0);
+  const colWidth = (_: unknown, i: number) => (isGrouped ? `${groupW + (groupStarts.has(i) ? GROUP_GAP : 0)}px` : SERIES_COL_W);
+  // Pomak naslova grupe udesno da stoji na sredini vrednosti: pola kolone (+ pola razmaka za grupe posle prve) − desni razmak ćelije − pola cifara.
+  const labelShift = (groupIndex: number) => Math.max(0, Math.round(groupW / 2 + (groupIndex > 0 ? GROUP_GAP / 2 : 0) - 6 - (hasDecimals ? 21 : 9)));
+  const gridTemplateColumns = [RANK_W, NAME_W, clubColW, ...seriesHeaders.map(colWidth), TOTAL_W, REMARK_W]
     .filter(Boolean)
     .join(" ");
   const mobileGridTemplateColumns = hasSeriesDetail
@@ -379,7 +398,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                 key={i}
                 role="columnheader"
                 className={`hidden sm:flex ${headerCellCls} ${group.span > 1 ? "justify-center" : "justify-end"} whitespace-nowrap`}
-                style={group.span > 1 ? { gridColumn: `span ${group.span}` } : undefined}
+                style={group.span > 1 ? { gridColumn: `span ${group.span}`, ...(isGrouped ? { paddingLeft: 6 + labelShift(i) * 2, paddingRight: 6 } : {}) } : undefined}
               >
                 {group.label}
               </div>
@@ -417,9 +436,13 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                     style={{ background: rowBg }}
                   >
                     {rankOf(r) != null ? (
-                      <span className={rankOf(r)! <= 3 ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>
-                        {rankOf(r)}
-                      </span>
+                      showMedals && MEDAL_COLOR[rankOf(r)!] ? (
+                        <MedalIcon rank={rankOf(r)!} />
+                      ) : (
+                        <span className={rankOf(r)! <= 3 ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>
+                          {rankOf(r)}
+                        </span>
+                      )
                     ) : (
                       <span className="text-[var(--subtle)]">—</span>
                     )}
@@ -488,7 +511,7 @@ export function CompetitionQualTable({ results, competitionLevel }: Props) {
                     return (
                       <div
                         key={i}
-                        className={`hidden sm:flex ${cellCls} justify-end font-[family-name:var(--font-jetbrains-mono)] text-xs sm:text-sm tabular-nums group-hover:bg-[var(--surface-2)]`}
+                        className={`hidden sm:flex ${cellCls} ${isGrouped ? "!px-1.5" : ""} justify-end font-[family-name:var(--font-jetbrains-mono)] text-xs sm:text-sm tabular-nums group-hover:bg-[var(--surface-2)]`}
                         style={{ background: rowBg }}
                       >
                         {item?.value != null ? (

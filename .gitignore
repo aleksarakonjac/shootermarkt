@@ -46,3 +46,4 @@ supabase/.temp/
 graphify-out/
 .claude/*
 !.claude/skills/
+.superpowers/

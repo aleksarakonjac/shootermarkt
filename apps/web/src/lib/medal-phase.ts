@@ -13,7 +13,7 @@
  */
 
 const NO_FINAL_DISCIPLINES: ReadonlySet<string> = new Set([
-  "RPRM", "RPRW", "FPM", "STPM", "STPW",
+  "RPRM", "RPRW", "FPM", "FPW", "STPM", "STPW",
   "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300",
 ]);
 const INTERNATIONAL_LEVELS: ReadonlySet<string> = new Set(["olympic", "world", "continental", "international"]);

@@ -11,7 +11,7 @@ export type RemarkDetails = { qual?: StageRemarks; elim?: StageRemarks; final?: 
 
 export type DisciplineCode =
   | "ARM" | "ARW" | "APM" | "APW" | "ARMT" | "APMT" | "R3PM" | "R3PW" | "RPRM" | "RPRW"
-  | "SPW" | "SPM" | "FPM" | "RFPM" | "STPM" | "STPW"
+  | "SPW" | "SPM" | "FPM" | "FPW" | "RFPM" | "STPM" | "STPW"
   | "R3P300M" | "R3P300W" | "RPR300M" | "RPR300W" | "STR300"
   | "SOLOARM" | "SOLOARW" | "SOLOAPM" | "SOLOAPW";
 /** ESC Challenge Solo — pogoci (ne ISSF skor), ne ulazi u formu ni u poređenja skorova. */
@@ -128,7 +128,8 @@ export const DISCIPLINE_META: Record<DisciplineCode, { apparatus: string; gender
   SPW:  { apparatus: "pistol",     gender: "F",  label: "Sport pištolj Ž" },
   SPM:  { apparatus: "pistol",     gender: "M",  label: "Sport pištolj M" },
   FPM:  { apparatus: "pistol",     gender: "M",  label: "Slobodni pištolj M" },
-  RFPM: { apparatus: "pistol",     gender: "M",  label: "Brzometni pištolj M" },
+  FPW:  { apparatus: "pistol",     gender: "F",  label: "Slobodni pištolj Ž" },
+  RFPM: { apparatus: "pistol",     gender: "M",  label: "Rapid Fire pištolj M" },
   STPM: { apparatus: "pistol",     gender: "M",  label: "25m standard pištolj M" },
   STPW: { apparatus: "pistol",     gender: "F",  label: "25m standard pištolj Ž" },
   R3P300M: { apparatus: "rifle",   gender: "M",  label: "300m puška 3x20 M" },

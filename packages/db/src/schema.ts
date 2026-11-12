@@ -50,6 +50,7 @@ export const disciplineCodeEnum = pgEnum("discipline_code", [
   "SPM",  // 25m Sport Pistol Men (nacionalna disciplina, format kao SPW)
   "RFPM", // 25m Rapid Fire Pistol Men — samo kvalifikacija; format finala još nije potvrđen
   "FPM",  // 50m Free Pistol Men
+  "FPW",  // 50m Free Pistol Women
   "STPM", // 25m Standard Pistol Men
   "STPW", // 25m Standard Pistol Women
   // 300m Rifle — sve celi brojevi, bez finala
@@ -807,6 +808,29 @@ export const competitionSchedule = pgTable(
   (t) => [
     index("competition_schedule_comp_idx").on(t.competitionId),
     index("competition_schedule_start_idx").on(t.startTime),
+  ]
+);
+
+// Stavke satnice koje nisu takmičenje: treninzi (pre-event, nezvanični), ceremonije, tehnički sastanci, kontrola opreme...
+// Zasebna tabela da ostatak aplikacije (live prozori, finala, ticker) vidi samo prave termine takmičenja.
+export const competitionScheduleExtras = pgTable(
+  "competition_schedule_extras",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+    // 'training' | 'ceremony' | 'other'
+    kind: varchar("kind", { length: 12 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    // Disciplina na koju se stavka odnosi (npr. trening za 10m vazdušnu pušku), kad je poznata.
+    disciplineId: integer("discipline_id").references(() => disciplines.id),
+    startTime: timestamp("start_time").notNull(),
+    endTime: timestamp("end_time"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("competition_schedule_extras_comp_idx").on(t.competitionId),
+    // Ponovni uvoz ne sme da duplira: isti naslov u isto vreme je ista stavka.
+    uniqueIndex("competition_schedule_extras_unique").on(t.competitionId, t.title, t.startTime),
   ]
 );
 

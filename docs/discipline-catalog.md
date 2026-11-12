@@ -16,7 +16,7 @@ ARM, ARW, APM, APW, ARMT, APMT, R3PM, R3PW (varijante 3x20 i 3x40), SPW.
 | RPRM / RPRW | 50m MK puška ležeći | 60 hitaca, 6×10, decimale | 654.0 | nema | ✓ |
 | SPM | 25m sport pištolj M | kao SPW: 30 precizno (6×5, 240 s) + 30 brzo, celi brojevi, iksevi | 600 | kao SPW | ✓ (ISSF 2026 vodi 25m Pistol samo za žene, SPM je nacionalni) |
 | FPM | 50m pištolj | 60 hitaca, 6×10, celi brojevi, iksevi | 600 | nema | ✓ |
-| RFPM | 25m brzometni pištolj | 2 poluprograma × 30; svaki ima 6 serija po 5 hitaca: 2×8 s, 2×6 s, 2×4 s; celi brojevi, iksevi | 600 | ? | kvalifikacija ~ (ISSF 2026, 8.7.6.3), finale ? |
+| RFPM | 25m Rapid Fire pištolj | 2 poluprograma × 30; svaki ima 6 serija po 5 hitaca: 2×8 s, 2×6 s, 2×4 s; celi brojevi, iksevi | 600 | ? | kvalifikacija ~ (ISSF 2026, 8.7.6.3), finale ? |
 
 ### Dodajemo posle (sve celi brojevi, iksevi, bez finala, max 600)
 

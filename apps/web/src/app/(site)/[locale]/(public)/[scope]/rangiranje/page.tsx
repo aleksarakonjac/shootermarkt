@@ -34,7 +34,7 @@ const TABS: { code: DiscCode; label: string; labelEn: string }[] = [
   { code: "R3PM", label: "Puška trostav M", labelEn: "Rifle 3 Positions Men" },
   { code: "R3PW", label: "Puška trostav Ž", labelEn: "Rifle 3 Positions Women" },
   { code: "SPW",  label: "Sport pištolj Ž", labelEn: "25m Sport Pistol Women" },
-  { code: "RFPM", label: "Brzometni pištolj M", labelEn: "25m Rapid Fire Pistol Men" },
+  { code: "RFPM", label: "Rapid Fire pištolj M", labelEn: "25m Rapid Fire Pistol Men" },
 ];
 
 type Props = {

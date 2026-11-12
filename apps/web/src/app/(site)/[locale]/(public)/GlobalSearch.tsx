@@ -64,7 +64,7 @@ const LEVEL_LABELS: Record<string, { sr: string; en: string }> = {
   club:          { sr: "Klupsko",       en: "Club" },
 };
 
-const DISC_CODES = new Set(["ARM","ARW","APM","APW","R3PM","R3PW","R3JM","R3JW","RPRM","RPRW","SPW","SPM","FPM","RFPM","STPM","STPW","R3P300M","R3P300W","RPR300M","RPR300W","STR300"]);
+const DISC_CODES = new Set(["ARM","ARW","APM","APW","R3PM","R3PW","R3JM","R3JW","RPRM","RPRW","SPW","SPM","FPM","FPW","RFPM","STPM","STPW","R3P300M","R3P300W","RPR300M","RPR300W","STR300"]);
 
 type DiscInfo = { sr: string; en: string; aparat: string; pol: "m" | "f" | null };
 const DISC_LABELS: Record<string, DiscInfo> = {
@@ -81,7 +81,8 @@ const DISC_LABELS: Record<string, DiscInfo> = {
   RPRW: { sr: "MK puška ležeći ženski",  en: "50m Rifle Prone Women",  aparat:"AR", pol:"f" },
   SPM:  { sr: "Sport pištolj muški",     en: "25m Sport Pistol Men",   aparat:"AP", pol:"m" },
   FPM:  { sr: "Pištolj 50m muški",       en: "50m Pistol Men",         aparat:"AP", pol:"m" },
-  RFPM: { sr: "Brzometni pištolj muški", en: "25m Rapid Fire Pistol Men", aparat:"AP", pol:"m" },
+  FPW:  { sr: "Pištolj 50m ženski",      en: "50m Pistol Women",       aparat:"AP", pol:"f" },
+  RFPM: { sr: "Rapid Fire pištolj muški", en: "25m Rapid Fire Pistol Men", aparat:"AP", pol:"m" },
   STPM: { sr: "25m standard pištolj muški", en: "25m Standard Pistol Men", aparat:"AP", pol:"m" },
   STPW: { sr: "25m standard pištolj ženski", en: "25m Standard Pistol Women", aparat:"AP", pol:"f" },
   R3P300M: { sr: "300m puška 3x20 muški", en: "300m Rifle 3x20 Men", aparat:"AR", pol:"m" },

@@ -25,7 +25,8 @@ export function QuotaTabs({ tabs, panels, label }: { tabs: Tab[]; panels: Record
 
   return (
     <div>
-      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1">
+      {/* Tabovi izgledaju kao podnaslovi stranice (Barlow Condensed, velika slova); izabrani je podvučen. */}
+      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className="mb-6 flex gap-x-4 overflow-x-auto overflow-y-hidden sm:gap-x-6 border-b border-[var(--border)] [scrollbar-width:none]">
         {tabs.map((t) => {
           const selected = t.id === active;
           return (
@@ -39,18 +40,19 @@ export function QuotaTabs({ tabs, panels, label }: { tabs: Tab[]; panels: Record
               tabIndex={selected ? 0 : -1}
               type="button"
               onClick={() => setActive(t.id)}
-              className={`relative flex min-h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)] ${selected ? "text-[var(--ink)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
+              className={`relative flex shrink-0 items-baseline gap-2 pb-2.5 font-[family-name:var(--font-barlow-condensed)] font-bold uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)] text-lg sm:text-2xl ${selected ? "text-[var(--ink)]" : "text-[var(--muted)] hover:text-[var(--ink)]"}`}
+              style={{ letterSpacing: "-0.02em" }}
             >
+              {t.label}
+              {t.count != null && <span className="hidden font-[family-name:var(--font-jetbrains-mono)] text-sm font-normal normal-case tabular-nums text-[var(--muted)] sm:inline" style={{ letterSpacing: 0 }}>{t.count}</span>}
               {selected && (
                 <motion.span
-                  layoutId="quota-tab-pill"
+                  layoutId="quota-tab-underline"
                   aria-hidden="true"
-                  className="absolute inset-0 rounded-lg bg-[var(--bg)] shadow-sm ring-1 ring-[var(--border)]"
+                  className="absolute inset-x-0 bottom-0 h-1 bg-[var(--brand-primary)]"
                   transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 40 }}
                 />
               )}
-              <span className="relative">{t.label}</span>
-              {t.count != null && <span className="relative font-[family-name:var(--font-jetbrains-mono)] text-xs font-normal tabular-nums text-[var(--muted)]">{t.count}</span>}
             </button>
           );
         })}

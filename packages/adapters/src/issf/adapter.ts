@@ -1,7 +1,7 @@
 const ISSF_API = "https://api.issf-sports.org/api/v01";
 const ISSF_WEB = "https://www.issf-sports.org";
 
-export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "R3PM" | "R3PW" | "RPRM" | "RPRW" | "FPM";
+export type DisciplineCode = "ARM" | "ARW" | "APM" | "APW" | "R3PM" | "R3PW" | "RPRM" | "RPRW" | "FPM" | "FPW";
 export type MixedTeamDisciplineCode = "APMT" | "ARMT";
 
 const ISSF_EVENT_MAP: Record<string, DisciplineCode> = {
@@ -14,6 +14,7 @@ const ISSF_EVENT_MAP: Record<string, DisciplineCode> = {
   RPRM: "RPRM",
   RPRW: "RPRW",
   FPM:  "FPM",
+  FPW:  "FPW",
 };
 
 // ISSF may use various codes for mixed team events
@@ -297,12 +298,20 @@ const EVENT_DISCIPLINE_MAP: Array<[RegExp, string]> = [
   [/50m rifle prone women/i,      "RPRW"],
   [/25m (?:sport )?pistol women/i,"SPW"],
   [/25m (?:sport )?pistol men/i,  "SPM"],
-  [/50m free pistol/i,            "FPM"],
-  // 25m rapid fire pistol (brzometni pištolj) namerno nije ovde: pravila još nisu implementirana,
-  // pa ne sme ni u raspored (live-fetch cron bi ga inače povukao iz SIUS-a).
+  [/50m (?:free )?pistol men/i,   "FPM"],
+  [/50m (?:free )?pistol women/i, "FPW"],
+  [/25m rapid fire pistol/i,      "RFPM"],
+  [/25m standard pistol men/i,    "STPM"],
+  [/25m standard pistol women/i,  "STPW"],
+  [/300m rifle (?:3.positions?|three positions?) men/i,   "R3P300M"],
+  [/300m rifle (?:3.positions?|three positions?) women/i, "R3P300W"],
+  [/300m rifle prone men/i,       "RPR300M"],
+  [/300m rifle prone women/i,     "RPR300W"],
+  [/300m standard rifle/i,        "STR300"],
 ];
 
-function mapTitleToDisciplineCode(title: string): string | null {
+/** Naziv događaja iz ISSF satnice → kod discipline (null = ne pratimo). */
+export function mapTitleToDisciplineCode(title: string): string | null {
   // Strip leading event type prefixes before matching
   const clean = title
     .replace(/^final\s+/i, "")
@@ -321,8 +330,9 @@ function mapTitleToDisciplineCode(title: string): string | null {
 // scheduled as its own slot (and each may span multiple relays/rounds), but
 // both feed one combined qual ranking (see live-fetch cron dedup). Only SPW
 // carries this split, so the sub-stage check only applies once we know the row is SPW.
-function detectStage(title: string, disciplineCode: string | null): ISSFScheduleEntry["stage"] {
-  if (/^pre-event training/i.test(title)) return "training";
+export function detectStage(title: string, disciplineCode: string | null): ISSFScheduleEntry["stage"] {
+  // Pre-event i nezvanični treninzi (naslov sadrži disciplinu, pa bi inače postali termin takmičenja).
+  if (/\btraining\b/i.test(title))        return "training";
   if (/^medal ceremony/i.test(title))     return "ceremony";
   if (/^final\s/i.test(title))            return "final";
   if (/elimination/i.test(title))         return "elimination";

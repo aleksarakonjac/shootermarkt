@@ -1,0 +1,1 @@
+ALTER TYPE "public"."discipline_code" ADD VALUE 'FPW' BEFORE 'STPM';
