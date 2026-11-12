@@ -260,7 +260,7 @@ export function MainNav() {
                 key={group.key}
                 href={scopedHref(group.directHref)}
                 data-nav-active={active && !group.featured ? "" : undefined}
-                className={`relative ${group.featured ? "rounded-lg" : "rounded-md"} text-sm font-medium transition-colors duration-150 ${
+                className={`relative whitespace-nowrap ${group.featured ? "rounded-lg" : "rounded-md"} text-sm font-medium transition-colors duration-150 ${
                   group.featured ? "mx-1 inline-flex items-center gap-2 py-[6.5px] pl-2.5 pr-3" : "px-3 py-2"
                 } ${
                   group.featured
