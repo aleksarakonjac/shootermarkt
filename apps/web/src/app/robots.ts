@@ -26,7 +26,7 @@ export default function robots(): MetadataRoute.Robots {
         allow: "/",
         // Profil strelca je isti u oba scope-a (canonical → /srb/); issf kopija samo duplira ISR writes.
         // /rezultati je puna tabela istog strelca — za pretragu dovoljan je profil, a crawl bi dupliran trošio CPU i ISR writes.
-        disallow: ["/admin", "/api/", "/*/issf/strelci/", "/*/strelci/*/rezultati"],
+        disallow: ["/admin", "/api/", "/ioc/", "/*/issf/strelci/", "/*/strelci/*/rezultati"],
         crawlDelay: 5,
       },
     ],
