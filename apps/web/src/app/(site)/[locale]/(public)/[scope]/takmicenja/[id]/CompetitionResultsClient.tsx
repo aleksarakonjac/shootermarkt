@@ -1035,7 +1035,7 @@ function CompetitionDetail({
           aria-label={locale === "en" ? "Back to disciplines" : "Nazad na pregled disciplina"}
         >
           <ChevronLeft size={14} aria-hidden="true" />
-          Nazad
+          {locale === "en" ? "Back" : "Nazad"}
         </button>
 
         <div className="min-w-0 flex items-center gap-2 flex-wrap">
