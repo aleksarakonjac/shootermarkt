@@ -2,6 +2,7 @@ export const revalidate = 86400;
 
 import type { CSSProperties, ReactNode } from "react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import { getLocale } from "next-intl/server";
 import { ScopedLink } from "../../components/ScopedLink";
 import { OlympicRings } from "@/components/result-display/OlympicQuotaBadge";
@@ -453,9 +454,15 @@ export default async function OlympicQuotasPage({ params }: Props) {
   return (
     <div>
       {/* Hero: svetla podloga, olimpijske boje kao veliki motiv (krugovi), široka traka i obojena legenda. */}
+      <div className="relative">
       <section className="relative overflow-hidden border-b border-[var(--border)] bg-[var(--bg)]" aria-labelledby="olympic-title">
         <div aria-hidden="true" className="flex h-2.5 w-full">
           {RING_COLORS.map((c) => <span key={c} className="flex-1" style={{ background: ringColor(c) }} />)}
+        </div>
+        {/* Desktop: fotografija desno do donje linije, levi rub se gradijentom topi u pozadinu. */}
+        <div className="absolute bottom-0 right-0 top-2.5 hidden w-[38%] lg:block">
+          <Image src="/olimpijske_hero.webp" alt="" fill priority sizes="38vw" className="object-cover object-[50%_78%]" />
+          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-[var(--bg)] via-[var(--bg)]/40 to-transparent" />
         </div>
         <div className="relative mx-auto max-w-6xl px-4 pb-6 pt-6 sm:px-6 lg:px-8">
           <h1 id="olympic-title" className={`${DISPLAY} flex flex-wrap items-center gap-x-4 gap-y-2 font-extrabold uppercase text-[var(--ink)] lg:max-w-[48rem]`} style={{ fontSize: "clamp(1.75rem, 5vw, 2.75rem)", letterSpacing: "-0.02em", lineHeight: 1.02 }}>
@@ -491,6 +498,11 @@ export default async function OlympicQuotasPage({ params }: Props) {
           <p className="mt-4 max-w-[65ch] text-xs text-[var(--muted)]">{t.note}</p>
         </div>
       </section>
+      {/* Izvor slike ispod linije hero sekcije (samo desktop, gde je slika vidljiva). */}
+      <a href="https://elev8.la/blog/how-many-people-will-attend-la-2028-olympics" target="_blank" rel="noopener noreferrer" className="absolute right-4 top-full mt-1 hidden text-[0.65rem] text-[var(--muted)] hover:underline lg:block">
+        {en ? "Image source" : "Izvor slike"}: elev8.la
+      </a>
+      </div>
 
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         {overview.sources.length === 0 ? (
