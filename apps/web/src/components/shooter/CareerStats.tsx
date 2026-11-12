@@ -17,6 +17,8 @@ export type CareerStat = {
   season: number | null;
   seasonCount: number;
   improvement: number | null;
+  /** Prosek prošle kalendarske godine. */
+  prevSeason: number | null;
   trend: Trend | null;
 };
 
@@ -57,14 +59,14 @@ export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: st
     best3: "The average of the three best qualification results in this discipline.",
     recent3: "The average of the last three qualification results in this discipline.",
     season: "The average qualification result in the current calendar year. The number after the slash is the number of starts.",
-    improvement: "The difference between this year's average and last year's average.",
+    improvement: "Last year's average qualification result, and the difference of this year's average from it.",
   } : {
     form: "FORMAScore je prognoza sledećeg rezultata, zasnovana na novijim nastupima i njihovom trendu.",
     peak: "Najbolji ostvareni kvalifikacioni rezultat u ovoj disciplini.",
     best3: "Prosek tri najbolja kvalifikaciona rezultata u ovoj disciplini.",
     recent3: "Prosek poslednja tri kvalifikaciona rezultata u ovoj disciplini.",
     season: "Prosek kvalifikacionih rezultata u tekućoj kalendarskoj godini. Broj posle kose crte je broj nastupa.",
-    improvement: "Razlika između proseka ove i prošle godine.",
+    improvement: "Prosek kvalifikacionih rezultata prošle godine i razlika proseka ove godine u odnosu na njega.",
   };
 
   return (
@@ -138,9 +140,14 @@ export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: st
         </div>
         <div className="bg-[var(--surface)] px-4 py-3">
           <StatLabel label={t("statNapredak")} description={info.improvement} locale={locale} align="right" />
-          <span className={`${valueClass} mt-0.5 block text-base`} style={{ color: deltaColor }}>
-            {stat.improvement === null ? "—" : `${stat.improvement > 0 ? "+" : ""}${fmtNum(stat.improvement)}`}
-          </span>
+          <div className="mt-0.5 flex items-baseline gap-1.5">
+            <span className={`${valueClass} text-base`}>{fmtNum(stat.prevSeason)}</span>
+            {stat.improvement !== null && (
+              <span className="font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold tabular-nums" style={{ color: deltaColor }}>
+                {`${stat.improvement > 0 ? "+" : ""}${fmtNum(stat.improvement)}`}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

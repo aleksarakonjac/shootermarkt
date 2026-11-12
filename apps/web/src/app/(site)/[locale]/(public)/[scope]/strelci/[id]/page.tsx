@@ -252,6 +252,7 @@ export default async function ShooterPage({ params }: Props) {
       season: cache.seasonAvg != null ? Number(cache.seasonAvg) : null,
       seasonCount: cache.seasonCount,
       improvement: cache.improvement != null ? Number(cache.improvement) : null,
+      prevSeason: cache.prevSeasonAvg != null ? Number(cache.prevSeasonAvg) : null,
       trend: cache.trend as CareerStat["trend"],
     }];
   });
