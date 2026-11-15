@@ -211,7 +211,6 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
     inners:           t("inners"),
     appearances:      t("appearances"),
     improvedCol:      t("improvedCol"),
-    footerSubtitle:   t("footerSubtitle"),
     periodCareer:     t("periodCareer"),
     seasonAir:        t("seasonAir"),
     seasonCalendar:   t("seasonCalendar"),

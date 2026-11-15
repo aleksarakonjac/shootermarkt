@@ -104,7 +104,6 @@
   "ranking": {
     "title": "Rangiranje",
     "subtitle": "Poredak po FORMAScore-u — weighted average poslednjih nastupa",
-    "footerSubtitle": "FORMAScore = weighted avg poslednjih 10 nastupa",
     "rank": "#",
     "shooter": "Strelac",
     "country": "Zemlja",

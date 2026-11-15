@@ -104,7 +104,6 @@
   "ranking": {
     "title": "Rankings",
     "subtitle": "Order by form score — weighted average of recent performances",
-    "footerSubtitle": "Form score = weighted avg of last 10 performances",
     "rank": "#",
     "shooter": "Shooter",
     "country": "Country",

@@ -73,7 +73,6 @@ export type RangiranjeLabels = {
   inners: string;
   appearances: string;
   improvedCol: string;
-  footerSubtitle: string;
   periodCareer: string;
   seasonAir: string;
   seasonCalendar: string;
@@ -647,8 +646,7 @@ export function RangiranjeClient({
                 {activeKategorija ? ` · ${CATEGORY_LABEL[activeKategorija]}` : ""}
                 {activeZemlja ? ` · ${activeZemlja}` : ""}
               </span>
-              <span className="text-xs text-[var(--muted)]">{labels.footerSubtitle}</span>
-            </div>
+              </div>
           </div>
         )}
       </div>
@@ -832,20 +830,9 @@ export function RangiranjeClient({
               {activeKategorija ? ` · ${CATEGORY_LABEL[activeKategorija]}` : ""}
               {activeZemlja ? ` · ${activeZemlja}` : ""}
             </span>
-            <span className="text-xs text-[var(--muted)]">{labels.footerSubtitle}</span>
           </div>
         </div>
       )}
-      </div>
-
-      {/* H2H link */}
-      <div className="mt-3 flex justify-end">
-        <ScopedLink
-          href={`/head-to-head?disc=${activeCode.toLowerCase()}`}
-          className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors font-[family-name:var(--font-jetbrains-mono)]"
-        >
-          {locale === "en" ? "Head-to-head comparison" : "Head-to-head poređenje"} →
-        </ScopedLink>
       </div>
     </>
   );
