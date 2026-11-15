@@ -185,7 +185,10 @@ export function SiusMode() {
       const res = await fetch(`/api/admin/sius/events?siusId=${encodeURIComponent(siusId.trim())}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed");
-      const supported = (data.events as SiusEvent[]).filter((e) => SUPPORTED_CODES.has(e.eventCode));
+      // Juniorski (ARMJ) i U16/U18 (10ARU18M) događaji: proveri osnovnu disciplinu; backend ih već mapira.
+      const baseCode = (c: string) => { const y = c.match(/^10(AR|AP)U(?:16|18)([MW])$/); return y ? `${y[1]}${y[2]}` : c.replace(/J(-ECH-SOLO)?$/, "$1"); };
+      const seen = new Set<string>(); // SIUS ponavlja kod za "- 2" meč; backend ga sam razdvaja po datumu
+      const supported = (data.events as SiusEvent[]).filter((e) => SUPPORTED_CODES.has(baseCode(e.eventCode)) && !seen.has(e.eventCode) && seen.add(e.eventCode));
       setEvents(supported);
       setSelectedCodes(new Set(supported.map((e) => e.eventCode)));
       setStep("disciplines");

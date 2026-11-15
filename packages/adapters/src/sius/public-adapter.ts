@@ -1,5 +1,5 @@
 import { normalizeNoc } from "@shootermarkt/db/name-match";
-import { canonicalSiusEventCode } from "./event-code-alias";
+import { siusEventCode } from "./event-code-alias";
 import type { EscSoloPart } from "@shootermarkt/db/schema";
 const SIUS_PUB = "https://shootingsportscloud.com:8594/api/v1/pub";
 
@@ -106,7 +106,7 @@ export async function fetchSiusEvents(compUuid: string): Promise<SiusEvent[]> {
   );
   return data.map((e) => ({
     runningId: e.RunningId,
-    eventCode: canonicalSiusEventCode(e.CompetitionEventType?.EventCode ?? ""),
+    eventCode: siusEventCode(e.CompetitionEventType?.EventCode ?? "", e.CompetitionEventType?.Name ?? ""),
     name: e.CompetitionEventType?.Name ?? "",
     state: e.State,
     startDate: e.Startdate,
@@ -633,7 +633,7 @@ export function splitDisplayName(displayName: string): {
 export type EscSoloEventCode = "SOLOARM" | "SOLOARW" | "SOLOAPM" | "SOLOAPW";
 
 export function escSoloCodeFromEvent(eventCode: string): EscSoloEventCode | null {
-  const m = eventCode.match(/^(AR|AP)([MW])-ECH-SOLO$/);
+  const m = eventCode.match(/^(AR|AP)([MW])J?-ECH-SOLO$/);
   return m ? (`SOLO${m[1]}${m[2]}` as EscSoloEventCode) : null;
 }
 

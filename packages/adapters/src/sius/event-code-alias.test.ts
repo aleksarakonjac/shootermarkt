@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canonicalSiusEventCode } from "./event-code-alias";
+import { canonicalSiusEventCode, siusEventCode } from "./event-code-alias";
 
 describe("canonicalSiusEventCode", () => {
   it("maps SIUS 300m codes to ours", () => {
@@ -21,5 +21,12 @@ describe("canonicalSiusEventCode", () => {
     for (const c of ["ARM", "ARWJ", "R3PM", "10ARU18W", "ARM-ECH-SOLO", "R3PM-ECH-SOLO", "APMT", ""]) {
       expect(canonicalSiusEventCode(c)).toBe(c);
     }
+  });
+  it("derives youth events from the SIUS name", () => {
+    expect(siusEventCode("AR18M", "10m AIR RIFLE MEN U18")).toBe("10ARU18M");
+    expect(siusEventCode("ARMY", "10m AIR RIFLE MEN YOUTH")).toBe("ARMY");
+    expect(siusEventCode("APWU16", "10m AIR PISTOL WOMEN U16")).toBe("10APU16W");
+    expect(siusEventCode("ARMTY", "10m AIR RIFLE MIXED TEAM YOUTH")).toBe("ARMTY");
+    expect(siusEventCode("ARM", "10m AIR RIFLE MEN")).toBe("ARM");
   });
 });

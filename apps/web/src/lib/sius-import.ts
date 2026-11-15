@@ -11,7 +11,7 @@ import { escSoloReviewRows, stageRemarks, type SiusFinalEntry } from "@/lib/sius
 import { matchShooter } from "@shootermarkt/db/name-match";
 
 /** ESC Solo SIUS eventi (juniorske varijante se ne nagađaju dok se ne pojave u podacima). */
-export const ESC_SOLO_EVENT_CODES = ["ARM-ECH-SOLO", "ARW-ECH-SOLO", "APM-ECH-SOLO", "APW-ECH-SOLO"];
+export const ESC_SOLO_EVENT_CODES = ["ARM-ECH-SOLO", "ARW-ECH-SOLO", "APM-ECH-SOLO", "APW-ECH-SOLO", "ARMJ-ECH-SOLO", "ARWJ-ECH-SOLO", "APMJ-ECH-SOLO", "APWJ-ECH-SOLO"];
 
 const SUPPORTED_CODES = ["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "FPW", "RFPM", "STPM", "STPW", "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300"] as const;
 
@@ -69,7 +69,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
       soloEventCount = soloEvents.length;
       for (const event of soloEvents) {
         const athletes = await fetchSiusEscSoloResults(siusId, event.runningId);
-        soloRows.push(...escSoloReviewRows(athletes, escSoloCodeFromEvent(event.eventCode)!, "senior", (first, last, noc) => {
+        soloRows.push(...escSoloReviewRows(athletes, escSoloCodeFromEvent(event.eventCode)!, /J-ECH-SOLO$/.test(event.eventCode) ? "junior" : "senior", (first, last, noc) => {
           const m = matchShooter(first, last, noc, allShooters);
           return m.kind === "exact" ? m.id : undefined;
         }));
