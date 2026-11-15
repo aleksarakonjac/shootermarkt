@@ -16,12 +16,14 @@ import {
 import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { matchShooter } from "@shootermarkt/db/name-match";
 import { parsePdfImport } from "@shootermarkt/adapters/pdf-import/parse-import";
+import { GeminiUnavailableError } from "@shootermarkt/adapters/pdf-import/gemini-adapter";
 import { downloadPdfImport, removePdfImports, uploadPdfImport } from "@shootermarkt/adapters/pdf-import/storage";
 import { deriveFinalRankProgression, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import { inngest } from "@shootermarkt/queue";
 import { randomUUID } from "crypto";
 
 const PDF_RETENTION_DAYS = 30;
+const GEMINI_WAIT_ROUNDS = 4;
 
 export const processPdfImport = inngest.createFunction(
   {
@@ -42,31 +44,30 @@ export const processPdfImport = inngest.createFunction(
         .where(and(eq(pdfImportJobs.id, jobId), eq(pdfImportJobs.status, "processing")));
     },
   },
-  async ({ event, attempt, step }) => {
+  async ({ event, step }) => {
     const jobId = event.data.jobId;
-    const status = attempt === 0 ? "queued" : "processing";
-    const update = {
-      attempts: sql`${pdfImportJobs.attempts} + 1`,
-      updatedAt: new Date(),
-      ...(attempt === 0 ? { status: "processing", startedAt: new Date() } : {}),
-    };
 
-    const [job] = await db.update(pdfImportJobs)
-      .set(update)
-      .where(and(eq(pdfImportJobs.id, jobId), eq(pdfImportJobs.status, status)))
-      .returning({
-        id: pdfImportJobs.id,
-        pdfData: pdfImportJobs.pdfData,
-        pdfStoragePath: pdfImportJobs.pdfStoragePath,
-        sourceUrl: pdfImportJobs.sourceUrl,
-      });
+    // U step-u: posle step.sleep Inngest ponovo pokreće funkciju od vrha, a memoizovan claim
+    // sprečava da nastavak vidi status "processing" i preskoči sopstveni posao.
+    const job = await step.run("claim-job", async () => {
+      const [claimed] = await db.update(pdfImportJobs)
+        .set({ status: "processing", startedAt: new Date(), attempts: sql`${pdfImportJobs.attempts} + 1`, updatedAt: new Date() })
+        .where(and(eq(pdfImportJobs.id, jobId), eq(pdfImportJobs.status, "queued")))
+        .returning({
+          id: pdfImportJobs.id,
+          hasPdfData: sql<boolean>`${pdfImportJobs.pdfData} is not null`,
+          pdfStoragePath: pdfImportJobs.pdfStoragePath,
+          sourceUrl: pdfImportJobs.sourceUrl,
+        });
+      return claimed ?? null;
+    });
     if (!job) return { skipped: true };
 
     const pdfStoragePath = job.pdfStoragePath ?? await step.run("download-source-pdf", async () => {
-      if (job.pdfData) return null;
+      if (job.hasPdfData) return null;
       if (!job.sourceUrl) throw new Error("Originalni PDF više nije dostupan");
 
-      const response = await fetch(job.sourceUrl, { headers: { "User-Agent": "Mozilla/5.0" } });
+      const response = await fetch(job.sourceUrl, { headers: { "User-Agent": "Mozilla/5.0" }, signal: AbortSignal.timeout(60_000) });
       if (!response.ok) throw new Error(`Preuzimanje izvornog PDF-a nije uspelo: HTTP ${response.status}`);
       const contentLength = Number(response.headers.get("content-length") ?? "0");
       if (contentLength > 20 * 1024 * 1024) throw new Error("Izvorni PDF je veći od 20 MB");
@@ -85,16 +86,33 @@ export const processPdfImport = inngest.createFunction(
       }
       return path;
     });
-    const pdfData = pdfStoragePath
-      ? await downloadPdfImport(pdfStoragePath)
-      : job.pdfData;
-    if (!pdfData) throw new Error("Originalni PDF više nije dostupan");
 
-    const result = await parsePdfImport(pdfData);
-    await db.update(pdfImportJobs)
-      .set({ status: "completed", result, completedAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(pdfImportJobs.id, job.id), eq(pdfImportJobs.status, "processing")));
-    return { jobId: job.id, rows: result.rows.length };
+    // Gemini preopterećenje (503/429/timeout) obično traje desetine minuta, a Inngest retry-ji su
+    // brzi — zato na privremen kvar spavamo 15 min i pokušavamo opet, do ~1 h ukupno.
+    for (let round = 0; ; round++) {
+      const outcome = await step.run(`parse-pdf-${round}`, async () => {
+        const pdfData = pdfStoragePath
+          ? await downloadPdfImport(pdfStoragePath)
+          : (await db.select({ pdfData: pdfImportJobs.pdfData }).from(pdfImportJobs).where(eq(pdfImportJobs.id, job.id)))[0]?.pdfData;
+        if (!pdfData) throw new Error("Originalni PDF više nije dostupan");
+        try {
+          const result = await parsePdfImport(pdfData);
+          await db.update(pdfImportJobs)
+            .set({ status: "completed", result, error: null, completedAt: new Date(), updatedAt: new Date() })
+            .where(and(eq(pdfImportJobs.id, job.id), eq(pdfImportJobs.status, "processing")));
+          return { rows: result.rows.length };
+        } catch (error) {
+          if (error instanceof GeminiUnavailableError && round < GEMINI_WAIT_ROUNDS) return { unavailable: error.message };
+          throw error;
+        }
+      });
+      if ("rows" in outcome) return { jobId: job.id, rows: outcome.rows };
+      await step.run(`note-gemini-wait-${round}`, () =>
+        db.update(pdfImportJobs)
+          .set({ error: `${outcome.unavailable} — novi pokušaj za 15 min (${round + 1}/${GEMINI_WAIT_ROUNDS})`, updatedAt: new Date() })
+          .where(eq(pdfImportJobs.id, job.id)));
+      await step.sleep(`gemini-wait-${round}`, "15m");
+    }
   }
 );
 

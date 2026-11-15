@@ -7,10 +7,23 @@ import { DISCIPLINE_META, IMPORTED_DISCIPLINE_CODES, dedupeRowsByCategory, merge
 
 export async function parsePdfImport(pdfBuffer: Buffer) {
   let finalsError: string | undefined;
+  let siusError: string | undefined;
   const [bilten, allClubs, allShooters] = await Promise.all([
     // SIUS bilten se čita deterministički; Gemini samo za ne-SIUS PDF i (best-effort) za finala.
-    parseSiusPdf(pdfBuffer).catch(() => null).then(async (sius) => {
-      if (!sius) return parsePdfWithGemini(pdfBuffer);
+    parseSiusPdf(pdfBuffer).catch((e: unknown) => {
+      // Ne gutati tiho: bez ovoga SIUS bilten ode ceo u Gemini, a niko ne zna zašto.
+      siusError = e instanceof Error ? e.message : String(e);
+      console.error("SIUS PDF parser pao, prelazim na Gemini:", e);
+      return null;
+    }).then(async (sius) => {
+      if (!sius) {
+        try {
+          return await parsePdfWithGemini(pdfBuffer);
+        } catch (e) {
+          if (siusError && e instanceof Error) e.message += ` (SIUS parser pre toga: ${siusError})`;
+          throw e;
+        }
+      }
       if (!sius.hasFinals) return sius;
       try {
         const g = await parsePdfWithGemini(pdfBuffer);
@@ -82,5 +95,6 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
     matchedFinals: finals.matchedFinals,
     unmatchedFinals: finals.unmatchedFinals,
     finalsError,
+    siusError,
   };
 }

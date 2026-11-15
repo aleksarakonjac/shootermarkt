@@ -131,6 +131,11 @@ function cleanJson(raw: string): string {
     .trim();
 }
 
+/** Privremen kvar na Google strani (preopterećenje 503, rate limit 429, timeout) — vredi pokušati kasnije. */
+export class GeminiUnavailableError extends Error {
+  name = "GeminiUnavailableError";
+}
+
 export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilten> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
@@ -151,6 +156,11 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    // Veliki bilteni znaju da traju minutima; 280 s je ispod Vercel max-a (300 s) da greška bude čista.
+    signal: AbortSignal.timeout(280_000),
+  }).catch((e: unknown) => {
+    if (e instanceof Error && e.name === "TimeoutError") throw new GeminiUnavailableError("Gemini API: nije odgovorio za 280 s");
+    throw e;
   });
 
   if (!res.ok) {
@@ -159,7 +169,8 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
       const errBody = await res.json() as { error?: { message?: string } };
       if (errBody?.error?.message) errMsg = errBody.error.message;
     } catch { /* ignore parse failure, use status code */ }
-    if (res.status === 429) throw new Error(`Gemini API: prekoračen limit zahteva (rate limit). Pokušaj ponovo za nekoliko sekundi.`);
+    if (res.status === 429) throw new GeminiUnavailableError(`Gemini API: prekoračen limit zahteva (rate limit).`);
+    if (res.status >= 500) throw new GeminiUnavailableError(`Gemini API greška (${errMsg})`);
     if (res.status === 400) throw new Error(`Gemini API: neispravan zahtev (${errMsg}). PDF možda nije u podržanom formatu.`);
     throw new Error(`Gemini API greška (${errMsg})`);
   }
