@@ -26,6 +26,7 @@ export async function fetchSssBilteni(): Promise<SssBilten[]> {
   const res = await fetch(RESULTS_PAGE, {
     headers: { "User-Agent": "Mozilla/5.0" },
     cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`SSS rezultati fetch failed: ${res.status}`);
   // Site uses Windows-1252 / latin-1
@@ -74,6 +75,7 @@ export async function fetchSssCalendar(): Promise<SssCalendarEvent[]> {
   const res = await fetch(CALENDAR_PAGE, {
     headers: { "User-Agent": "Mozilla/5.0" },
     cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new Error(`SSS kalendar fetch failed: ${res.status}`);
   const buf = await res.arrayBuffer();

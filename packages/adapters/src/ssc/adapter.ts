@@ -61,6 +61,7 @@ export async function getAccessToken(): Promise<string> {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
     cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {
@@ -83,6 +84,7 @@ async function sscFetch<T>(path: string): Promise<T> {
       Accept: "application/json",
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
     const txt = await res.text();

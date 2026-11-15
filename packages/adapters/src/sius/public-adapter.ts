@@ -71,6 +71,7 @@ async function pub<T>(path: string): Promise<T> {
     headers: { Accept: "application/json" },
     cache: "no-store",
     next: { revalidate: 0 },
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`SIUS pub ${path} → ${res.status}`);
   return res.json() as Promise<T>;

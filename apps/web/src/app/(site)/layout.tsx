@@ -8,10 +8,11 @@ import { PullToRefresh, PULL_CONTENT_ID } from "@/components/PullToRefresh";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 
+// Plus Jakarta i JetBrains Mono su variable fontovi: bez `weight` liste jedan fajl pokriva sve težine
+// (ticker koristi 800, koji ranije nije bio učitan pa ga je browser veštački podebljavao).
 const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -25,7 +26,6 @@ const barlowCondensed = Barlow_Condensed({
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
   display: "swap",
 });
 

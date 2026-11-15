@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
           { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
         ],
       }),
+      signal: AbortSignal.timeout(30_000),
     }
   );
 

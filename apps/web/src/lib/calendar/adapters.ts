@@ -97,7 +97,7 @@ async function fetchEscEvents(year: number): Promise<CalendarEvent[]> {
     months.map((month) =>
       fetch(
         `${ESC_BASE}/calendar?filter%5Bevent_year%5D=${year}&filter%5Bevent_month%5D=${month}`,
-        { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store" }
+        { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store", signal: AbortSignal.timeout(30_000) }
       ).then((r) => {
         if (!r.ok) throw new Error(`ESC fetch failed: ${r.status}`);
         return r.text();
