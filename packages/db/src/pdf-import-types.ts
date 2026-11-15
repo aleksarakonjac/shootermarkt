@@ -78,8 +78,7 @@ export function computeAgeCategoryFromBirthYear(
   atYear: number = new Date().getFullYear()
 ): AgeCategory {
   const age = atYear - birthYear;
-  if (age <= 13) return "pionir";
-  if (age <= 15) return "kadet";
+  if (age <= 15) return "kadet"; // pionir kategorija se ne koristi na sajtu
   if (age <= 17) return "mladji_junior";
   if (age <= 20) return "junior";
   return "senior";

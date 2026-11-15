@@ -7,7 +7,7 @@ import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { ScopedLink } from "../../components/ScopedLink";
 import type { Metadata } from "next";
 import { type CompetitionLevel, type Trend } from "@/lib/forma";
-import { type AgeCategory, CATEGORY_RANK } from "@shootermarkt/db/pdf-import-types";
+import { type AgeCategory, CATEGORY_RANK, computeAgeCategoryFromBirthYear } from "@shootermarkt/db/pdf-import-types";
 import { getLocale, getTranslations } from "next-intl/server";
 import { pageParams } from "@/i18n/page-params";
 import { buildAlternates } from "@/i18n/alternates";
@@ -35,6 +35,11 @@ const TABS: { code: DiscCode; label: string; labelEn: string }[] = [
   { code: "R3PW", label: "Puška trostav Ž", labelEn: "Rifle 3 Positions Women" },
   { code: "SPW",  label: "Sport pištolj Ž", labelEn: "25m Sport Pistol Women" },
   { code: "RFPM", label: "Rapid Fire pištolj M", labelEn: "25m Rapid Fire Pistol Men" },
+];
+
+const DISC_GROUPS: { key: string; label: string; labelEn: string; codes: DiscCode[] }[] = [
+  { key: "rifle",  label: "Puška",   labelEn: "Rifle",  codes: ["ARM", "ARW", "R3PM", "R3PW"] },
+  { key: "pistol", label: "Pištolj", labelEn: "Pistol", codes: ["APM", "APW", "SPW", "RFPM"] },
 ];
 
 type Props = {
@@ -66,6 +71,7 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
           firstName:       shooters.firstName,
           lastName:        shooters.lastName,
           nationality:     shooters.nationality,
+          birthYear:       shooters.birthYear,
           clubName:        clubs.name,
           category:        results.category,
           qualTotal:       results.qualTotal,
@@ -90,7 +96,8 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
         .orderBy(asc(competitions.date))
     : [];
 
-  // Group by (shooterId, category) — same shooter can appear in both senior + junior
+  // Jedan unos po strelcu; uzrast = trenutni (po godini rođenja), ne kategorija pojedinačnih rezultata.
+  // Bez godine rođenja: najviša kategorija iz rezultata. Juniorski rezultati se vrednuju u formi (results.category).
   type MatchRow = {
     competitionId: number;
     competitionName: string;
@@ -113,7 +120,7 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
   const shooterMap = new Map<string, ShooterEntry>();
 
   for (const r of rawResults) {
-    const key = `${r.shooterId}:${r.category}`;
+    const key = String(r.shooterId);
     if (!shooterMap.has(key)) {
       shooterMap.set(key, {
         shooterId: r.shooterId,
@@ -121,12 +128,13 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
         lastName: r.lastName,
         nationality: r.nationality,
         clubName: r.clubName,
-        category: r.category as AgeCategory,
+        category: r.birthYear ? computeAgeCategoryFromBirthYear(r.birthYear) : (r.category as AgeCategory),
         bestInners: null,
         matches: [],
       });
     }
     const entry = shooterMap.get(key)!;
+    if (!r.birthYear && CATEGORY_RANK[r.category as AgeCategory] > CATEGORY_RANK[entry.category]) entry.category = r.category as AgeCategory;
     if (r.qualTotal != null) {
       entry.matches.push({
         competitionId:   r.competitionId,
@@ -184,7 +192,7 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
     };
   });
 
-  const categoriesPresent = Array.from(new Set(rawResults.map((r) => r.category))) as AgeCategory[];
+  const categoriesPresent = Array.from(new Set(shooterData.map((s) => s.category)));
   categoriesPresent.sort((a, b) => CATEGORY_RANK[b] - CATEGORY_RANK[a]);
 
   const activeTabLabel = locale === "en"
@@ -234,29 +242,36 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
         </p>
       </div>
 
-      {/* Discipline tabs — server links, changing discipline refetches data */}
-      <div className="flex items-center gap-1 mb-3 flex-wrap">
-        {TABS.map(({ code, label, labelEn }) => {
-          const active = activeCode === code;
-          const displayLabel = locale === "en" ? labelEn : label;
-          return (
-            <ScopedLink
-              key={code}
-              href={`/rangiranje?disciplina=${code.toLowerCase()}`}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors no-underline"
-              style={
-                active
-                  ? { background: "var(--ink)", color: "var(--bg)" }
-                  : { background: "var(--surface-2)", color: "var(--muted)" }
-              }
-            >
-              <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold">{code}</span>
-              <span className="hidden sm:inline font-normal">{displayLabel}</span>
-            </ScopedLink>
-          );
-        })}
+      {/* Discipline filter — grouped rifle / pistol; server links, changing discipline refetches data */}
+      <div className="flex flex-col gap-2 mb-4">
+        {DISC_GROUPS.map((group) => (
+          <div key={group.key} className="flex items-center gap-3 flex-wrap">
+            <span className="w-16 shrink-0 text-xs font-bold uppercase tracking-wider text-[var(--subtle)]">
+              {locale === "en" ? group.labelEn : group.label}
+            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {TABS.filter((tab) => group.codes.includes(tab.code)).map(({ code, label, labelEn }) => {
+                const active = activeCode === code;
+                return (
+                  <ScopedLink
+                    key={code}
+                    href={`/rangiranje?disciplina=${code.toLowerCase()}`}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors no-underline"
+                    style={
+                      active
+                        ? { background: "var(--ink)", color: "var(--bg)" }
+                        : { background: "var(--surface-2)", color: "var(--muted)" }
+                    }
+                  >
+                    <span className="font-[family-name:var(--font-jetbrains-mono)] font-bold hidden sm:inline">{code}</span>
+                    <span className="font-normal">{locale === "en" ? labelEn : label}</span>
+                  </ScopedLink>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
-
       {/* Client component handles all interactive state */}
       <RangiranjeClient
         activeCode={activeCode}

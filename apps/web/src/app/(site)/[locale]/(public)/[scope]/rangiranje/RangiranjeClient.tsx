@@ -31,6 +31,7 @@ import { FormaScoreMark } from "@/components/shooter/FormaScoreMark";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type DiscCode = "ARM" | "ARW" | "APM" | "APW" | "R3PM" | "R3PW" | "SPW" | "RFPM";
+type SortKey = "forma" | "peak" | "best3" | "avg" | "recent3" | "delta" | "count";
 type ViewKey = "forma" | "peak" | "best3" | "seasonavg" | "recent3" | "improved";
 
 export type RangiranjeShooter = {
@@ -109,6 +110,8 @@ const VIEWS: { key: ViewKey; labelKey: keyof RangiranjeLabels }[] = [
 
 const PERIOD_VIEWS: ViewKey[] = ["peak", "best3", "seasonavg", "recent3"];
 const IMPROVED_VIEWS: ViewKey[] = ["improved"];
+// Pogledi bez "Karijera" perioda (smisleno samo za konkretnu godinu).
+const NO_CAREER_VIEWS: ViewKey[] = ["improved", "recent3"];
 
 const TH = "px-4 py-3 text-[0.65rem] font-semibold uppercase tracking-wider text-[var(--muted)] select-none";
 
@@ -164,9 +167,9 @@ export function RangiranjeClient({
   locale,
 }: Props) {
   const t = useTranslations("ranking");
-  const defaultKategorija = categoriesPresent.includes("senior")
-    ? "senior"
-    : categoriesPresent[0] ?? null;
+  // Podrazumevano "Sve"; senior (i mlađi senior) nisu poseban filter — to je "Sve" bez mlađih.
+  const filterCategories: AgeCategory[] = categoriesPresent.filter((c) => c !== "senior" && c !== "mladji_senior" && c !== "pionir");
+  const defaultKategorija: AgeCategory | null = null;
 
   const [activeView, setActiveView] = useState<ViewKey>("forma");
   const [activeKategorija, setActiveKategorija] = useState<AgeCategory | null>(
@@ -175,17 +178,20 @@ export function RangiranjeClient({
   const [activeZemlja, setActiveZemlja] = useState<string | null>(null);
   const [activePeriod, setActivePeriod] = useState<PeriodType>("karijera");
   const [seasonYear, setSeasonYear] = useState<number>(() => currentSeasonStartYear("vazdusna"));
+  // Desktop tabela: sortiranje po koloni
+  const [sortKey, setSortKey] = useState<SortKey>("forma");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
 
   // Read initial state from URL hash (client-only, runs once on mount)
   useEffect(() => {
     const h = parseHash(window.location.hash);
     void Promise.resolve().then(() => {
       if (h.view && VIEWS.some((v) => v.key === h.view)) setActiveView(h.view as ViewKey);
-      if (h.kategorija && categoriesPresent.includes(h.kategorija as AgeCategory)) {
+      if (h.kategorija && filterCategories.includes(h.kategorija as AgeCategory)) {
         setActiveKategorija(h.kategorija as AgeCategory);
       }
       if (h.zemlja) setActiveZemlja(h.zemlja);
-      if (h.period && ["karijera", "vazdusna", "kalendarska"].includes(h.period)) {
+      if (h.period && ["karijera", "kalendarska"].includes(h.period)) {
         setActivePeriod(h.period as PeriodType);
       }
       if (h.sezona && !isNaN(parseInt(h.sezona))) setSeasonYear(parseInt(h.sezona));
@@ -205,7 +211,14 @@ export function RangiranjeClient({
   }, [activeView, activeKategorija, activeZemlja, activePeriod, seasonYear, defaultKategorija]);
 
   const seasonType: SeasonType = activePeriod === "karijera" ? "vazdusna" : activePeriod;
-  const seasonPeriods = [seasonYear, seasonYear - 1, seasonYear - 2, seasonYear - 3, seasonYear - 4];
+  // Fiksna lista godina: od tekuće do godine najranijeg rezultata (ne zavisi od izabrane godine)
+  const seasonPeriods = useMemo(() => {
+    let minYear = Infinity;
+    for (const sh of shooters) for (const m of sh.matches) minYear = Math.min(minYear, Number(m.date.slice(0, 4)));
+    const top = currentSeasonStartYear(seasonType);
+    const from = Number.isFinite(minYear) ? Math.min(minYear, top) : top;
+    return Array.from({ length: top - from + 1 }, (_, i) => top - i);
+  }, [shooters, seasonType]);
 
   // ── Computed data ────────────────────────────────────────────────────────────
 
@@ -261,8 +274,15 @@ export function RangiranjeClient({
       const improvement =
         seasonAvg != null && prevSeasonAvg != null ? seasonAvg - prevSeasonAvg : null;
 
+      // Δ vs. prošla godina (desktop tabela): kalendarska godina — izabrana, ili tekuća za Karijeru
+      const deltaYearBase = activePeriod === "kalendarska" ? seasonYear : currentSeasonStartYear("kalendarska");
+      const { avg: yAvg }     = computeSeasonAvg(entries, seasonWindow("kalendarska", deltaYearBase));
+      const { avg: yPrevAvg } = computeSeasonAvg(entries, seasonWindow("kalendarska", deltaYearBase - 1));
+      const deltaYear = yAvg != null && yPrevAvg != null ? yAvg - yPrevAvg : null;
+
       return {
         ...s,
+        deltaYear,
         peakActive,
         best3Active,
         recent3Active,
@@ -304,9 +324,36 @@ export function RangiranjeClient({
     }
   }, [zFiltered, activeView]);
 
+  const desktopRows = useMemo(() => {
+    const val = (s: (typeof zFiltered)[number]): number | null => {
+      switch (sortKey) {
+        case "forma":   return s.forma;
+        case "peak":    return s.peakActive;
+        case "best3":   return s.best3Active;
+        case "avg":     return s.avgActive;
+        case "recent3": return s.recent3Active;
+        case "delta":   return s.deltaYear;
+        case "count":   return s.periodCount;
+      }
+    };
+    const dir = sortDir === "desc" ? -1 : 1;
+    return zFiltered
+      .filter((s) => val(s) !== null && (sortKey !== "count" || s.periodCount > 0))
+      .sort((a, b) => {
+        const d = (val(a)! - val(b)!) * dir;
+        if (d !== 0) return d;
+        return (b.forma ?? 0) - (a.forma ?? 0) || (b.peakCareer ?? 0) - (a.peakCareer ?? 0) || b.formaSampleSize - a.formaSampleSize;
+      });
+  }, [zFiltered, sortKey, sortDir]);
+
+  const handleSort = (key: SortKey) => {
+    if (key === sortKey) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    else { setSortKey(key); setSortDir("desc"); }
+  };
+
   const handlePeriodChange = useCallback((pt: PeriodType) => {
     const effectivePeriod: PeriodType =
-      IMPROVED_VIEWS.includes(activeView) && pt === "karijera" ? "vazdusna" : pt;
+      NO_CAREER_VIEWS.includes(activeView) && pt === "karijera" ? "kalendarska" : pt;
     setActivePeriod(effectivePeriod);
     if (effectivePeriod !== "karijera") {
       setSeasonYear(currentSeasonStartYear(effectivePeriod as SeasonType));
@@ -315,88 +362,15 @@ export function RangiranjeClient({
 
   const showPeriodControl = PERIOD_VIEWS.includes(activeView) || IMPROVED_VIEWS.includes(activeView);
 
-  // ── Render ───────────────────────────────────────────────────────────────────
-
-  return (
-    <>
-      {/* Category tabs */}
-      {categoriesPresent.length > 1 && (
-        <div className="flex items-center gap-1 mb-4 flex-wrap">
-          <button
-            aria-pressed={activeKategorija === null}
-            onClick={() => setActiveKategorija(null)}
-            className="inline-flex items-center px-2.5 py-2 rounded-md text-[0.7rem] font-semibold transition-colors"
-            style={
-              activeKategorija === null
-                ? { background: "var(--brand-primary)", color: "white" }
-                : { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" }
-            }
-          >
-            {labels.all}
-          </button>
-          {categoriesPresent.filter((cat) => cat !== "mladji_senior").map((cat) => {
-            const active = activeKategorija === cat;
-            return (
-              <button
-                key={cat}
-                aria-pressed={active}
-                onClick={() => setActiveKategorija(cat)}
-                className="inline-flex items-center px-2.5 py-2 rounded-md text-[0.7rem] font-semibold transition-colors"
-                style={
-                  active
-                    ? { background: "var(--brand-primary)", color: "white" }
-                    : { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" }
-                }
-              >
-                {CATEGORY_LABEL[cat]}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* View selector */}
-      <div className="flex items-center gap-1 mb-4 flex-nowrap overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
-        {VIEWS.map(({ key, labelKey }) => {
-          const active = activeView === key;
-          return (
-            <button
-              key={key}
-              aria-pressed={active}
-              onClick={() => {
-                setActiveView(key);
-                // "improved" doesn't allow "karijera" period
-                if (IMPROVED_VIEWS.includes(key) && activePeriod === "karijera") {
-                  setActivePeriod("vazdusna");
-                  setSeasonYear(currentSeasonStartYear("vazdusna"));
-                }
-              }}
-              className="inline-flex items-center shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-colors border"
-              style={
-                active
-                  ? { background: "var(--brand-primary)", color: "white", borderColor: "var(--brand-primary)" }
-                  : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--border)" }
-              }
-            >
-              {key === "forma" ? <FormaScoreMark size="sm" inverted={active} /> : labels[labelKey] as string}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Period control */}
-      {showPeriodControl && (
+  const renderPeriodControl = (periods: PeriodType[], onPick: (pt: PeriodType) => void) => (
         <div className="flex flex-wrap items-center gap-2 mb-4 p-2.5 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
           <div className="flex items-center gap-1">
-            {(PERIOD_VIEWS.includes(activeView)
-              ? (["karijera", "vazdusna", "kalendarska"] as PeriodType[])
-              : (["vazdusna", "kalendarska"] as PeriodType[])
-            ).map((pt) => (
+            {periods.map((pt) => (
               <button
                 key={pt}
                 aria-pressed={activePeriod === pt}
-                onClick={() => handlePeriodChange(pt)}
-                className="px-2.5 py-2 rounded-md text-[0.7rem] font-semibold transition-colors"
+                onClick={() => onPick(pt)}
+                className="px-3 py-2 rounded-md text-xs md:text-sm font-semibold transition-colors"
                 style={
                   activePeriod === pt
                     ? { background: "var(--ink)", color: "var(--bg)" }
@@ -405,8 +379,6 @@ export function RangiranjeClient({
               >
                 {pt === "karijera"
                   ? labels.periodCareer
-                  : pt === "vazdusna"
-                  ? labels.seasonAir
                   : labels.seasonCalendar}
               </button>
             ))}
@@ -434,11 +406,101 @@ export function RangiranjeClient({
             </>
           )}
         </div>
+  );
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
+  return (
+    <>
+      {/* Category tabs */}
+      {filterCategories.length > 0 && (
+        <div className="flex items-center gap-1 sm:gap-2 mb-4 flex-nowrap overflow-x-auto sm:flex-wrap sm:overflow-visible">
+          <span className="hidden sm:block w-16 shrink-0 mr-1 text-xs font-bold uppercase tracking-wider text-[var(--subtle)]">
+            {locale === "en" ? "Age" : "Uzrast"}
+          </span>
+          <button
+            aria-pressed={activeKategorija === null}
+            onClick={() => setActiveKategorija(null)}
+            className="inline-flex items-center justify-center flex-none shrink-0 px-2.5 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
+            style={
+              activeKategorija === null
+                ? { background: "var(--brand-primary)", color: "white" }
+                : { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" }
+            }
+          >
+            {labels.all}
+          </button>
+          {filterCategories.map((cat) => {
+            const active = activeKategorija === cat;
+            return (
+              <button
+                key={cat}
+                aria-pressed={active}
+                onClick={() => setActiveKategorija(cat)}
+                className="inline-flex items-center justify-center flex-1 sm:flex-none shrink-0 px-1.5 sm:px-4 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
+                style={
+                  active
+                    ? { background: "var(--brand-primary)", color: "white" }
+                    : { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" }
+                }
+              >
+                {CATEGORY_LABEL[cat]}
+              </button>
+            );
+          })}
+        </div>
       )}
+
+      {/* View selector */}
+      <div className="md:hidden flex items-center gap-1 mb-4 flex-nowrap overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
+        {VIEWS.map(({ key, labelKey }) => {
+          const active = activeView === key;
+          return (
+            <button
+              key={key}
+              aria-pressed={active}
+              onClick={() => {
+                setActiveView(key);
+                // "improved" / "recent3" don't allow "karijera" period
+                if (NO_CAREER_VIEWS.includes(key) && activePeriod === "karijera") {
+                  setActivePeriod("kalendarska");
+                  setSeasonYear(currentSeasonStartYear("kalendarska"));
+                }
+              }}
+              className="inline-flex items-center shrink-0 px-3 py-2 rounded-full text-xs font-semibold transition-colors border"
+              style={
+                active
+                  ? { background: "var(--brand-primary)", color: "white", borderColor: "var(--brand-primary)" }
+                  : { background: "var(--surface)", color: "var(--muted)", borderColor: "var(--border)" }
+              }
+            >
+              {key === "forma" ? <FormaScoreMark size="sm" inverted={active} /> : labels[labelKey] as string}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Period control (mobilni: zavisi od pogleda) */}
+      {showPeriodControl && (
+        <div className="md:hidden">
+          {renderPeriodControl(
+            NO_CAREER_VIEWS.includes(activeView) ? ["kalendarska"] : ["karijera", "kalendarska"],
+            handlePeriodChange
+          )}
+        </div>
+      )}
+      {/* Desktop: period i zemlja u jednom redu */}
+      <div className="md:flex md:items-center md:gap-4 md:flex-wrap md:mb-5">
+      <div className="hidden md:block [&>div]:mb-0">
+        {renderPeriodControl(["karijera", "kalendarska"], (pt) => {
+          setActivePeriod(pt);
+          if (pt !== "karijera") setSeasonYear(currentSeasonStartYear(pt as SeasonType));
+        })}
+      </div>
 
       {/* Country filter */}
       {allNocs.length > 1 && (
-        <div className="flex items-center gap-3 mb-5">
+        <div className="flex items-center gap-3 mb-5 md:mb-0">
           <SearchDropdown
             className="w-52"
             value={activeZemlja ?? ""}
@@ -450,11 +512,148 @@ export function RangiranjeClient({
             labelClassName="font-[family-name:var(--font-jetbrains-mono)] font-semibold"
           />
           <span className="text-xs text-[var(--muted)] ml-1 font-[family-name:var(--font-jetbrains-mono)] tabular-nums">
-            {displayed.length}
+            <span className="md:hidden">{displayed.length}</span>
+            <span className="hidden md:inline">{desktopRows.length}</span>
           </span>
         </div>
       )}
+      </div>
 
+      {/* Desktop: sve statistike u jednoj tabeli, sortiranje klikom na zaglavlje */}
+      <div className="hidden md:block">
+        {desktopRows.length === 0 ? (
+          <div className="rounded-xl border border-[var(--border)] py-20 text-center">
+            <p className="text-sm text-[var(--muted)]">{labels.noData}</p>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+            <table className="w-full text-sm">
+              <caption className="sr-only">{labels.activeTabLabel} — {labels.title}</caption>
+              <thead>
+                <tr className="bg-[var(--surface-2)] border-b border-[var(--border)]">
+                  <th scope="col" className={`${TH} text-right w-12`}>#</th>
+                  <th scope="col" className={`${TH} text-left`}>{labels.shooter}</th>
+                  <th scope="col" className={`${TH} text-left`}>{labels.country}</th>
+                  {([
+                    ["forma",   <FormaScoreMark key="f" size="sm" />],
+                    ["peak",    labels.viewPeak],
+                    ["best3",   labels.viewBest3],
+                    ["avg",     labels.viewSeasonAvg],
+                    ["recent3", labels.viewRecent3],
+                    ["delta",   labels.improvedCol],
+                  ] as [SortKey, React.ReactNode][]).map(([key, label]) => (
+                    <th
+                      key={key}
+                      scope="col"
+                      aria-sort={sortKey === key ? (sortDir === "desc" ? "descending" : "ascending") : "none"}
+                      className={`${TH} text-right`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSort(key)}
+                        className={`inline-flex items-center gap-1 whitespace-nowrap uppercase tracking-wider hover:text-[var(--ink)] transition-colors ${sortKey === key ? "text-[var(--ink)]" : ""}`}
+                      >
+                        {label}
+                        <span aria-hidden="true" className="text-[0.55rem]">
+                          {sortKey === key ? (sortDir === "desc" ? "▼" : "▲") : ""}
+                        </span>
+                      </button>
+                    </th>
+                  ))}
+                  {isAP && <th scope="col" className={`${TH} text-right`}>{labels.inners}</th>}
+                  <th
+                    scope="col"
+                    aria-sort={sortKey === "count" ? (sortDir === "desc" ? "descending" : "ascending") : "none"}
+                    className={`${TH} text-right`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSort("count")}
+                      className={`inline-flex items-center gap-1 whitespace-nowrap uppercase tracking-wider hover:text-[var(--ink)] transition-colors ${sortKey === "count" ? "text-[var(--ink)]" : ""}`}
+                    >
+                      {activePeriod === "karijera" ? labels.appearances : labels.inSeason}
+                      <span aria-hidden="true" className="text-[0.55rem]">
+                        {sortKey === "count" ? (sortDir === "desc" ? "▼" : "▲") : ""}
+                      </span>
+                    </button>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {desktopRows.map((s, i) => {
+                  const rank = i + 1;
+                  const num = "px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] tabular-nums";
+                  const dash = <span className="text-[var(--subtle)]">—</span>;
+                  const cell = (v: number | null, key: SortKey) => (
+                    <td className={`${num} ${sortKey === key ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}`}>
+                      {v !== null ? v.toFixed(1) : dash}
+                    </td>
+                  );
+                  return (
+                    <tr key={s.shooterId} className="group hover:bg-[var(--surface)] transition-colors">
+                      <td className="w-12 px-4 py-3 text-right">
+                        <span
+                          className="font-[family-name:var(--font-barlow-condensed)] font-extrabold tabular-nums leading-none"
+                          style={{
+                            fontSize: rank === 1 ? "1.2rem" : rank <= 3 ? "1rem" : "0.875rem",
+                            color: rank === 1 ? "var(--rank-accent)" : rank <= 3 ? "var(--ink)" : "var(--muted)",
+                          }}
+                        >
+                          {rank}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <ScopedLink
+                          href={`/strelci/${s.shooterId}`}
+                          className="font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors"
+                        >
+                          {s.lastName} {s.firstName}
+                        </ScopedLink>
+                      </td>
+                      <td className="px-4 py-3"><FlagChip noc={s.nationality} /></td>
+                      <td className={`${num} ${sortKey === "forma" ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}`}>
+                        {s.forma !== null ? (
+                          <span className="inline-flex items-center justify-end gap-1.5">
+                            {s.forma.toFixed(1)}
+                            <span className="font-bold text-xs" style={{ color: trendColor(s.formaTrend) }}>{trendLabel(s.formaTrend)}</span>
+                          </span>
+                        ) : dash}
+                      </td>
+                      {cell(s.peakActive, "peak")}
+                      {cell(s.best3Active, "best3")}
+                      {cell(s.avgActive, "avg")}
+                      {cell(s.recent3Active, "recent3")}
+                      <td className={`${num} ${sortKey === "delta" ? "font-bold" : ""}`}
+                        style={{ color: s.deltaYear === null ? "var(--subtle)" : s.deltaYear > 0 ? "var(--success)" : s.deltaYear < 0 ? "var(--brand-primary)" : "var(--ink)" }}
+                      >
+                        {s.deltaYear !== null ? `${s.deltaYear > 0 ? "+" : ""}${s.deltaYear.toFixed(1)}` : "—"}
+                      </td>
+                      {isAP && (
+                        <td className={`${num} text-xs text-[var(--muted)]`}>
+                          {s.bestInners != null ? `${s.bestInners}×` : dash}
+                        </td>
+                      )}
+                      <td className={`${num} text-xs ${sortKey === "count" ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}`}>
+                        {s.periodCount}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 flex items-center justify-between">
+              <span className="text-xs text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)]">
+                {t("shootersCount", { count: desktopRows.length })} · {labels.activeTabLabel}
+                {activeKategorija ? ` · ${CATEGORY_LABEL[activeKategorija]}` : ""}
+                {activeZemlja ? ` · ${activeZemlja}` : ""}
+              </span>
+              <span className="text-xs text-[var(--muted)]">{labels.footerSubtitle}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="md:hidden">
       {displayed.length === 0 ? (
         <div className="rounded-xl border border-[var(--border)] py-20 text-center">
           <p className="text-sm text-[var(--muted)]">{labels.noData}</p>
@@ -473,9 +672,11 @@ export function RangiranjeClient({
                     ? labels.improvedCol
                     : labels[VIEWS.find((v) => v.key === activeView)!.labelKey] as string}
                 </th>
-                <th scope="col" className={`${TH} text-right hidden sm:table-cell`}>
-                  {activeView === "forma" ? labels.peak : labels.inSeason}
-                </th>
+                {(activeView === "forma" || activePeriod !== "karijera") && (
+                  <th scope="col" className={`${TH} text-right hidden sm:table-cell`}>
+                    {activeView === "forma" ? labels.peak : labels.inSeason}
+                  </th>
+                )}
                 {isAP && (
                   <th scope="col" className={`${TH} text-right hidden sm:table-cell`}>{labels.inners}</th>
                 )}
@@ -595,15 +796,17 @@ export function RangiranjeClient({
                     </td>
 
                     {/* Secondary column */}
-                    <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm text-[var(--muted)] tabular-nums hidden sm:table-cell">
-                      {activeView === "forma" ? (
-                        s.peakCareer !== null ? s.peakCareer.toFixed(1) : <span className="text-[var(--subtle)]">—</span>
-                      ) : activeView === "improved" ? (
-                        s.seasonCount
-                      ) : (
-                        s.periodCount
-                      )}
-                    </td>
+                    {(activeView === "forma" || activePeriod !== "karijera") && (
+                      <td className="px-4 py-3 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm text-[var(--muted)] tabular-nums hidden sm:table-cell">
+                        {activeView === "forma" ? (
+                          s.peakCareer !== null ? s.peakCareer.toFixed(1) : <span className="text-[var(--subtle)]">—</span>
+                        ) : activeView === "improved" ? (
+                          s.seasonCount
+                        ) : (
+                          s.periodCount
+                        )}
+                      </td>
+                    )}
 
                     {/* Inners (AP only) */}
                     {isAP && (
@@ -633,6 +836,7 @@ export function RangiranjeClient({
           </div>
         </div>
       )}
+      </div>
 
       {/* H2H link */}
       <div className="mt-3 flex justify-end">

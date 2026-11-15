@@ -130,9 +130,9 @@
     "seasonAir": "Sezona",
     "periodCareer": "Karijera",
     "seasonCalendar": "Kalendarska godina",
-    "inSeason": "u periodu",
+    "inSeason": "Nastupa u godini",
     "seasonAvgCol": "Sezona prosek",
-    "improvedCol": "Δ vs. prethodna sezona",
+    "improvedCol": "Δ vs. prošla godina",
     "improvedNow": "sad",
     "h2hPickPrompt": "Izaberi strelca",
     "h2hVs": "vs",
@@ -230,7 +230,7 @@
       "statsCareer": "Statistike karijere",
       "statBest3": "Best-3",
       "statSezonaProsek": "Ova godina",
-      "statNapredak": "vs. prošla",
+      "statNapredak": "vs. prošla god.",
       "statUkupnoNastupa": "Nastupa"
     }
   },

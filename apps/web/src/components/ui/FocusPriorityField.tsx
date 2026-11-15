@@ -2,7 +2,7 @@
 
 import { FOCUS_300M_OFFSET, FOCUS_AGE_OFFSET, FOCUS_PRIORITY_MAX, FOCUS_PRIORITY_MIN, FOCUS_PRIORITY_TIERS } from "@/lib/competition-priority";
 
-const AGE_ROWS: Array<[string, string]> = [["senior", "Senior"], ["junior", "Junior"], ["mladji_junior", "Mlađi junior (U18)"], ["kadet", "Kadet"], ["pionir", "Pionir"]];
+const AGE_ROWS: Array<[string, string]> = [["senior", "Senior"], ["junior", "Junior"], ["mladji_junior", "Mlađi junior (U18)"], ["kadet", "Kadet"]];
 
 /**
  * Ručni prioritet za "In focus" sekciju (manji broj = važnije). Prazno = auto.

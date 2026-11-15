@@ -130,9 +130,9 @@
     "seasonAir": "Season",
     "periodCareer": "Career",
     "seasonCalendar": "Calendar year",
-    "inSeason": "in period",
+    "inSeason": "Starts in year",
     "seasonAvgCol": "Season avg",
-    "improvedCol": "Δ vs. prior season",
+    "improvedCol": "Δ vs. last year",
     "improvedNow": "now",
     "h2hPickPrompt": "Choose a shooter",
     "h2hVs": "vs",
@@ -230,7 +230,7 @@
       "statsCareer": "Career Statistics",
       "statBest3": "Best-3",
       "statSezonaProsek": "This year",
-      "statNapredak": "vs. prior",
+      "statNapredak": "vs. last year",
       "statUkupnoNastupa": "Appearances"
     }
   },

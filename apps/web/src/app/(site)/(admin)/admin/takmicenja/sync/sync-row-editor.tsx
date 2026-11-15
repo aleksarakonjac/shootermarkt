@@ -61,7 +61,6 @@ export const AGE_CATEGORIES = [
   { value: "junior", label: "Junior" },
   { value: "mladji_junior", label: "Mlađi junior (U18)" },
   { value: "kadet", label: "Kadet" },
-  { value: "pionir", label: "Pionir" },
   { value: "master", label: "Master" },
 ];
 
