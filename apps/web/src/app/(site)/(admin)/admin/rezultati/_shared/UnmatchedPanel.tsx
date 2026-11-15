@@ -106,6 +106,7 @@ export function UnmatchedPanel({ rows, onRowChange }: Props) {
   const [issfImported, setIssfImported] = useState<Record<string, ImportedShooter>>({});
   const [issfError, setIssfError] = useState<Record<string, string>>({});
   const [lookupOpen, setLookupOpen] = useState<Record<string, boolean>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const unmatched: UnmatchedShooter[] = [];
   const seen = new Set<string>();
@@ -118,7 +119,8 @@ export function UnmatchedPanel({ rows, onRowChange }: Props) {
       seen.add(key);
       unmatched.push({
         key, lastName: row.lastName, firstName: row.firstName, teamNoc: row.teamNoc,
-        issfId: row.issfId,
+        // SIUS šalje svoj lokalni ID (npr. "S29/19463"), ne ISSF ID — samo pravi ISSF ID (SH…) sme da ide na preuzimanje
+        issfId: row.issfId?.startsWith("SH") ? row.issfId : undefined,
         disciplines: [], rowIndices: [],
         clubAbbr: row.clubAbbr, gender: row.gender, apparatus: row.apparatus,
       });
@@ -199,6 +201,43 @@ export function UnmatchedPanel({ rows, onRowChange }: Props) {
     setApplied((prev) => new Set(prev).add(u.key));
   }
 
+  // Masovne akcije nad izabranima (samo neobrađeni). "Poveži sa postojećim" traži izbor po strelcu, pa nije masovna.
+  const selectable = unmatched.filter((u) => !applied.has(u.key));
+  const chosen = selectable.filter((u) => selected.has(u.key));
+  const allChosen = selectable.length > 0 && chosen.length === selectable.length;
+  const markApplied = (keys: string[]) => setApplied((prev) => new Set([...prev, ...keys]));
+  const clearSelection = () => setSelected(new Set());
+
+  function bulkCreate() {
+    chosen.forEach((u) => {
+      const p = profiles[u.key];
+      u.rowIndices.forEach((i) => onRowChange(i, {
+        firstName: p?.firstName ?? u.firstName, lastName: p?.lastName ?? u.lastName,
+        teamNoc: p?.nationality ?? u.teamNoc, clubAbbr: (p?.clubAbbr ?? u.clubAbbr) || undefined,
+        birthYear: p?.birthYear ? parseInt(p.birthYear) : undefined,
+        isNew: true, warning: "Novi strelac — biće kreiran", shooterId: undefined,
+      }));
+      setActions((prev) => ({ ...prev, [u.key]: "create" }));
+    });
+    markApplied(chosen.map((u) => u.key));
+    clearSelection();
+  }
+
+  function bulkSkip() {
+    chosen.forEach((u) => {
+      u.rowIndices.forEach((i) => onRowChange(i, { skip: true }));
+      setActions((prev) => ({ ...prev, [u.key]: "skip" }));
+    });
+    markApplied(chosen.map((u) => u.key));
+    clearSelection();
+  }
+
+  async function bulkIssf() {
+    const withIssf = chosen.filter((u) => u.issfId);
+    for (const u of withIssf) await importFromIssf(u);
+    setSelected((prev) => { const n = new Set(prev); withIssf.forEach((u) => n.delete(u.key)); return n; });
+  }
+
   const pending = unmatched.filter((u) => !applied.has(u.key));
   const done = unmatched.filter((u) => applied.has(u.key));
 
@@ -216,6 +255,38 @@ export function UnmatchedPanel({ rows, onRowChange }: Props) {
         </span>
       </div>
 
+      {/* Masovne akcije */}
+      {selectable.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-t border-[var(--border)] bg-[var(--surface)]">
+          <label className="flex items-center gap-2 text-xs font-semibold text-[var(--ink)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allChosen}
+              onChange={() => setSelected(allChosen ? new Set() : new Set(selectable.map((u) => u.key)))}
+            />
+            Izaberi sve
+          </label>
+          <span className="text-xs text-[var(--muted)]">{chosen.length} izabrano</span>
+          <div className="ml-auto flex flex-wrap gap-1">
+            {chosen.some((u) => u.issfId) && (
+              <button onClick={bulkIssf} disabled={Object.keys(issfLoading).length > 0}
+                className="px-3 py-1 rounded-md text-xs font-semibold border disabled:opacity-50"
+                style={{ background: "oklch(0.95 0.04 260)", borderColor: "oklch(0.7 0.12 260)", color: "oklch(0.3 0.12 260)" }}>
+                ⬇ Preuzmi sa ISSF ({chosen.filter((u) => u.issfId).length})
+              </button>
+            )}
+            <button onClick={bulkCreate} disabled={chosen.length === 0}
+              className="px-3 py-1 rounded-md text-xs font-semibold text-white disabled:opacity-40" style={{ background: "var(--brand-primary)" }}>
+              Kreiraj novog ({chosen.length})
+            </button>
+            <button onClick={bulkSkip} disabled={chosen.length === 0}
+              className="px-3 py-1 rounded-md text-xs font-semibold text-white disabled:opacity-40" style={{ background: "oklch(0.55 0.18 25)" }}>
+              Isključi ({chosen.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Cards */}
       <div className="divide-y divide-[var(--border)]">
         {unmatched.map((u) => {
@@ -229,6 +300,15 @@ export function UnmatchedPanel({ rows, onRowChange }: Props) {
             <div key={u.key} className="p-4 space-y-3" style={{ opacity: isApplied ? 0.5 : 1 }}>
               {/* Shooter identity */}
               <div className="flex items-start gap-3">
+                {!isApplied && (
+                  <input
+                    type="checkbox"
+                    className="mt-1 shrink-0"
+                    checked={selected.has(u.key)}
+                    onChange={() => setSelected((prev) => { const n = new Set(prev); if (n.has(u.key)) n.delete(u.key); else n.add(u.key); return n; })}
+                    aria-label={`Izaberi ${u.lastName} ${u.firstName}`}
+                  />
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm text-[var(--ink)]">
                     {u.lastName} {u.firstName}

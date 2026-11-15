@@ -15,6 +15,10 @@ async function handlePOST(req: NextRequest) {
   if (!issfId) return NextResponse.json({ error: "issfId required" }, { status: 400 });
 
   const profile = await fetchAthleteProfile(issfId);
+  // ISSF vraća prazan profil za nepoznat ID (npr. SIUS lokalni "S29/19463") — ne kreiraj praznog strelca
+  if (!profile.familyName && !profile.firstName) {
+    return NextResponse.json({ error: `ISSF nema strelca sa ID-jem ${issfId}` }, { status: 404 });
+  }
 
   const fullDate = profile.birthday ? profile.birthday.slice(0, 10) : null;
   const apparatus = inferApparatus(profile.events);

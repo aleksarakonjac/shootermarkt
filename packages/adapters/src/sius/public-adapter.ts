@@ -194,7 +194,7 @@ export async function fetchSiusSeries(
         total,
         inners: inners === 0 ? null : inners, // 0 = not applicable (AR disciplines)
         series,
-        siusAthleteId: athlete.AthleteIdentifier?.Identifier ?? null,
+        siusAthleteId: athlete.AthleteIdentifier?.Identifier || null,
         qualified,
         remark,
         qualificationRemark,
@@ -274,7 +274,7 @@ function elimRoundNumber(name: string, fallback: number): number {
  * prikazala svakog dvaput, a rang bi se računao preko duplikata.
  */
 export function dedupeQualRows<T extends { siusAthleteId: string | null; firstName: string; lastName: string; nation: string; series: number[]; total: number }>(rows: T[]): T[] {
-  const key = (r: T) => r.siusAthleteId ?? `${r.lastName}|${r.firstName}|${r.nation}`.toLowerCase();
+  const key = (r: T) => r.siusAthleteId || `${r.lastName}|${r.firstName}|${r.nation}`.toLowerCase();
   const best = new Map<string, T>();
   for (const r of rows) {
     const cur = best.get(key(r));
@@ -490,7 +490,7 @@ async function fetchSiusTeamSeries(
         const { firstName, lastName } = splitDisplayName(a.DisplayName ?? "");
         const { total: aTotal, inners: aInners } = parseTeamValue(a.Result ?? "");
         return {
-          siusAthleteId: a.AthleteIdentifier?.Identifier ?? null,
+          siusAthleteId: a.AthleteIdentifier?.Identifier || null,
           firstName,
           lastName,
           nation: normalizeNoc(a.Nation) ?? "",

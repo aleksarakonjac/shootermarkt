@@ -108,6 +108,11 @@ describe("dedupeQualRows", () => {
     expect(out.map((x) => x.total).sort()).toEqual([201, 99.5]);
   });
 
+  it("treats an empty athlete id as missing (non-SVK athletes come with \"\")", () => {
+    const row = (first: string) => ({ siusAthleteId: "", firstName: first, lastName: "B", nation: "HUN", series: [1], total: 1 });
+    expect(dedupeQualRows([row("A"), row("C"), row("D")])).toHaveLength(3);
+  });
+
   it("falls back to name+nation when SIUS gives no athlete id", () => {
     expect(dedupeQualRows([r(null, [1], 1), r(null, [1], 2)])).toHaveLength(1);
   });

@@ -415,7 +415,8 @@ export function SiusMode() {
           {finalEntries.length > 0 && (() => {
             const byDisc = Array.from(
               finalEntries.reduce((map, f, idx) => {
-                const key = f.disciplineCode;
+                // Posebno finale po disciplini + uzrastu + meču (dva dana iste discipline, junior/U18 sa istim kodom)
+                const key = `${f.disciplineCode}|${f.category ?? "senior"}|${f.eventName ?? ""}`;
                 if (!map.has(key)) map.set(key, []);
                 map.get(key)!.push({ f, idx });
                 return map;
@@ -423,14 +424,17 @@ export function SiusMode() {
             );
             return (
               <div className="space-y-4">
-                {byDisc.map(([disc, entries]) => {
+                {byDisc.map(([groupKey, entries]) => {
+                  const disc = entries[0].f.disciplineCode;
+                  const { category, eventName } = entries[0].f;
                   const maxSeries = Math.max(...entries.map(({ f }) => f.series.length));
                   const activeCount = entries.filter(({ f }) => !f.skip).length;
                   return (
-                    <div key={disc} className="rounded-xl border border-[var(--border)] overflow-hidden">
+                    <div key={groupKey} className="rounded-xl border border-[var(--border)] overflow-hidden">
                       <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 py-2.5 flex items-center justify-between">
                         <span className="text-xs font-semibold text-[var(--ink)]">
                           Finale · <span className="font-[family-name:var(--font-jetbrains-mono)]">{disc}</span>
+                          {category && category !== "senior" ? ` · ${category}` : ""}{eventName ? ` · ${eventName}` : ""}
                         </span>
                         <span className="text-xs text-[var(--subtle)]">{activeCount} za unos</span>
                       </div>
