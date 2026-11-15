@@ -1,5 +1,5 @@
 import { db } from "@shootermarkt/db";
-import { clubs, competitionSchedule, competitions, countries, disciplines, mixedTeamResults, olympicQuotaAllocations, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@shootermarkt/db/schema";
+import { clubs, competitionSchedule, competitions, countries, disciplines, homepageFocusOverrides, mixedTeamResults, olympicQuotaAllocations, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@shootermarkt/db/schema";
 import { displayNoc, NOC_LIST } from "@shootermarkt/db/noc-list";
 import { isEscSoloCode, isSportPistolCode, qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
 import { effectiveFocusPriority } from "@/lib/competition-priority";
@@ -62,15 +62,19 @@ type FocusCompetition = {
 };
 
 const FOCUS_WINDOW_DAYS = 14;
+const SRB_HIGHLIGHT_MAX = 5;
+
+/** Ručni izbor iz admina (tabela homepage_focus_overrides): pin na poziciji, sakrij, sažeta kartica. */
+export type FocusOverride = { competitionId: number; position: number | null; hidden: boolean; collapsed: boolean };
 
 /**
- * Bira `limit` takmičenja za fokus sekciju: tekuća (live) uvek prva, zatim po
+ * Automatski izbor `limit` takmičenja za fokus sekciju: tekuća (live) uvek prva, zatim po
  * prioritetu (manji broj = važnije, vidi competition-priority.ts), pa po novijem
  * datumu. Kandidati su tekuća + završena u poslednjih FOCUS_WINDOW_DAYS dana; ako
  * ih ima manje od `limit`, dopunjava se najnovijim starijim da sekcija ne ostane prazna.
  * `categoriesById` = starosne kategorije koje se na takmičenju takmiče (raspored/rezultati).
  */
-export function selectHomepageFocusCompetitions<T extends FocusCompetition>(candidates: T[], today: string, categoriesById: Map<number, Iterable<string>> = new Map(), limit = 3) {
+function selectAutoFocus<T extends FocusCompetition>(candidates: T[], today: string, categoriesById: Map<number, Iterable<string>>, limit: number) {
   const cutoff = new Date(`${today}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - FOCUS_WINDOW_DAYS);
   const cutoffKey = cutoff.toISOString().slice(0, 10);
@@ -86,6 +90,27 @@ export function selectHomepageFocusCompetitions<T extends FocusCompetition>(cand
   const taken = new Set(windowed.map((c) => c.id));
   const filler = candidates.filter((c) => c.date <= today && !taken.has(c.id)).toSorted((a, b) => b.date.localeCompare(a.date)).slice(0, limit - windowed.length);
   return [...windowed, ...filler];
+}
+
+/**
+ * Konačan izbor: ručni pinovi (po poziciji) uvek ispred, skrivena takmičenja nikad, a ostatak do `limit`
+ * popunjava automatika. Pinova može biti i više od `limit` — svi se prikazuju. `candidates` mora sadržati
+ * i zakačena takmičenja (getHomepageMain ih dovlači posebno).
+ */
+export function selectHomepageFocusCompetitions<T extends FocusCompetition>(candidates: T[], today: string, categoriesById: Map<number, Iterable<string>> = new Map(), limit = 3, overrides: FocusOverride[] = []) {
+  const hidden = new Set(overrides.filter((o) => o.hidden).map((o) => o.competitionId));
+  const pinned = overrides
+    .filter((o) => !o.hidden && o.position != null)
+    .toSorted((a, b) => a.position! - b.position!)
+    .flatMap((o) => candidates.find((c) => c.id === o.competitionId) ?? []);
+  const pinnedIds = new Set(pinned.map((c) => c.id));
+  const rest = candidates.filter((c) => !hidden.has(c.id) && !pinnedIds.has(c.id));
+  return [...pinned, ...selectAutoFocus(rest, today, categoriesById, Math.max(0, limit - pinned.length))];
+}
+
+/** Svi kandidati u automatskom redosledu (za admin ekran: šta bi automatika izabrala i sledeće po redu). */
+export function rankFocusCandidates<T extends FocusCompetition>(candidates: T[], today: string, categoriesById: Map<number, Iterable<string>> = new Map()) {
+  return selectAutoFocus(candidates, today, categoriesById, candidates.length);
 }
 
 export function selectTickerUpcoming<T extends { date: string }>(competitions: T[], today: string) {
@@ -151,7 +176,9 @@ function slotsFromResults(
   codes: Map<number, string>,
 ): ScheduleSlotLike[] {
   const startTime = new Date(`${competition.date}T00:00:00Z`);
-  const endTime = new Date(`${competition.dateEnd ?? competition.date}T23:59:59Z`);
+  // Bez rasporeda ne znamo kad se pucalo: slot je nulte dužine (nikad "live"), samo nosi rezultate.
+  // Ranije je trajao ceo dan(e) takmičenja pa su sve discipline s rezultatima izgledale kao LIVE.
+  const endTime = startTime;
   const found = new Map<string, ScheduleSlotLike>();
   const add = (disciplineId: number, category: string, stage: string) => {
     const discCode = codes.get(disciplineId);
@@ -346,13 +373,20 @@ export async function getHomepageMain(scope: Scope) {
   const competitionScope = buildCompetitionScopeFilter(scope);
   const nationalityFilter = scope === 'srb' ? eq(shooters.nationality, 'SRB') : undefined;
   // Tri talasa upita (ranije ~7): svaki talas je jedan round-trip do baze.
-  const [candidateComps, cacheRows, upcoming, disciplineRows] = await Promise.all([
+  const [baseCandidateComps, cacheRows, upcoming, disciplineRows, focusOverrides] = await Promise.all([
     // Šira lista kandidata; konačni izbor 3 po prioritetu radi selectHomepageFocusCompetitions.
     db.select().from(competitions).where(and(sql`${competitions.date} <= ${today}`, sql`(EXISTS (SELECT 1 FROM ${results} WHERE ${results.competitionId} = ${competitions.id}) OR EXISTS (SELECT 1 FROM ${mixedTeamResults} WHERE ${mixedTeamResults.competitionId} = ${competitions.id}))`, competitionScope)).orderBy(desc(competitions.date)).limit(40),
     db.select({ shooterId: shooterFormaCache.shooterId, discCode: shooterFormaCache.disciplineCode, forma: shooterFormaCache.forma, trend: shooterFormaCache.trend, sampleSize: shooterFormaCache.sampleSize, peakCareer: shooterFormaCache.peakCareer, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality, countryCode2: countries.code2 }).from(shooterFormaCache).innerJoin(shooters, eq(shooterFormaCache.shooterId, shooters.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(and(eq(shooters.verified, true), nationalityFilter, rankedFormaCacheFilter())),
     db.select().from(competitions).where(and(sql`${competitions.date} >= ${today} AND ${competitions.date} < ${upcomingDeadline}`, competitionScope)).orderBy(asc(competitions.date)).limit(10),
     db.select({ id: disciplines.id, code: disciplines.code }).from(disciplines),
+    db.select({ competitionId: homepageFocusOverrides.competitionId, position: homepageFocusOverrides.position, hidden: homepageFocusOverrides.hidden, collapsed: homepageFocusOverrides.collapsed }).from(homepageFocusOverrides).where(eq(homepageFocusOverrides.scope, scope)),
   ]);
+  // Zakačena takmičenja ne moraju biti među poslednjih 40 kandidata (ni imati rezultate) — dovuci ih posebno.
+  const haveIds = new Set(baseCandidateComps.map((c) => c.id));
+  const missingPinnedIds = focusOverrides.filter((o) => !o.hidden && o.position != null && !haveIds.has(o.competitionId)).map((o) => o.competitionId);
+  const pinnedExtra = missingPinnedIds.length ? await db.select().from(competitions).where(inArray(competitions.id, missingPinnedIds)) : [];
+  const candidateComps = [...baseCandidateComps, ...pinnedExtra];
+  const focusOverrideById = new Map(focusOverrides.map((o) => [o.competitionId, o]));
   const disciplineCodes = new Map(disciplineRows.map((d) => [d.id, d.code]));
   const showSrbHighlight = scope === 'srb';
   const candidateIds = candidateComps.map((competition) => competition.id);
@@ -374,7 +408,7 @@ export async function getHomepageMain(scope: Scope) {
   ]);
   const categoriesById = new Map<number, Set<string>>();
   for (const row of [...scheduleCategories, ...resultCategories]) categoriesById.set(row.competitionId, (categoriesById.get(row.competitionId) ?? new Set()).add(row.category));
-  const recentComps = selectHomepageFocusCompetitions(candidateComps, today, categoriesById);
+  const recentComps = selectHomepageFocusCompetitions(candidateComps, today, categoriesById, 3, focusOverrides);
   const countryById = new Map(countryRows.map((country) => [country.id, country]));
   const recentIds = recentComps.map((competition) => competition.id);
   // Jedan upit po tabeli za sva izabrana takmičenja (ne 3 po takmičenju — pool ima 5 konekcija).
@@ -454,7 +488,10 @@ export async function getHomepageMain(scope: Scope) {
       if (!isLive && !entries.length) return [];
       const top3 = entries.slice(0, 3);
       const shown = new Set(top3.map((entry) => entry.id));
-      const srbHighlights = showSrbHighlight ? entries.filter((entry) => entry.nationality === "SRB" && !shown.has(entry.id)) : [];
+      // Srpski strelci se izdvajaju samo kad ih je u disciplini najviše SRB_HIGHLIGHT_MAX; više od toga je
+      // masovno učešće (državno prvenstvo, mlađi turniri) i lista bi preplavila karticu.
+      const srbEntries = entries.filter((entry) => entry.nationality === "SRB");
+      const srbHighlights = showSrbHighlight && srbEntries.length <= SRB_HIGHLIGHT_MAX ? srbEntries.filter((entry) => !shown.has(entry.id)) : [];
       const phaseLive = stageKind === "elimination" ? isElimRoundLive(slot.elimSlots, roundIndex, rounds.length, isLive, nowForSlots) : isLive;
       const { elimSlots: _elimSlots, ...phaseSlot } = slot;
       return [{ ...phaseSlot, isLive: phaseLive, hasSrb: entries.some((entry) => entry.nationality === "SRB"), discCode: slot.discCode, stage: slot.stage, elimRound: round, isJunior: slot.category !== "senior", top3, srbHighlights }];
@@ -516,7 +553,7 @@ export async function getHomepageMain(scope: Scope) {
       };
     });
     const country = competition.countryId != null ? countryById.get(competition.countryId) : undefined;
-    return { ...competition, countryCode2: country?.code2 ?? null, nocCode: country?.nocCode ?? null, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), discResults };
+    return { ...competition, countryCode2: country?.code2 ?? null, nocCode: country?.nocCode ?? null, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), collapsed: focusOverrideById.get(competition.id)?.collapsed ?? false, discResults };
   });
   const scores = groupTopFormaScores(scoreRows);
   const map = (row: (typeof cacheRows)[number]) => ({ shooterId: row.shooterId, firstName: row.firstName, lastName: row.lastName, nationality: row.nationality, countryCode2: row.countryCode2, formaScore: Number(row.forma), trend: row.trend ?? "stable", peak: row.peakCareer == null ? null : Number(row.peakCareer), entriesCount: row.sampleSize, recentScores: scores.get(`${row.shooterId}:${row.discCode}`) ?? [] });

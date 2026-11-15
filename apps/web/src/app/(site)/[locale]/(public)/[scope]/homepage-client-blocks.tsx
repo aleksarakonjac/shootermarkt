@@ -301,7 +301,11 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
   if (state === "error" || !data) return <HomepageError retry={retry} />;
 
   const upcoming = data.upcoming.map((item) => ({ ...item, name: locale === "en" ? (item.nameEn ?? item.name) : (item.nameSr ?? item.name) }));
-  const [lead, ...recent] = data.recent;
+  // Prva nesažeta kartica je glavna (lead); sažete ispred nje idu iznad nje kao zatvoreni redovi, ostale ispod.
+  const leadIndex = data.recent.findIndex((competition) => !competition.collapsed);
+  const lead = leadIndex >= 0 ? data.recent[leadIndex] : undefined;
+  const beforeLead = leadIndex >= 0 ? data.recent.slice(0, leadIndex) : data.recent;
+  const recent = leadIndex >= 0 ? data.recent.slice(leadIndex + 1) : [];
   const formatCompetitionDate = (date: string, dateEnd: string | null) => {
     const [year, month, day] = date.split("-");
     if (!dateEnd || dateEnd === date) return `${day}.${month}.${year}.`;
@@ -421,50 +425,9 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
     );
   }
 
-  return <>
-    <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-[family-name:var(--font-barlow-condensed)] text-2xl sm:text-3xl font-bold uppercase leading-none tracking-wider">{t("recentCompetitions")}</h2>
-        <ScopedLink href="/takmicenja" className="-my-3 inline-flex min-h-11 items-center text-sm font-semibold text-[var(--rank-accent)] hover:underline">{t("allCompsLink")}</ScopedLink>
-      </div>
-
-      {!lead ? (
-        <p className="py-8 text-sm text-[var(--muted)]">{t("noRecentComps")}</p>
-      ) : (() => {
-        const name = locale === "en" ? (lead.nameEn ?? lead.name) : (lead.nameSr ?? lead.name);
-        const levelKey = `levels.${lead.level.toLowerCase()}`;
-        const leadLevelLabel = tComp.has(levelKey) ? tComp(levelKey) : lead.level;
-        const leadLevelStyle = LEVEL_STYLE[lead.level.toLowerCase()] ?? FALLBACK_LEVEL_STYLE;
-        return (
-          <div className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 pb-0.5 pt-4 hover:border-[var(--brand-primary)] transition-colors">
-            <ScopedLink href={`/takmicenja/${lead.id}`} className="block no-underline">
-              <div className="flex items-center gap-2 flex-nowrap">
-                {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-xs font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
-                <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
-                  {leadLevelLabel}
-                </span>
-                <span className="flex-1 min-w-0 truncate text-sm font-semibold text-[var(--muted)]">
-                  {formatCompetitionDate(lead.date, lead.dateEnd)}
-                </span>
-              </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <h3 className="font-[family-name:var(--font-barlow-condensed)] text-xl sm:text-2xl font-extrabold uppercase leading-tight line-clamp-2 group-hover:text-[var(--brand-primary)] transition-colors">
-                  {name}
-                </h3>
-                <CompetitionPlace location={lead.location} countryCode2={lead.countryCode2} nocCode={lead.nocCode} display />
-              </div>
-            </ScopedLink>
-            {renderDiscResults(lead.discResults, lead.level, lead.id)}
-            <ScopedLink href={`/takmicenja/${lead.id}`} className="mt-4 min-h-11 items-center border-t border-[var(--border)] text-sm font-semibold text-[var(--rank-accent)] hover:underline flex no-underline">
-              {t("viewResults")} →
-            </ScopedLink>
-          </div>
-        );
-      })()}
-
-      {recent.length > 0 && (
+  const renderRows = (items: typeof data.recent) => items.length > 0 && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
-          {recent.map((item) => {
+          {items.map((item) => {
             const isExpanded = expandedId === item.id;
             const name = locale === "en" ? (item.nameEn ?? item.name) : (item.nameSr ?? item.name);
             const levelKey = `levels.${item.level.toLowerCase()}`;
@@ -517,7 +480,52 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
             );
           })}
         </div>
-      )}
+  );
+
+  return <>
+    <section className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-[family-name:var(--font-barlow-condensed)] text-2xl sm:text-3xl font-bold uppercase leading-none tracking-wider">{t("recentCompetitions")}</h2>
+        <ScopedLink href="/takmicenja" className="-my-3 inline-flex min-h-11 items-center text-sm font-semibold text-[var(--rank-accent)] hover:underline">{t("allCompsLink")}</ScopedLink>
+      </div>
+
+      {renderRows(beforeLead)}
+
+      {data.recent.length === 0 ? (
+        <p className="py-8 text-sm text-[var(--muted)]">{t("noRecentComps")}</p>
+      ) : !lead ? null : (() => {
+        const name = locale === "en" ? (lead.nameEn ?? lead.name) : (lead.nameSr ?? lead.name);
+        const levelKey = `levels.${lead.level.toLowerCase()}`;
+        const leadLevelLabel = tComp.has(levelKey) ? tComp(levelKey) : lead.level;
+        const leadLevelStyle = LEVEL_STYLE[lead.level.toLowerCase()] ?? FALLBACK_LEVEL_STYLE;
+        return (
+          <div className="group rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 pb-0.5 pt-4 hover:border-[var(--brand-primary)] transition-colors">
+            <ScopedLink href={`/takmicenja/${lead.id}`} className="block no-underline">
+              <div className="flex items-center gap-2 flex-nowrap">
+                {lead.isLive && <span className="shrink-0 inline-flex rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-xs font-extrabold uppercase tracking-wider text-white">{t("inProgress")}</span>}
+                <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded" style={leadLevelStyle}>
+                  {leadLevelLabel}
+                </span>
+                <span className="flex-1 min-w-0 truncate text-sm font-semibold text-[var(--muted)]">
+                  {formatCompetitionDate(lead.date, lead.dateEnd)}
+                </span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h3 className="font-[family-name:var(--font-barlow-condensed)] text-xl sm:text-2xl font-extrabold uppercase leading-tight line-clamp-2 group-hover:text-[var(--brand-primary)] transition-colors">
+                  {name}
+                </h3>
+                <CompetitionPlace location={lead.location} countryCode2={lead.countryCode2} nocCode={lead.nocCode} display />
+              </div>
+            </ScopedLink>
+            {renderDiscResults(lead.discResults, lead.level, lead.id)}
+            <ScopedLink href={`/takmicenja/${lead.id}`} className="mt-4 min-h-11 items-center border-t border-[var(--border)] text-sm font-semibold text-[var(--rank-accent)] hover:underline flex no-underline">
+              {t("viewResults")} →
+            </ScopedLink>
+          </div>
+        );
+      })()}
+
+      {renderRows(recent)}
     </section>
     <section className="mt-8"><TopFormaClient initialData={data.topForma as never} /></section>
     <section className="mt-8"><NewsSection /></section>

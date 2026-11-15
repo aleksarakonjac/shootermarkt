@@ -855,6 +855,26 @@ export const competitionScheduleChanges = pgTable(
   (t) => [index("competition_schedule_changes_open_idx").on(t.acknowledgedAt)]
 );
 
+// ── Homepage In focus overrides ───────────────────────────────────────────────
+// Ručni izbor za "In focus" na početnoj (po scope-u). `position` != null = zakačeno (pin) na tom mestu,
+// pinovi uvek idu ispred automatskog izbora; `hidden` = nikad ne prikazuj; `collapsed` = sažeta kartica.
+
+export const homepageFocusOverrides = pgTable(
+  "homepage_focus_overrides",
+  {
+    id: serial("id").primaryKey(),
+    scope: varchar("scope", { length: 10 }).notNull(), // 'srb' | 'issf'
+    competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+    position: smallint("position"),
+    hidden: boolean("hidden").notNull().default(false),
+    collapsed: boolean("collapsed").notNull().default(false),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("homepage_focus_overrides_scope_comp_idx").on(t.scope, t.competitionId),
+  ]
+);
+
 // ── Ticker Live Overrides ─────────────────────────────────────────────────────
 
 export const tickerLiveOverrides = pgTable(

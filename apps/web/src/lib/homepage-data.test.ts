@@ -194,4 +194,36 @@ describe("competition focus priority", () => {
     const old = comp(6, "Kup Srbije", "national", "cup", "2026-08-01");
     expect(selectHomepageFocusCompetitions([old, worldChamp, live], "2026-10-15", none).map((c) => c.id)).toEqual([5, 2, 6]);
   });
+
+  describe("manual overrides", () => {
+    const pin = (competitionId: number, position: number, collapsed = false) => ({ competitionId, position, hidden: false, collapsed });
+    const hide = (competitionId: number) => ({ competitionId, position: null, hidden: true, collapsed: false });
+
+    it("pins come first in their order and the automatic pick fills the rest", () => {
+      // auto bi dao [2, 1, 3]; ručno: klub prvi
+      const out = selectHomepageFocusCompetitions([club, youthFinal, worldCup, worldChamp], "2026-10-15", youthCats, 3, [pin(4, 0)]);
+      expect(out.map((c) => c.id)).toEqual([4, 2, 1]);
+    });
+
+    it("a pinned live competition can be placed below a non-live one", () => {
+      const live = comp(5, "Regionalni miting", "regional", "other", "2026-10-14", "2026-10-16");
+      const out = selectHomepageFocusCompetitions([live, worldChamp], "2026-10-15", none, 3, [pin(2, 0), pin(5, 1)]);
+      expect(out.map((c) => c.id)).toEqual([2, 5]);
+    });
+
+    it("hidden competitions never show, even when they would win automatically", () => {
+      const out = selectHomepageFocusCompetitions([worldCup, worldChamp, club], "2026-10-15", none, 3, [hide(2)]);
+      expect(out.map((c) => c.id)).toEqual([1, 4]);
+    });
+
+    it("more pins than the limit are all shown and nothing automatic is added", () => {
+      const out = selectHomepageFocusCompetitions([club, youthFinal, worldCup, worldChamp], "2026-10-15", youthCats, 3, [pin(4, 0), pin(3, 1), pin(1, 2), pin(2, 3)]);
+      expect(out.map((c) => c.id)).toEqual([4, 3, 1, 2]);
+    });
+
+    it("a pin for a competition missing from the candidates is ignored", () => {
+      const out = selectHomepageFocusCompetitions([worldCup], "2026-10-15", none, 3, [pin(99, 0)]);
+      expect(out.map((c) => c.id)).toEqual([1]);
+    });
+  });
 });
