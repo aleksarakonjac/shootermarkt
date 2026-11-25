@@ -34,6 +34,7 @@
     "sharp": "^0.35.2"
   },
   "devDependencies": {
+    "@types/node": "^20",
     "drizzle-kit": "^0.31.10",
     "dotenv": "^17.4.2",
     "tsx": "^4.22.4",
