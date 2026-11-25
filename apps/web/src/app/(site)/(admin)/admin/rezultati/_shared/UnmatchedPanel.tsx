@@ -113,8 +113,9 @@ export function UnmatchedPanel({ rows, onRowChange }: Props) {
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    if (row.shooterId || row.skip) continue;
     const key = `${row.lastName}|${row.firstName}|${row.teamNoc}`;
+    // Obrađeni ostaju u listi, inače kartica nestane i ishod (uvezen/povezan/isključen) se ne vidi
+    if ((row.shooterId || row.skip) && !applied.has(key)) continue;
     if (!seen.has(key)) {
       seen.add(key);
       unmatched.push({

@@ -85,6 +85,8 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
 
   for (const row of rows) {
     if (row.skip) { skipped++; continue; }
+    // SIUS redovi u issfId nose lokalni SIUS ID (npr. "S35/21945") — u shooters.issf_id sme samo pravi ISSF ID
+    const rowIssfId = row.issfId?.startsWith("SH") ? row.issfId : null;
     try {
       let clubId = row.clubId;
       if (!clubId && row.clubAbbr) {
@@ -101,7 +103,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
       let shooterId = row.shooterId;
       if (!shooterId) {
         // issfId (ISSF import) pre imena; ime se ne prihvata ako taj strelac ima drugi issfId — druga osoba
-        const issfId = row.issfId || null;
+        const issfId = rowIssfId;
         const match = matchShooter(row.firstName, row.lastName, row.teamNoc || null, allShooters);
         const byName = match.kind === "exact" ? allShooters.find((shooter) => shooter.id === match.id) : undefined;
         const existing = (issfId && shooterByIssfId.get(issfId))
@@ -140,13 +142,13 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
           allShooters.push(added);
           if (issfId) shooterByIssfId.set(issfId, added);
         }
-      } else if (row.issfId && !shooterByIssfId.has(row.issfId)) {
+      } else if (rowIssfId && !shooterByIssfId.has(rowIssfId)) {
         // Strelac izabran u review-u (ili po imenu u ingest-u) — poveži ga sa ISSF ID-jem iz reda
         const chosen = allShooters.find((shooter) => shooter.id === shooterId);
         if (chosen && !chosen.issfId) {
-          await db.update(shooters).set({ issfId: row.issfId }).where(eq(shooters.id, chosen.id));
-          chosen.issfId = row.issfId;
-          shooterByIssfId.set(row.issfId, chosen);
+          await db.update(shooters).set({ issfId: rowIssfId }).where(eq(shooters.id, chosen.id));
+          chosen.issfId = rowIssfId;
+          shooterByIssfId.set(rowIssfId, chosen);
         }
       }
       if (shooterId) affectedShooterIds.add(shooterId);
