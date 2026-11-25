@@ -1,3 +1,5 @@
+import { splitDisplayName } from "../sius/public-adapter";
+
 const ISSF_API = "https://api.issf-sports.org/api/v01";
 const ISSF_WEB = "https://www.issf-sports.org";
 
@@ -178,15 +180,21 @@ export function extractMvpEvents(
 }
 
 /**
- * Fetch R3P elimination round results — same HTML format as qualification.
- * Integer totals (no decimals for 50m 3P elimination), with Q marker for advancers.
+ * Elimination round results. Air events use the qualification table; 3-position events use
+ * three rows per athlete, mapped here to the same shape (series = K1 K2 P1 P2 S1 S2).
  */
 export async function fetchElimResultsFromHtml(
   competitionId: number,
   resultKey: string,
   noCache = false
 ): Promise<ISSFQualResult[]> {
-  return fetchQualResultsFromHtml(competitionId, resultKey, noCache);
+  // 3 položaja prvo: kvalifikacioni parser bi iz takve tabele pročitao samo klečeći stav
+  const threePositions = await fetchR3PResultsFromHtml(competitionId, resultKey, noCache);
+  if (!threePositions.length) return fetchQualResultsFromHtml(competitionId, resultKey, noCache);
+  return threePositions.map(({ kneeling, prone, standing, ...r }) => ({
+    ...r,
+    series: [kneeling, prone, standing].flatMap((position) => position.series.flat()),
+  }));
 }
 
 const API_LIMIT = 300;
@@ -446,7 +454,7 @@ export interface ISSFQualResult {
  * No Gemini API needed — data is in a plain HTML table.
  *
  * Table row format (qualification):
- *   rank | bib | LASTNAME Firstname (link) | NOC | s1..s6 | total | Q?
+ *   rank | bib | LASTNAME Firstname (link) | NOC | s1..s6 | total | remark columns (RPO, Q)
  *
  * For Air Pistol, total is integer and inners come from "NNNx" style total cell
  * (e.g. "594-35x"). For Air Rifle, total is decimal (636.3).
@@ -466,37 +474,31 @@ export async function fetchQualResultsFromHtml(
 
   const results: ISSFQualResult[] = [];
 
-  // Match each result row: starts with a rank td, has athlete link, NOC, series, total
+  // Match each result row: rank td, bib, athlete link, NOC, then every text-only cell (series, total, remarks)
   const rowRe =
-    /<tr>\s*<td[^>]*>(\d+)<\/td>\s*<td[^>]*>\d+<\/td>\s*<td[^>]*><a href="\/athletes\/([^"]+)">([^<]+)<\/a><\/td>\s*<td[^>]*>([A-Z]{3})<\/td>((?:\s*<td[^>]*>[^<]*<\/td>)+)\s*<td[^>]*>([^<]*)<\/td>\s*<td[^>]*>([^<]*)<\/td>/g;
+    /<tr>\s*<td[^>]*>(\d+)<\/td>\s*<td[^>]*>\d+<\/td>\s*<td[^>]*><a href="\/athletes\/([^"]+)">([^<]+)<\/a><\/td>\s*<td[^>]*>([A-Z]{3})<\/td>((?:\s*<td[^>]*>[^<]*<\/td>)+)/g;
 
   let m: RegExpExecArray | null;
   while ((m = rowRe.exec(html)) !== null) {
     const rank = parseInt(m[1]);
     const issfId = m[2].trim();
     const rawName = m[3].replace(/&nbsp;/gi, " ").replace(/ /g, " ").trim(); // literal "&nbsp;" or real NBSP → space
-    const spaceIdx = rawName.indexOf(" ");
-    const lastName = spaceIdx > 0 ? rawName.slice(0, spaceIdx) : rawName;
-    const firstName = spaceIdx > 0 ? rawName.slice(spaceIdx + 1) : "";
+    const { lastName, firstName } = splitDisplayName(rawName);
     const nationCode = m[4];
-    const seriesCells = m[5];
-    const totalCell = m[6].trim();
-    const remarkRaw = m[7].trim();
-    const qualified = remarkRaw === "Q";
-    const remark = (remarkRaw && remarkRaw !== "Q") ? remarkRaw : null;
+    // Broj kolona sa oznakama varira (samo "Q", ili "RPO" i "Q" zasebno): total je poslednja brojčana ćelija
+    const cells = [...m[5].matchAll(/<td[^>]*>([^<]*)<\/td>/g)].map((c) => c[1].trim());
+    const totalIdx = cells.findLastIndex((c) => /^\d/.test(c));
+    if (totalIdx < 0) continue;
+    const totalCell = cells[totalIdx];
+    const marks = cells.slice(totalIdx + 1).filter(Boolean);
+    const qualified = marks.includes("Q");
+    const remark = marks.filter((mark) => mark !== "Q").join(" ") || null;
+    const series = cells.slice(0, totalIdx).filter((c) => /^[\d.]+$/.test(c)).map(Number);
 
-    // Extract series values from cells
-    const seriesRe = /<td[^>]*>([\d.]+)<\/td>/g;
-    const series: number[] = [];
-    let sm: RegExpExecArray | null;
-    while ((sm = seriesRe.exec(seriesCells)) !== null) {
-      series.push(parseFloat(sm[1]));
-    }
-
-    // Parse total — may be "594-35x" (AP) or "636.3" (AR)
+    // Parse total — may be "594-35x" / "594 - 35x" (AP) or "636.3" (AR)
     let total: number;
     let inners: number | null = null;
-    const innersMatch = totalCell.match(/^(\d+)-(\d+)x$/);
+    const innersMatch = totalCell.match(/^(\d+)\s*-\s*(\d+)x$/);
     if (innersMatch) {
       total = parseInt(innersMatch[1]);
       inners = parseInt(innersMatch[2]);
@@ -570,11 +572,11 @@ export async function fetchR3PResultsFromHtml(
 
     const issfId   = athleteMatch[1].trim();
     const rawName  = athleteMatch[2].replace(/&nbsp;/gi, " ").replace(/ /g, " ").replace(/<[^>]+>/g, "").trim();
-    const spaceIdx = rawName.indexOf(" ");
-    const lastName  = spaceIdx > 0 ? rawName.slice(0, spaceIdx) : rawName;
-    const firstName = spaceIdx > 0 ? rawName.slice(spaceIdx + 1) : "";
+    const { lastName, firstName } = splitDisplayName(rawName);
 
     const knCells = extractCells(tr);
+    // Samo format sa tri reda po strelcu — druge tabele (npr. vazdušne startne liste) se preskaču
+    if (!/^kneeling$/i.test(knCells[4] ?? "")) continue;
     const rank       = parseInt(knCells[0]) || 0;
     const nationCode = knCells[3] ?? "";
     const knS1       = parseFloat(knCells[5]) || 0;
@@ -595,6 +597,7 @@ export async function fetchR3PResultsFromHtml(
     const totalMatch = totalRaw.match(/(\d+)\s*[-–]\s*(\d+)x/i);
     const total  = totalMatch ? parseInt(totalMatch[1]) : (knTotal + prTotal + stTotal);
     const inners = totalMatch ? parseInt(totalMatch[2]) : null;
+    if (!total) continue; // startna lista — još nema pogodaka
 
     // Q marker may be in index 9 or 10 of the standing row
     const qCandidates = [stCells[9] ?? "", stCells[10] ?? ""];
@@ -682,9 +685,7 @@ export async function fetchFinalResultsFromHtml(
     const rank = parseInt(mm[1]);
     const issfId = mm[2].trim();
     const rawName = mm[3].replace(/&nbsp;/gi, " ").replace(/\u00a0/g, " ").trim();
-    const spaceIdx = rawName.indexOf(" ");
-    const lastName = spaceIdx > 0 ? rawName.slice(0, spaceIdx) : rawName;
-    const firstName = spaceIdx > 0 ? rawName.slice(spaceIdx + 1) : "";
+    const { lastName, firstName } = splitDisplayName(rawName);
     const nationCode = mm[4];
     const rest = mm[5];
 
@@ -826,12 +827,7 @@ function parseAthleteLink(html: string): { issfId: string; lastName: string; fir
   if (!m) return null;
   const issfId  = m[1].trim();
   const rawName = m[2].replace(/&nbsp;/gi, " ").replace(/ /g, " ").replace(/<[^>]+>/g, "").trim();
-  const sp = rawName.indexOf(" ");
-  return {
-    issfId,
-    lastName:  sp > 0 ? rawName.slice(0, sp) : rawName,
-    firstName: sp > 0 ? rawName.slice(sp + 1) : "",
-  };
+  return { issfId, ...splitDisplayName(rawName) };
 }
 
 /**
