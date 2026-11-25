@@ -8,12 +8,14 @@ import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
 import { MixedTeamQualTable, MixedTeamFinalsTable, type MixedTeamEntry } from "../_shared/MixedTeamReviewTable";
 import { commitMixedTeams } from "../_shared/commitMixedTeams";
+import { ImportDiffPanel, diffToWrite } from "../_shared/ImportDiffPanel";
+import type { ImportDiff } from "@/lib/import-diff";
 
 type Step = "pick" | "disciplines" | "review" | "done";
 
 interface DbComp { id: number; name: string; date: string; location: string | null; siusId?: string | null }
 interface SiusEvent { runningId: string; eventCode: string; name: string; state: string }
-interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
+interface CommitResult { inserted: number; updated: number; unchanged: number; skipped: number; errors: string[]; competitionId: number }
 
 const SUPPORTED_CODES = new Set(["ARM", "ARW", "APM", "APW", "R3PM", "R3PW", "RPRM", "RPRW", "SPW", "SPM", "FPM", "FPW", "RFPM", "STPM", "STPW", "R3P300M", "R3P300W", "RPR300M", "RPR300W", "STR300", "ARMT", "APMT", "ARM-ECH-SOLO", "ARW-ECH-SOLO", "APM-ECH-SOLO", "APW-ECH-SOLO"]);
 
@@ -165,6 +167,9 @@ export function SiusMode() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [nocFilter, setNocFilter] = useState("");
   const [result, setResult] = useState<CommitResult | null>(null);
+  const [diff, setDiff] = useState<ImportDiff | null>(null);
+  // Posle ručne izmene diff više ne opisuje redove — unos ostaje moguć, server sam preskače nepromenjene.
+  const [edited, setEdited] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/competitions")
@@ -203,7 +208,7 @@ export function SiusMode() {
       const res = await fetch("/api/admin/sius/public-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siusId: siusId.trim(), disciplineCodes: Array.from(selectedCodes) }),
+        body: JSON.stringify({ siusId: siusId.trim(), disciplineCodes: Array.from(selectedCodes), competitionId: selectedComp?.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Import failed");
@@ -212,6 +217,8 @@ export function SiusMode() {
       setTeamEntries(data.teamEntries ?? []);
       setEventCount(data.eventCount);
       setImportErrors(data.errors ?? []);
+      setDiff(data.diff);
+      setEdited(false);
       setStep("review");
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
@@ -224,7 +231,7 @@ export function SiusMode() {
     // Merge active final entries into qual rows before committing
     const mergedRows = mergeSiusFinals(rows, finalEntries);
     const payload: CommitPayload = { source: "sius_import", competitionId: selectedComp.id, rows: mergedRows };
-    let inserted = 0, skipped = 0;
+    let inserted = 0, updated = 0, unchanged = 0, skipped = 0;
     const errors: string[] = [];
     try {
       if (mergedRows.length > 0) {
@@ -236,32 +243,38 @@ export function SiusMode() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Commit error");
         inserted += data.inserted ?? 0;
+        updated += data.updated ?? 0;
+        unchanged += data.unchanged ?? 0;
         skipped += data.skipped ?? 0;
         errors.push(...(data.errors ?? []));
       }
 
       const mixed = await commitMixedTeams(selectedComp.id, teamEntries);
       inserted += mixed.inserted;
+      updated += mixed.updated;
+      unchanged += mixed.unchanged;
       skipped += mixed.skipped;
       errors.push(...mixed.errors);
 
-      setResult({ inserted, skipped, errors, competitionId: selectedComp.id });
+      setResult({ inserted, updated, unchanged, skipped, errors, competitionId: selectedComp.id });
       setStep("done");
     } catch (e) { setError(String(e)); }
     finally { setLoading(false); }
   }
 
   function updateRow(idx: number, patch: Partial<ReviewRow>) {
+    setEdited(true);
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
 
   function toggleTeamSkip(idx: number) {
+    setEdited(true);
     setTeamEntries((prev) => prev.map((e, i) => (i === idx ? { ...e, skip: !e.skip } : e)));
   }
 
   function reset() {
     setStep("pick"); setRows([]); setFinalEntries([]); setTeamEntries([]); setResult(null); setError(null);
-    setNocFilter(""); setImportErrors([]); setEvents([]);
+    setNocFilter(""); setImportErrors([]); setEvents([]); setDiff(null); setEdited(false);
     setSelectedCodes(new Set()); setSelectedComp(null); setSiusId("");
   }
 
@@ -270,6 +283,7 @@ export function SiusMode() {
   }
 
   const activeCount = rows.filter((r) => !r.skip).length + teamEntries.filter((e) => !e.skip).length;
+  const writeCount = diff && !edited ? diffToWrite(diff) : activeCount;
 
   if (step === "done" && result) {
     return <DonePanel result={result} onReset={reset} resetLabel="Uvezi još jedno takmičenje" />;
@@ -382,7 +396,7 @@ export function SiusMode() {
               <p className="text-xs text-[var(--muted)]">{selectedComp?.name}</p>
               <div className="flex flex-wrap gap-4 text-sm text-[var(--muted)] mt-1">
                 <span><span className="font-semibold text-[var(--ink)]">{eventCount}</span> disciplin{eventCount === 1 ? "a" : "e"}</span>
-                <span><span className="font-semibold text-[var(--ink)]">{activeCount}</span> za unos</span>
+                <span><span className="font-semibold text-[var(--ink)]">{writeCount}</span> za unos</span>
                 <span><span className="font-semibold text-[var(--ink)]">{rows.filter(r => r.skip).length}</span> preskočeno</span>
                 {rows.filter(r => r.warning).length > 0 && (
                   <span style={{ color: "var(--warning)" }}>⚠ {rows.filter(r => r.warning).length} novih strelaca</span>
@@ -392,6 +406,8 @@ export function SiusMode() {
             <button onClick={() => setStep("disciplines")} className="text-xs text-[var(--muted)] hover:text-[var(--ink)] transition-colors">← Nazad</button>
           </div>
 
+          {diff && <ImportDiffPanel diff={diff} edited={edited} />}
+
           {importErrors.length > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 space-y-1">
               <p className="font-semibold">Upozorenja:</p>
@@ -400,7 +416,7 @@ export function SiusMode() {
           )}
 
           {rows.length > 0 && (
-            <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))} />
+            <ReviewTable rows={rows} nocFilter={nocFilter} onRowChange={updateRow} onNocFilterChange={setNocFilter} onSkipNoc={(noc) => { setEdited(true); setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r)); }} />
           )}
 
           {teamEntries.length > 0 && (
@@ -468,7 +484,7 @@ export function SiusMode() {
                                 <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]">{fmtVal(f.total, disc)}</td>
                                 <td className="px-3 py-2 text-right">
                                   <button
-                                    onClick={() => setFinalEntries(prev => prev.map((e, i) => i === idx ? { ...e, skip: !e.skip } : e))}
+                                    onClick={() => { setEdited(true); setFinalEntries(prev => prev.map((e, i) => i === idx ? { ...e, skip: !e.skip } : e)); }}
                                     className="text-xs px-2 py-0.5 rounded border transition-colors"
                                     style={f.skip
                                       ? { borderColor: "var(--border)", color: "var(--subtle)" }
@@ -491,8 +507,8 @@ export function SiusMode() {
           })()}
 
           <div className="flex gap-3">
-            <button onClick={handleCommit} disabled={loading || activeCount === 0} className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50">
-              {loading ? "Unosim…" : `Potvrdi i unesi ${activeCount} rezultata →`}
+            <button onClick={handleCommit} disabled={loading || writeCount === 0} className="rounded-md px-6 py-2.5 text-sm font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] transition-colors disabled:opacity-50">
+              {loading ? "Unosim…" : writeCount === 0 ? "Nema izmena za unos" : `Potvrdi i unesi ${writeCount} rezultata →`}
             </button>
             <button onClick={reset} className="rounded-md border border-[var(--border-strong)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] hover:bg-[var(--surface)] transition-colors">Otkaži</button>
           </div>

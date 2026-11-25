@@ -11,7 +11,7 @@ type Step = "pick" | "disciplines" | "review" | "done";
 
 interface DbComp { id: number; name: string; date: string; location: string | null; issfId?: string | null }
 interface IssfEvent { code: string; label: string }
-interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
+interface CommitResult { inserted: number; updated?: number; unchanged?: number; skipped: number; errors: string[]; competitionId: number }
 
 // ── CompSearch ────────────────────────────────────────────────────────────────
 
@@ -250,6 +250,8 @@ export function IssfMode() {
       if (activeMixed.length > 0) {
         const mixed = await commitMixedTeams(resolvedCompId, activeMixed);
         data.inserted += mixed.inserted;
+        data.updated += mixed.updated;
+        data.unchanged += mixed.unchanged;
         data.skipped += mixed.skipped;
         data.errors.push(...mixed.errors);
       }

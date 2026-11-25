@@ -4,7 +4,8 @@ import { fetchSiusEvents, fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, f
 import { matchEventName } from "@/lib/competition-events";
 import { shooterResultCount } from "@/lib/import-commit";
 import { db } from "@shootermarkt/db";
-import { shooters } from "@shootermarkt/db/schema";
+import { competitions, shooters } from "@shootermarkt/db/schema";
+import { eq } from "drizzle-orm";
 import { isUnrankedRemark, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
 import { escSoloReviewRows, stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
@@ -30,7 +31,7 @@ export class SiusImportError extends Error {
 }
 
 /** Fetches SIUS public results for a competition UUID and shapes them as review rows (no DB writes). */
-export async function buildSiusImport(siusId: string, disciplineCodes?: string[]) {
+export async function buildSiusImport(siusId: string, disciplineCodes?: string[], competitionId?: number) {
   const requested = [
     ...withJunior((disciplineCodes ?? [...SUPPORTED_CODES, ...MIXED_TEAM_CODES]).filter((c) => !escSoloCodeFromEvent(c))),
     ...(disciplineCodes ?? ESC_SOLO_EVENT_CODES).filter((c) => escSoloCodeFromEvent(c)),
@@ -318,6 +319,14 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
       .map((e) => e.eventCode)
       .filter((c) => !requested.includes(c)))];
     if (unsupported.length) errors.push(`Nije uvezeno (disciplina nije podržana): ${unsupported.join(", ")}`);
+  }
+
+  // SIUS kod "…J" je junior; na prvenstvima označenim U18 u nazivu to je mlađi junior.
+  if (competitionId) {
+    const [comp] = await db.select({ name: competitions.name }).from(competitions).where(eq(competitions.id, competitionId));
+    if (/\bU-?18\b/i.test(comp?.name ?? "")) {
+      for (const x of [...rows, ...finalEntries]) if (x.category === "junior") x.category = "mladji_junior";
+    }
   }
 
   return { rows, finalEntries, teamEntries, eventCount: siusData.size + mixedData.size + soloEventCount, errors };

@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { importSiusCompetition } from "@/lib/sius-bulk";
 import { SiusImportError } from "@/lib/sius-import";
 import { matchSiusCompetition, type SiusMatch } from "@/lib/sius-match";
-import { revalidatesPublicSite } from "@/lib/revalidate-public";
+import { revalidatePublicSite } from "@/lib/revalidate-public";
 
 // One import commits a whole competition (hundreds of rows) — give it room.
 export const maxDuration = 300;
@@ -77,7 +77,7 @@ type Action =
   | { action: "link"; competitionId: number; siusId: string };
 
 /** preview: what SIUS has for one competition · import: write it · link: store a SIUS UUID on a competition. */
-async function handlePOST(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
@@ -96,14 +96,14 @@ async function handlePOST(req: NextRequest) {
 
   if (!comp.siusId) return NextResponse.json({ error: "Takmičenje nema SIUS UUID" }, { status: 400 });
   try {
-    return NextResponse.json(body.action === "import"
-      ? await importSiusCompetition(comp.id, comp.siusId, { commit: true })
-      : await importSiusCompetition(comp.id, comp.siusId));
+    if (body.action !== "import") return NextResponse.json(await importSiusCompetition(comp.id, comp.siusId));
+    const result = await importSiusCompetition(comp.id, comp.siusId, { commit: true });
+    // Bez upisa nema šta da zastari — čišćenje keša celog sajta košta CPU.
+    if (result.inserted + result.teamsInserted > 0) revalidatePublicSite();
+    return NextResponse.json(result);
   } catch (err) {
     if (err instanceof SiusImportError) return NextResponse.json({ error: err.message }, { status: err.status });
     console.error("[sius-bulk]", body.action, comp.id, err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Uvoz nije uspeo" }, { status: 500 });
   }
 }
-
-export const POST = revalidatesPublicSite(handlePOST);

@@ -6,6 +6,7 @@ import { formatDateRangeSr } from "@/lib/date-utils";
 import { LEVEL_LABEL, LEVEL_STYLE } from "@/lib/competition-utils";
 import type { SiusImportResult, SiusImportSummary } from "@/lib/sius-bulk";
 import type { SiusMatch } from "@/lib/sius-match";
+import { ImportDiffPanel, diffToWrite } from "../_shared/ImportDiffPanel";
 
 interface Comp {
   id: number;
@@ -77,8 +78,8 @@ export function PeriodImportClient() {
       try {
         const data = await post<SiusImportSummary>({ action: "preview", competitionId: c.id });
         setPreviews((prev) => ({ ...prev, [c.id]: { state: "ok", data } }));
-        // Pre-select whatever SIUS has more of than the DB — new or partial imports.
-        if (data.rows + data.teams > c.resultCount + c.teamCount) setSelected((prev) => new Set(prev).add(c.id));
+        // Pre-select only what would actually write something: new or changed results.
+        if (diffToWrite(data.diff) > 0) setSelected((prev) => new Set(prev).add(c.id));
       } catch (e) {
         setPreviews((prev) => ({ ...prev, [c.id]: { state: "error", message: e instanceof Error ? e.message : String(e) } }));
       }
@@ -107,7 +108,9 @@ export function PeriodImportClient() {
       try {
         const data = await post<SiusImportResult>({ action: "import", competitionId: c.id });
         setOutcomes((prev) => ({ ...prev, [c.id]: { state: "done", data } }));
-        setComps((prev) => prev?.map((x) => (x.id === c.id ? { ...x, resultCount: Math.max(x.resultCount, data.inserted), teamCount: Math.max(x.teamCount, data.teamsInserted) } : x)) ?? prev);
+        setComps((prev) => prev?.map((x) => (x.id === c.id ? { ...x, resultCount: x.resultCount + data.inserted - data.updated, teamCount: Math.max(x.teamCount, data.teamsInserted) } : x)) ?? prev);
+        // Without errors everything SIUS has is now in the DB.
+        if (!data.errors.length) setPreviews((prev) => ({ ...prev, [c.id]: { state: "ok", data: { ...data, diff: { added: 0, changed: 0, same: data.diff.added + data.diff.changed + data.diff.same, items: [] } } } }));
         setSelected((prev) => { const next = new Set(prev); next.delete(c.id); return next; });
       } catch (e) {
         setOutcomes((prev) => ({ ...prev, [c.id]: { state: "error", message: e instanceof Error ? e.message : String(e) } }));
@@ -128,7 +131,7 @@ export function PeriodImportClient() {
         <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">Uvoz rezultata za period</h1>
         <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">
           Uvozi SIUS rezultate za sva takmičenja u izabranim godinama odjednom, uključujući mešane timove, DSQ/DNS i kazne.
-          Već uvezeni rezultati se ažuriraju, ne dupliraju.
+          Već uneti rezultati bez razlike se preskaču, izmenjeni se ažuriraju.
         </p>
       </header>
 
@@ -177,7 +180,7 @@ export function PeriodImportClient() {
                       type="checkbox"
                       aria-label={`Izaberi: ${c.name}`}
                       checked={selected.has(c.id)}
-                      disabled={importing}
+                      disabled={importing || upToDate(previews[c.id])}
                       onChange={() => setSelected((prev) => { const next = new Set(prev); if (next.has(c.id)) next.delete(c.id); else next.add(c.id); return next; })}
                       className="mt-1 size-4 accent-[var(--brand-primary)]"
                     />
@@ -191,6 +194,7 @@ export function PeriodImportClient() {
                         <span>U bazi: <span className="tabular-nums text-[var(--ink)]">{c.resultCount}</span> rez.{c.teamCount > 0 && <> · <span className="tabular-nums text-[var(--ink)]">{c.teamCount}</span> timova</>}</span>
                         <PreviewLine preview={previews[c.id]} />
                       </div>
+                      {previews[c.id]?.state === "ok" && <div className="mt-2"><ImportDiffPanel diff={(previews[c.id] as Extract<Preview, { state: "ok" }>).data.diff} /></div>}
                       <OutcomeLine outcome={outcomes[c.id]} />
                     </div>
                   </li>
@@ -247,6 +251,8 @@ export function PeriodImportClient() {
   );
 }
 
+const upToDate = (p?: Preview) => p?.state === "ok" && diffToWrite(p.data.diff) === 0;
+
 function PreviewLine({ preview }: { preview?: Preview }) {
   if (!preview) return null;
   if (preview.state === "loading") return <span className="inline-block h-3 w-40 animate-pulse rounded bg-[var(--surface-2)] align-middle motion-reduce:animate-none" aria-label="Učitavam SIUS" />;
@@ -271,7 +277,7 @@ function OutcomeLine({ outcome }: { outcome?: Outcome }) {
   const d = outcome.data;
   return (
     <p className="mt-1 text-xs text-[var(--success)]" aria-live="polite">
-      Uvezeno {d.inserted} rez.{d.teamsInserted > 0 && `, ${d.teamsInserted} timova`}{d.skipped > 0 && `, preskočeno ${d.skipped}`}
+      Uvezeno {d.inserted} rez.{d.updated > 0 && ` (izmenjeno ${d.updated})`}{d.teamsInserted > 0 && `, ${d.teamsInserted} timova`}{d.unchanged > 0 && `, već uneto ${d.unchanged}`}{d.skipped > 0 && `, preskočeno ${d.skipped}`}
       {d.errors.length > 0 && <span className="text-[var(--danger)]"> · {d.errors.length} grešaka: {d.errors.slice(0, 2).join("; ")}</span>}
     </p>
   );

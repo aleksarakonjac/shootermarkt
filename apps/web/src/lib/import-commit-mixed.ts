@@ -3,6 +3,8 @@ import { competitions, disciplines, mixedTeamResults } from "@shootermarkt/db/sc
 import { and, eq, sql } from "drizzle-orm";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
 import { eventTypeFromName } from "@/lib/competition-filters";
+import { changedColumns, changedParts, type ImportStatus } from "@/lib/import-diff";
+import { commitMixedStages, toFinalCommit, toQualCommit } from "@/app/(site)/(admin)/admin/rezultati/_shared/commitMixedTeams";
 import { isUnrankedRemark, type CompetitionLevel, type EventType, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
 
 export class MixedCommitError extends Error {
@@ -39,6 +41,62 @@ export interface MixedCommitEntry {
 
 /** Shallow per-stage merge: qualification and finals are committed in separate calls. */
 const mergeRemarkDetails = sql`coalesce(${mixedTeamResults.remarkDetails} || excluded.remark_details, excluded.remark_details, ${mixedTeamResults.remarkDetails})`;
+
+/** Kolone koje upisuje jedna faza (bez ključa, `remarkDetails` i `source`). */
+function stageColumns(e: MixedCommitEntry, isFinals: boolean) {
+  if (isFinals) {
+    return {
+      finalRank: e.finalRank ?? null,
+      finalTotal: e.finalTotal != null ? String(e.finalTotal) : null,
+      finalRemark: e.finalRemark ?? null,
+      shooter1FinalDetail: e.mFinalSeries?.length ? { series: e.mFinalSeries } : null,
+      shooter2FinalDetail: e.fFinalSeries?.length ? { series: e.fFinalSeries } : null,
+    };
+  }
+  return {
+    shooter1Name: `${e.m_lastName} ${e.m_firstName}`.trim() || null,
+    shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
+    shooter1Detail: { series: e.m_series ?? [], inners: e.mInners ?? null, total: e.mTotal ?? 0 },
+    shooter2Detail: { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
+    qualRank: isUnrankedRemark(e.qualRemark) ? null : e.qualRank ?? null,
+    qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
+    qualInners: e.qualInners ?? null,
+    qualRemark: e.qualRemark ?? null,
+    qualified: e.qualified ?? null,
+  };
+}
+
+const teamKey = (nocCode: string, teamNumber: number | undefined) => `${nocCode}#${teamNumber ?? 1}`;
+
+async function loadTeams(competitionId: number, disciplineId: number, category: NonNullable<MixedCommitInput["category"]>) {
+  const rows = await db.select().from(mixedTeamResults).where(and(
+    eq(mixedTeamResults.competitionId, competitionId), eq(mixedTeamResults.disciplineId, disciplineId), eq(mixedTeamResults.category, category),
+  ));
+  return new Map<string, Record<string, unknown>>(rows.map((r) => [teamKey(r.nocCode, r.teamNumber), r]));
+}
+
+/** Kolone koje bi se promenile upisom faze u postojeći red tima. */
+function teamChanges(old: Record<string, unknown>, e: MixedCommitEntry, isFinals: boolean) {
+  const remarkDetails = e.extras
+    ? { ...(old.remarkDetails as object | null), [isFinals ? "final" : "qual"]: e.extras }
+    : old.remarkDetails;
+  return changedColumns(old, { ...stageColumns(e, isFinals), remarkDetails });
+}
+
+/** Šta bi uvoz uradio sa svakim mešovitim timom, bez ijednog upisa. */
+export async function previewMixedTeams(competitionId: number, entries: MixedTeamEntry[]): Promise<{ status: ImportStatus; changes: string[] }[]> {
+  const disciplineIds = new Map<string, number>((await db.select().from(disciplines)).map((d) => [d.code, d.id]));
+  const rows = await db.select().from(mixedTeamResults).where(eq(mixedTeamResults.competitionId, competitionId));
+  return entries.map((e) => {
+    const old = rows.find((r) => r.disciplineId === disciplineIds.get(e.disciplineCode) && r.category === (e.category ?? "senior")
+      && r.nocCode === e.nocCode && r.teamNumber === e.teamNumber);
+    if (!old) return { status: "new", changes: [] };
+    const columns = teamChanges(old, toQualCommit(e), false);
+    if (e.finalRank != null) columns.push(...teamChanges(old, toFinalCommit(e), true));
+    const changes = changedParts(columns);
+    return { status: changes.length ? "changed" : "same", changes };
+  });
+}
 
 export interface MixedCommitInput {
   discipline: string;
@@ -88,112 +146,48 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
   const disc = await db.query.disciplines.findFirst({ where: eq(disciplines.code, code as any) });
   if (!disc) throw new MixedCommitError("Discipline not found", 404);
 
-  let inserted = 0, skipped = 0;
+  let inserted = 0, skipped = 0, unchanged = 0;
+  /** Timovi upisani u ovoj fazi (novi ili izmenjeni) — pozivalac spaja kvalifikacije i finale. */
+  const written: string[] = [], updated: string[] = [];
   const errors: string[] = [];
+  const existing = await loadTeams(competitionId, disc.id, category);
 
   for (const e of entries) {
     if (e.skip) { skipped++; continue; }
     try {
-      if (isFinals) {
-        await db
-          .insert(mixedTeamResults)
-          .values({
-            competitionId,
-            disciplineId: disc.id,
-            category,
-            nocCode: e.nocCode,
-            teamNumber: e.teamNumber ?? 1,
-            finalRank: e.finalRank ?? null,
-            finalTotal: e.finalTotal != null ? String(e.finalTotal) : null,
-            finalRemark: e.finalRemark ?? null,
-            shooter1FinalDetail: e.mFinalSeries?.length ? { series: e.mFinalSeries } : null,
-            shooter2FinalDetail: e.fFinalSeries?.length ? { series: e.fFinalSeries } : null,
-            remarkDetails: e.extras ? { final: e.extras } : null,
-            source: "manual",
-          })
-          .onConflictDoUpdate({
-            target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
-            set: {
-              finalRank: e.finalRank ?? null,
-              finalTotal: e.finalTotal != null ? String(e.finalTotal) : null,
-              finalRemark: e.finalRemark ?? null,
-              shooter1FinalDetail: e.mFinalSeries?.length ? { series: e.mFinalSeries } : null,
-              shooter2FinalDetail: e.fFinalSeries?.length ? { series: e.fFinalSeries } : null,
-              remarkDetails: mergeRemarkDetails,
-            },
-          });
-      } else {
-        await db
-          .insert(mixedTeamResults)
-          .values({
-            competitionId,
-            disciplineId: disc.id,
-            category,
-            nocCode: e.nocCode,
-            teamNumber: e.teamNumber ?? 1,
-            shooter1Name: `${e.m_lastName} ${e.m_firstName}`.trim() || null,
-            shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
-            shooter1Detail: { series: e.m_series ?? [], inners: e.mInners ?? null, total: e.mTotal ?? 0 },
-            shooter2Detail: { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
-            qualRank: isUnrankedRemark(e.qualRemark) ? null : e.qualRank ?? null,
-            qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
-            qualInners: e.qualInners ?? null,
-            qualRemark: e.qualRemark ?? null,
-            qualified: e.qualified ?? null,
-            remarkDetails: e.extras ? { qual: e.extras } : null,
-            source: "manual",
-          })
-          .onConflictDoUpdate({
-            target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
-            set: {
-              shooter1Name: `${e.m_lastName} ${e.m_firstName}`.trim() || null,
-              shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
-              shooter1Detail: { series: e.m_series ?? [], inners: e.mInners ?? null, total: e.mTotal ?? 0 },
-              shooter2Detail: { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
-              qualRank: isUnrankedRemark(e.qualRemark) ? null : e.qualRank ?? null,
-              qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
-              qualInners: e.qualInners ?? null,
-              qualRemark: e.qualRemark ?? null,
-              qualified: e.qualified ?? null,
-              remarkDetails: mergeRemarkDetails,
-            },
-          });
-      }
+      const key = teamKey(e.nocCode, e.teamNumber);
+      const old = existing.get(key);
+      if (old && teamChanges(old, e, isFinals).length === 0) { unchanged++; continue; }
+      const columns = stageColumns(e, isFinals);
+      await db
+        .insert(mixedTeamResults)
+        .values({
+          competitionId,
+          disciplineId: disc.id,
+          category,
+          nocCode: e.nocCode,
+          teamNumber: e.teamNumber ?? 1,
+          ...columns,
+          remarkDetails: e.extras ? { [isFinals ? "final" : "qual"]: e.extras } : null,
+          source: "manual",
+        })
+        .onConflictDoUpdate({
+          target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
+          set: { ...columns, remarkDetails: mergeRemarkDetails },
+        });
       inserted++;
+      written.push(key);
+      if (old) updated.push(key);
     } catch (err) {
       errors.push(`${e.nocCode}: ${String(err)}`);
     }
   }
 
-  return { inserted, skipped, errors, competitionId };
+  return { inserted, skipped, unchanged, written, updated, errors, competitionId };
 }
 
 
 /** Commits reviewed mixed-team entries (qualification, then finals) per discipline; same payloads as the admin UI. */
 export async function commitMixedTeamsDirect(competitionId: number, entries: MixedTeamEntry[]) {
-  let inserted = 0, skipped = 0;
-  const errors: string[] = [];
-  const byEvent = new Map<string, MixedTeamEntry[]>();
-  for (const e of entries) {
-    const key = `${e.disciplineCode}|${e.category ?? "senior"}`;
-    byEvent.set(key, [...(byEvent.get(key) ?? []), e]);
-  }
-
-  for (const rows of byEvent.values()) {
-    const discipline = rows[0].disciplineCode, category = rows[0].category ?? "senior";
-    const qual = await commitMixedTeamEntries({ competitionId, discipline, category, isFinals: false, entries: rows.map((e) => ({
-      skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber, qualRank: e.qualRank, qualTotal: e.qualTotal, qualInners: e.inners, qualRemark: e.qualRemark, qualified: e.qualified, extras: e.qualExtras,
-      m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mInners: e.mInners, mTotal: e.mTotal,
-      f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
-    })) });
-    inserted += qual.inserted; skipped += qual.skipped; errors.push(...qual.errors);
-
-    const finalists = rows.filter((e) => !e.skip && e.finalRank != null);
-    if (!finalists.length) continue;
-    const fin = await commitMixedTeamEntries({ competitionId, discipline, category, isFinals: true, entries: finalists.map((e) => ({
-      nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark, mFinalSeries: e.mFinalSeries, fFinalSeries: e.fFinalSeries, extras: e.finalExtras,
-    })) });
-    errors.push(...fin.errors);
-  }
-  return { inserted, skipped, errors };
+  return commitMixedStages(entries, (input) => commitMixedTeamEntries({ competitionId, ...input }));
 }

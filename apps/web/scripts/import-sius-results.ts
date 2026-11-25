@@ -34,10 +34,10 @@ async function main() {
     process.stdout.write(`[${c.id}] ${String(c.date).slice(0, 10)} ${c.name} ... `);
     try {
       const r: SiusImportSummary & Partial<SiusImportResult> = commit ? await importSiusCompetition(c.id, c.siusId, { commit: true }) : await importSiusCompetition(c.id, c.siusId);
-      console.log(`${r.rows} redova [${Object.entries(r.perDiscipline).map(([k, v]) => `${k}:${v}`).join(" ")}], timova: ${r.teams}, novih strelaca: ${r.newShooters}, bez plasmana (DSQ/DNS): ${r.unranked}, sa kaznom/SO/rekordom: ${r.withMarks}${r.warnings.length ? `, upozorenja: ${r.warnings.join("; ")}` : ""}`);
+      console.log(`${r.rows} redova [${Object.entries(r.perDiscipline).map(([k, v]) => `${k}:${v}`).join(" ")}], timova: ${r.teams}, novih strelaca: ${r.newShooters}, u bazi: novo ${r.diff.added}, izmenjeno ${r.diff.changed}, isto ${r.diff.same}, bez plasmana (DSQ/DNS): ${r.unranked}, sa kaznom/SO/rekordom: ${r.withMarks}${r.warnings.length ? `, upozorenja: ${r.warnings.join("; ")}` : ""}`);
       totalRows += r.rows;
       if (r.inserted !== undefined) {
-        console.log(`    upisano ${r.inserted}, preskočeno ${r.skipped}, mešani timovi: ${r.teamsInserted}${r.errors?.length ? `, greške: ${r.errors.slice(0, 5).join("; ")}` : ""}`);
+        console.log(`    upisano ${r.inserted}, bez izmene ${r.unchanged}, preskočeno ${r.skipped}, mešani timovi: ${r.teamsInserted}${r.errors?.length ? `, greške: ${r.errors.slice(0, 5).join("; ")}` : ""}`);
       }
     } catch (e) {
       failed++;

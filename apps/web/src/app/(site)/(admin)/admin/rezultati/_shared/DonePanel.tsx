@@ -4,6 +4,8 @@ import Link from "next/link";
 
 interface CommitResult {
   inserted: number;
+  updated?: number;
+  unchanged?: number;
   skipped: number;
   errors: string[];
   competitionId?: number;
@@ -27,6 +29,8 @@ export function DonePanel({ result, onReset, resetLabel = "Unesi još" }: Props)
         </div>
         <p className="text-sm text-[var(--muted)]">
           rezultata uneto
+          {!!result.updated && ` (od toga ${result.updated} izmenjeno)`}
+          {!!result.unchanged && ` · ${result.unchanged} već uneto, bez izmene`}
           {result.skipped > 0 && ` · ${result.skipped} preskočeno`}
         </p>
         {result.errors.length > 0 && (

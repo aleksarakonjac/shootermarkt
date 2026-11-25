@@ -1,25 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildSiusImport, SiusImportError } from "@/lib/sius-import";
+import { buildSiusImport, mergeSiusFinals, SiusImportError } from "@/lib/sius-import";
+import { diffSiusImport } from "@/lib/sius-bulk";
 import { requireAdmin } from "@/lib/admin-auth";
-import { revalidatesPublicSite } from "@/lib/revalidate-public";
 
 export type { SiusFinalEntry } from "@/lib/sius-import";
 
-async function handlePOST(req: NextRequest) {
+/** Read-only: fetches SIUS results for review and compares them with what the competition already has. */
+export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
-  const { siusId, disciplineCodes } = (await req.json()) as { siusId: string; disciplineCodes?: string[] };
-  if (!siusId?.trim()) {
-    return NextResponse.json({ error: "siusId required" }, { status: 400 });
+  const { siusId, disciplineCodes, competitionId } = (await req.json()) as { siusId: string; disciplineCodes?: string[]; competitionId: number };
+  if (!siusId?.trim() || !Number.isInteger(competitionId)) {
+    return NextResponse.json({ error: "siusId and competitionId required" }, { status: 400 });
   }
 
   try {
-    return NextResponse.json(await buildSiusImport(siusId, disciplineCodes));
+    const data = await buildSiusImport(siusId, disciplineCodes, competitionId);
+    const diff = await diffSiusImport(competitionId, mergeSiusFinals(data.rows, data.finalEntries), data.teamEntries);
+    return NextResponse.json({ ...data, diff });
   } catch (e) {
     if (e instanceof SiusImportError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
   }
 }
-
-export const POST = revalidatesPublicSite(handlePOST);

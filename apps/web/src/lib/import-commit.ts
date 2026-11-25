@@ -1,12 +1,13 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
-import { clubs, competitions, disciplines, results, shooters } from "@shootermarkt/db/schema";
+import { clubs, competitionEvents, competitions, disciplines, results, shooters } from "@shootermarkt/db/schema";
 import { ensureCompetitionEvent } from "@/lib/competition-events";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { eventTypeFromName, groupsFromName } from "@/lib/competition-filters";
 import { refreshDisciplineGroups } from "@/lib/discipline-groups";
 import { matchShooter } from "@shootermarkt/db/name-match";
-import { DISCIPLINE_META, isUnrankedRemark, type CommitPayload } from "@shootermarkt/db/pdf-import-types";
+import { DISCIPLINE_META, type CommitPayload, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
+import { changedColumns, changedParts, resultColumns, upsertedResult, type ImportStatus } from "@/lib/import-diff";
 
 export class CommitValidationError extends Error {}
 
@@ -15,7 +16,12 @@ export class CommitValidationError extends Error {}
 export const shooterResultCount = sql<number>`(select count(*)::int from results r where r.shooter_id = "shooters"."id")`;
 
 export type CommitResult = {
+  /** Upisani redovi: novi + izmenjeni. */
   inserted: number;
+  /** Od upisanih, koliko ih je već postojalo sa drugim vrednostima. */
+  updated: number;
+  /** Već uneti bez razlike — nisu ponovo upisivani. */
+  unchanged: number;
   skipped: number;
   errors: string[];
   competitionId: number;
@@ -31,6 +37,38 @@ async function addCompetitionTags(competitionId: number, tags: string[]) {
 
 /** Shallow per-stage merge so a re-import of one stage never wipes another stage's marks. */
 const mergeRemarkDetails = sql`coalesce(${results.remarkDetails} || excluded.remark_details, excluded.remark_details, ${results.remarkDetails})`;
+
+const resultKey = (shooterId: number, eventId: number | null, disciplineId: number, category: string) =>
+  `${shooterId}|${eventId ?? ""}|${disciplineId}|${category}`;
+
+/** Postojeći rezultati i mečevi takmičenja, za poređenje pre upisa. */
+async function loadExisting(competitionId: number) {
+  const [rows, events] = await Promise.all([
+    db.select().from(results).where(eq(results.competitionId, competitionId)),
+    db.select({ id: competitionEvents.id, name: competitionEvents.name }).from(competitionEvents).where(eq(competitionEvents.competitionId, competitionId)),
+  ]);
+  return {
+    results: new Map<string, Record<string, unknown>>(rows.map((r) => [resultKey(r.shooterId, r.competitionEventId, r.disciplineId, r.category), r])),
+    eventIds: new Map(events.map((e) => [e.name, e.id])),
+  };
+}
+
+/** Šta bi commit uradio sa svakim redom, bez ijednog upisa. Red bez strelca je nov. */
+export async function previewImportRows(competitionId: number, rows: ReviewRow[]): Promise<{ status: ImportStatus; changes: string[] }[]> {
+  const existing = await loadExisting(competitionId);
+  const disciplineMap = Object.fromEntries((await db.select().from(disciplines)).map((d) => [d.code, d.id]));
+  return rows.map((row) => {
+    const eventName = row.eventName?.trim();
+    const eventId = eventName ? existing.eventIds.get(eventName) : null;
+    const old = row.shooterId && eventId !== undefined
+      ? existing.results.get(resultKey(row.shooterId, eventId, disciplineMap[row.disciplineCode], row.category ?? "senior"))
+      : undefined;
+    if (!old) return { status: "new", changes: [] };
+    const columns = resultColumns(row);
+    const changes = changedParts(changedColumns(old, upsertedResult(old, { ...columns, clubId: row.clubId }, row.elimRound != null && row.qualTotal == null)));
+    return { status: changes.length ? "changed" : "same", changes };
+  });
+}
 
 /** Commits reviewed individual result rows and refreshes their forma cache. */
 export async function commitImportReview(payload: CommitPayload): Promise<CommitResult> {
@@ -72,10 +110,13 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
   }).from(shooters);
   const shooterByIssfId = new Map(allShooters.filter((s) => s.issfId).map((s) => [s.issfId!, s]));
   let inserted = 0;
+  let updated = 0;
+  let unchanged = 0;
   let skipped = 0;
   const errors: string[] = [];
   const affectedShooterIds = new Set<number>();
-  const eventIds = new Map<string, number>();
+  const existingResults = await loadExisting(competitionId);
+  const eventIds = existingResults.eventIds;
   const competitionDate = comp?.date
     ?? (await db.query.competitions.findFirst({ where: eq(competitions.id, competitionId), columns: { date: true } }))?.date;
   async function eventIdFor(name: string, date: string | null | undefined) {
@@ -151,36 +192,24 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
           shooterByIssfId.set(rowIssfId, chosen);
         }
       }
-      if (shooterId) affectedShooterIds.add(shooterId);
 
       const disciplineId = disciplineMap[row.disciplineCode];
       if (!disciplineId) { errors.push(`Unknown discipline: ${row.disciplineCode}`); continue; }
       const isElimOnly = row.elimRound != null && row.qualTotal == null;
-      const competitionEventId = row.eventName?.trim() ? await eventIdFor(row.eventName.trim(), row.eventDate) : null;
+      const columns = resultColumns(row);
+      const category = (row.category ?? "senior") as typeof results.$inferInsert.category & string;
+      const eventName = row.eventName?.trim();
+      const knownEventId = eventName ? eventIds.get(eventName) : null;
+      const key = knownEventId !== undefined ? resultKey(shooterId, knownEventId, disciplineId, category) : null;
+      const old = key ? existingResults.results.get(key) : undefined;
+      const next = old ? upsertedResult(old, { ...columns, clubId }, isElimOnly) : null;
+      if (old && next && changedColumns(old, next).length === 0) { unchanged++; continue; }
+
+      const competitionEventId = eventName ? await eventIdFor(eventName, row.eventDate) : null;
       const values = {
-        shooterId, competitionId, competitionEventId, disciplineId,
-        category: (row.category ?? "senior") as typeof results.$inferInsert.category,
+        shooterId, competitionId, competitionEventId, disciplineId, category,
         clubId: clubId ?? null,
-        qualTotal: row.qualTotal?.toString() ?? null, qualInners: row.qualInners ?? null, qualRank: isUnrankedRemark(row.remark) ? null : row.qualRank ?? null,
-        qualDetail: row.qualEscSolo ? row.qualEscSolo : row.qualPositions
-          ? { kneeling: row.qualPositions.kneeling, prone: row.qualPositions.prone, standing: row.qualPositions.standing }
-          : row.qualSeries ? { series: row.qualSeries } : null,
-        qualified: row.qualified ?? null,
-        elimRound: row.elimRound ?? null, elimTotal: row.elimTotal != null ? Math.round(row.elimTotal) : null,
-        elimRank: row.elimRank ?? null,
-        elimDetail: row.elimSeries || row.elimInners != null
-          ? { ...(row.elimSeries ? { series: row.elimSeries.map(Math.round) } : { series: [] }), inners: row.elimInners ?? null } : null,
-        finalTotal: row.finalTotal?.toString() ?? null, finalRank: row.finalRank ?? null,
-        finalDetail: row.finalSeries || row.finalShots || row.finalCumulative || row.finalShotsByStage
-          ? { format: "bulletin" as const, scoring: (row.finalScoring ?? "decimal") as "decimal" | "hit_count",
-              ...(row.finalSeries ? { series: row.finalSeries } : {}), ...(row.finalSeriesLabels ? { seriesLabels: row.finalSeriesLabels } : {}),
-              ...(row.finalShots ? { shots: row.finalShots } : {}), ...(row.finalShotsByStage ? { shotsByStage: row.finalShotsByStage } : {}),
-              ...(row.finalCumulative ? { cumulative: row.finalCumulative } : {}), ...(row.finalRanks ? { ranks: row.finalRanks } : {}),
-              ...(row.finalShootOff ? { shootOff: true } : {}),
-              ...(row.finalOpponentTotal != null ? { opponentTotal: row.finalOpponentTotal, opponentName: row.finalOpponentName ?? null } : {}) } : null,
-        ...(isElimOnly ? { elimRemark: row.elimRemark ?? row.remark ?? null } : { qualRemark: row.remark ?? null, elimRemark: row.elimRemark ?? null }),
-        finalRemark: row.finalRemark ?? null,
-        remarkDetails: row.remarkDetails ?? null,
+        ...columns,
         source: payload.source ?? "pdf_import",
       };
       if (isElimOnly) {
@@ -191,7 +220,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
       } else await db.insert(results).values(values).onConflictDoUpdate({
         target: [results.shooterId, results.competitionId, results.competitionEventId, results.disciplineId, results.category],
         set: {
-          clubId: sql`excluded.club_id`,
+          clubId: sql`coalesce(excluded.club_id, ${results.clubId})`,
           qualTotal: sql`excluded.qual_total`, qualInners: sql`excluded.qual_inners`, qualRank: sql`excluded.qual_rank`, qualDetail: sql`excluded.qual_detail`,
           qualified: sql`coalesce(excluded.qualified, ${results.qualified})`,
           finalTotal: sql`excluded.final_total`, finalRank: sql`excluded.final_rank`, finalDetail: sql`excluded.final_detail`,
@@ -205,12 +234,15 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
         },
       });
       inserted++;
+      if (old) updated++;
+      affectedShooterIds.add(shooterId);
+      existingResults.results.set(resultKey(shooterId, competitionEventId, disciplineId, category), { ...old, ...(next ?? values) });
     } catch (error) {
       errors.push(`${row.lastName} ${row.firstName} (${row.teamNoc}): ${String(error)}`);
     }
   }
 
-  await refreshDisciplineGroups(competitionId);
+  if (inserted) await refreshDisciplineGroups(competitionId);
   const affectedIds = [...affectedShooterIds];
   if (affectedIds.length) {
     try {
@@ -220,5 +252,5 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
       errors.push(`[forma-cache] ${String(error)}`);
     }
   }
-  return { inserted, skipped, errors, competitionId };
+  return { inserted, updated, unchanged, skipped, errors, competitionId };
 }
