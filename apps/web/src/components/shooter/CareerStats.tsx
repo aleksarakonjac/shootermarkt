@@ -31,7 +31,7 @@ function StatLabel({ label, description, locale, align }: { label: string; descr
   );
 }
 
-export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: string }) {
+export function CareerStats({ stats, locale, year }: { stats: CareerStat[]; locale: string; year: number }) {
   const t = useTranslations("shooters.profile");
   const [selectedCode, setSelectedCode] = useState(stats[0]?.code ?? "");
   const stat = stats.find((item) => item.code === selectedCode) ?? stats[0];
@@ -56,14 +56,14 @@ export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: st
   const info = locale === "en" ? {
     form: "FORMAScore is the forecast of the next result, based on recent performances and their trend.",
     peak: "The best qualification result achieved in this discipline.",
-    best3: "The average of the three best qualification results in this discipline.",
+    best3: `The average of the three best qualification results in ${year}.`,
     recent3: "The average of the last three qualification results in this discipline.",
     season: "The average qualification result in the current calendar year. The number after the slash is the number of starts.",
     improvement: "Last year's average qualification result, and the difference of this year's average from it.",
   } : {
     form: "FORMAScore je prognoza sledećeg rezultata, zasnovana na novijim nastupima i njihovom trendu.",
     peak: "Najbolji ostvareni kvalifikacioni rezultat u ovoj disciplini.",
-    best3: "Prosek tri najbolja kvalifikaciona rezultata u ovoj disciplini.",
+    best3: `Prosek tri najbolja kvalifikaciona rezultata u ${year}. godini.`,
     recent3: "Prosek poslednja tri kvalifikaciona rezultata u ovoj disciplini.",
     season: "Prosek kvalifikacionih rezultata u tekućoj kalendarskoj godini. Broj posle kose crte je broj nastupa.",
     improvement: "Prosek kvalifikacionih rezultata prošle godine i razlika proseka ove godine u odnosu na njega.",
@@ -124,7 +124,7 @@ export function CareerStats({ stats, locale }: { stats: CareerStat[]; locale: st
           <span className={`${valueClass} mt-0.5 block text-base`}>{fmtNum(stat.peak)}</span>
         </div>
         <div className="bg-[var(--surface)] px-4 py-3">
-          <StatLabel label={t("statBest3")} description={info.best3} locale={locale} align="right" />
+          <StatLabel label={`${t("statBest3")} ${year}`} description={info.best3} locale={locale} align="right" />
           <span className={`${valueClass} mt-0.5 block text-base`}>{fmtNum(stat.best3)}</span>
         </div>
         <div className="bg-[var(--surface)] px-4 py-3">

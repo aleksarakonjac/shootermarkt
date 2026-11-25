@@ -8,6 +8,7 @@ import type { QualDetail, FinalDetail, ElimDetail, AgeCategory } from "@shooterm
 import { CATEGORY_LABEL, isEscSoloCode, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
 import { DISCIPLINE_DISPLAY_ORDER } from "@shootermarkt/db/discipline-names";
 import { EscSoloResults } from "@/components/result-display/EscSoloResults";
+import { NoSearchMatch, ResultSearch, matchesSearch, nocKeywords } from "@/components/result-display/ResultSearch";
 import {
   CompetitionQualTable,
   type CompResultRow,
@@ -825,6 +826,11 @@ function CompetitionDetail({
   onStageChange: (stage: string, elimRound?: number) => void;
 }) {
   const reducedMotion = useReducedMotion();
+  const en = locale === "en";
+  // Pretraga strelca/nacije (kvalifikacije, eliminacije, miks); nova disciplina kreće od prazne.
+  const [query, setQuery] = useState("");
+  const [queryKey, setQueryKey] = useState(`${selection.disciplineCode}|${selection.category}`);
+  if (queryKey !== `${selection.disciplineCode}|${selection.category}`) { setQueryKey(`${selection.disciplineCode}|${selection.category}`); setQuery(""); }
   // Sat za odluku o medaljama u finalu (finale se završava dok je stranica otvorena).
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -840,6 +846,10 @@ function CompetitionDetail({
     const finalStages = mixedGroup ? mixedFinalStages(mixedGroup.teams) : [];
     const mixedStage = selection.stage;
     const stageTeams = mixedGroup ? (mixedStage === "gold" || mixedStage === "bronze" ? matchTeams(mixedGroup.teams, mixedStage) : mixedGroup.teams) : [];
+    const mixedSearchable = selection.stage === "qual";
+    const shownTeams = mixedSearchable && query.trim()
+      ? stageTeams.filter((t) => matchesSearch(query, t.shooter1Name, t.shooter2Name, nocKeywords(t.nocCode)))
+      : stageTeams;
     const showMixedMedals = shouldShowFinalMedals(finalSlots.find((slot) => slot.disciplineCode === selection.disciplineCode && slot.category === selection.category), [], now);
 
     return (
@@ -870,6 +880,7 @@ function CompetitionDetail({
           </div>
         </div>
 
+        <div className="sm:flex sm:items-start sm:gap-3">
         {finalStages.length > 0 && (
           <div className="flex items-center gap-0.5 mb-5 p-1 bg-[var(--surface)] rounded-lg w-fit border border-[var(--border)] max-w-full overflow-x-auto">
             {(["qual", ...finalStages] as const).map((s) => (
@@ -890,9 +901,12 @@ function CompetitionDetail({
           </div>
         )}
 
+        {mixedSearchable && stageTeams.length > 0 && <ResultSearch value={query} onChange={setQuery} en={en} count={shownTeams.length} total={stageTeams.length} className="mb-5 sm:ml-auto" />}
+        </div>
+
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={selection.stage} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.22 } }} exit={{ opacity: 0, transition: { duration: 0.16 } }}>
-            <MixedTeamQualTable teams={stageTeams} apparatus={mixedGroup?.apparatus ?? null} stage={selection.stage === "qual" ? "qual" : "final"} showMedals={showMixedMedals} />
+            {shownTeams.length === 0 && query.trim() ? <NoSearchMatch query={query} en={en} /> : <MixedTeamQualTable teams={shownTeams} apparatus={mixedGroup?.apparatus ?? null} stage={selection.stage === "qual" ? "qual" : "final"} showMedals={showMixedMedals} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -1025,6 +1039,13 @@ function CompetitionDetail({
     ? selection.stage
     : (stageOptions[0]?.key ?? "qual");
 
+  const searchable = !isSolo && effectiveStage !== "final";
+  const stageRows = effectiveStage === "elim" ? elimRows : qualRows;
+  const rowMatches = (r: CompResultRow) => matchesSearch(query, r.firstName, r.lastName, r.clubDisplay, nocKeywords(r.nationality));
+  const searching = searchable && query.trim() !== "";
+  const shownElimRows = searching ? elimRows.filter(rowMatches) : elimRows;
+  const shownQualRows = searching ? qualRows.filter(rowMatches) : qualRows;
+
   return (
     <div>
       {/* ── Detail header ───────────────────────────────────────── */}
@@ -1066,7 +1087,8 @@ function CompetitionDetail({
         </div>
       </div>
 
-      {/* ── Stage toggle ─────────────────────────────────────────── */}
+      {/* ── Stage toggle + pretraga (desktop: pretraga desno od selektora) ── */}
+      <div className="sm:flex sm:items-start sm:gap-3">
       {!isSolo && (stageOptions.length > 1 || (effectiveStage === "elim" && elimRounds.length > 1)) && (
         <div className={`mb-4 flex w-full flex-col items-start sm:inline-flex sm:w-auto ${elimRounds.length > 1 ? "min-h-[5rem]" : ""}`}>
           {stageOptions.length > 1 && (
@@ -1140,6 +1162,9 @@ function CompetitionDetail({
         </div>
       )}
 
+      {searchable && stageRows.length > 0 && <ResultSearch value={query} onChange={setQuery} en={en} count={(effectiveStage === "elim" ? shownElimRows : shownQualRows).length} total={stageRows.length} className="mb-4 sm:ml-auto" />}
+      </div>
+
       {/* ── Table ────────────────────────────────────────────────── */}
       {isSolo ? (
         <EscSoloResults results={catGroup?.results ?? []} disciplineCode={group?.code ?? selection.disciplineCode} locale={locale} />
@@ -1152,7 +1177,7 @@ function CompetitionDetail({
             animate={{ opacity: 1, transition: { duration: 0.22 } }}
             exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
-            <CompetitionQualTable results={elimRows} competitionLevel={competitionLevel} />
+            {searching && shownElimRows.length === 0 ? <NoSearchMatch query={query} en={en} /> : <CompetitionQualTable results={shownElimRows} competitionLevel={competitionLevel} />}
           </motion.div>
         ) : effectiveStage === "qual" ? (
           <motion.div
@@ -1161,7 +1186,7 @@ function CompetitionDetail({
             animate={{ opacity: 1, transition: { duration: 0.22 } }}
             exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
-            <CompetitionQualTable results={qualRows} competitionLevel={competitionLevel} showMedals={showQualMedals} />
+            {searching && shownQualRows.length === 0 ? <NoSearchMatch query={query} en={en} /> : <CompetitionQualTable results={shownQualRows} competitionLevel={competitionLevel} showMedals={showQualMedals} />}
           </motion.div>
         ) : (
           <motion.div

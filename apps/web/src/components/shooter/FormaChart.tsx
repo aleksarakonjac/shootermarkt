@@ -7,6 +7,7 @@ import { rollingForma, type CompetitionEventType, type CompetitionLevel, type Re
 import { qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
 import { FormaScoreInfo } from "./FormaScoreHeading";
 import { DisciplineSelector } from "./DisciplineSelector";
+import { useScopedHref } from "@/hooks/use-scoped-href";
 
 // FORMAScore je uvek crven — disciplina se razlikuje selektorom, ne bojom.
 const CHART_COLOR = "#C20000";
@@ -16,6 +17,7 @@ export type ChartPoint = {
   score: number;
   discipline: string;
   competitionId: number;
+  competitionEventId?: number | null;
   competitionName: string;
   location?: string | null;
   countryCode2?: string | null;
@@ -209,7 +211,6 @@ interface FormaChartProps {
   formaScores: Record<string, FormaScore | null>;
   locale?: string;
   noDataLabel?: string;
-  competitionUrlBase?: string;
   /** Današnji datum (YYYY-MM-DD) sa servera — za "poslednji nastup pre X mes." */
   today?: string;
 }
@@ -220,13 +221,16 @@ export function FormaChart({
   formaScores,
   locale = "sr",
   noDataLabel = "Nema dovoljno podataka",
-  competitionUrlBase = "/takmicenja",
   today,
 }: FormaChartProps) {
   const available = disciplines.filter(d => points.some(p => p.discipline === d.code));
   const [disc, setDisc] = useState(available[0]?.code ?? "");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  // Klik/tap na tačku zaključava panel (može se kliknuti unutra); klik van ga zatvara.
+  const [locked, setLocked] = useState(false);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const scopedHref = useScopedHref();
   const vpW = useSyncExternalStore(subscribeToViewportWidth, getViewportWidth, getServerViewportWidth);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgW, setSvgW] = useState(0);
@@ -241,6 +245,25 @@ export function FormaChart({
   const [prevSlice, setPrevSlice] = useState<{ data: ChartPoint[]; values: WindowValues; xExit: number } | null>(null);
   const [navDir, setNavDir] = useState<"left" | "right" | null>(null);
   const isAnimating = prevSlice !== null;
+
+  useEffect(() => {
+    if (!locked) return;
+    const close = () => { setLocked(false); setHoverIdx(null); setTooltipPos(null); };
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (tooltipRef.current?.contains(target) || containerRef.current?.contains(target)) return;
+      close();
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", close, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", close);
+    };
+  }, [locked]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -268,6 +291,9 @@ export function FormaChart({
       : "Procena nepouzdana — manje od 5 nastupa",
     lowConfidenceBadge: en ? "low data" : "malo podataka",
     legendScore: en ? "Result" : "Nastup",
+    result: en ? "Qualification result" : "Rezultat kvalifikacija",
+    openQual: en ? "Open qualification results" : "Otvori rezultate kvalifikacija",
+    formaThen: en ? "FORMAScore at the time" : "FORMAScore tada",
     legendForma: "FORMAScore",
     lastStart: (months: number) => en ? `Last start ${months} months ago` : `Poslednji nastup pre ${months} mes.`,
     metricsTitle: en ? "What do these metrics mean?" : "Šta znače ove metrike?",
@@ -320,6 +346,7 @@ export function FormaChart({
     setNavDir(dir);
     setHoverIdx(null);
     setTooltipPos(null);
+    setLocked(false);
     setWindowOffset(newOffset);
   }
 
@@ -339,22 +366,37 @@ export function FormaChart({
     setWindowOffset(0);
     setHoverIdx(null);
     setTooltipPos(null);
+    setLocked(false);
     setPrevSlice(null);
     setNavDir(null);
   }
 
-  function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
-    if (!containerRef.current || isAnimating || !built) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const relX = e.clientX - rect.left;
+  function closestIdx(clientX: number): number | null {
+    if (!containerRef.current || isAnimating || !built) return null;
+    const relX = clientX - containerRef.current.getBoundingClientRect().left;
     let closest = 0, minDist = Infinity;
     data.forEach((_, i) => {
-      const x = built.sx(i);
-      const dist = Math.abs(x - relX);
+      const dist = Math.abs(built.sx(i) - relX);
       if (dist < minDist) { minDist = dist; closest = i; }
     });
-    setHoverIdx(closest);
+    return closest;
+  }
+
+  function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    if (locked) return;
+    const i = closestIdx(e.clientX);
+    if (i === null) return;
+    setHoverIdx(i);
     setTooltipPos({ x: e.clientX, y: e.clientY });
+  }
+
+  function handleClick(e: React.MouseEvent<SVGSVGElement>) {
+    const i = closestIdx(e.clientX);
+    if (i === null) return;
+    if (locked && i === hoverIdx) { setLocked(false); setHoverIdx(null); setTooltipPos(null); return; } // ponovni klik na istu tačku zatvara
+    setHoverIdx(i);
+    setTooltipPos({ x: e.clientX, y: e.clientY });
+    setLocked(true);
   }
 
   if (allData.length < 2) {
@@ -367,9 +409,13 @@ export function FormaChart({
 
   const hovPt = hoverIdx !== null ? data[hoverIdx] : null;
   const hovForma = hoverIdx !== null ? values.forma[hoverIdx] : null;
+  // Rezultat i naziv takmičenja vode na kvalifikacije baš ove discipline/meča.
+  const qualHref = hovPt
+    ? scopedHref(`/takmicenja/${hovPt.competitionId}?result=individual&disc=${hovPt.competitionEventId ? `${hovPt.discipline}@${hovPt.competitionEventId}` : hovPt.discipline}&category=${hovPt.category ?? "senior"}&stage=qual`)
+    : "";
   const compactTooltip = vpW < 640;
   const TIP_W = compactTooltip ? 184 : 220;
-  const TIP_H = compactTooltip ? 185 : 160;
+  const TIP_H = compactTooltip ? 200 : 175;
   const tipX = tooltipPos ? Math.min(vpW - TIP_W - 8, Math.max(8, tooltipPos.x + 16 + TIP_W > vpW ? tooltipPos.x - TIP_W - 16 : tooltipPos.x + 16)) : 0;
   const tipY = tooltipPos ? Math.min(window.innerHeight - TIP_H - 8, Math.max(8, tooltipPos.y - TIP_H / 2)) : 0;
 
@@ -378,43 +424,45 @@ export function FormaChart({
 
   return (
     <>
-      {/* Floating tooltip */}
+      {/* Floating tooltip — rezultat primarno, FORMAScore sekundarno */}
       {hovPt && tooltipPos && hovForma !== null && (
-        <div className="fixed z-50 pointer-events-none" style={{ left: tipX, top: tipY, width: TIP_W }}>
-          <div className="bg-[var(--bg)] border border-[var(--border)] rounded-lg shadow-xl px-3 py-2.5">
-            <p style={{ color, fontFamily: "var(--font-jetbrains-mono,monospace)", fontWeight: 700, fontSize: "1.25rem", lineHeight: 1 }}>
-              {hovForma.toFixed(1)}
+        <div ref={tooltipRef} className={`fixed z-50 ${locked ? "" : "pointer-events-none"}`} style={{ left: tipX, top: tipY, width: TIP_W }}>
+          <div className={`bg-[var(--bg)] border rounded-lg shadow-xl px-3 py-2.5 ${locked ? "border-[var(--border-strong)]" : "border-[var(--border)]"}`}>
+            <p className="flex items-center gap-1.5 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="3.5" fill="var(--bg)" stroke={color} strokeWidth="2" /></svg>
+              {t.result}
             </p>
-            <p style={{ color: "var(--muted)", fontSize: "0.75rem", marginTop: 3, fontFamily: "var(--font-jetbrains-mono,monospace)" }}>
-              {fmtFull(hovPt.date)}
-            </p>
-            <div className={compactTooltip ? "" : "flex items-start gap-2"} style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
-              <Link
-                href={`${competitionUrlBase}/${hovPt.competitionId}`}
-                className={compactTooltip ? "pointer-events-auto block hover:underline" : "pointer-events-auto min-w-0 flex-1 hover:underline"}
-                style={{ color: "var(--ink)", fontSize: "0.75rem", lineHeight: 1.4 }}
-              >
-                {hovPt.competitionName}
-              </Link>
-              <span
-                title={locale === "en" ? "Qualification result" : "Kvalifikacioni rezultat"}
-                className={compactTooltip ? "mt-1 block" : "shrink-0"}
-                style={{ color: "var(--muted)", fontFamily: "var(--font-jetbrains-mono,monospace)", fontSize: "0.75rem", fontWeight: 700, lineHeight: 1.4 }}
-              >
-                {t.legendScore} {qualHasDecimals(hovPt.discipline) ? hovPt.score.toFixed(1) : Math.round(hovPt.score)}
-              </span>
+            <Link
+              href={qualHref}
+              aria-label={t.openQual}
+              title={t.openQual}
+              className="mt-1 inline-block rounded hover:underline"
+              style={{ color: "var(--ink)", fontFamily: "var(--font-jetbrains-mono,monospace)", fontWeight: 800, fontSize: "1.5rem", lineHeight: 1 }}
+            >
+              {qualHasDecimals(hovPt.discipline) ? hovPt.score.toFixed(1) : Math.round(hovPt.score)}
+            </Link>
+            <Link
+              href={qualHref}
+              className="mt-2 block hover:underline"
+              style={{ color: "var(--ink)", fontSize: "0.75rem", fontWeight: 600, lineHeight: 1.35 }}
+            >
+              {hovPt.competitionName}
+            </Link>
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1" style={{ marginTop: 3, color: "var(--muted)", fontSize: "0.7rem", lineHeight: 1.3 }}>
+              <span style={{ fontFamily: "var(--font-jetbrains-mono,monospace)" }}>{fmtFull(hovPt.date)}</span>
+              {hovPt.location && <span>· {hovPt.location}</span>}
+              {hovPt.nocCode && (
+                <span className="inline-flex items-center gap-1 rounded px-1.5" style={{ background: "var(--surface-2)", height: 18 }}>
+                  {hovPt.countryCode2 && <span className={`fi fi-${hovPt.countryCode2.toLowerCase()}`} style={{ fontSize: 10, borderRadius: 2 }} aria-hidden="true" />}
+                  <span style={{ fontFamily: "var(--font-jetbrains-mono,monospace)", fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", color: "var(--ink)" }}>{hovPt.nocCode}</span>
+                </span>
+              )}
             </div>
-            {(hovPt.location || hovPt.nocCode) && (
-              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1" style={{ marginTop: 4, color: "var(--muted)", fontSize: "0.7rem", lineHeight: 1.3 }}>
-                {hovPt.location && <span>{hovPt.location}</span>}
-                {hovPt.nocCode && (
-                  <span className="inline-flex items-center gap-1 rounded px-1.5" style={{ background: "var(--surface-2)", height: 18 }}>
-                    {hovPt.countryCode2 && <span className={`fi fi-${hovPt.countryCode2.toLowerCase()}`} style={{ fontSize: 10, borderRadius: 2 }} aria-hidden="true" />}
-                    <span style={{ fontFamily: "var(--font-jetbrains-mono,monospace)", fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", color: "var(--ink)" }}>{hovPt.nocCode}</span>
-                  </span>
-                )}
-              </div>
-            )}
+            <p className="flex items-center gap-1.5 text-[0.75rem] text-[var(--muted)]" style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><line x1="0" y1="5" x2="10" y2="5" stroke={color} strokeWidth="2.5" strokeLinecap="round" /></svg>
+              <span>{t.formaThen}</span>
+              <span className="ml-auto" style={{ color, fontFamily: "var(--font-jetbrains-mono,monospace)", fontWeight: 700 }}>{hovForma.toFixed(1)}</span>
+            </p>
           </div>
         </div>
       )}
@@ -451,6 +499,15 @@ export function FormaChart({
 
           {forma && (
             <div className="ml-auto mr-2 flex shrink-0 items-center gap-2">
+              {forma.lowConfidence && (
+                <span
+                  title={t.lowConfidence}
+                  className="mr-1 hidden items-center rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide sm:inline-flex"
+                  style={{ background: "var(--surface-2)", color: "var(--muted)" }}
+                >
+                  {t.lowConfidenceBadge}
+                </span>
+              )}
               <span
                 title={forma.lowConfidence ? t.lowConfidence : undefined}
                 style={{
@@ -476,7 +533,7 @@ export function FormaChart({
           )}
 
           {forma?.lowConfidence && (
-            <div className="flex w-full justify-end">
+            <div className="flex w-full justify-end sm:hidden">
               <span
                 title={t.lowConfidence}
                 className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide"
@@ -499,7 +556,8 @@ export function FormaChart({
               height={H}
               style={{ display: "block" }}
               onMouseMove={!isAnimating ? handleMouseMove : undefined}
-              onMouseLeave={() => { setHoverIdx(null); setTooltipPos(null); }}
+              onClick={!isAnimating ? handleClick : undefined}
+              onMouseLeave={() => { if (!locked) { setHoverIdx(null); setTooltipPos(null); } }}
             >
               <defs>
                 <clipPath id={`chart-clip-${disc}`}>
@@ -543,7 +601,7 @@ export function FormaChart({
                   locale={locale}
                   showLabels={!isAnimating}
                   hoverIdx={isAnimating ? null : hoverIdx}
-                  onHover={isAnimating ? undefined : setHoverIdx}
+                  onHover={isAnimating || locked ? undefined : setHoverIdx}
                   xInitial={xEnter}
                   xAnimate={0}
                 />
@@ -627,6 +685,7 @@ export function FormaChart({
                     setNavDir("left");
                     setHoverIdx(null);
                     setTooltipPos(null);
+                    setLocked(false);
                     setWindowOffset(0);
                   }}
                   disabled={isAnimating}

@@ -17,6 +17,12 @@ export type MixedRowInput = {
   shooter1LastName: string | null;
   shooter2FirstName: string | null;
   shooter2LastName: string | null;
+  shooter1AvatarUrl?: string | null;
+  shooter2AvatarUrl?: string | null;
+  shooter1BirthYear?: number | null;
+  shooter2BirthYear?: number | null;
+  shooter1Nationality?: string | null;
+  shooter2Nationality?: string | null;
   shooter1Detail: SlotDetail;
   shooter2Detail: SlotDetail;
   qualTotal: string | null;
@@ -47,15 +53,45 @@ export function partnerShortName(firstName: string | null, lastName: string | nu
   return split.firstName ? `${split.firstName[0]}. ${titleCase(split.lastName)}` : titleCase(split.lastName);
 }
 
+/** "Žaklina Petrović" — puno ime za desktop prikaz. */
+export function fullDisplayName(firstName: string | null, lastName: string | null, displayName: string | null): string | null {
+  if (firstName && lastName) return `${firstName} ${lastName === lastName.toUpperCase() ? titleCase(lastName) : lastName}`;
+  if (!displayName?.trim()) return null;
+  const split = splitDisplayName(displayName);
+  return split.firstName ? `${titleCase(split.firstName)} ${titleCase(split.lastName)}` : titleCase(split.lastName);
+}
+
 export function toMixedHistoryRow(row: MixedRowInput, shooterId: number): ResultRowData {
   const isFirst = row.shooter1Id === shooterId;
+  const own = isFirst
+    ? [row.shooter1FirstName, row.shooter1LastName, row.shooter1Name] as const
+    : [row.shooter2FirstName, row.shooter2LastName, row.shooter2Name] as const;
+  const partner = isFirst
+    ? [row.shooter2FirstName, row.shooter2LastName, row.shooter2Name] as const
+    : [row.shooter1FirstName, row.shooter1LastName, row.shooter1Name] as const;
   return {
     id: row.id,
     rowKey: `m:${row.id}`,
     kind: "mixed",
-    partnerName: isFirst
-      ? partnerShortName(row.shooter2FirstName, row.shooter2LastName, row.shooter2Name)
-      : partnerShortName(row.shooter1FirstName, row.shooter1LastName, row.shooter1Name),
+    partnerName: partnerShortName(...partner),
+    partnerFullName: fullDisplayName(...partner),
+    partnerId: isFirst ? row.shooter2Id : row.shooter1Id,
+    partnerProfile: (() => {
+      const full = fullDisplayName(...partner);
+      if (!full) return null;
+      const [firstName, lastName] = partner[0] && partner[1]
+        ? [partner[0], full.slice(partner[0].length + 1)]
+        : ["", full];
+      return {
+        firstName,
+        lastName,
+        avatarUrl: isFirst ? row.shooter2AvatarUrl ?? null : row.shooter1AvatarUrl ?? null,
+        birthYear: isFirst ? row.shooter2BirthYear ?? null : row.shooter1BirthYear ?? null,
+        nationality: isFirst ? row.shooter2Nationality ?? null : row.shooter1Nationality ?? null,
+      };
+    })(),
+    ownName: partnerShortName(...own),
+    ownFullName: fullDisplayName(...own),
     mixedDetail: { own: isFirst ? row.shooter1Detail : row.shooter2Detail, partner: isFirst ? row.shooter2Detail : row.shooter1Detail },
     competitionId: row.competitionId,
     competitionName: row.competitionName,
@@ -111,6 +147,12 @@ export async function getShooterMixedRows(shooterId: number, competitionIds?: nu
       shooter1LastName: partner1.lastName,
       shooter2FirstName: partner2.firstName,
       shooter2LastName: partner2.lastName,
+      shooter1AvatarUrl: partner1.avatarUrl,
+      shooter2AvatarUrl: partner2.avatarUrl,
+      shooter1BirthYear: partner1.birthYear,
+      shooter2BirthYear: partner2.birthYear,
+      shooter1Nationality: partner1.nationality,
+      shooter2Nationality: partner2.nationality,
       shooter1Detail: mixedTeamResults.shooter1Detail,
       shooter2Detail: mixedTeamResults.shooter2Detail,
       qualTotal: mixedTeamResults.qualTotal,

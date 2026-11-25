@@ -133,7 +133,7 @@ export function BottomSheet({ open, onClose, label, children }: { open: boolean;
             aria-modal="true"
             aria-label={label}
             tabIndex={-1}
-            className="relative flex max-h-[88dvh] w-full flex-col rounded-t-2xl border-t border-[var(--border)] bg-[var(--bg)] shadow-lg outline-none"
+            className="relative flex max-h-[88dvh] w-full flex-col sm:mx-auto sm:max-w-lg rounded-t-2xl border-t border-[var(--border)] bg-[var(--bg)] shadow-lg outline-none"
             style={{ y, paddingBottom: "env(safe-area-inset-bottom)" }}
             initial={reduced ? false : { y: "100%" }}
             animate={{ y: 0 }}

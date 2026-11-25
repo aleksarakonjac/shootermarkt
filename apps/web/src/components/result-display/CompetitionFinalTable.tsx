@@ -103,13 +103,26 @@ function seriesCells(columns: Column[], r: FinalResultRow) {
   });
 }
 
+/** Kartice serija finala jednog strelca (oznaka, vrednost, kumulativ) — isti obračun kao tabela finala; za stranicu strelca. */
+export function finalCellsFor(finalDetail: FinalDetail, disciplineCode: string) {
+  const row = { finalDetail, disciplineCode } as FinalResultRow;
+  return seriesCells(buildColumns([row]), row).filter((cell) => cell.main);
+}
+
 const decimalFmt = (v: number) => v.toFixed(1);
 const intFmt = (v: number) => Math.round(v).toString();
 
 // Nazivi serija finala se čuvaju na srpskom; na engleskom se prevode stavovi trostava.
 const POSITION_LABELS_EN: Record<string, string> = { "Klečeći": "Kneeling", "Ležeći": "Prone", "Stojeći": "Standing" };
-const localizeSeriesLabel = (label: string, locale: string) =>
+export const localizeSeriesLabel = (label: string, locale: string) =>
   locale === "en" ? label.replace(/^(Klečeći|Ležeći|Stojeći)/, (word) => POSITION_LABELS_EN[word] ?? word) : label;
+/** Kratke oznake stava za uske kartice serija na telefonu ("Stojeći 1" → "Stoj. 1"). */
+const SHORT_POSITION: Record<string, Record<string, string>> = {
+  sr: { "Klečeći": "Kleč.", "Ležeći": "Lež.", "Stojeći": "Stoj." },
+  en: { "Klečeći": "Kneel.", "Ležeći": "Prone", "Stojeći": "Stand." },
+};
+export const shortSeriesLabel = (label: string, locale: string) =>
+  label.replace(/^(Klečeći|Ležeći|Stojeći)/, (word) => SHORT_POSITION[locale === "en" ? "en" : "sr"][word] ?? word);
 
 /** Susedne kolone "Stojeći 1", "Stojeći 2" → jedan naslov "Stojeći" preko obe (desktop zaglavlje). */
 function groupColumnHeaders(headers: string[]): Array<{ label: string; span: number }> {
@@ -548,7 +561,7 @@ export function CompetitionFinalTable({ results, competitionLevel, showMedals = 
                       <div className="grid grid-cols-[repeat(auto-fill,minmax(3.25rem,1fr))] gap-x-1 gap-y-2 py-2.5">
                         {seriesCells(columns, r).filter((cell) => cell.main).map((cell, i) => (
                           <div key={i} className="flex min-w-0 flex-col gap-1">
-                            <span className="max-w-full truncate text-center text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{localizeSeriesLabel(cell.header, locale)}</span>
+                            <span title={localizeSeriesLabel(cell.header, locale)} className="max-w-full truncate whitespace-nowrap text-center text-[0.6rem] font-semibold uppercase text-[var(--subtle)]">{shortSeriesLabel(cell.header, locale)}</span>
                             <div className="flex min-w-0 flex-col items-center rounded-md bg-[var(--surface)] px-1 py-1.5 ring-1 ring-[var(--border)]">
                               <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold tabular-nums text-[var(--ink)]">{cell.main}</span>
                               <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--subtle)]">{cell.sub || "\u00a0"}</span>

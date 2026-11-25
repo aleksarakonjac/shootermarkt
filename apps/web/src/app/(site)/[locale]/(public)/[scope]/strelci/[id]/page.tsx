@@ -98,6 +98,7 @@ export default async function ShooterPage({ params }: Props) {
         competitionLevel: competitions.level,
         competitionEventType: competitions.eventType,
         qualRemark: results.qualRemark,
+        competitionEventId: results.competitionEventId,
         disciplineCode: disciplines.code,
         disciplineId: disciplines.id,
         maxQualScore: disciplines.maxQualScore,
@@ -122,7 +123,6 @@ export default async function ShooterPage({ params }: Props) {
         sampleSize:     shooterFormaCache.sampleSize,
         lowConfidence:  shooterFormaCache.lowConfidence,
         peakCareer:     shooterFormaCache.peakCareer,
-        best3Career:    shooterFormaCache.best3Career,
         recent3Career:  shooterFormaCache.recent3Career,
         seasonAvg:      shooterFormaCache.seasonAvg,
         prevSeasonAvg:  shooterFormaCache.prevSeasonAvg,
@@ -185,6 +185,7 @@ export default async function ShooterPage({ params }: Props) {
       score: parseFloat(r.qualTotal!),
       discipline: r.disciplineCode,
       competitionId: r.competitionId,
+      competitionEventId: r.competitionEventId,
       competitionName: r.eventName ? `${r.competitionName} — ${localizeMatchName(r.eventName, locale)}` : r.competitionName,
       location: r.competitionLocation,
       countryCode2: r.competitionCountryCode2,
@@ -237,6 +238,16 @@ export default async function ShooterPage({ params }: Props) {
   };
 
   const cacheByCode = new Map(cacheRows.map((r) => [r.disciplineCode, r]));
+  // Best-3 tekuće godine (ne karijere) — iz istih tačaka kao grafik.
+  const currentYear = today.slice(0, 4);
+  const best3Year = (code: string) => {
+    const top = chartPoints
+      .filter((p) => p.discipline === code && p.date.startsWith(currentYear))
+      .map((p) => p.score)
+      .sort((a, b) => b - a)
+      .slice(0, 3);
+    return top.length ? Math.round((top.reduce((a, b) => a + b, 0) / top.length) * 10) / 10 : null;
+  };
   // Keep only disciplines that actually have results, in the same order
   const careerStats: CareerStat[] = chartDisciplines.flatMap(({ code }) => {
     const cache = cacheByCode.get(code);
@@ -247,7 +258,7 @@ export default async function ShooterPage({ params }: Props) {
       careerCount: cache.careerCount,
       forma: cache.forma != null ? Number(cache.forma) : null,
       peak: cache.peakCareer != null ? Number(cache.peakCareer) : null,
-      best3: cache.best3Career != null ? Number(cache.best3Career) : null,
+      best3: best3Year(code),
       recent3: cache.recent3Career != null ? Number(cache.recent3Career) : null,
       season: cache.seasonAvg != null ? Number(cache.seasonAvg) : null,
       seasonCount: cache.seasonCount,
@@ -429,7 +440,7 @@ export default async function ShooterPage({ params }: Props) {
             {tProfile("statsCareer")}
           </h2>
 
-          <CareerStats stats={careerStats} locale={locale} />
+          <CareerStats stats={careerStats} locale={locale} year={Number(currentYear)} />
         </div>
       )}
 

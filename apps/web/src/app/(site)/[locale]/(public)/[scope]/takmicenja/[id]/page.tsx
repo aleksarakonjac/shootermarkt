@@ -460,12 +460,16 @@ export default async function CompetitionPage({ params }: Props) {
 
       {/* ── Results ───────────────────────────────────────────────── */}
       <div>
-        <h2
-          className="font-[family-name:var(--font-barlow-condensed)] font-bold uppercase tracking-tight text-[var(--ink)] mb-5"
-          style={{ fontSize: "1.5rem", letterSpacing: "-0.02em" }}
-        >
-          {t("detail.results")}
-        </h2>
+        <div className="mb-5 flex items-center gap-3">
+          <h2
+            className="shrink-0 font-[family-name:var(--font-barlow-condensed)] font-bold uppercase tracking-tight text-[var(--ink)]"
+            style={{ fontSize: "1.5rem", letterSpacing: "-0.02em" }}
+          >
+            {t("detail.results")}
+          </h2>
+          {/* Telefon: pretraga faze (ResultSearch) se portuje ovde, desno od naslova. */}
+          <div id="results-search-slot" className="flex min-w-0 flex-1 justify-end sm:hidden" />
+        </div>
         <CompetitionResultsClient formaByKey={formaByKey} groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} timezone={comp.timezone ?? undefined} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} qualSlots={scheduleSlots.filter((slot) => slot.stage === "qual")} dateFrom={comp.date} dateTo={comp.dateEnd} endedOnServer={endedOnServer} liveWindows={scheduleSlots} />
       </div>
 

@@ -1,31 +1,37 @@
+import type { ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { SeriesQualDisplay } from "./SeriesQualDisplay";
-import { PositionsQualDisplay } from "./PositionsQualDisplay";
+import { describe, expect, it, vi } from "vitest";
+import { ResultDetailPanel } from "./ResultDetailPanel";
 
-const highlighted = (el: HTMLElement) => el.className.includes("text-[var(--ink)]");
+vi.mock("@/i18n/navigation", () => ({ Link: ({ children }: { children: ReactNode }) => <a>{children}</a> }));
+
+const base = { elimDetail: null, elimTotal: null, elimRank: null, qualRank: 1, qualScore: "x", locale: "sr", finalDetail: null, finalScore: null, finalRank: null };
+const highlighted = (el: HTMLElement) => el.className.includes("font-semibold");
+const chips = (texts: string[]) => texts.flatMap((t) => screen.getAllByText(t)).filter((el, i, a) => a.indexOf(el) === i).sort((a, b) => (a.compareDocumentPosition(b) & 4 ? -1 : 1));
 
 describe("best series highlight", () => {
   it("highlights every series tied for the best, not just the first", () => {
-    render(<SeriesQualDisplay detail={{ series: [98, 100, 97, 100, 99, 100] }} showTotal={false} />);
-    const cells = screen.getAllByRole("cell");
+    render(<ResultDetailPanel {...base} disciplineCode="APM" qualDetail={{ series: [98, 100, 97, 100, 99, 100] }} />);
+    const cells = chips(["98", "100", "97", "99"]);
+    expect(cells.map((c) => c.textContent)).toEqual(["98", "100", "97", "100", "99", "100"]);
     expect(cells.map(highlighted)).toEqual([false, true, false, true, false, true]);
   });
 
-  it("highlights tied best series within a 3-position row", () => {
+  it("highlights tied best series within a 3-position group", () => {
     const tenShots = (score: number) => Array.from({ length: 10 }, () => score / 10);
     render(
-      <PositionsQualDisplay
-        showGrandTotal={false}
-        detail={{
-          kneeling: { series: [tenShots(100), tenShots(98), tenShots(100), tenShots(99)] },
-          prone: { series: [tenShots(99), tenShots(99), tenShots(98), tenShots(97)] },
-          standing: { series: [tenShots(95), tenShots(96), tenShots(94), tenShots(93)] },
-        } as never}
+      <ResultDetailPanel
+        {...base}
+        disciplineCode="R3PM"
+        qualDetail={{
+          kneeling: { series: [tenShots(100), tenShots(98), tenShots(100), tenShots(99)], total: 397 },
+          prone: { series: [tenShots(91), tenShots(92), tenShots(93), tenShots(94)], total: 370 },
+          standing: { series: [tenShots(85), tenShots(86), tenShots(87), tenShots(88)], total: 346 },
+        }}
       />,
     );
-    const kneelingRow = screen.getByText("Klečeći").closest("tr")!;
-    const cells = [...kneelingRow.querySelectorAll("td")].slice(1, 5) as HTMLElement[];
+    const kneeling = screen.getByText("Klečeći").closest("div")!;
+    const cells = [...kneeling.querySelectorAll("div > span")].filter((el) => /^\d+$/.test(el.textContent ?? "")) as HTMLElement[];
     expect(cells.map((c) => c.textContent)).toEqual(["100", "98", "100", "99"]);
     expect(cells.map(highlighted)).toEqual([true, false, true, false]);
   });

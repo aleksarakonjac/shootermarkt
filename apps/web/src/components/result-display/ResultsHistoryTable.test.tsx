@@ -1,5 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import type { ReactNode } from "react";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/i18n/navigation", () => ({ Link: ({ children }: { children: ReactNode }) => <a>{children}</a> }));
 import { ResultsHistoryTable, sortHistoryRows, type ResultRowData } from "./ResultsHistoryTable";
 
 const result: ResultRowData = {
@@ -70,7 +73,7 @@ describe("ResultsHistoryTable", () => {
     expect(screen.getByText("Eliminations · #4")).toBeInTheDocument();
     expect(screen.getByLabelText("Open elimination results")).toHaveAttribute("href", "/sr/srb/takmicenja/1?result=individual&disc=R3PM&category=senior&stage=elim&round=2");
     expect(screen.getAllByText("Kneeling")).toHaveLength(2);
-    expect([...document.querySelectorAll("colgroup")].map((group) => group.children.length)).toEqual([6, 6]);
+    expect([...document.querySelectorAll<HTMLElement>("[style*='--cols']")].map((grid) => grid.style.getPropertyValue("--cols"))).toEqual(["6", "6"]);
   });
 
   const MIXED: ResultRowData = { ...result, id: 9, rowKey: "m:9", kind: "mixed", disciplineCode: "ARMT", partnerName: "Ž. Petrović", qualTotal: "629.1", qualRank: 6, finalTotal: null, finalRank: null, mixedDetail: { own: { series: [105.1], total: 315.2 }, partner: { series: [104.9], total: 313.9 } } };

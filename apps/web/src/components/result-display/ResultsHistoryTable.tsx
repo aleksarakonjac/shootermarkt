@@ -3,13 +3,16 @@
 import { localizeMatchName } from "@/lib/match-name";
 import { Fragment, type ReactNode, useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { SheetCells, SheetGroup, SheetPerson, SheetStats } from "./ResultSheet";
 import { useParams } from "next/navigation";
 import type { ElimDetail, QualDetail, FinalDetail } from "@shootermarkt/db/schema";
 import { CATEGORY_LABEL, escSoloPlacement, qualHasDecimals, type AgeCategory, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
 import { DISCIPLINE_DISPLAY_ORDER, disciplineName } from "@shootermarkt/db/discipline-names";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useScopedHref } from "@/hooks/use-scoped-href";
-import { ResultDetailPanel, finalSeriesValues } from "./ResultDetailPanel";
+import { ResultDetailPanel, SeriesChips, finalSeriesValues } from "./ResultDetailPanel";
 import { RemarkBadge } from "./RemarkBadge";
 
 const MEDAL_COLOR: Record<number, string> = {
@@ -36,6 +39,13 @@ export type ResultRowData = {
   kind: "individual" | "mixed" | "esc";
   /** Mešoviti tim: partner ("Ž. Petrović"). */
   partnerName?: string | null;
+  /** Mešoviti tim: puno ime partnera i strelca (desktop), kratko ime strelca (telefon), id partnera za link. */
+  partnerFullName?: string | null;
+  partnerId?: number | null;
+  /** Mešoviti tim: podaci partnera za bottom sheet. */
+  partnerProfile?: { firstName: string; lastName: string; avatarUrl: string | null; birthYear: number | null; nationality: string | null } | null;
+  ownName?: string | null;
+  ownFullName?: string | null;
   /** Mešoviti tim: serije ovog strelca i partnera. */
   mixedDetail?: { own: MixedSlot | null; partner: MixedSlot | null } | null;
   competitionId: number;
@@ -120,10 +130,29 @@ function hitsLabel(n: number, en: boolean): string {
   return "hitova";
 }
 
-function SeriesLine({ label, series, total, inners }: { label: string; series: number[]; total: number | null; inners?: number | null }) {
+/** Kratko ime na telefonu, puno na desktopu. */
+function PersonName({ short, full }: { short: string; full?: string | null }) {
+  if (!full || full === short) return <>{short}</>;
+  return <><span className="sm:hidden">{short}</span><span className="max-sm:hidden">{full}</span></>;
+}
+
+/** Član miks tima: ime + zbir u zaglavlju, serije u karticama — isto kao prošireni red na stranici takmičenja. */
+function MemberSeries({ label, series, total, inners, fmt }: { label: ReactNode; series: number[]; total: number | null; inners?: number | null; fmt: (v: number) => string }) {
+  return (
+    <div className="min-w-0">
+      <p className="mb-1.5 flex items-center justify-between gap-3 font-[family-name:var(--font-barlow-condensed)] text-xs font-semibold uppercase tracking-wider text-[var(--muted)] sm:justify-start sm:text-sm">
+        <span className="min-w-0 truncate">{label}</span>
+        {total != null && <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-sm font-bold normal-case tabular-nums text-[var(--ink)]">{fmt(total)}{inners != null && ` ${inners}×`}</span>}
+      </p>
+      <SeriesChips groups={[{ label: "", values: series }]} fmt={fmt} />
+    </div>
+  );
+}
+
+function SeriesLine({ label, series, total, inners }: { label: ReactNode; series: number[]; total: number | null; inners?: number | null }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-      <span className="w-24 shrink-0 sm:w-36 font-[family-name:var(--font-barlow-condensed)] text-xs font-semibold uppercase tracking-wider text-[var(--muted)] sm:text-sm">{label}</span>
+      <span className="w-24 shrink-0 truncate sm:w-48 font-[family-name:var(--font-barlow-condensed)] text-xs font-semibold uppercase tracking-wider text-[var(--muted)] sm:text-sm">{label}</span>
       <span className="flex flex-wrap gap-x-3 font-[family-name:var(--font-jetbrains-mono)] text-base tabular-nums text-[var(--muted)] sm:text-lg">{series.map((v, i) => <span key={i}>{v}</span>)}</span>
       {total != null && <span className="font-[family-name:var(--font-jetbrains-mono)] text-base font-bold tabular-nums text-[var(--ink)] sm:text-lg">{total}{inners != null && <span className="ml-0.5 text-xs font-normal text-[var(--muted)]">{inners}×</span>}</span>}
     </div>
@@ -132,6 +161,7 @@ function SeriesLine({ label, series, total, inners }: { label: string; series: n
 
 export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", toolbar, emptyContent }: { results: ResultRowData[]; allLabel?: string; locale?: string; toolbar?: ReactNode; emptyContent?: ReactNode }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [partnerSheet, setPartnerSheet] = useState<ResultRowData | null>(null);
   const [selectedDisc, setSelectedDisc] = useState<string | null>(null);
   const scopedHref = useScopedHref();
   const params = useParams();
@@ -283,9 +313,13 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                               <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
                                 <div className="overflow-hidden">
                                   {isMixed ? (
-                                    <div className="space-y-2.5 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3.5">
-                                      {r.mixedDetail?.own && <SeriesLine label={en ? "You" : "Strelac"} series={r.mixedDetail.own.series} total={r.mixedDetail.own.total} inners={showInners ? r.mixedDetail.own.inners : null} />}
-                                      {r.mixedDetail?.partner && <SeriesLine label={r.partnerName ?? (en ? "Partner" : "Partner")} series={r.mixedDetail.partner.series} total={r.mixedDetail.partner.total} inners={showInners ? r.mixedDetail.partner.inners : null} />}
+                                    <div className="flex flex-col gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-3 pb-3 pt-2 sm:flex-row sm:flex-wrap sm:gap-x-10 sm:px-4">
+                                      {r.mixedDetail?.own && <MemberSeries fmt={fmtSeries} label={r.ownName ? <PersonName short={r.ownName} full={r.ownFullName} /> : en ? "Shooter" : "Strelac"} series={r.mixedDetail.own.series} total={r.mixedDetail.own.total} inners={showInners ? r.mixedDetail.own.inners : null} />}
+                                      {r.mixedDetail?.partner && <MemberSeries fmt={fmtSeries} label={r.partnerName
+                                        ? r.partnerId != null
+                                          ? <button type="button" onClick={() => setPartnerSheet(r)} className="max-w-full truncate uppercase tracking-wider underline decoration-[var(--border-strong)] underline-offset-2 transition-colors hover:text-[var(--ink)] hover:decoration-current"><PersonName short={r.partnerName} full={r.partnerFullName} /></button>
+                                          : <PersonName short={r.partnerName} full={r.partnerFullName} />
+                                        : "Partner"} series={r.mixedDetail.partner.series} total={r.mixedDetail.partner.total} inners={showInners ? r.mixedDetail.partner.inners : null} />}
                                     </div>
                                   ) : isSolo && r.qualDetail && "format" in r.qualDetail ? (
                                     <div className="space-y-2.5 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3.5">
@@ -311,6 +345,49 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
         </table>
         </motion.div>
       </AnimatePresence>
+      <PartnerSheet row={partnerSheet} onClose={() => setPartnerSheet(null)} locale={locale} profileHref={partnerSheet?.partnerId != null ? `/${activeLocale}${scopedHref(`/strelci/${partnerSheet.partnerId}`)}` : null} />
     </div>
+  );
+}
+
+/** Mešoviti tim: partner u bottom sheet-u — njegove serije u ovom meču + link na profil. */
+function PartnerSheet({ row, onClose, locale, profileHref }: { row: ResultRowData | null; onClose: () => void; locale: string; profileHref: string | null }) {
+  const en = locale === "en";
+  const p = row?.partnerProfile;
+  const slot = row?.mixedDetail?.partner;
+  const decimals = row ? qualHasDecimals(row.disciplineCode) : false;
+  const fmt = (v: number) => (decimals ? v.toFixed(1) : String(Math.round(v)));
+  const best = slot?.series.length ? Math.max(...slot.series) : null;
+  return (
+    <BottomSheet open={row != null} onClose={onClose} label={row?.partnerFullName ?? row?.partnerName ?? "Partner"}>
+      {row && (
+        <>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-1">
+            {p ? <SheetPerson firstName={p.firstName} lastName={p.lastName} avatarUrl={p.avatarUrl} birthYear={p.birthYear} nationality={p.nationality} en={en} />
+              : <h2 className="pr-10 text-xl font-semibold text-[var(--ink)]">{row.partnerFullName ?? row.partnerName}</h2>}
+            <p className="mt-3 text-sm text-[var(--muted)]">{rowName(row, locale)} · {row.competitionName}</p>
+            <SheetStats items={[
+              { label: en ? "Team rank" : "Mesto tima", value: row.finalRank ?? row.qualRank ?? "—" },
+              { label: en ? "Team total" : "Zbir tima", value: row.qualTotal != null ? (decimals ? parseFloat(row.qualTotal).toFixed(1) : Math.round(parseFloat(row.qualTotal))) : "—" },
+              { label: en ? "Partner" : "Partner", value: slot ? fmt(slot.total) : "—" },
+            ]} />
+            {slot && slot.series.length > 0 && (
+              <div className="mt-4">
+                <SheetGroup label={en ? "Series" : "Serije"} subtotal={fmt(slot.total)} sub={slot.inners != null && !row.disciplineCode.startsWith("AR") ? `${slot.inners}×` : undefined}>
+                  <SheetCells cells={slot.series.map((v, i) => ({ label: `S${i + 1}`, main: fmt(v), best: v === best }))} />
+                </SheetGroup>
+              </div>
+            )}
+          </div>
+          {profileHref && (
+            <div className="shrink-0 border-t border-[var(--border)] px-5 py-3">
+              <Link href={profileHref} className="flex h-11 items-center justify-center rounded-lg bg-[var(--brand-primary)] px-4 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-primary)]">
+                {en ? "Shooter profile" : "Profil strelca"}
+              </Link>
+            </div>
+          )}
+        </>
+      )}
+    </BottomSheet>
   );
 }
