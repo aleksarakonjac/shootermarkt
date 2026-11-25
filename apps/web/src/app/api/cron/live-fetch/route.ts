@@ -501,8 +501,8 @@ async function resolveOrCreateShooter(
   r: { firstName: string; lastName: string; nation?: string; siusAthleteId?: string | null },
   roster: ShooterRoster
 ): Promise<number | null> {
-  const match = await roster.match(r.firstName, r.lastName, r.nation ?? null);
-  if (match.kind === "exact") return match.id;
+  const found = await roster.matchSius(r);
+  if (found) return found;
 
   if (r.siusAthleteId) {
     const [created] = await db

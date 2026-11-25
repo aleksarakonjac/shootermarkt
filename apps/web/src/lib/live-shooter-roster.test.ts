@@ -55,4 +55,16 @@ describe("createShooterRoster", () => {
     roster.add(shooter(2, "New", "Athlete", "USA"));
     expect(await roster.match("New", "Athlete", "USA")).toEqual({ kind: "exact", id: 2 });
   });
+
+  it("finds a SIUS athlete by the ISSF id when name and nation differ", async () => {
+    const roster = createShooterRoster([shooter(1, "Nadiege Nicole", "MARIE-LOUISE", "FRA", "SHFRAW1")], queries());
+    expect(await roster.matchSius({ siusAthleteId: "SHFRAW1", firstName: "Nadiege", lastName: "MARIE-LOUIS", nation: "GLP" })).toBe(1);
+  });
+
+  it("does not treat a local SIUS id as an ISSF id", async () => {
+    const q = queries();
+    const roster = createShooterRoster([shooter(1, "Other", "Name", "SVK", "S35/1")], q);
+    expect(await roster.matchSius({ siusAthleteId: "S35/1", firstName: "Ana", lastName: "Petrovic", nation: "SVK" })).toBeNull();
+    expect(q.byIssfId).not.toHaveBeenCalled();
+  });
 });

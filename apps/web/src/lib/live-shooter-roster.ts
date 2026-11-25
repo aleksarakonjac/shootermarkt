@@ -50,7 +50,11 @@ export function createShooterRoster(known: RosterShooter[], queries: RosterQueri
     return result.kind === "exact" ? result.id : null;
   };
 
-  return { match, matchIssf, add: (shooter: RosterShooter) => void known.push(shooter) };
+  // SIUS identifikator je nekad ISSF ID ("SH…"), nekad lokalni broj organizatora — samo prvi važi kao issfId
+  const matchSius = (athlete: { siusAthleteId?: string | null; firstName: string; lastName: string; nation?: string }) =>
+    matchIssf(athlete.siusAthleteId?.startsWith("SH") ? athlete.siusAthleteId : null, athlete.firstName, athlete.lastName, athlete.nation ?? null);
+
+  return { match, matchIssf, matchSius, add: (shooter: RosterShooter) => void known.push(shooter) };
 }
 
 const columns = {

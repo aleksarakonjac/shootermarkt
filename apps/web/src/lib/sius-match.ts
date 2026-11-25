@@ -43,3 +43,19 @@ export function matchSiusCompetition(
     confident: best.score >= MIN_SCORE && (!second || best.score - second.score >= MIN_MARGIN),
   };
 }
+
+/** Confident links only; a UUID goes to its best-scoring competition. */
+export function pickSiusLinks(
+  targets: Array<{ id: number; name: string; date: string; location?: string | null }>,
+  sius: SiusCompetition[],
+  takenIds: ReadonlySet<string> = new Set(),
+): Map<number, string> {
+  const best = new Map<string, { id: number; score: number }>();
+  for (const target of targets) {
+    const match = matchSiusCompetition(target, sius, takenIds);
+    if (!match?.confident) continue;
+    const current = best.get(match.id);
+    if (!current || match.score > current.score) best.set(match.id, { id: target.id, score: match.score });
+  }
+  return new Map([...best].map(([siusId, { id }]) => [id, siusId]));
+}
