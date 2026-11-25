@@ -196,6 +196,9 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
           qualified: sql`coalesce(excluded.qualified, ${results.qualified})`,
           finalTotal: sql`excluded.final_total`, finalRank: sql`excluded.final_rank`, finalDetail: sql`excluded.final_detail`,
           qualRemark: sql`excluded.qual_remark`, finalRemark: sql`excluded.final_remark`,
+          // Eliminacije se dopisuju i na postojeći red; uvoz bez njih ih ne briše
+          elimRound: sql`coalesce(excluded.elim_round, ${results.elimRound})`, elimTotal: sql`coalesce(excluded.elim_total, ${results.elimTotal})`,
+          elimRank: sql`coalesce(excluded.elim_rank, ${results.elimRank})`, elimDetail: sql`coalesce(excluded.elim_detail, ${results.elimDetail})`,
           elimRemark: sql`coalesce(excluded.elim_remark, ${results.elimRemark})`,
           remarkDetails: mergeRemarkDetails,
           source: sql`excluded.source`,

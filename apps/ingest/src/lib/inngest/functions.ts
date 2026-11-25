@@ -7,20 +7,18 @@ import {
   extractMixedTeamEvents,
   extractMvpEvents,
   fetchCompetitionResults,
-  fetchFinalResultsFromHtml,
   fetchMixedTeamFinalFromHtml,
   fetchMixedTeamQualFromHtml,
-  fetchQualResultsFromHtml,
-  fetchR3PResultsFromHtml,
 } from "@shootermarkt/adapters/issf/adapter";
 import { NOC_LIST } from "@shootermarkt/db/noc-list";
 import { matchShooter } from "@shootermarkt/db/name-match";
 import { parsePdfImport } from "@shootermarkt/adapters/pdf-import/parse-import";
 import { GeminiUnavailableError } from "@shootermarkt/adapters/pdf-import/gemini-adapter";
 import { downloadPdfImport, removePdfImports, uploadPdfImport } from "@shootermarkt/adapters/pdf-import/storage";
-import { deriveFinalRankProgression, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
+import { type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import { inngest } from "@shootermarkt/queue";
 import { randomUUID } from "crypto";
+import { buildIssfEventRows } from "../issf-event-rows";
 
 const PDF_RETENTION_DAYS = 30;
 const GEMINI_WAIT_ROUNDS = 4;
@@ -310,110 +308,8 @@ export const processIssfDirectImport = inngest.createFunction(
 
     const rows: ReviewRow[] = [];
 
-    for (const { disciplineCode, category, qualPhase, finalPhase, elimPhases } of mvpEvents) {
-      const isR3P = disciplineCode === "R3PM" || disciplineCode === "R3PW";
-
-      if (isR3P) {
-        const relayPhases = elimPhases.filter((ep) => ep.phase.resultKey);
-        if (relayPhases.length === 0) continue;
-
-        const allR3P: Awaited<ReturnType<typeof fetchR3PResultsFromHtml>> = [];
-        for (const { phase } of relayPhases) {
-          try {
-            const relay = await fetchR3PResultsFromHtml(competitionId, phase.resultKey!);
-            allR3P.push(...relay);
-          } catch { continue; }
-        }
-        if (allR3P.length === 0) continue;
-
-        allR3P.sort((a, b) => b.total - a.total || (b.inners ?? 0) - (a.inners ?? 0));
-        allR3P.forEach((r, idx) => { r.rank = idx + 1; });
-
-        for (const result of allR3P) {
-          const shooterId = resolveShooter(result);
-          rows.push({
-            shooterId,
-            issfId: result.issfId || undefined,
-            firstName: result.firstName,
-            lastName: result.lastName,
-            teamNoc: result.nationCode,
-            disciplineCode,
-            category,
-            qualTotal: result.total,
-            qualInners: result.inners,
-            qualRank: result.rank,
-            qualPositions: { kneeling: result.kneeling, prone: result.prone, standing: result.standing },
-            qualified: result.qualified,
-            remark: result.remark,
-            finalTotal: null,
-            finalRank: null,
-            warning: shooterId ? undefined : "Novi strelac — biće kreiran",
-          });
-        }
-        continue;
-      }
-
-      if (!qualPhase?.resultKey) continue;
-
-      let qualResults;
-      try {
-        qualResults = await fetchQualResultsFromHtml(competitionId, qualPhase.resultKey);
-      } catch {
-        continue;
-      }
-
-      const discRows: typeof rows = [];
-
-      for (const result of qualResults) {
-        const shooterId = resolveShooter(result);
-
-        discRows.push({
-          shooterId,
-          issfId: result.issfId || undefined,
-          firstName: result.firstName,
-          lastName: result.lastName,
-          teamNoc: result.nationCode,
-          disciplineCode,
-          category,
-          qualTotal: result.total,
-          qualInners: result.inners,
-          qualRank: result.rank,
-          qualSeries: result.series,
-          qualified: result.qualified,
-          remark: result.remark,
-          finalTotal: null,
-          finalRank: null,
-          warning: shooterId ? undefined : "Novi strelac — biće kreiran",
-        });
-      }
-
-      if (finalPhase?.resultKey) {
-        try {
-          const finalResults = await fetchFinalResultsFromHtml(competitionId, finalPhase.resultKey);
-          const allCumulatives = finalResults.map((f) => f.stageCumulatives);
-
-          for (const finalist of finalResults) {
-            const row = discRows.find(
-              (r) => r.lastName.toLowerCase() === finalist.lastName.toLowerCase() && r.firstName.toLowerCase() === finalist.firstName.toLowerCase()
-            );
-            if (!row) continue;
-
-            row.finalRank = finalist.rank;
-            row.finalTotal = finalist.total;
-            row.finalCumulative = finalist.stageCumulatives;
-            row.finalRanks = deriveFinalRankProgression(finalist.stageCumulatives, allCumulatives);
-            row.finalShotsByStage = finalist.shotsByStage;
-            row.finalShootOff = finalist.shootOff || null;
-            // AR/AP/R3P finala se boduju decimalno (hit_count je samo 25m pištolj).
-            row.finalScoring = "decimal";
-            row.qualified = true;
-          }
-        } catch {
-          // Finals may not be published yet — non-fatal
-        }
-      }
-
-      rows.push(...discRows);
+    for (const event of mvpEvents) {
+      rows.push(...await buildIssfEventRows(competitionId, event, resolveShooter));
     }
 
     type MixedEntry = {

@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --env-file=../../.env.local node_modules/.bin/vitest run"
+    "test": "node --env-file=../../.env.local node_modules/vitest/vitest.mjs run"
   },
   "dependencies": {
     "@shootermarkt/adapters": "workspace:*",
