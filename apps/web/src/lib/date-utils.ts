@@ -34,3 +34,8 @@ export function formatShortDateRange(date: string, dateEnd?: string | null, loca
     ? `${d.getDate()}\u2013${de.getDate()}. ${M[d.getMonth()]}`
     : `${s} \u2013 ${de.getDate()}. ${M[de.getMonth()]}`;
 }
+
+/** Takmičenja koja su po datumu počela (tekuća i prošla), najnovija prva — samo ona mogu imati rezultate za uvoz. */
+export function startedCompetitions<T extends { date: string }>(list: T[], today = new Date().toLocaleDateString("sv-SE")): T[] {
+  return list.filter((c) => c.date.slice(0, 10) <= today).sort((a, b) => b.date.localeCompare(a.date));
+}

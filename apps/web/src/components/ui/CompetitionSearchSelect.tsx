@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
+import { startedCompetitions } from "@/lib/date-utils";
 
 export interface CompetitionOption {
   id: number;
@@ -84,10 +85,11 @@ export function CompetitionSearchSelect({
   const selected = competitions.find((competition) => competition.id === value) ?? null;
 
   const filtered = useMemo(() => {
+    const options = startedCompetitions(competitions);
     const normalizedQuery = query.trim().toLocaleLowerCase("sr");
-    if (!normalizedQuery) return competitions;
+    if (!normalizedQuery) return options;
 
-    return competitions.filter((competition) =>
+    return options.filter((competition) =>
       [competition.name, competition.nameSr, competition.location, competition.date]
         .filter(Boolean)
         .some((item) => item!.toLocaleLowerCase("sr").includes(normalizedQuery))

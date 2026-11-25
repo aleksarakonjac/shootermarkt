@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { startedCompetitions } from "@/lib/date-utils";
 import { MIXED_TEAM_CODES, type ReviewRow, type CommitPayload } from "@shootermarkt/db/pdf-import-types";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { DonePanel } from "../_shared/DonePanel";
@@ -33,8 +34,7 @@ function CompSearch({ comps, value, onChange }: {
     return () => document.removeEventListener("mousedown", onOut);
   }, []);
 
-  const today = new Date().toISOString().split("T")[0];
-  const sorted = [...comps].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = startedCompetitions(comps);
 
   const filtered = query.trim()
     ? sorted.filter((c) =>
@@ -44,7 +44,8 @@ function CompSearch({ comps, value, onChange }: {
       )
     : sorted;
 
-  const pinned = query.trim() ? [] : sorted.filter((c) => c.date <= today).slice(0, 3);
+  // pinned: 3 najnovija
+  const pinned = query.trim() ? [] : sorted.slice(0, 3);
   const pinnedIds = new Set(pinned.map((c) => c.id));
   const listItems = query.trim() ? filtered : filtered.filter((c) => !pinnedIds.has(c.id));
 
