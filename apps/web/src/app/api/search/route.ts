@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { clubs, competitionEvents, competitions, results, shooterFormaCache, shooters } from "@shootermarkt/db/schema";
-import { foldName, foldNameSql } from "@shootermarkt/db/name-match";
 import { matchedPreviousLastName, shooterNameLike } from "@/lib/previous-last-name";
 import { RANKING_ACTIVE_DAYS, rankedFormaCacheFilter } from "@/lib/forma-query";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
@@ -24,15 +23,6 @@ export async function GET(request: NextRequest) {
 
   const terms = q.split(/\s+/).filter(Boolean);
   const shooterMatches = terms.map((term) => shooterNameLike(term, "prefix"));
-  const keys = terms.map(foldName).filter(Boolean);
-  const anyKey = (column: SQL<string>, mode: "exact" | "prefix") =>
-    sql.join(keys.map((k) => sql`${column} ${mode === "exact" ? sql`=` : sql`like`} ${mode === "exact" ? k : `${k}%`}`), sql` or `);
-  const lastKey = foldNameSql(shooters.lastName);
-  const firstKey = foldNameSql(shooters.firstName);
-  // 0 tačno prezime · 1 prefiks prezimena · 2 ime · 3 pogođeno samo ranije prezime
-  const matchTier = keys.length
-    ? sql`case when ${anyKey(lastKey, "exact")} then 0 when ${anyKey(lastKey, "prefix")} then 1 when ${anyKey(firstKey, "prefix")} then 2 else 3 end`
-    : sql`0`;
   const lastResultDate = sql<string | null>`(
     select max(coalesce(${competitionEvents.date}, ${competitions.date})) from ${results}
     join ${competitions} on ${competitions.id} = ${results.competitionId}
@@ -71,9 +61,9 @@ export async function GET(request: NextRequest) {
     .leftJoin(bestRank, eq(bestRank.shooterId, shooters.id))
     .where(and(eq(shooters.verified, true), inArray(shooters.apparatus, [...MVP_APPARATUS]), ...shooterMatches))
     .orderBy(
-      // Na srpskom sajtu domaći strelci uvek ispred stranih, pa tek onda kvalitet poklapanja.
+      // Način poklapanja (ime / prezime / ranije prezime) ne utiče na redosled — odlučuju aktivnost i rang.
+      // Na srpskom sajtu domaći strelci uvek ispred stranih.
       ...(scope === "srb" ? [sql`(${shooters.nationality} = 'SRB') desc nulls last`] : []),
-      matchTier,
       sql`(${lastResultDate} >= to_char(current_date - ${RANKING_ACTIVE_DAYS}::int, 'YYYY-MM-DD')) desc nulls last`,
       sql`${bestRank.pct} asc nulls last`,
       sql`${lastResultDate} desc nulls last`,
