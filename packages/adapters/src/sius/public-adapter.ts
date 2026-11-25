@@ -117,17 +117,7 @@ export async function fetchSiusSubEvents(
   compUuid: string,
   eventUuid: string
 ): Promise<SiusSubEvent[]> {
-  const data = await pub<RawSubEvent[]>(
-    `/competitions/${compUuid}/events/${eventUuid}/subevents`
-  );
-  return data
-    .filter((s) => !s.Hidden)
-    .map((s) => ({
-      runningId: s.RunningId,
-      name: s.Name,
-      state: s.State,
-      hidden: s.Hidden,
-    }));
+  return (await fetchSiusSubEventsAll(compUuid, eventUuid)).filter((s) => !s.hidden);
 }
 
 /** Same as fetchSiusSubEvents but includes hidden sub-events (needed for debug). */
@@ -138,7 +128,11 @@ export async function fetchSiusSubEventsAll(
   const data = await pub<RawSubEvent[]>(
     `/competitions/${compUuid}/events/${eventUuid}/subevents`
   );
-  return data.map((s) => ({
+  // SIUS ume da navede isti pod-događaj dva puta; dva "Qualification" bi se čitala kao dve partije,
+  // pa bi se plasman preračunao po zbiru i izgubio zvanični redosled izjednačenih. Vidljiva kopija ima prednost.
+  const byId = new Map<string, RawSubEvent>();
+  for (const s of data) if (!byId.has(s.RunningId) || !s.Hidden) byId.set(s.RunningId, s);
+  return [...byId.values()].map((s) => ({
     runningId: s.RunningId,
     name: s.Name,
     state: s.State,
