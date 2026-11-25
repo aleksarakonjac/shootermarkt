@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchAthleteProfile, inferApparatus } from "@shootermarkt/adapters/issf/adapter";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
+import { normalizeNoc } from "@shootermarkt/db/name-match";
 import { eq } from "drizzle-orm";
 import { uploadAvatarFromUrl } from "@shootermarkt/db/upload-avatar";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -28,7 +29,8 @@ async function handlePOST(req: NextRequest) {
     .values({
       firstName: profile.firstName ?? "",
       lastName: profile.familyName ?? "",
-      nationality: profile.nationCode ?? nationCode ?? null,
+      // Država iz rezultata (za koga nastupa, npr. GLP) pre ISSF registra (FRA)
+      nationality: normalizeNoc(nationCode) ?? profile.nationCode ?? null,
       gender: profile.gender === "Male" ? "M" : profile.gender === "Female" ? "F" : null,
       birthYear: fullDate ? new Date(fullDate).getFullYear() : null,
       birthDate: fullDate,
