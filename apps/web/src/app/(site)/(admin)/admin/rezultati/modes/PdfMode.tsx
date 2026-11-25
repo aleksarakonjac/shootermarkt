@@ -8,9 +8,12 @@ import { CompetitionSearchSelect } from "@/components/ui/CompetitionSearchSelect
 import { ReviewTable } from "../_shared/ReviewTable";
 import { NewShootersPanel } from "../_shared/NewShootersPanel";
 import { DonePanel } from "../_shared/DonePanel";
+import { OverwriteCheck } from "../_shared/OverwriteCheck";
 import { PdfImportJobsPanel, type PdfImportJobSummary } from "./PdfImportJobsPanel";
 
 type Step = "upload" | "review" | "done";
+/** `fromMain`: red koji je admin prebacio iz glavnog meča u zaseban, da bi se izbor mogao poništiti. */
+type PdfRow = ReviewRow & { fromMain?: boolean };
 
 
 interface ParseInfo { eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number; finalsError?: string }
@@ -35,7 +38,7 @@ export function PdfMode() {
     return Number.isInteger(savedJobId) && savedJobId > 0 ? savedJobId : null;
   });
 
-  const [rows, setRows] = useState<ReviewRow[]>([]);
+  const [rows, setRows] = useState<PdfRow[]>([]);
   const [parseInfo, setParseInfo] = useState<ParseInfo | null>(null);
   const [nocFilter, setNocFilter] = useState("");
   const [result, setResult] = useState<CommitResult | null>(null);
@@ -78,7 +81,6 @@ export function PdfMode() {
     const file = fileRef.current?.files?.[0];
     if (!file) { setError("Izaberi PDF fajl"); return; }
     if (!selectedCompId) { setError("Izaberi takmičenje iz baze"); return; }
-    if (rows.some((r) => r.eventName != null && !r.eventName.trim())) { setError("Svaki dodatni meč mora imati naziv"); return; }
     setLoading(true); setError(null);
     try {
       const fd = new FormData();
@@ -112,6 +114,7 @@ export function PdfMode() {
   async function handleCommit() {
     if (!selectedCompId) { setError("Izaberi takmičenje iz baze"); return; }
     if (rows.some((r) => r.eventName != null && !r.eventName.trim())) { setError("Svaki dodatni meč mora imati naziv"); return; }
+    if (rows.some((r) => r.eventName != null && !r.eventDate)) { setError("Svaki dodatni meč mora imati datum"); return; }
     setLoading(true);
     setError(null);
     const payload: CommitPayload = { competitionId: selectedCompId, tags: importTags, rows };
@@ -189,6 +192,15 @@ export function PdfMode() {
 
   const activeCount = rows.filter((r) => !r.skip).length;
   const eventNames = [...new Set(rows.flatMap((r) => (r.eventName != null ? [r.eventName] : [])))];
+  const isSeparate = rows.some((r) => r.fromMain);
+  const unnamedMatch = rows.some((r) => r.eventName != null && !r.eventName.trim());
+
+  function toggleSeparate(on: boolean) {
+    setRows((prev) => prev.map((r) =>
+      on && r.eventName == null ? { ...r, eventName: "", eventDate: "", fromMain: true }
+      : !on && r.fromMain ? { ...r, eventName: null, eventDate: null, fromMain: false }
+      : r));
+  }
 
   if (step === "done" && result) {
     return <DonePanel result={result} onReset={reset} resetLabel="Import još jedan PDF" />;
@@ -301,10 +313,19 @@ export function PdfMode() {
             </div>
           )}
 
+          <label className="flex items-start gap-2 text-sm text-[var(--ink)]">
+            <input type="checkbox" checked={isSeparate} disabled={!isSeparate && rows.every((r) => r.eventName != null)}
+              onChange={(e) => toggleSeparate(e.target.checked)} className="mt-1 accent-[var(--brand-primary)]" />
+            <span>
+              Ovaj bilten je zaseban meč istog takmičenja (drugi dan, memorijal…)
+              <span className="block text-xs text-[var(--muted)]">Upiši naziv i datum. Kod ponovnog uvoza istog biltena koristi isti naziv.</span>
+            </span>
+          </label>
+
           {eventNames.length > 0 && (
             <div className="rounded-lg border border-[var(--border)] px-4 py-3 text-sm space-y-2">
               <p className="text-[var(--muted)]">
-                Bilten ima i dodatne mečeve — upisuju se u isto takmičenje kao posebne discipline sa svojim nazivom i datumom:
+                Zasebni mečevi — upisuju se u isto takmičenje kao posebne discipline sa svojim nazivom i datumom:
               </p>
               {eventNames.map((name, i) => {
                 const date = rows.find((r) => r.eventName === name)?.eventDate ?? "";
@@ -320,6 +341,8 @@ export function PdfMode() {
               })}
             </div>
           )}
+
+          {selectedCompId && activeCount > 0 && !unnamedMatch && <OverwriteCheck competitionId={selectedCompId} rows={rows} />}
 
           <NewShootersPanel rows={rows} onRowChange={updateRow} />
 
