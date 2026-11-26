@@ -166,7 +166,10 @@ export interface ParsedFinalResult {
   lastName: string;
   firstName: string;
   teamNoc: string;
-  total: number;
+  /** null kad finalista nije pucao (DNS) */
+  total: number | null;
+  /** DNS/DNF/DSQ ili "SO" (ispao posle shoot-off-a) */
+  remark?: string | null;
   /** Zbirovi po seriji/fazi finala iz biltena. */
   series?: number[] | null;
   /** Nazivi serija/faza koji odgovaraju polju series. */
@@ -328,6 +331,8 @@ export function mergeFinalsIntoRows(
 
       row.finalTotal = rawResult.total;
       row.finalRank = rawResult.rank;
+      row.finalRemark = isUnrankedRemark(rawResult.remark) ? rawResult.remark : null;
+      row.finalShootOff = rawResult.remark === "SO" ? true : null;
       row.finalSeries = rawResult.series ?? null;
       row.finalSeriesLabels = rawResult.seriesLabels ?? null;
       row.finalShots = rawResult.shots ?? null;

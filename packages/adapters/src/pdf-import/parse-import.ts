@@ -27,7 +27,9 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
       if (!sius.hasFinals) return sius;
       try {
         const g = await parsePdfWithGemini(pdfBuffer);
-        return { events: [...sius.events, ...g.events.filter((e) => e.stage === "final")] };
+        // finala koja je SIUS parser već pročitao imaju prednost nad Gemini čitanjem
+        const parsed = new Set(sius.events.filter((e) => e.stage === "final").map((e) => e.discipline));
+        return { events: [...sius.events, ...g.events.filter((e) => e.stage === "final" && !parsed.has(e.discipline))] };
       } catch (e) {
         finalsError = e instanceof Error ? e.message : String(e);
         return sius;
