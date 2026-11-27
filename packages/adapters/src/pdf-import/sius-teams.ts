@@ -89,13 +89,15 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
     if (qualDays.length) page.date = qualDays.at(-1)!;
   }
   // svaki dan discipline je svoj meč: timovi, numeracija po državi i finale se vezuju samo unutar dana
-  const days = [...new Set(parsed.map((p) => `${p.discipline}|${p.date}`))].sort((a, b) => a.split("|")[1].localeCompare(b.split("|")[1]));
+  // dani se broje po disciplini i uzrastu: juniori pucani drugog dana od seniora su i dalje svoj prvi meč
+  const dayKey = (p: TeamPage) => `${p.discipline}|${p.junior ? "junior" : "senior"}|${p.date}`;
+  const days = [...new Set(parsed.map(dayKey))].sort((a, b) => a.split("|")[2].localeCompare(b.split("|")[2]));
   for (const day of days) {
-    const [discipline, date] = day.split("|") as [MixedTeamCode, string];
-    const match = parsed.filter((p) => p.discipline === discipline && p.date === date);
+    const [discipline, age, date] = day.split("|") as [MixedTeamCode, string, string];
+    const match = parsed.filter((p) => dayKey(p) === day);
     // prvi dan discipline ide u glavni meč; svaki sledeći je zaseban meč, inače bi prepisao prvi
-    // (isti oblik naziva kao matchEventName u apps/web/src/lib/competition-events.ts)
-    const nth = days.filter((d) => d.startsWith(`${discipline}|`)).indexOf(day) + 1;
+    // (isti oblik naziva kao matchEventName u apps/web/src/lib/match-name.ts)
+    const nth = days.filter((d) => d.startsWith(`${discipline}|${age}|`)).indexOf(day) + 1;
     const eventName = nth > 1 ? `${nth}. meč · ${date.slice(8, 10)}.${date.slice(5, 7)}.` : null;
     const category = match[0].junior ? "junior" : "senior";
     const numbers = new Map<string, number>();

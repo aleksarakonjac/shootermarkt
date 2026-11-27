@@ -121,3 +121,33 @@ describe("PdfMode: zaseban meč za timove", () => {
     }
   });
 });
+
+describe("PdfMode: naziv meča timova", () => {
+  it("refuses a team match named like the individual match but on another day", async () => {
+    const individual = { ...row, eventName: "Salona Trophy 2026", eventDate: "2026-10-24", fromMain: true };
+    const team = {
+      skip: false, nocCode: "SRB", teamNumber: 1, disciplineCode: "APMT", category: "senior", eventName: null, eventDate: "2026-10-23",
+      qualRank: 2, qualTotal: 572, inners: 21, qualified: true, finalRank: null, finalTotal: null,
+      mIssfId: null, mLastName: "Mikec", mFirstName: "Damir", m_series: [], mInners: null, mTotal: 294,
+      fIssfId: null, fLastName: "Mikec", fFirstName: "Tea", f_series: [], fInners: null, fTotal: 278,
+    };
+    const sent: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { body?: string }) => {
+      if (init?.body) sent.push(url);
+      const data = url.endsWith("/jobs/1") ? { ...job, result: { rows: [individual], eventsCount: 1, skippedDisciplines: [], mixedTeams: [team] } }
+        : url.endsWith("/preview") ? { added: 2, changed: 0, same: 0, items: [] }
+        : [];
+      return { ok: true, json: async () => data };
+    }));
+    localStorage.setItem("pdfImportJobId", "1");
+    render(<PdfMode />);
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: /mešoviti timovi su zaseban meč/i }, { timeout: 3000 }));
+    fireEvent.change(screen.getByLabelText("Naziv meča timova"), { target: { value: "Salona Trophy 2026" } });
+    fireEvent.click(screen.getByRole("button", { name: /potvrdi i unesi/i }));
+
+    expect(screen.getByText(/meč „Salona Trophy 2026“ već ima datum 24\.10\.2026\./i)).toBeInTheDocument();
+    expect(sent.some((url) => url.endsWith("/commit") || url.endsWith("/commit-mixed"))).toBe(false);
+  });
+});
+

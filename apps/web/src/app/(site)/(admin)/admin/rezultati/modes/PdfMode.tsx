@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 
 import type { ReviewRow, CommitPayload, MixedTeamEntry } from "@shootermarkt/db/pdf-import-types";
+import { formatDateSr } from "@/lib/date-utils";
 import { CompetitionSearchSelect } from "@/components/ui/CompetitionSearchSelect";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { NewShootersPanel } from "../_shared/NewShootersPanel";
@@ -125,6 +126,9 @@ export function PdfMode() {
     if (rows.some((r) => r.eventName != null && !r.eventDate)) { setError("Svaki dodatni meč mora imati datum"); return; }
     if (teamMatch && !teamMatch.name.trim()) { setError("Svaki dodatni meč mora imati naziv"); return; }
     if (teamMatch && !teamMatch.date) { setError("Svaki dodatni meč mora imati datum"); return; }
+    // jedan meč ima jedan datum: isti naziv kao meč pojedinačnih bi timovima tiho dao datum pojedinačnih
+    const sameName = teamMatch && rows.find((r) => r.eventName?.trim() === teamMatch.name.trim() && r.eventDate && r.eventDate !== teamMatch.date);
+    if (sameName) { setError(`Meč „${teamMatch!.name.trim()}“ već ima datum ${formatDateSr(sameName.eventDate)} — za timove upiši drugi naziv.`); return; }
     setLoading(true);
     setError(null);
     const payload: CommitPayload = { competitionId: selectedCompId, tags: importTags, rows };

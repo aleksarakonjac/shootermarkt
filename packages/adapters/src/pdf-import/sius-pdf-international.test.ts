@@ -80,6 +80,18 @@ describe("parseSiusPdf — Salona Trophy + DC Open 2026", async () => {
     expect(parsed.warnings ?? []).toEqual([]);
   });
 
+  it("counts match days per age group, so juniors shot on another day stay in their main match", async () => {
+    const pages = await extractSiusPages(fixture);
+    // isti ARMT kao juniorska lista, pucana dan kasnije
+    const juniors = pages
+      .filter((items) => items.some((it) => /^[QF]200000TA231026\d{4}\.1\.ARMT\./.test(it.str)))
+      .map((items) => [...items.map((it) => ({ ...it, str: it.str.replace("TA231026", "TA241026") })), { x: 280, y: 764, str: "Junior" }]);
+    const parsed = parseSiusPages([...pages, ...juniors])!;
+    const armt = parsed.mixedTeams!.filter((t) => t.disciplineCode === "ARMT");
+    expect(armt.filter((t) => t.category === "junior")).toHaveLength(19);
+    expect(new Set(armt.map((t) => `${t.category}|${t.eventName}`))).toEqual(new Set(["senior|null", "junior|null"]));
+  });
+
   it("keeps a final printed on a later day with its qualification", async () => {
     const pages = await extractSiusPages(fixture);
     const finalNextDay = pages.map((items) => items.map((it) => ({ ...it, str: it.str.replace(/^F200000TA231026(\d{4}\.1\.ARMT\.)/, "F200000TA241026$1") })));

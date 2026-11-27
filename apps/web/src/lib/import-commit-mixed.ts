@@ -4,6 +4,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
 import { eventTypeFromName } from "@/lib/competition-filters";
 import { ensureCompetitionEvent } from "@/lib/competition-events";
+import { formatDateSr } from "@/lib/date-utils";
 import { shooterResultCount } from "@/lib/import-commit";
 import { linkTeamMembers } from "@/lib/mixed-team-link";
 import { changedColumns, changedParts, type ImportStatus } from "@/lib/import-diff";
@@ -168,6 +169,16 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
   let eventDate = input.eventDate;
   if (eventName && !eventDate) {
     eventDate = (await db.query.competitions.findFirst({ where: eq(competitions.id, competitionId), columns: { date: true } }))?.date;
+  }
+  if (eventName && input.eventDate) {
+    // meč ima jedan datum: postojeći meč istog naziva sa drugim datumom bi tiho progutao datum timova
+    const existingEvent = await db.query.competitionEvents.findFirst({
+      where: and(eq(competitionEvents.competitionId, competitionId), eq(competitionEvents.name, eventName)),
+      columns: { date: true },
+    });
+    if (existingEvent && existingEvent.date !== input.eventDate) {
+      throw new MixedCommitError(`Meč „${eventName}“ već ima datum ${formatDateSr(existingEvent.date)} — za timove upiši drugi naziv.`, 409);
+    }
   }
   const competitionEventId = eventName ? await ensureCompetitionEvent(competitionId, eventName, eventDate!) : null;
   const existing = await loadTeams(competitionId, competitionEventId, disc.id, category);
