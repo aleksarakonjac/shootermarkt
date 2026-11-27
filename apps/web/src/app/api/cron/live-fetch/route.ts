@@ -468,7 +468,8 @@ async function processMixedTeamSlots(
     .insert(mixedTeamResults)
     .values(dedupedRows)
     .onConflictDoUpdate({
-      target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
+      // live upisuje samo glavni meč (competition_event_id null)
+      target: [mixedTeamResults.competitionId, mixedTeamResults.competitionEventId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
       set: {
         shooter1Id: sql`coalesce(excluded.shooter1_id, ${mixedTeamResults.shooter1Id})`,
         shooter2Id: sql`coalesce(excluded.shooter2_id, ${mixedTeamResults.shooter2Id})`,
