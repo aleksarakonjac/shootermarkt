@@ -132,6 +132,9 @@ export default async function CompetitionPage({ params }: Props) {
         category: mixedTeamResults.category,
         nocCode: mixedTeamResults.nocCode,
         teamNumber: mixedTeamResults.teamNumber,
+        competitionEventId: mixedTeamResults.competitionEventId,
+        eventName: competitionEvents.name,
+        eventDate: competitionEvents.date,
         shooter1Id: mixedTeamResults.shooter1Id,
         shooter2Id: mixedTeamResults.shooter2Id,
         shooter1Name: mixedTeamResults.shooter1Name,
@@ -152,6 +155,7 @@ export default async function CompetitionPage({ params }: Props) {
       })
       .from(mixedTeamResults)
       .innerJoin(disciplines, eq(mixedTeamResults.disciplineId, disciplines.id))
+      .leftJoin(competitionEvents, eq(mixedTeamResults.competitionEventId, competitionEvents.id))
       .where(eq(mixedTeamResults.competitionId, compId))
       .orderBy(asc(mixedTeamResults.qualRank)),
 
@@ -253,12 +257,17 @@ export default async function CompetitionPage({ params }: Props) {
 
   // Group mixed team results by discipline code
   const mixedGroupOrder: string[] = [];
-  const mixedGroupMap = new Map<string, { code: string; category: typeof mixedResults[number]["category"]; name: string; apparatus: string | null; date: string | null; teams: Array<typeof mixedResults[number] & { shooter1AvatarUrl: string | null; shooter2AvatarUrl: string | null; shooter1BirthYear: number | null; shooter2BirthYear: number | null }> }>();
+  const mixedGroupMap = new Map<string, { key: string; code: string; category: typeof mixedResults[number]["category"]; name: string; eventName: string | null; apparatus: string | null; date: string | null; teams: Array<typeof mixedResults[number] & { shooter1AvatarUrl: string | null; shooter2AvatarUrl: string | null; shooter1BirthYear: number | null; shooter2BirthYear: number | null }> }>();
   for (const r of mixedResults) {
-    const key = `${r.disciplineCode}|${r.category}`;
+    // zaseban meč (drugi dan) je svoj blok, kao kod pojedinačnih: izbor ide preko "KOD@event"
+    const selectionKey = r.competitionEventId ? `${r.disciplineCode}@${r.competitionEventId}` : r.disciplineCode;
+    const key = `${selectionKey}|${r.category}`;
     if (!mixedGroupMap.has(key)) {
       mixedGroupOrder.push(key);
-      mixedGroupMap.set(key, { code: r.disciplineCode, category: r.category, name: r.disciplineName, apparatus: r.apparatus, date: scheduledDate.get(key) ?? null, teams: [] });
+      mixedGroupMap.set(key, {
+        key: selectionKey, code: r.disciplineCode, category: r.category, name: r.disciplineName, eventName: r.eventName ?? null, apparatus: r.apparatus,
+        date: r.eventDate ?? scheduledDate.get(`${r.disciplineCode}|${r.category}`) ?? null, teams: [],
+      });
     }
     const p1 = r.shooter1Id != null ? mixedProfileById.get(r.shooter1Id) : undefined;
     const p2 = r.shooter2Id != null ? mixedProfileById.get(r.shooter2Id) : undefined;
