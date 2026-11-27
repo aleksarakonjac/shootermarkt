@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  eventTypeFromName, groupsFromDistances, groupsFromName, levelsForGroups, mergeGroups, parseDisciplineParam, parseLevelParam,
+  eventTypeFromName, eventsFromCodes, matchesDiscipline, groupsFromDistances, groupsFromName, levelsForGroups, mergeGroups, parseDisciplineParam, parseLevelParam,
 } from "./competition-filters";
 
 describe("competition filters", () => {
@@ -33,6 +33,15 @@ describe("competition filters", () => {
     expect(parseDisciplineParam(undefined, "MK")).toEqual(["smallbore"]);
     expect(parseDisciplineParam("air", "10m")).toEqual(["air"]);
     expect(parseDisciplineParam("x")).toEqual([]);
+  });
+
+  it("filters by group or single discipline, men and women together", () => {
+    expect(eventsFromCodes(["R3PW", "ARM", "ARW"])).toEqual(["ar", "r3p"]);
+    expect(parseDisciplineParam("r3p,air")).toEqual(["r3p", "air"]);
+    expect(matchesDiscipline([], [], [])).toBe(true);
+    expect(matchesDiscipline(["r3p"], ["smallbore"], ["R3PW"])).toBe(true);
+    expect(matchesDiscipline(["r3p"], ["smallbore"], ["SPW"])).toBe(false);
+    expect(matchesDiscipline(["r3p", "air"], ["air"], [])).toBe(true);
   });
 
   it("merges groups in a stable order", () => {

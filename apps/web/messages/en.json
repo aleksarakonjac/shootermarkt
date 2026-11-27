@@ -74,7 +74,24 @@
         "continental": "Continental",
         "international": "International",
         "national": "National",
-        "regional": "Regional / club"
+        "regional": "Regional"
+      },
+      "disciplineEvents": {
+        "ar": "10m Air Rifle",
+        "ap": "10m Air Pistol",
+        "armixed": "10m Air Rifle Mixed Team",
+        "apmixed": "10m Air Pistol Mixed Team",
+        "arsolo": "10m Air Rifle Solo",
+        "apsolo": "10m Air Pistol Solo",
+        "r3p": "50m Rifle 3 Positions",
+        "prone": "50m Rifle Prone",
+        "sp": "25m Sport Pistol",
+        "rfp": "25m Rapid Fire Pistol",
+        "stp": "25m Standard Pistol",
+        "fp": "50m Free Pistol",
+        "r3p300": "300m Rifle 3 Positions",
+        "prone300": "300m Rifle Prone",
+        "std300": "300m Standard Rifle"
       },
       "disciplineGroups": {
         "air": "Air",

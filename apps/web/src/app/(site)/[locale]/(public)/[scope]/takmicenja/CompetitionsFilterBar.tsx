@@ -6,9 +6,10 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { useTranslations } from "next-intl";
 import {
   DISCIPLINE_GROUPS,
+  type DisciplineEventKey,
+  type DisciplineFilter,
   ISSF_LEVEL_GROUP_KEYS,
   LEVEL_GROUPS,
-  type DisciplineGroup,
   type LevelGroupKey,
 } from "@/lib/competition-filters";
 import { useScopedHref } from "@/hooks/use-scoped-href";
@@ -18,7 +19,8 @@ interface Props {
   availableYears: string[];
   currentYear: string;
   currentLevels: LevelGroupKey[];
-  currentDisc: DisciplineGroup[];
+  currentDisc: DisciplineFilter[];
+  availableEvents: DisciplineEventKey[];
   totalCount: number;
   scope: string;
 }
@@ -84,7 +86,7 @@ function FilterMenu({ label, value, count, children }: { label: string; value?: 
       {open && (
         <div
           id={id}
-          className="absolute left-0 top-[calc(100%+4px)] z-[var(--z-dropdown)] w-max min-w-[13rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_4px_16px_oklch(0_0_0/0.12)]"
+          className="absolute left-0 top-[calc(100%+4px)] z-[var(--z-dropdown)] w-max min-w-[13rem] max-w-[calc(100vw-2rem)] max-h-[min(24rem,60vh)] overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg)] py-1 shadow-[0_4px_16px_oklch(0_0_0/0.12)]"
         >
           {children}
         </div>
@@ -101,6 +103,7 @@ export function CompetitionsFilterBar({
   currentYear,
   currentLevels,
   currentDisc,
+  availableEvents,
   totalCount,
   scope,
 }: Props) {
@@ -155,7 +158,10 @@ export function CompetitionsFilterBar({
   const hasFilters = currentLevels.length > 0 || currentDisc.length > 0 || Boolean(searchParams.get("q")) || currentYear !== String(new Date().getFullYear());
 
   const levelLabel = (key: LevelGroupKey) => t(`list.levelGroups.${key}`);
-  const discLabel = (key: DisciplineGroup) => t(`list.disciplineGroups.${key}`);
+  const isGroup = (key: DisciplineFilter) => (DISCIPLINE_GROUPS as readonly string[]).includes(key);
+  const discLabel = (key: DisciplineFilter) => t(`list.${isGroup(key) ? "disciplineGroups" : "disciplineEvents"}.${key}`);
+  // Izabrana disciplina ostaje u meniju i kad je nema u godini.
+  const discOptions: DisciplineFilter[] = [...DISCIPLINE_GROUPS, ...new Set([...availableEvents, ...currentDisc.filter((k): k is DisciplineEventKey => !isGroup(k))])];
 
   const chips = [
     ...currentLevels.map((key) => ({ id: `level:${key}`, label: levelLabel(key), remove: () => toggle("level", currentLevels, key) })),
@@ -229,10 +235,10 @@ export function CompetitionsFilterBar({
         </FilterMenu>
 
         <FilterMenu label={t("list.filterDiscipline")} count={currentDisc.length}>
-          {DISCIPLINE_GROUPS.map((key) => {
+          {discOptions.map((key, i) => {
             const on = currentDisc.includes(key);
             return (
-              <button key={key} type="button" role="checkbox" aria-checked={on} onClick={() => toggle("disc", currentDisc, key)} className={`${optionRow} ${on ? "text-[var(--ink)]" : "text-[var(--muted)]"}`}>
+              <button key={key} type="button" role="checkbox" aria-checked={on} onClick={() => toggle("disc", currentDisc, key)} className={`${optionRow} ${on ? "text-[var(--ink)]" : "text-[var(--muted)]"} ${i === DISCIPLINE_GROUPS.length ? "border-t border-[var(--border)]" : ""}`}>
                 <Check on={on} />
                 {discLabel(key)}
               </button>

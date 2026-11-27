@@ -2,7 +2,7 @@ export const revalidate = 300;
 
 import { countryNameSql } from "@/lib/country-name";
 import { db } from "@shootermarkt/db";
-import { competitions, results, disciplines, countries } from "@shootermarkt/db/schema";
+import { competitions, results, disciplines, countries, mixedTeamResults, competitionSchedule } from "@shootermarkt/db/schema";
 import { eq, desc, ilike, inArray, and, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
@@ -13,7 +13,7 @@ import { CompetitionsFilterBar } from "./CompetitionsFilterBar";
 import type { CompetitionLevel } from "@shootermarkt/db/pdf-import-types";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import { CompetitionCalendar, type CalendarComp } from "./CompetitionCalendar";
-import { levelsForGroups, parseDisciplineParam, parseLevelParam, ISSF_LEVEL_GROUP_KEYS } from "@/lib/competition-filters";
+import { eventsFromCodes, matchesDiscipline, levelsForGroups, parseDisciplineParam, parseLevelParam, ISSF_LEVEL_GROUP_KEYS } from "@/lib/competition-filters";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { pageParams } from "@/i18n/page-params";
@@ -314,11 +314,10 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
     activeQ        ? ilike(competitions.name, `%${activeQ}%`)                          : undefined,
     activeYear  !== "all" ? ilike(competitions.date, `${activeYear}%`)               : undefined,
     activeLevels.length ? inArray(competitions.level, levelsForGroups(activeLevels) as CompetitionLevel[]) : undefined,
-    activeDisc.length   ? sql`${competitions.disciplineGroups} && ARRAY[${sql.join(activeDisc.map((d) => sql`${d}`), sql`, `)}]::varchar[]` : undefined,
     activeLocation ? ilike(competitions.location, `%${activeLocation}%`)             : undefined,
   ].filter(Boolean) as Parameters<typeof and>;
 
-  const [rows, yearRows, calRows] = await Promise.all([
+  const [rows, yearRows, calRows, codeRows] = await Promise.all([
     db
       .select({
         id:              competitions.id,
@@ -374,11 +373,29 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
       .leftJoin(countries, eq(competitions.countryId, countries.id))
       .where(scopeFilter)
       .orderBy(competitions.date),
+    // Koje discipline ima koje takmičenje: rezultati, miks timovi i satnica.
+    Promise.all(
+      [results, mixedTeamResults, competitionSchedule].map((source) =>
+        db
+          .selectDistinct({ id: competitions.id, code: disciplines.code, year: sql<string>`LEFT(${competitions.date}, 4)` })
+          .from(source)
+          .innerJoin(disciplines, eq(source.disciplineId, disciplines.id))
+          .innerJoin(competitions, eq(source.competitionId, competitions.id))
+          .where(scopeFilter),
+      ),
+    ).then((lists) => lists.flat()),
   ]);
+
+  const codesByComp = new Map<number, string[]>();
+  for (const r of codeRows) codesByComp.set(r.id, [...(codesByComp.get(r.id) ?? []), r.code]);
+  const matchesDisc = (c: { id: number; disciplineGroups: string[] | null }) =>
+    matchesDiscipline(activeDisc, c.disciplineGroups ?? [], codesByComp.get(c.id) ?? []);
+  // Ponuda u filteru: discipline iz izabrane godine (+ već izabrane, da mogu da se isključe).
+  const yearEvents = eventsFromCodes(codeRows.filter((r) => activeYear === "all" || r.year === activeYear).map((r) => r.code));
 
   const availableYears = yearRows.map((r) => r.year).filter(Boolean) as string[];
 
-  const filtered = rows as CompItem[];
+  const filtered = (rows as CompItem[]).filter(matchesDisc);
 
   // Tačke u mreži prate filtere (pretraga, nivo, tag, lokacija) ali ne i godinu, da se vide svi meseci.
   const qLower = activeQ.toLowerCase();
@@ -387,7 +404,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
     .filter((r) =>
       (!qLower || r.name.toLowerCase().includes(qLower)) &&
       (!activeLevels.length || levelsForGroups(activeLevels).includes(r.level)) &&
-      (!activeDisc.length || (r.disciplineGroups ?? []).some((g) => (activeDisc as string[]).includes(g))) &&
+      matchesDisc(r) &&
       (!locLower || (r.location ?? "").toLowerCase().includes(locLower)))
     .map((r) => ({
       id: r.id,
@@ -543,6 +560,7 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
           currentYear={activeYear}
           currentLevels={activeLevels}
           currentDisc={activeDisc}
+          availableEvents={yearEvents}
           totalCount={translatedFiltered.length}
           scope={scope}
         />
