@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { asIssfId, type AgeContext } from "@shootermarkt/db/name-match";
 import { siusEventCodes } from "@/lib/sius-event-code";
 import { db } from "@shootermarkt/db";
 import { competitions, competitionSchedule, disciplines, mixedTeamResults, results, shooters } from "@shootermarkt/db/schema";
@@ -179,7 +180,7 @@ async function processCompetition(
 
       if (slot.stage.startsWith("qual") && eventData.qual.length > 0) {
         for (const r of eventData.qual) {
-          const shooterId = await resolveOrCreateShooter(r, roster);
+          const shooterId = await resolveOrCreateShooter(r, roster, { category: slot.category, date: slot.startTime });
           if (!shooterId) continue;
           rows.push({
             shooterId,
@@ -202,7 +203,7 @@ async function processCompetition(
       if (slot.stage === "elimination") {
         for (const { round, results: elimResults } of eventData.elim) {
           for (const r of elimResults) {
-            const shooterId = await resolveOrCreateShooter(r, roster);
+            const shooterId = await resolveOrCreateShooter(r, roster, { category: slot.category, date: slot.startTime });
             if (!shooterId) continue;
             rows.push({
               shooterId,
@@ -228,7 +229,7 @@ async function processCompetition(
         const withSeries = finalists.filter((r) => r.series.length > 0);
         const detailOf = new Map(buildSiusFinalDetails(slot.disciplineCode, withSeries).map((d, i) => [withSeries[i], d]));
         for (const r of finalists) {
-          const shooterId = await resolveOrCreateShooter(r, roster);
+          const shooterId = await resolveOrCreateShooter(r, roster, { category: slot.category, date: slot.startTime });
           if (!shooterId) continue;
           rows.push({
             shooterId,
@@ -376,7 +377,7 @@ async function processMixedTeamSlots(
   competitionId: number,
   siusId: string | null,
   issfId: string | null,
-  mixedSlots: Array<{ disciplineId: number; stage: string; disciplineCode: string; category: AgeCategory }>,
+  mixedSlots: Array<{ disciplineId: number; stage: string; disciplineCode: string; category: AgeCategory; startTime: Date }>,
   roster: ShooterRoster,
 ): Promise<number> {
   // SIUS vodi juniorski mixed team kao poseban događaj (APMTJ); druge mlađe kategorije za mixed ne postoje.
@@ -416,8 +417,8 @@ async function processMixedTeamSlots(
 
       const push = async (r: SiusTeamResult, isFinal: boolean) => {
         const [a1, a2] = r.athletes;
-        const shooter1Id = a1 ? await resolveOrCreateShooter({ ...a1, nation: r.nocCode }, roster) : null;
-        const shooter2Id = a2 ? await resolveOrCreateShooter({ ...a2, nation: r.nocCode }, roster) : null;
+        const shooter1Id = a1 ? await resolveOrCreateShooter({ ...a1, nation: r.nocCode }, roster, { category: slot.category, date: slot.startTime }) : null;
+        const shooter2Id = a2 ? await resolveOrCreateShooter({ ...a2, nation: r.nocCode }, roster, { category: slot.category, date: slot.startTime }) : null;
         rows.push({
           competitionId,
           disciplineId: slot.disciplineId,
@@ -500,9 +501,10 @@ async function processMixedTeamSlots(
 
 async function resolveOrCreateShooter(
   r: { firstName: string; lastName: string; nation?: string; siusAthleteId?: string | null },
-  roster: ShooterRoster
+  roster: ShooterRoster,
+  age: AgeContext
 ): Promise<number | null> {
-  const found = await roster.matchSius(r);
+  const found = await roster.matchSius(r, age);
   if (found) return found;
 
   if (r.siusAthleteId) {
@@ -515,13 +517,14 @@ async function resolveOrCreateShooter(
         verified: false,
         createdBySelf: false,
         siusAthleteId: r.siusAthleteId,
+        issfId: asIssfId(r.siusAthleteId),
       })
       .onConflictDoUpdate({
         target: [shooters.siusAthleteId],
         set: { firstName: r.firstName, lastName: r.lastName, nationality: r.nation ?? null },
       })
       .returning({ id: shooters.id });
-    roster.add({ id: created.id, firstName: r.firstName, lastName: r.lastName, nationality: r.nation ?? null, issfId: null });
+    roster.add({ id: created.id, firstName: r.firstName, lastName: r.lastName, nationality: r.nation ?? null, issfId: asIssfId(r.siusAthleteId) });
     return created.id;
   }
 
@@ -532,7 +535,7 @@ async function resolveOrCreateShooter(
 
 async function fetchMixedTeamFromIssf(
   issfCompId: number,
-  slots: Array<{ disciplineCode: string; stage: string; disciplineId: number; category: AgeCategory }>,
+  slots: Array<{ disciplineCode: string; stage: string; disciplineId: number; category: AgeCategory; startTime: Date }>,
   competitionId: number,
   roster: ShooterRoster,
   rows: Array<typeof mixedTeamResults.$inferInsert>
@@ -575,8 +578,8 @@ async function fetchMixedTeamFromIssf(
           teamNumber,
           mIssfId: r.mIssfId,
           fIssfId: r.fIssfId,
-          shooter1Id: await roster.matchIssf(r.mIssfId, r.mFirstName, r.mLastName, r.nocCode),
-          shooter2Id: await roster.matchIssf(r.fIssfId, r.fFirstName, r.fLastName, r.nocCode),
+          shooter1Id: await roster.matchIssf(r.mIssfId, r.mFirstName, r.mLastName, r.nocCode, { category: slot.category, date: slot.startTime }),
+          shooter2Id: await roster.matchIssf(r.fIssfId, r.fFirstName, r.fLastName, r.nocCode, { category: slot.category, date: slot.startTime }),
           shooter1Name: `${r.mLastName} ${r.mFirstName}`.trim() || null,
           shooter2Name: `${r.fLastName} ${r.fFirstName}`.trim() || null,
           shooter1Detail: { series: r.mSeries, inners: r.mInners, total: r.mTotal },
@@ -615,8 +618,8 @@ async function fetchMixedTeamFromIssf(
             teamNumber,
             mIssfId: r.mIssfId,
             fIssfId: r.fIssfId,
-            shooter1Id: await roster.matchIssf(r.mIssfId, r.mFirstName, r.mLastName, r.nocCode),
-            shooter2Id: await roster.matchIssf(r.fIssfId, r.fFirstName, r.fLastName, r.nocCode),
+            shooter1Id: await roster.matchIssf(r.mIssfId, r.mFirstName, r.mLastName, r.nocCode, { category: slot.category, date: slot.startTime }),
+            shooter2Id: await roster.matchIssf(r.fIssfId, r.fFirstName, r.fLastName, r.nocCode, { category: slot.category, date: slot.startTime }),
             shooter1Name: `${r.mLastName} ${r.mFirstName}`.trim() || null,
             shooter2Name: `${r.fLastName} ${r.fFirstName}`.trim() || null,
             finalRank: r.rank,
@@ -635,7 +638,7 @@ async function fetchMixedTeamFromIssf(
 
 async function fetchFromIssf(
   issfCompId: number,
-  slots: Array<{ disciplineCode: string; stage: string; disciplineId: number; category: AgeCategory }>,
+  slots: Array<{ disciplineCode: string; stage: string; disciplineId: number; category: AgeCategory; startTime: Date }>,
   competitionId: number,
   roster: ShooterRoster,
   rows: Array<typeof results.$inferInsert>
@@ -664,7 +667,7 @@ async function fetchFromIssf(
       } catch { continue; }
 
       for (const r of issfResults) {
-        const shooterId = await roster.matchIssf(r.issfId, r.firstName, r.lastName, r.nationCode);
+        const shooterId = await roster.matchIssf(r.issfId, r.firstName, r.lastName, r.nationCode, { category: slot.category, date: slot.startTime });
         if (!shooterId) continue;
 
         rows.push({
@@ -691,7 +694,7 @@ async function fetchFromIssf(
         } catch { continue; }
 
         for (const r of issfResults) {
-          const shooterId = await roster.matchIssf(r.issfId, r.firstName, r.lastName, r.nationCode);
+          const shooterId = await roster.matchIssf(r.issfId, r.firstName, r.lastName, r.nationCode, { category: slot.category, date: slot.startTime });
           if (!shooterId) continue;
 
           rows.push({
@@ -721,7 +724,7 @@ async function fetchFromIssf(
       const finalDetails = buildIssfFinalDetails(slot.disciplineCode, finalists);
 
       for (const [index, r] of finalists.entries()) {
-        const shooterId = await roster.matchIssf(r.issfId, r.firstName, r.lastName, r.nationCode);
+        const shooterId = await roster.matchIssf(r.issfId, r.firstName, r.lastName, r.nationCode, { category: slot.category, date: slot.startTime });
         if (!shooterId) continue;
 
         rows.push({

@@ -26,11 +26,13 @@ export interface MixedCommitEntry {
   qualified?: boolean | null;
   m_lastName?: string;
   m_firstName?: string;
+  mIssfId?: string | null;
   m_series?: number[];
   mInners?: number | null;
   mTotal?: number;
   f_lastName?: string;
   f_firstName?: string;
+  fIssfId?: string | null;
   f_series?: number[];
   fInners?: number | null;
   fTotal?: number;
@@ -187,15 +189,16 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
   const candidates = isFinals ? [] : await db.select({
     id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName,
     previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames,
-    nationality: shooters.nationality, resultCount: shooterResultCount,
+    nationality: shooters.nationality, resultCount: shooterResultCount, issfId: shooters.issfId, birthYear: shooters.birthYear,
   }).from(shooters);
+  const matchDate = isFinals ? null : eventDate ?? (await db.query.competitions.findFirst({ where: eq(competitions.id, competitionId), columns: { date: true } }))?.date;
 
   for (const e of entries) {
     if (e.skip) { skipped++; continue; }
     try {
       const key = teamKey(e.nocCode, e.teamNumber);
       const old = existing.get(key);
-      const links: { shooter1Id?: number | null; shooter2Id?: number | null } = isFinals ? {} : linkTeamMembers(e, e.nocCode, candidates);
+      const links: { shooter1Id?: number | null; shooter2Id?: number | null } = isFinals ? {} : linkTeamMembers(e, e.nocCode, candidates, { category, date: matchDate });
       // nova veza sa profilom je izmena i kad su rezultati isti (timovi uvezeni pre povezivanja)
       const newLink = old && !isFinals && ((!old.shooter1Id && links.shooter1Id) || (!old.shooter2Id && links.shooter2Id));
       if (old && !newLink && teamChanges(old, e, isFinals).length === 0) { unchanged++; continue; }

@@ -61,6 +61,18 @@ describe("createShooterRoster", () => {
     expect(await roster.matchSius({ siusAthleteId: "SHFRAW1", firstName: "Nadiege", lastName: "MARIE-LOUIS", nation: "GLP" })).toBe(1);
   });
 
+  it("does not link a SIUS athlete to a namesake with another ISSF id", async () => {
+    const namesake = shooter(1, "Pushpender", "Singh", "IND", "SHINDM0206198601");
+    const roster = createShooterRoster([namesake], queries([namesake], [namesake]));
+    expect(await roster.matchSius({ siusAthleteId: "SHINDM2208200401", firstName: "Pushpender", lastName: "SINGH", nation: "IND" })).toBeNull();
+  });
+
+  it("does not link a youth athlete to a namesake who is too old for the category", async () => {
+    const adult = { ...shooter(1, "Pavel", "Hrabalik", "CZE"), birthYear: 1981 };
+    const roster = createShooterRoster([adult], queries([adult], [adult]));
+    expect(await roster.matchSius({ firstName: "Pavel", lastName: "HRABALIK", nation: "CZE" }, { category: "kadet", date: "2026-11-14" })).toBeNull();
+  });
+
   it("does not treat a local SIUS id as an ISSF id", async () => {
     const q = queries();
     const roster = createShooterRoster([shooter(1, "Other", "Name", "SVK", "S35/1")], q);

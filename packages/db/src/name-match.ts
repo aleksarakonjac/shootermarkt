@@ -62,12 +62,49 @@ export type MatchCandidate = {
   nationality?: string | null;
   /** Broj rezultata u bazi — razrešava dvosmislenu varijantu imena (aktivan strelac pre neaktivnog imenjaka). */
   resultCount?: number | null;
+  issfId?: string | null;
+  birthYear?: number | null;
 };
+
+/** Najviše godina (godina takmičenja − godište) po uzrasnoj kategoriji; ostale nemaju granicu. */
+const MAX_AGE: Record<string, number> = { pionir: 14, kadet: 16, mladji_junior: 18, junior: 21, mladji_senior: 23 };
+
+/** Kategorija nastupa i njegov datum (YYYY-MM-DD ili Date). */
+export type AgeContext = { category?: string | null; date?: string | Date | null };
+export type MatchOptions = { exactOnly?: boolean; age?: AgeContext };
+
+/** Prestar za kategoriju — po imenu je to imenjak. Bez godišta, datuma ili granice niko nije prestar. */
+function tooOld({ birthYear }: MatchCandidate, { category, date }: AgeContext) {
+  const max = MAX_AGE[category ?? ""];
+  return !!max && !!birthYear && !!date && new Date(date).getUTCFullYear() - birthYear > max;
+}
 
 export type MatchResult =
   | { kind: "exact"; id: number }
   | { kind: "suggestion"; id: number; name: string }
   | { kind: "none" };
+
+/** ISSF ID počinje sa "SH". SIUS identifikator je najčešće ISSF ID, a nekad lokalni broj organizatora. */
+export const asIssfId = (id: string | null | undefined) => (id?.startsWith("SH") ? id : null);
+
+/**
+ * Poklapanje kad izvor daje ID strelca (SIUS, ISSF): ISSF ID odlučuje. Po imenu se traži samo među
+ * strelcima bez ISSF ID-a — kandidat sa drugim ID-em je druga osoba (imenjak). Bez ID-a = matchShooter.
+ */
+export function matchAthlete(
+  id: string | null | undefined,
+  first: string,
+  last: string,
+  noc: string | null,
+  existing: MatchCandidate[],
+  options?: MatchOptions
+): MatchResult {
+  const issfId = asIssfId(id);
+  if (!issfId) return matchShooter(first, last, noc, existing, options);
+  const linked = existing.find((c) => c.issfId === issfId);
+  if (linked) return { kind: "exact", id: linked.id };
+  return matchShooter(first, last, noc, existing.filter((c) => !asIssfId(c.issfId)), options);
+}
 
 /**
  * Nađi poklapanje za strelca iz biltena među postojećima.
@@ -80,9 +117,10 @@ export function matchShooter(
   last: string,
   noc: string | null,
   existing: MatchCandidate[],
-  /** Samo tačno ime: bezbedno i nad delom tabele; varijante traže sve strelce te države. */
-  { exactOnly = false }: { exactOnly?: boolean } = {}
+  /** exactOnly: samo tačno ime, bezbedno i nad delom tabele (varijante traže sve strelce te države). */
+  { exactOnly = false, age }: MatchOptions = {}
 ): MatchResult {
+  if (age) existing = existing.filter((c) => !tooOld(c, age));
   const fLast = foldName(last);
   const fFirst = foldName(first);
   const nation = normalizeNoc(noc);

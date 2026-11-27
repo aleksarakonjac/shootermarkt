@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchShooter } from "./name-match";
+import { matchAthlete, matchShooter } from "./name-match";
 
 const aleksandra = { id: 1, firstName: "Aleksandra", lastName: "Stojadinović", previousLastNames: ["Havran"] };
 
@@ -48,5 +48,56 @@ describe("matchShooter spelling variants (SIUS vs ISSF)", () => {
   it("remembered first-name variants from merges match exactly", () => {
     const mariam = { id: 20, firstName: "Mariami", lastName: "PRANGISHVILI", previousFirstNames: ["Mariam"], nationality: "GEO" };
     expect(matchShooter("Mariam", "PRANGISHVILI", "GEO", [mariam])).toEqual({ kind: "exact", id: 20 });
+  });
+});
+
+describe("matchAthlete (ISSF ID odlučuje)", () => {
+  const namesake = { id: 1, firstName: "Pushpender", lastName: "SINGH", nationality: "IND", issfId: "SHINDM0206198601" };
+  const junior = { id: 2, firstName: "Pushpender", lastName: "SINGH", nationality: "IND", issfId: "SHINDM2208200401" };
+  const unlinked = { id: 3, firstName: "Pushpender", lastName: "SINGH", nationality: "IND", issfId: null };
+
+  it("bira strelca sa istim ID-em umesto prvog imenjaka", () => {
+    expect(matchAthlete("SHINDM2208200401", "Pushpender", "Singh", "IND", [namesake, junior])).toEqual({ kind: "exact", id: 2 });
+  });
+
+  it("ne vezuje za imenjaka sa drugim ID-em", () => {
+    expect(matchAthlete("SHINDM2208200401", "Pushpender", "Singh", "IND", [namesake])).toEqual({ kind: "none" });
+  });
+
+  it("po imenu prihvata strelca bez ISSF ID-a", () => {
+    expect(matchAthlete("SHINDM2208200401", "Pushpender", "Singh", "IND", [namesake, unlinked])).toEqual({ kind: "exact", id: 3 });
+  });
+
+  it("bez ISSF ID-a (ili uz lokalni SIUS broj) poklapa po imenu kao i do sada", () => {
+    expect(matchAthlete(null, "Pushpender", "Singh", "IND", [namesake])).toEqual({ kind: "exact", id: 1 });
+    expect(matchAthlete("S35/21945", "Pushpender", "Singh", "IND", [namesake])).toEqual({ kind: "exact", id: 1 });
+  });
+});
+
+describe("uzrasna granica pri poklapanju po imenu", () => {
+  const born = (id: number, birthYear: number | null, issfId: string | null = null) => ({ id, firstName: "Pavel", lastName: "HRABALIK", nationality: "CZE", birthYear, issfId });
+  const match = (candidates: ReturnType<typeof born>[], category: string, id: string | null = null) =>
+    matchAthlete(id, "Pavel", "Hrabalik", "CZE", candidates, { age: { category, date: "2026-11-14" } });
+
+  it("preskače prestarog imenjaka i uzima mlađeg ili onog bez godišta", () => {
+    expect(match([born(1, 1981)], "kadet")).toEqual({ kind: "none" });
+    expect(match([born(1, 1981), born(2, null)], "kadet")).toEqual({ kind: "exact", id: 2 });
+    expect(match([born(1, 1981), born(3, 2011)], "kadet")).toEqual({ kind: "exact", id: 3 });
+  });
+
+  it("granica po kategoriji je uključiva: U16 16, U18 18, junior 21", () => {
+    for (const [category, max] of [["kadet", 16], ["mladji_junior", 18], ["junior", 21]] as const) {
+      expect(match([born(1, 2026 - max)], category)).toEqual({ kind: "exact", id: 1 });
+      expect(match([born(1, 2026 - max - 1)], category)).toEqual({ kind: "none" });
+    }
+  });
+
+  it("seniori i nepoznat datum nemaju granicu", () => {
+    expect(match([born(1, 1981)], "senior")).toEqual({ kind: "exact", id: 1 });
+    expect(matchShooter("Pavel", "Hrabalik", "CZE", [born(1, 1981)], { age: { category: "kadet", date: null } })).toEqual({ kind: "exact", id: 1 });
+  });
+
+  it("isti ISSF ID pobeđuje i kad godište odudara", () => {
+    expect(match([born(1, 1981, "SHCZEM1710198101")], "kadet", "SHCZEM1710198101")).toEqual({ kind: "exact", id: 1 });
   });
 });

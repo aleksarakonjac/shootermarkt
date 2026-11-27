@@ -5,7 +5,7 @@ import { ensureCompetitionEvent } from "@/lib/competition-events";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { eventTypeFromName, groupsFromName } from "@/lib/competition-filters";
 import { refreshDisciplineGroups } from "@/lib/discipline-groups";
-import { matchShooter } from "@shootermarkt/db/name-match";
+import { asIssfId, matchAthlete } from "@shootermarkt/db/name-match";
 import { DISCIPLINE_META, type CommitPayload, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import { changedColumns, changedParts, resultColumns, upsertedResult, type ImportStatus } from "@/lib/import-diff";
 
@@ -127,7 +127,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
   for (const row of rows) {
     if (row.skip) { skipped++; continue; }
     // SIUS redovi u issfId nose lokalni SIUS ID (npr. "S35/21945") — u shooters.issf_id sme samo pravi ISSF ID
-    const rowIssfId = row.issfId?.startsWith("SH") ? row.issfId : null;
+    const rowIssfId = asIssfId(row.issfId);
     try {
       let clubId = row.clubId;
       if (!clubId && row.clubAbbr) {
@@ -143,17 +143,16 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
 
       let shooterId = row.shooterId;
       if (!shooterId) {
-        // issfId (ISSF import) pre imena; ime se ne prihvata ako taj strelac ima drugi issfId — druga osoba
         const issfId = rowIssfId;
-        const match = matchShooter(row.firstName, row.lastName, row.teamNoc || null, allShooters);
-        const byName = match.kind === "exact" ? allShooters.find((shooter) => shooter.id === match.id) : undefined;
-        const existing = (issfId && shooterByIssfId.get(issfId))
-          || (byName && (!issfId || !byName.issfId) ? byName : undefined);
+        const match = matchAthlete(issfId, row.firstName, row.lastName, row.teamNoc || null, allShooters, {
+          age: { category: row.category, date: row.eventDate ?? competitionDate },
+        });
+        const existing = match.kind === "exact" ? allShooters.find((shooter) => shooter.id === match.id) : undefined;
         if (existing) {
           shooterId = existing.id;
           const patch: Partial<typeof shooters.$inferInsert> = {};
-          // Samo po imenu (matchShooter pušta SRB/AIN/praznu naciju) → issfId tek uz istu naciju
-          if (issfId && !existing.issfId && (existing !== byName || existing.nationality === row.teamNoc)) {
+          // Bez ID-a na profilu pogodak je po imenu (pušta SRB/AIN/praznu naciju) → issfId tek uz istu naciju
+          if (issfId && !existing.issfId && existing.nationality === row.teamNoc) {
             patch.issfId = issfId;
             existing.issfId = issfId;
             shooterByIssfId.set(issfId, existing);
