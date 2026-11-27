@@ -18,7 +18,7 @@ import { useRowFlash } from "./useRowFlash";
 import { isUnrankedRemark, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
 
 export type MixedTeamRow = {
-  id: number; nocCode: string; teamNumber: number; shooter1Id: number | null; shooter2Id: number | null;
+  id: number; nocCode: string; teamNumber: number; clubName?: string | null; shooter1Id: number | null; shooter2Id: number | null;
   shooter1Name: string | null; shooter2Name: string | null;
   shooter1AvatarUrl?: string | null; shooter2AvatarUrl?: string | null; shooter1BirthYear?: number | null; shooter2BirthYear?: number | null;
   shooter1Detail: { series: number[]; inners?: number | null; total: number } | null; shooter2Detail: { series: number[]; inners?: number | null; total: number } | null;
@@ -158,7 +158,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
       const si = sheetId == null ? -1 : sorted.findIndex((t) => t.id === sheetId);
       const st = si >= 0 ? sorted[si] : null;
       if (!st) return { st: null, title: "", body: null };
-      const title = `${teamCountry(st.nocCode).name} ${st.teamNumber}`;
+      const title = st.clubName ?? `${teamCountry(st.nocCode).name} ${st.teamNumber}`;
       const stRank = isUnranked(st) ? null : rank(st); const stMark = remark(st) ?? remarkLabel(null, stageDetails(st), remarkCodes[si]);
       const stRounds = isMatch ? roundOutcomes(st) : null; const label = `${st.shooter1Name ?? ""} / ${st.shooter2Name ?? ""}`;
       const members = [
@@ -264,10 +264,10 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
           <div role="row" className={`group ${hasSeries || desktop ? "cursor-pointer" : ""} ${flashing.has(team.id) ? "result-row-flash" : ""}`} style={{ display: "contents" }} onClick={desktop ? () => setSheetId(sheetId === team.id ? null : team.id) : hasSeries ? () => toggle(team.id) : undefined}>
             <div className={`${cell} max-sm:!px-1.5 justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{teamRank == null ? <span className="text-[var(--subtle)]">—</span> : isFinal && showMedals && teamRank <= 3 ? <span className="flex w-full justify-center"><MedalIcon rank={teamRank} /></span> : <span className={teamRank <= 3 && !isFinal ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>{teamRank}</span>}</div>
             <div className={`${cell} min-w-0 group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
-              <span className="hidden sm:inline min-w-0 truncate text-sm text-[var(--ink)]">{countryName} {team.teamNumber}</span>
+              <span className="hidden sm:inline min-w-0 truncate text-sm text-[var(--ink)]">{team.clubName ?? `${countryName} ${team.teamNumber}`}</span>
             </div>
             <div className={`${cell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
-              <button type="button" onClick={(event) => { event.stopPropagation(); setSheetId(team.id); }} aria-label={`${en ? "Details" : "Detalji"}: ${noc} ${team.teamNumber}`} className="flex min-h-11 items-center sm:hidden"><span className="flex shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">{flags}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span></button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setSheetId(team.id); }} aria-label={`${en ? "Details" : "Detalji"}: ${noc} ${team.teamNumber}`} className="flex min-h-11 min-w-0 items-center sm:hidden"><span className="flex shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">{flags}{team.clubName ? <span className="max-w-20 truncate">{team.clubName}</span> : <>{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></>}</span></button>
               <span className="hidden shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)] sm:flex">{flags}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span>
             </div>
             <div className={`${memberCell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}><TeamMember id={team.shooter1Id} name={team.shooter1Name} onOpen={() => setSheetId(desktop && sheetId === team.id ? null : team.id)} /></div>

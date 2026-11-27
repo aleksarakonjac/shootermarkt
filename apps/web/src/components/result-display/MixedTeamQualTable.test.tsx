@@ -40,3 +40,11 @@ describe("MixedTeamQualTable — pair from two countries", () => {
     expect(container.querySelector(".fi-gb")).toBeTruthy();
   });
 });
+
+describe("MixedTeamQualTable — domestic club", () => {
+  it("shows the club instead of the country and team number", () => {
+    render(<MixedTeamQualTable teams={[{ ...team("SRB", 1, "16.0"), clubName: "Pancevo 1813" }]} apparatus="air_rifle" stage="final" />);
+    expect(screen.getAllByText("Pancevo 1813").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Serbia 1")).toBeNull();
+  });
+});

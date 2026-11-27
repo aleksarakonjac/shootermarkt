@@ -2,7 +2,7 @@ export const revalidate = 300;
 
 import { countryNameSql } from "@/lib/country-name";
 import { db } from "@shootermarkt/db";
-import { competitions, results, disciplines, countries, mixedTeamResults, competitionSchedule } from "@shootermarkt/db/schema";
+import { competitions, results, disciplines, countries, mixedTeamResults, teamResults, competitionSchedule } from "@shootermarkt/db/schema";
 import { eq, desc, ilike, inArray, and, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
@@ -373,9 +373,9 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
       .leftJoin(countries, eq(competitions.countryId, countries.id))
       .where(scopeFilter)
       .orderBy(competitions.date),
-    // Koje discipline ima koje takmičenje: rezultati, miks timovi i satnica.
+    // Koje discipline ima koje takmičenje: rezultati, miks i klupske ekipe, satnica.
     Promise.all(
-      [results, mixedTeamResults, competitionSchedule].map((source) =>
+      [results, mixedTeamResults, teamResults, competitionSchedule].map((source) =>
         db
           .selectDistinct({ id: competitions.id, code: disciplines.code, year: sql<string>`LEFT(${competitions.date}, 4)` })
           .from(source)

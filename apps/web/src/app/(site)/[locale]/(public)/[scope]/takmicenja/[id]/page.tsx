@@ -8,6 +8,7 @@ import {
   clubs,
   disciplines,
   mixedTeamResults,
+  teamResults, teamResultMembers,
   competitionSchedule,
   shooterFormaCache,
   olympicQuotas,
@@ -20,6 +21,7 @@ import type { Metadata } from "next";
 import { ScopedLink } from "../../../components/ScopedLink";
 import { CATEGORY_RANK } from "@shootermarkt/db/pdf-import-types";
 import { categoryLabel, localizeMatchName } from "@/lib/match-name";
+import { attachTeams } from "@/lib/competition-teams";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import {
   CompetitionResultsClient,
@@ -132,6 +134,7 @@ export default async function CompetitionPage({ params }: Props) {
         category: mixedTeamResults.category,
         nocCode: mixedTeamResults.nocCode,
         teamNumber: mixedTeamResults.teamNumber,
+        clubName: mixedTeamResults.clubName,
         competitionEventId: mixedTeamResults.competitionEventId,
         eventName: competitionEvents.name,
         eventDate: competitionEvents.date,
@@ -182,6 +185,25 @@ export default async function CompetitionPage({ params }: Props) {
       .where(eq(results.competitionId, compId)),
   ]);
   if (!comp) notFound();
+  // Klupske ekipe sa strelcima, po plasmanu.
+  const teamRows = await db
+    .select({
+      id: teamResults.id, teamName: teamResults.teamName, rank: teamResults.rank, total: teamResults.total, inners: teamResults.inners, remark: teamResults.remark,
+      category: teamResults.category, competitionEventId: teamResults.competitionEventId, eventName: competitionEvents.name, eventDate: competitionEvents.date,
+      disciplineCode: disciplines.code, disciplineName: disciplines.name, apparatus: disciplines.apparatus,
+    })
+    .from(teamResults)
+    .innerJoin(disciplines, eq(teamResults.disciplineId, disciplines.id))
+    .leftJoin(competitionEvents, eq(teamResults.competitionEventId, competitionEvents.id))
+    .where(eq(teamResults.competitionId, compId))
+    .orderBy(asc(teamResults.rank));
+  const teamMembers = teamRows.length
+    ? await db
+      .select({ teamResultId: teamResultMembers.teamResultId, shooterId: teamResultMembers.shooterId, name: teamResultMembers.name, series: teamResultMembers.series, total: teamResultMembers.total, inners: teamResultMembers.inners })
+      .from(teamResultMembers)
+      .where(inArray(teamResultMembers.teamResultId, teamRows.map((t) => t.id)))
+      .orderBy(asc(teamResultMembers.position))
+    : [];
   // Treninzi, ceremonije i ostalo iz satnice; ako tabela još ne postoji (migracija), stranica radi bez njih.
   const extraRows = await Promise.resolve(
     db
@@ -347,14 +369,14 @@ export default async function CompetitionPage({ params }: Props) {
     });
   }
 
-  const groups = disciplineOrder.map((key) => {
+  const individualGroups = disciplineOrder.map((key) => {
     const catMapForDiscipline = categoryMap.get(key)!;
-    const cats = categoryOrder
-      .get(key)!
-      .map((cat) => catMapForDiscipline.get(cat)!)
-      .sort((a, b) => CATEGORY_RANK[b.category] - CATEGORY_RANK[a.category]); // stariji prvo
-    return { ...disciplineMap.get(key)!, categories: cats };
+    return { ...disciplineMap.get(key)!, categories: categoryOrder.get(key)!.map((cat) => catMapForDiscipline.get(cat)!) };
   });
+  const teams = teamRows.map((t) => ({ ...t, members: teamMembers.filter((m) => m.teamResultId === t.id) }));
+  const groups = attachTeams(individualGroups, teams, locale).map((g) => ({
+    ...g, categories: [...g.categories].sort((a, b) => CATEGORY_RANK[b.category] - CATEGORY_RANK[a.category]), // stariji prvo
+  }));
   // Unutar discipline (pregled ih deli po danu ili polu, pa po kodu): stariji uzrast prvo, pa glavni meč, pa ostali po nazivu/datumu
   groups.sort((a, b) =>
     CATEGORY_RANK[b.categories[0].category] - CATEGORY_RANK[a.categories[0].category]
