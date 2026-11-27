@@ -215,11 +215,9 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   for (const [key, data] of mixedData) {
     const { eventCode, match } = parseSiusMatchKey(key);
     const { code, category } = splitEventCode(eventCode);
-    if (match > 1) {
-      // ponytail: mixed_team_results još nema competition_event_id — drugi meč se prijavljuje, ne upisuje preko prvog
-      errors.push(`${code}: ${match}. meč nije uvezen — mešoviti tim još nema podršku za više mečeva`);
-      continue;
-    }
+    // drugi meč mik tima (drugi dan) je zaseban meč takmičenja, kao kod pojedinačnih
+    const eventName = (data.matchCount ?? 1) > 1 && data.date ? matchEventName(match, data.date) : null;
+    const eventDate = eventName ? data.date! : null;
     const disciplineCode = code as MixedTeamEntry["disciplineCode"];
     if (data.qual.length === 0 && data.final.length === 0) {
       errors.push(`${disciplineCode}: no results`);
@@ -242,6 +240,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         teamNumber: nextTeamNumber(r.nocCode),
         disciplineCode,
         category,
+        eventName,
+        eventDate,
         qualRank: isUnrankedRemark(r.statusRemark) ? null : r.rank,
         qualTotal: r.rank === null ? null : r.total,
         inners: r.inners,
@@ -283,6 +283,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
           teamNumber: nextTeamNumber(r.nocCode),
           disciplineCode,
           category,
+          eventName,
+          eventDate,
           qualRank: null,
           qualTotal: null,
           inners: null,

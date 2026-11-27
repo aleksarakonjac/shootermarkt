@@ -407,6 +407,10 @@ export interface SiusTeamResult extends SiusExtraRemarks {
 export interface SiusMixedTeamData {
   qual: SiusTeamResult[];
   final: SiusTeamResult[];
+  /** Datum početka SIUS događaja (YYYY-MM-DD, UTC) */
+  date?: string;
+  /** Koliko mečeva te discipline takmičenje ima po SIUS rasporedu (različiti dani) */
+  matchCount?: number;
 }
 
 /** A team row can retain an athlete's historical federation (e.g. RUS), while
@@ -557,6 +561,8 @@ export async function fetchLiveSiusMixedTeamResults(
           .filter((e) => e.eventCode === event.eventCode)
           .sort((a, b) => a.startDate.localeCompare(b.startDate))
           .indexOf(event) + 1;
+        data.date = event.startDate.slice(0, 10);
+        data.matchCount = new Set(relevantEvents.filter((e) => e.eventCode === event.eventCode).map((e) => e.startDate.slice(0, 10))).size;
         out.set(n === 1 ? event.eventCode : `${event.eventCode}#${n}`, data);
       }
     })
