@@ -24,7 +24,8 @@ import {
   type PeriodType,
   type MetricEntry,
 } from "@/lib/ranking-metrics";
-import { CATEGORY_LABEL, type AgeCategory } from "@shootermarkt/db/pdf-import-types";
+import type { AgeCategory } from "@shootermarkt/db/pdf-import-types";
+import { categoryLabel } from "@/lib/match-name";
 import { SearchDropdown } from "@/components/ui/SearchDropdown";
 import { FormaScoreMark } from "@/components/shooter/FormaScoreMark";
 
@@ -443,7 +444,7 @@ export function RangiranjeClient({
                     : { background: "transparent", color: "var(--muted)", border: "1px solid var(--border)" }
                 }
               >
-                {CATEGORY_LABEL[cat]}
+                {categoryLabel(cat, locale)}
               </button>
             );
           })}
@@ -643,7 +644,7 @@ export function RangiranjeClient({
             <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 flex items-center justify-between">
               <span className="text-xs text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)]">
                 {t("shootersCount", { count: desktopRows.length })} · {labels.activeTabLabel}
-                {activeKategorija ? ` · ${CATEGORY_LABEL[activeKategorija]}` : ""}
+                {activeKategorija ? ` · ${categoryLabel(activeKategorija, locale)}` : ""}
                 {activeZemlja ? ` · ${activeZemlja}` : ""}
               </span>
               </div>
@@ -827,7 +828,7 @@ export function RangiranjeClient({
           <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2 flex items-center justify-between">
             <span className="text-xs text-[var(--muted)] font-[family-name:var(--font-jetbrains-mono)]">
               {t("shootersCount", { count: displayed.length })} · {labels.activeTabLabel}
-              {activeKategorija ? ` · ${CATEGORY_LABEL[activeKategorija]}` : ""}
+              {activeKategorija ? ` · ${categoryLabel(activeKategorija, locale)}` : ""}
               {activeZemlja ? ` · ${activeZemlja}` : ""}
             </span>
           </div>

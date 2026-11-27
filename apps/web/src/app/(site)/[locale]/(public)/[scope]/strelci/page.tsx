@@ -17,7 +17,8 @@ import { StrelciFilterBar } from "./StrelciFilterBar";
 import { StrelciTableTransition } from "./StrelciTableTransition";
 import { getLocale, getTranslations } from "next-intl/server";
 import { pageParams } from "@/i18n/page-params";
-import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear } from "@shootermarkt/db/pdf-import-types";
+import { computeAgeCategoryFromBirthYear } from "@shootermarkt/db/pdf-import-types";
+import { categoryLabel } from "@/lib/match-name";
 import { buildAlternates } from "@/i18n/alternates";
 import type { Metadata } from "next";
 import { type Scope } from "@/lib/scope";
@@ -664,7 +665,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
                       {/* Uzrasna kategorija */}
                       <td className="px-4 py-2.5 text-xs font-semibold text-[var(--muted)] hidden sm:table-cell">
                         {currentCategory ? (
-                          CATEGORY_LABEL[currentCategory]
+                          categoryLabel(currentCategory, locale)
                         ) : (
                           <span className="text-[var(--subtle)]">—</span>
                         )}

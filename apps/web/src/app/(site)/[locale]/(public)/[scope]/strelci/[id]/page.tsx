@@ -17,7 +17,8 @@ import { FormaChart } from "@/components/shooter/FormaChart";
 import type { ChartPoint, FormaScore } from "@/components/shooter/FormaChart";
 import { FormaScoreHeading } from "@/components/shooter/FormaScoreHeading";
 import { CareerStats, type CareerStat } from "@/components/shooter/CareerStats";
-import { CATEGORY_LABEL, computeAgeCategoryFromBirthYear, isEscSoloCode } from "@shootermarkt/db/pdf-import-types";
+import { computeAgeCategoryFromBirthYear, isEscSoloCode } from "@shootermarkt/db/pdf-import-types";
+import { categoryLabel } from "@/lib/match-name";
 import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
 import { getLocale, getTranslations } from "next-intl/server";
 import { pageParams } from "@/i18n/page-params";
@@ -366,7 +367,7 @@ export default async function ShooterPage({ params }: Props) {
               {currentCategory && (
                 <div className="flex min-w-0 items-baseline gap-1 text-sm">
                   <dt className="text-[var(--subtle)] shrink-0">{locale === "en" ? "Category" : "Kategorija"}:</dt>
-                  <dd className="min-w-0 text-[var(--ink)]">{CATEGORY_LABEL[currentCategory]}</dd>
+                  <dd className="min-w-0 text-[var(--ink)]">{categoryLabel(currentCategory, locale)}</dd>
                 </div>
               )}
             </dl>

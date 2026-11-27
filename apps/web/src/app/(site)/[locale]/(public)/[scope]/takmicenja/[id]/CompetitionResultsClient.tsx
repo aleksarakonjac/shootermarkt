@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef, useTransition, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChevronRight, ChevronLeft, RefreshCw } from "lucide-react";
+import { ChevronRight, ChevronLeft, RefreshCw, X } from "lucide-react";
 import type { QualDetail, FinalDetail, ElimDetail, AgeCategory } from "@shootermarkt/db/schema";
-import { CATEGORY_LABEL, isEscSoloCode, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
+import { DISCIPLINE_META, isEscSoloCode, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
 import { DISCIPLINE_DISPLAY_ORDER } from "@shootermarkt/db/discipline-names";
 import { EscSoloResults } from "@/components/result-display/EscSoloResults";
 import { NoSearchMatch, ResultSearch, matchesSearch, nocKeywords } from "@/components/result-display/ResultSearch";
@@ -28,6 +28,7 @@ import { isOlympicDiscipline } from "@/lib/olympic-disciplines";
 import { isQualOnlyDiscipline, shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
 import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
 import { categoryLabel } from "@/lib/match-name";
+import { disciplineFamily, filterOptions, matchesFilters, type Facets, type Family, type Filters, type Gender } from "@/lib/competition-result-filters";
 import { todayKey } from "./ScheduleSection";
 import { SheetInsightsProvider, type SheetForma, type SheetOtherResult } from "@/components/result-display/SheetInsights";
 
@@ -180,15 +181,11 @@ function disciplineOrder(code: string) {
 
 // Dok takmičenje traje, pregled je po danima (discipline bez datuma idu u grupu puška/pištolj posle dana).
 // Kad se završi, grupe su puška i pištolj (muški, ženski i miks iste discipline stoje zajedno), olimpijske prve.
-type Family = "rifle" | "pistol";
 const FAMILY_ORDER: Family[] = ["rifle", "pistol"];
 const FAMILY_LABELS: Record<string, Record<Family, string>> = {
   sr: { rifle: "Puška", pistol: "Pištolj" },
   en: { rifle: "Rifle", pistol: "Pistol" },
 };
-function disciplineFamily(code: string): Family {
-  return /^(AR|R3|RPR|STR|SOLOAR)/.test(code) ? "rifle" : "pistol";
-}
 // Olimpijske discipline (uključujući miks timove) idu pre neolimpijskih.
 const nonOlympic = (code: string) => (isOlympicDiscipline(code) ? 0 : 1);
 const ddmm = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
@@ -202,6 +199,14 @@ function disciplineName(code: string, locale: string): string {
   if (!entry) return code;
   return locale === "en" ? entry.en : entry.sr;
 }
+
+const GENDER_LABELS: Record<string, Record<Gender, string>> = {
+  sr: { M: "Muškarci", F: "Žene", X: "Miks" },
+  en: { M: "Men", F: "Women", X: "Mixed" },
+};
+// Čipovi su kratki na oba jezika; puni nazivi (Kadet, Mlađi junior) stoje u podnaslovima.
+const CATEGORY_CHIP: Record<Exclude<AgeCategory, "pionir">, string> = { kadet: "U16", mladji_junior: "U18", junior: "Junior", mladji_senior: "U23", senior: "Senior", master: "Master", open: "Open" };
+const categoryChip = (category: AgeCategory, locale: string) => (category === "pionir" ? (locale === "en" ? "Pioneer" : "Pionir") : CATEGORY_CHIP[category]);
 
 // ── Phase labels ──────────────────────────────────────────────────────────────
 
@@ -230,7 +235,7 @@ export function CompetitionResultsClient(props: Props) {
       const name = disciplineName(g.code, locale);
       for (const c of g.categories) {
         for (const r of c.results) {
-          const label = [name, g.label, c.category !== "senior" ? categoryLabel(c.category, CATEGORY_LABEL[c.category], locale) : null].filter(Boolean).join(" · ");
+          const label = [name, g.label, c.category !== "senior" ? categoryLabel(c.category, locale) : null].filter(Boolean).join(" · ");
           const entry: SheetOtherResult | null =
             r.finalRank != null || r.finalTotal != null ? { id: r.id, label: `${label} · ${en ? "Final" : "Finale"}`, total: r.finalTotal, rank: r.finalRank, stage: "final" }
             : r.qualTotal != null ? { id: r.id, label, total: r.qualTotal, rank: r.qualRank, stage: "qual" } : null;
@@ -257,6 +262,8 @@ function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel,
   const router = useRouter();
   const pathname = usePathname();
   const detailRef = useRef<HTMLDivElement>(null);
+  // Filteri pregleda žive ovde da prežive otvaranje discipline i povratak.
+  const [filters, setFilters] = useState<Filters>({});
   // Overview se unmount-uje dok je disciplina otvorena; pamtimo scroll da ga vratimo na izlazu.
   const overviewScroll = useRef<number | null>(null);
 
@@ -376,6 +383,8 @@ function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel,
             groups={groups}
             mixedGroups={mixedGroups}
             locale={locale}
+            filters={filters}
+            onFiltersChange={setFilters}
             onSelectIndividual={(code, category, stage, elimRound) => {
               const next = { kind: "individual" as const, disciplineCode: code, category, stage, elimRound };
               overviewScroll.current = window.scrollY;
@@ -427,6 +436,8 @@ function CompetitionOverview({
   groups,
   mixedGroups,
   locale,
+  filters,
+  onFiltersChange,
   onSelectIndividual,
   onSelectMixed,
 }: {
@@ -436,6 +447,8 @@ function CompetitionOverview({
   groups: DisciplineGroup[];
   mixedGroups: MixedTeamGroup[];
   locale: string;
+  filters: Filters;
+  onFiltersChange: (filters: Filters) => void;
   onSelectIndividual: (code: string, category: AgeCategory, stage: Stage, elimRound?: number) => void;
   onSelectMixed: (code: string, category: AgeCategory, stage: "qual" | "final" | "gold" | "bronze") => void;
 }) {
@@ -460,9 +473,17 @@ function CompetitionOverview({
     nav.scrollLeft += chipRect.left - navRect.left - (navRect.width - chipRect.width) / 2;
   }, [today]);
   const todayLabel = locale === "en" ? "Today" : "Danas";
+  const groupFacets = (g: DisciplineGroup): Facets => ({ family: disciplineFamily(g.code), categories: g.categories.map((c) => c.category), gender: DISCIPLINE_META[g.code as keyof typeof DISCIPLINE_META]?.gender ?? null });
+  const mixedFacets = (g: MixedTeamGroup): Facets => ({ family: disciplineFamily(g.code), categories: [g.category], gender: "X" });
+  const options = filterOptions([...groups.map(groupFacets), ...mixedGroups.map(mixedFacets)]);
+  // Izabran uzrast sužava i redove kategorija unutar discipline.
+  const shownGroups = groups
+    .filter((g) => matchesFilters(groupFacets(g), filters))
+    .map((g) => (filters.category ? { ...g, categories: g.categories.filter((c) => c.category === filters.category) } : g));
+  const shownMixed = mixedGroups.filter((g) => matchesFilters(mixedFacets(g), filters));
   const items: Array<{ key: string; code: string; date: string | null; node: React.ReactNode }> = [
       // Individual disciplines
-      ...groups.map((g) => {
+      ...shownGroups.map((g) => {
         const totalShooters = g.categories.reduce((count, category) => {
           const eliminationRows = category.results.filter((result) => result.elimRound != null);
           return count + (eliminationRows.length > 0
@@ -471,20 +492,25 @@ function CompetitionOverview({
         }, 0);
         const singleCat = g.categories.length === 1;
         const singleCatData = singleCat ? g.categories[0] : null;
+        // Podeljeni blokovi (id ≠ key) već nose kategoriju u oznaci meča.
+        const subCategory = g.id === g.key && singleCatData && (filters.category != null || singleCatData.category !== "senior") ? singleCatData.category : null;
 
         return { key: g.id, code: g.code, date: g.date, node: (
           <div>
-            <div className="flex items-center gap-2.5 mb-2">
+            <div className="flex items-center gap-2.5 mb-2.5">
               <span
-                className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded"
+                className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold px-2 py-0.5 rounded"
                 style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
               >
                 {g.code}
               </span>
-              <span className="text-sm font-semibold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
-              {g.label && <span className="text-xs font-semibold text-[var(--brand-primary)] truncate">{g.label}</span>}
-              {g.date && !byDay && <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)]">{ddmm(g.date)}</span>}
-              <span className="text-[0.8rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
+              <span className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                <span className="text-base sm:text-lg font-bold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
+                {g.label && <span className="text-sm sm:text-base font-semibold text-[var(--brand-primary)]">{g.label}</span>}
+                {subCategory && <span className="text-sm sm:text-base font-semibold text-[var(--brand-primary)]">{categoryLabel(subCategory, locale)}</span>}
+                {g.date && !byDay && <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm sm:text-base font-medium text-[var(--muted)]">{ddmm(g.date)}</span>}
+              </span>
+              <span className="shrink-0 text-[0.8rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
                 {totalShooters} {locale === "en" ? "athletes" : "strelaca"}
               </span>
             </div>
@@ -511,7 +537,7 @@ function CompetitionOverview({
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span className="text-sm font-semibold text-[var(--ink)] truncate">
-                          {CATEGORY_LABEL[cat.category]}
+                          {categoryLabel(cat.category, locale)}
                         </span>
                         <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">
                           {cat.results.length}
@@ -533,17 +559,21 @@ function CompetitionOverview({
       }),
 
       // Mixed team disciplines
-      ...mixedGroups.map((g) => ({ key: `${g.code}|${g.category}`, code: g.code, date: g.date, node: (
+      ...shownMixed.map((g) => ({ key: `${g.code}|${g.category}`, code: g.code, date: g.date, node: (
         <div>
-          <div className="flex items-center gap-2.5 mb-2">
+          <div className="flex items-center gap-2.5 mb-2.5">
             <span
-              className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded"
+              className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold px-2 py-0.5 rounded"
               style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
             >
               {g.code}
             </span>
-            <span className="text-sm font-semibold text-[var(--ink)]">{disciplineName(g.code, locale)}{g.category !== "senior" && ` · ${CATEGORY_LABEL[g.category]}`}</span>
-            <span className="text-[0.8rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
+            <span className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+              <span className="text-base sm:text-lg font-bold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
+              {(g.category !== "senior" || filters.category != null) && <span className="text-sm sm:text-base font-semibold text-[var(--brand-primary)]">{categoryLabel(g.category, locale)}</span>}
+              {g.date && !byDay && <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm sm:text-base font-medium text-[var(--muted)]">{ddmm(g.date)}</span>}
+            </span>
+            <span className="shrink-0 text-[0.8rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
               {g.teams.length} {locale === "en" ? "teams" : "timova"}
             </span>
           </div>
@@ -569,44 +599,60 @@ function CompetitionOverview({
   ];
 
   // Sekcija: dan (kad je pregled po danima i stavka ima datum), inače grupa disciplina. Unutar sekcije po kodu discipline.
-  const sectionOf = (item: (typeof items)[number]): string => (byDay && item.date ? item.date : disciplineFamily(item.code));
+  const sectionOf = (item: { code: string; date: string | null }): string => (byDay && item.date ? item.date : disciplineFamily(item.code));
   // dani (ISO) hronološki, pa grupe disciplina; "~" je u ASCII posle cifara
   const sectionRank = (key: string) => (/^\d/.test(key) ? key : `~${FAMILY_ORDER.indexOf(key as Family)}`);
   const sections = [...new Set(items.map(sectionOf))].sort((a, b) => (sectionRank(a) < sectionRank(b) ? -1 : 1));
   const familyLabels = FAMILY_LABELS[locale] ?? FAMILY_LABELS.en;
 
   const isDaySection = (section: string) => /^\d/.test(section);
+  // Naslovi sekcija zavise od celog takmičenja, da filter ne ukloni kontekst.
+  const showHeadings = new Set([...groups, ...mixedGroups].map(sectionOf)).size > 1;
+  const daySections = sections.filter(isDaySection);
+  const en = locale === "en";
+  const hasFilterBar = Object.values(options).some((values) => values.length > 0);
 
   return (
     <div className="flex flex-col gap-10">
-      {sections.length > 1 && (
-        // Prečice do sekcija: sidra (rade i bez JS-a), skrol bez menjanja URL-a
-        <nav
-          ref={navRef}
-          aria-label={locale === "en" ? "Jump to section" : "Skok na sekciju"}
-          className="-mb-4 flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 [scrollbar-width:none]"
-        >
-          {sections.map((section) => (
-            <a
-              key={section}
-              href={`#sekcija-${section}`}
-              onClick={(e) => {
-                e.preventDefault();
-                document.getElementById(`sekcija-${section}`)?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
-              }}
-              className="flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--bg)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand-primary)]"
+      {(hasFilterBar || (showHeadings && daySections.length > 0)) && (
+        <div className="-mb-4 flex flex-col gap-2">
+          {hasFilterBar && (
+            <div className="flex flex-wrap gap-2">
+              <FilterGroup label={en ? "Weapon" : "Oružje"} options={options.family} text={(f) => familyLabels[f]} value={filters.family} onChange={(family) => onFiltersChange({ ...filters, family })} />
+              <FilterGroup label={en ? "Age category" : "Uzrasna kategorija"} options={options.category} text={(c) => categoryChip(c, locale)} value={filters.category} onChange={(category) => onFiltersChange({ ...filters, category })} />
+              <FilterGroup label={en ? "Gender" : "Pol"} options={options.gender} text={(g) => (GENDER_LABELS[locale] ?? GENDER_LABELS.en)[g]} value={filters.gender} onChange={(gender) => onFiltersChange({ ...filters, gender })} />
+            </div>
+          )}
+          {showHeadings && daySections.length > 0 && (
+            // Prečice do dana: sidra (rade i bez JS-a), skrol bez menjanja URL-a
+            <nav
+              ref={navRef}
+              aria-label={en ? "Jump to day" : "Skok na dan"}
+              className="flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 [scrollbar-width:none]"
             >
-              {isDaySection(section) ? (
-                <>
+              {daySections.map((section) => (
+                <a
+                  key={section}
+                  href={`#sekcija-${section}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById(`sekcija-${section}`)?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+                  }}
+                  className="flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--bg)] hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand-primary)]"
+                >
                   {section === today ? <span className="text-[var(--brand-primary)]">{todayLabel}</span> : weekday(section, locale, "short")}
                   <span className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-medium normal-case tracking-normal text-[var(--subtle)]">{ddmm(section)}</span>
-                </>
-              ) : (
-                familyLabels[section as Family]
-              )}
-            </a>
-          ))}
-        </nav>
+                </a>
+              ))}
+            </nav>
+          )}
+        </div>
+      )}
+      {items.length === 0 && (
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-12 text-center">
+          <p className="mx-auto text-sm text-[var(--muted)]">{en ? "No disciplines match these filters." : "Nema disciplina za izabrane filtere."}</p>
+          <button type="button" onClick={() => onFiltersChange({})} className="mt-3 text-sm font-semibold text-[var(--brand-primary)] hover:underline">{en ? "Clear filters" : "Poništi filtere"}</button>
+        </div>
       )}
       {sections.map((section) => {
         const sectionItems = items
@@ -616,8 +662,8 @@ function CompetitionOverview({
         const isDay = /^\d/.test(section);
         return (
           <section key={section} id={`sekcija-${section}`} className="flex scroll-mt-24 flex-col gap-5" aria-label={isDay ? `${weekday(section, locale)} ${ddmm(section)}` : familyLabels[section as Family]}>
-            {sections.length > 1 && (
-              <h3 className="flex items-center gap-3 font-[family-name:var(--font-barlow-condensed)] font-bold uppercase text-[var(--ink)] text-lg leading-none tracking-[-0.01em]">
+            {showHeadings && (
+              <h3 className="flex items-center gap-3 font-[family-name:var(--font-barlow-condensed)] font-extrabold uppercase text-[var(--ink)] text-2xl leading-none tracking-[-0.01em]">
                 {isDay ? (
                   <>
                     <span className={section === today ? "text-[var(--brand-primary)]" : undefined}>{section === today ? todayLabel : weekday(section, locale)}</span>
@@ -631,6 +677,34 @@ function CompetitionOverview({
             )}
             {sectionItems.map((item) => <div key={item.key}>{item.node}</div>)}
           </section>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Filter group ──────────────────────────────────────────────────────────────
+
+/** Klik na izabranu vrednost poništava filter; X pored nje to i pokazuje. */
+function FilterGroup<T extends string>({ label, options, text, value, onChange }: { label: string; options: T[]; text: (option: T) => string; value: T | undefined; onChange: (value: T | undefined) => void }) {
+  if (options.length === 0) return null;
+  return (
+    <div role="group" aria-label={label} className="flex max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 [scrollbar-width:none]">
+      {options.map((key) => {
+        const active = value === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(active ? undefined : key)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--brand-primary)] ${
+              active ? "bg-[var(--brand-primary)] text-white" : "text-[var(--muted)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
+            }`}
+          >
+            {text(key)}
+            {active && <X size={13} strokeWidth={2.75} aria-hidden="true" />}
+          </button>
         );
       })}
     </div>
@@ -872,9 +946,9 @@ function CompetitionDetail({
             </span>
             <h3
               className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase truncate"
-              style={{ fontSize: "1.1rem", letterSpacing: "-0.02em", lineHeight: 1.2 }}
+              style={{ fontSize: "1.5rem", letterSpacing: "-0.02em", lineHeight: 1.2 }}
             >
-              {mixedGroup ? disciplineName(mixedGroup.code, locale) : ""}{selection.category !== "senior" && ` · ${CATEGORY_LABEL[selection.category]}`}
+              {mixedGroup ? disciplineName(mixedGroup.code, locale) : ""}{selection.category !== "senior" && ` · ${categoryLabel(selection.category, locale)}`}
             </h3>
             <RefreshButton onRefresh={onRefresh} refreshing={refreshing} locale={locale} />
           </div>
@@ -1068,19 +1142,19 @@ function CompetitionDetail({
           </span>
           <h3
             className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase"
-            style={{ fontSize: "1.1rem", letterSpacing: "-0.02em", lineHeight: 1.2 }}
+            style={{ fontSize: "1.5rem", letterSpacing: "-0.02em", lineHeight: 1.2 }}
           >
             {disciplineName(group?.code ?? selection.disciplineCode, locale)}
           </h3>
           {group?.label && (
-            <span className="text-sm font-semibold text-[var(--brand-primary)]">{group.label}</span>
+            <span className="text-base sm:text-lg font-semibold text-[var(--brand-primary)]">{group.label}</span>
           )}
           {group?.date && (
-            <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm font-medium text-[var(--muted)]">{ddmm(group.date)}</span>
+            <span className="font-[family-name:var(--font-jetbrains-mono)] text-base font-medium text-[var(--muted)]">{ddmm(group.date)}</span>
           )}
           {showCategory && (
-            <span className="text-sm font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
-              {CATEGORY_LABEL[selection.category]}
+            <span className="text-lg sm:text-xl font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
+              {categoryLabel(selection.category, locale)}
             </span>
           )}
           <RefreshButton onRefresh={onRefresh} refreshing={refreshing} locale={locale} />
