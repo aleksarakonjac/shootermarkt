@@ -1,0 +1,4 @@
+DROP INDEX "mixed_team_results_comp_disc_cat_noc_unique";--> statement-breakpoint
+ALTER TABLE "mixed_team_results" ADD COLUMN "competition_event_id" integer;--> statement-breakpoint
+ALTER TABLE "mixed_team_results" ADD CONSTRAINT "mixed_team_results_competition_event_id_competition_events_id_fk" FOREIGN KEY ("competition_event_id") REFERENCES "public"."competition_events"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "mixed_team_results" ADD CONSTRAINT "mixed_team_results_comp_event_disc_cat_noc_unique" UNIQUE NULLS NOT DISTINCT("competition_id","competition_event_id","discipline_id","category","noc_code","team_number");

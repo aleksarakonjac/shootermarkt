@@ -673,6 +673,8 @@ export const mixedTeamResults = pgTable(
     nocCode: varchar("noc_code", { length: 3 }).notNull(),
     // A nation can enter 2 teams (e.g. "China 1", "China 2") — distinguishes them.
     teamNumber: smallint("team_number").notNull().default(1),
+    // Zaseban meč istog takmičenja (drugi dan, memorijal); null = glavni meč. Isto kao results.competitionEventId.
+    competitionEventId: integer("competition_event_id").references(() => competitionEvents.id),
     // Optional links to shooters in our DB
     shooter1Id: integer("shooter1_id").references(() => shooters.id, { onDelete: "set null" }),
     shooter2Id: integer("shooter2_id").references(() => shooters.id, { onDelete: "set null" }),
@@ -703,7 +705,10 @@ export const mixedTeamResults = pgTable(
   },
   (t) => [
     index("mixed_team_results_comp_idx").on(t.competitionId),
-    uniqueIndex("mixed_team_results_comp_disc_cat_noc_unique").on(t.competitionId, t.disciplineId, t.category, t.nocCode, t.teamNumber),
+    // NULLS NOT DISTINCT: timovi bez zasebnog meča i dalje imaju jedan red po (takmičenje, disciplina, kategorija, NOC, broj tima).
+    unique("mixed_team_results_comp_event_disc_cat_noc_unique")
+      .on(t.competitionId, t.competitionEventId, t.disciplineId, t.category, t.nocCode, t.teamNumber)
+      .nullsNotDistinct(),
   ]
 );
 

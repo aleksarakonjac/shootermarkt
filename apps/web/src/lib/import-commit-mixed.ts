@@ -1,8 +1,12 @@
 import { db } from "@shootermarkt/db";
-import { competitions, disciplines, mixedTeamResults } from "@shootermarkt/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { competitionEvents, competitions, disciplines, mixedTeamResults, shooters } from "@shootermarkt/db/schema";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
 import { eventTypeFromName } from "@/lib/competition-filters";
+import { ensureCompetitionEvent } from "@/lib/competition-events";
+import { formatDateSr } from "@/lib/date-utils";
+import { shooterResultCount } from "@/lib/import-commit";
+import { linkTeamMembers } from "@/lib/mixed-team-link";
 import { changedColumns, changedParts, type ImportStatus } from "@/lib/import-diff";
 import { commitMixedStages, toFinalCommit, toQualCommit } from "@/app/(site)/(admin)/admin/rezultati/_shared/commitMixedTeams";
 import { isUnrankedRemark, type CompetitionLevel, type EventType, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
@@ -68,9 +72,10 @@ function stageColumns(e: MixedCommitEntry, isFinals: boolean) {
 
 const teamKey = (nocCode: string, teamNumber: number | undefined) => `${nocCode}#${teamNumber ?? 1}`;
 
-async function loadTeams(competitionId: number, disciplineId: number, category: NonNullable<MixedCommitInput["category"]>) {
+async function loadTeams(competitionId: number, eventId: number | null, disciplineId: number, category: NonNullable<MixedCommitInput["category"]>) {
   const rows = await db.select().from(mixedTeamResults).where(and(
     eq(mixedTeamResults.competitionId, competitionId), eq(mixedTeamResults.disciplineId, disciplineId), eq(mixedTeamResults.category, category),
+    eventId === null ? isNull(mixedTeamResults.competitionEventId) : eq(mixedTeamResults.competitionEventId, eventId),
   ));
   return new Map<string, Record<string, unknown>>(rows.map((r) => [teamKey(r.nocCode, r.teamNumber), r]));
 }
@@ -86,10 +91,17 @@ function teamChanges(old: Record<string, unknown>, e: MixedCommitEntry, isFinals
 /** Šta bi uvoz uradio sa svakim mešovitim timom, bez ijednog upisa. */
 export async function previewMixedTeams(competitionId: number, entries: MixedTeamEntry[]): Promise<{ status: ImportStatus; changes: string[] }[]> {
   const disciplineIds = new Map<string, number>((await db.select().from(disciplines)).map((d) => [d.code, d.id]));
-  const rows = await db.select().from(mixedTeamResults).where(eq(mixedTeamResults.competitionId, competitionId));
+  const [rows, events] = await Promise.all([
+    db.select().from(mixedTeamResults).where(eq(mixedTeamResults.competitionId, competitionId)),
+    db.select({ id: competitionEvents.id, name: competitionEvents.name }).from(competitionEvents).where(eq(competitionEvents.competitionId, competitionId)),
+  ]);
+  const eventIds = new Map(events.map((ev) => [ev.name, ev.id]));
   return entries.map((e) => {
-    const old = rows.find((r) => r.disciplineId === disciplineIds.get(e.disciplineCode) && r.category === (e.category ?? "senior")
-      && r.nocCode === e.nocCode && r.teamNumber === e.teamNumber);
+    const name = e.eventName?.trim();
+    // meč koji još ne postoji → svi njegovi timovi su novi
+    const eventId = name ? eventIds.get(name) : null;
+    const old = eventId === undefined ? undefined : rows.find((r) => r.disciplineId === disciplineIds.get(e.disciplineCode) && r.category === (e.category ?? "senior")
+      && r.competitionEventId === eventId && r.nocCode === e.nocCode && r.teamNumber === e.teamNumber);
     if (!old) return { status: "new", changes: [] };
     const columns = teamChanges(old, toQualCommit(e), false);
     if (e.finalRank != null) columns.push(...teamChanges(old, toFinalCommit(e), true));
@@ -104,6 +116,9 @@ export interface MixedCommitInput {
   category?: typeof mixedTeamResults.$inferInsert["category"];
   isFinals: boolean;
   entries: MixedCommitEntry[];
+  /** Zaseban meč (competition_events); null/izostavljeno = glavni meč. */
+  eventName?: string | null;
+  eventDate?: string | null;
   competitionId?: number;
   competition?: { name: string; date: string; location?: string; level: CompetitionLevel; eventType?: EventType };
 }
@@ -150,14 +165,39 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
   /** Timovi upisani u ovoj fazi (novi ili izmenjeni) — pozivalac spaja kvalifikacije i finale. */
   const written: string[] = [], updated: string[] = [];
   const errors: string[] = [];
-  const existing = await loadTeams(competitionId, disc.id, category);
+  const eventName = input.eventName?.trim();
+  let eventDate = input.eventDate;
+  if (eventName && !eventDate) {
+    eventDate = (await db.query.competitions.findFirst({ where: eq(competitions.id, competitionId), columns: { date: true } }))?.date;
+  }
+  if (eventName && input.eventDate) {
+    // meč ima jedan datum: postojeći meč istog naziva sa drugim datumom bi tiho progutao datum timova
+    const existingEvent = await db.query.competitionEvents.findFirst({
+      where: and(eq(competitionEvents.competitionId, competitionId), eq(competitionEvents.name, eventName)),
+      columns: { date: true },
+    });
+    if (existingEvent && existingEvent.date !== input.eventDate) {
+      throw new MixedCommitError(`Meč „${eventName}“ već ima datum ${formatDateSr(existingEvent.date)} — za timove upiši drugi naziv.`, 409);
+    }
+  }
+  const competitionEventId = eventName ? await ensureCompetitionEvent(competitionId, eventName, eventDate!) : null;
+  const existing = await loadTeams(competitionId, competitionEventId, disc.id, category);
+  // Članovi se povezuju pri upisu kvalifikacija (finale nosi iste ljude).
+  const candidates = isFinals ? [] : await db.select({
+    id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName,
+    previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames,
+    nationality: shooters.nationality, resultCount: shooterResultCount,
+  }).from(shooters);
 
   for (const e of entries) {
     if (e.skip) { skipped++; continue; }
     try {
       const key = teamKey(e.nocCode, e.teamNumber);
       const old = existing.get(key);
-      if (old && teamChanges(old, e, isFinals).length === 0) { unchanged++; continue; }
+      const links: { shooter1Id?: number | null; shooter2Id?: number | null } = isFinals ? {} : linkTeamMembers(e, e.nocCode, candidates);
+      // nova veza sa profilom je izmena i kad su rezultati isti (timovi uvezeni pre povezivanja)
+      const newLink = old && !isFinals && ((!old.shooter1Id && links.shooter1Id) || (!old.shooter2Id && links.shooter2Id));
+      if (old && !newLink && teamChanges(old, e, isFinals).length === 0) { unchanged++; continue; }
       const columns = stageColumns(e, isFinals);
       await db
         .insert(mixedTeamResults)
@@ -167,13 +207,23 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
           category,
           nocCode: e.nocCode,
           teamNumber: e.teamNumber ?? 1,
+          competitionEventId,
           ...columns,
+          ...links,
           remarkDetails: e.extras ? { [isFinals ? "final" : "qual"]: e.extras } : null,
           source: "manual",
         })
         .onConflictDoUpdate({
-          target: [mixedTeamResults.competitionId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
-          set: { ...columns, remarkDetails: mergeRemarkDetails },
+          target: [mixedTeamResults.competitionId, mixedTeamResults.competitionEventId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
+          set: {
+            ...columns,
+            // postojeća veza (live cron, ručno povezivanje) se ne gazi
+            ...(isFinals ? {} : {
+              shooter1Id: sql`coalesce(${mixedTeamResults.shooter1Id}, excluded.shooter1_id)`,
+              shooter2Id: sql`coalesce(${mixedTeamResults.shooter2Id}, excluded.shooter2_id)`,
+            }),
+            remarkDetails: mergeRemarkDetails,
+          },
         });
       inserted++;
       written.push(key);

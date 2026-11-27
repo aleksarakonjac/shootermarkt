@@ -38,7 +38,7 @@ export async function diffSiusImport(competitionId: number, rows: ReviewRow[], t
     [code, category && category !== "senior" ? category : null, name].filter(Boolean).join(" · ");
   return summarizeDiff([
     ...rows.map((r, i) => ({ label: `${r.lastName} ${r.firstName} (${r.teamNoc}) · ${event(r.disciplineCode, r.category, r.eventName)}`, ...individual[i] })),
-    ...teams.map((t, i) => ({ label: `Tim ${t.nocCode} ${t.teamNumber} · ${event(t.disciplineCode, t.category)}`, ...mixed[i] })),
+    ...teams.map((t, i) => ({ label: `Tim ${t.nocCode} ${t.teamNumber} · ${event(t.disciplineCode, t.category, t.eventName)}`, ...mixed[i] })),
   ]);
 }
 

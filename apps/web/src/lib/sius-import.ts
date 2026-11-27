@@ -8,7 +8,7 @@ import { competitions, shooters } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import { isUnrankedRemark, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
-import { escSoloReviewRows, stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
+import { escSoloReviewRows, mixedTeamMatch, stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
 import { matchShooter } from "@shootermarkt/db/name-match";
 
 /** ESC Solo SIUS eventi (juniorske varijante se ne nagađaju dok se ne pojave u podacima). */
@@ -215,11 +215,12 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   for (const [key, data] of mixedData) {
     const { eventCode, match } = parseSiusMatchKey(key);
     const { code, category } = splitEventCode(eventCode);
-    if (match > 1) {
-      // ponytail: mixed_team_results još nema competition_event_id — drugi meč se prijavljuje, ne upisuje preko prvog
-      errors.push(`${code}: ${match}. meč nije uvezen — mešoviti tim još nema podršku za više mečeva`);
+    const teamMatch = mixedTeamMatch(match, data.matchCount, data.date);
+    if (!teamMatch) {
+      errors.push(`${code}: ${match}. meč istog dana nije uvezen — prepisao bi prvi meč`);
       continue;
     }
+    const { eventName, eventDate } = teamMatch;
     const disciplineCode = code as MixedTeamEntry["disciplineCode"];
     if (data.qual.length === 0 && data.final.length === 0) {
       errors.push(`${disciplineCode}: no results`);
@@ -242,6 +243,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         teamNumber: nextTeamNumber(r.nocCode),
         disciplineCode,
         category,
+        eventName,
+        eventDate,
         qualRank: isUnrankedRemark(r.statusRemark) ? null : r.rank,
         qualTotal: r.rank === null ? null : r.total,
         inners: r.inners,
@@ -283,6 +286,8 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
           teamNumber: nextTeamNumber(r.nocCode),
           disciplineCode,
           category,
+          eventName,
+          eventDate,
           qualRank: null,
           qualTotal: null,
           inners: null,

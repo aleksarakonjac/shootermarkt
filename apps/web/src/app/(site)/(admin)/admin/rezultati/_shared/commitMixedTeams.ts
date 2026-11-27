@@ -3,7 +3,7 @@ import type { MixedCommitEntry, MixedCommitInput } from "@/lib/import-commit-mix
 import type { MixedTeamEntry } from "./MixedTeamReviewTable";
 
 type StageResult = { inserted?: number; skipped?: number; written?: string[]; updated?: string[]; errors?: string[] };
-type StageInput = Required<Pick<MixedCommitInput, "discipline" | "category" | "isFinals" | "entries">>;
+type StageInput = Required<Pick<MixedCommitInput, "discipline" | "category" | "isFinals" | "entries" | "eventName" | "eventDate">>;
 
 export const toQualCommit = (e: MixedTeamEntry): MixedCommitEntry => ({
   skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber, qualRank: e.qualRank, qualTotal: e.qualTotal, qualInners: e.inners, qualRemark: e.qualRemark, qualified: e.qualified, extras: e.qualExtras,
@@ -15,21 +15,22 @@ export const toFinalCommit = (e: MixedTeamEntry): MixedCommitEntry => ({
   nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark, mFinalSeries: e.mFinalSeries, fFinalSeries: e.fFinalSeries, extras: e.finalExtras,
 });
 
-/** Commits qualification, then finals, per discipline and category. Counts are teams, not stages. */
+/** Commits qualification, then finals, per discipline, category and match. Counts are teams, not stages. */
 export async function commitMixedStages(entries: MixedTeamEntry[], commit: (input: StageInput) => Promise<StageResult>) {
   let inserted = 0, updated = 0, unchanged = 0, skipped = 0;
   const errors: string[] = [];
   const byEvent = new Map<string, MixedTeamEntry[]>();
   for (const entry of entries) {
-    const key = `${entry.disciplineCode}|${entry.category ?? "senior"}`;
+    const key = `${entry.disciplineCode}|${entry.category ?? "senior"}|${entry.eventName?.trim() ?? ""}`;
     byEvent.set(key, [...(byEvent.get(key) ?? []), entry]);
   }
   for (const rows of byEvent.values()) {
     const discipline = rows[0].disciplineCode, category = rows[0].category ?? "senior";
+    const eventName = rows[0].eventName?.trim() || null, eventDate = eventName ? rows[0].eventDate ?? null : null;
     let qual: StageResult;
     let finals: StageResult = {};
     try {
-      qual = await commit({ discipline, category, isFinals: false, entries: rows.map(toQualCommit) });
+      qual = await commit({ discipline, category, eventName, eventDate, isFinals: false, entries: rows.map(toQualCommit) });
     } catch (error) {
       errors.push(`${discipline}: ${error instanceof Error ? error.message : String(error)}`);
       continue;
@@ -37,7 +38,7 @@ export async function commitMixedStages(entries: MixedTeamEntry[], commit: (inpu
     const finalists = rows.filter((e) => !e.skip && e.finalRank != null);
     if (finalists.length) {
       try {
-        finals = await commit({ discipline, category, isFinals: true, entries: finalists.map(toFinalCommit) });
+        finals = await commit({ discipline, category, eventName, eventDate, isFinals: true, entries: finalists.map(toFinalCommit) });
       } catch (error) {
         errors.push(`${discipline} finale: ${error instanceof Error ? error.message : String(error)}`);
       }

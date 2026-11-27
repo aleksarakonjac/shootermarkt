@@ -50,21 +50,34 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         disciplineId: mixedTeamResults.disciplineId,
         code: disciplines.code,
         disciplineName: disciplines.name,
+        eventId: mixedTeamResults.competitionEventId,
+        eventName: competitionEvents.name,
+        eventDate: competitionEvents.date,
         category: mixedTeamResults.category,
         count: count(),
       })
       .from(mixedTeamResults)
       .innerJoin(disciplines, eq(disciplines.id, mixedTeamResults.disciplineId))
+      .leftJoin(competitionEvents, eq(competitionEvents.id, mixedTeamResults.competitionEventId))
       .where(eq(mixedTeamResults.competitionId, compId))
-      .groupBy(mixedTeamResults.disciplineId, disciplines.code, disciplines.name, mixedTeamResults.category)
-      .orderBy(asc(disciplines.code), asc(mixedTeamResults.category)),
+      .groupBy(mixedTeamResults.disciplineId, disciplines.code, disciplines.name, mixedTeamResults.competitionEventId, competitionEvents.name, competitionEvents.date, mixedTeamResults.category)
+      .orderBy(asc(disciplines.code), asc(competitionEvents.date), asc(mixedTeamResults.category)),
   ]);
 
   const groups: CompetitionResultGroup[] = [
     ...individual.map((r) => ({ kind: "individual" as const, ...r })),
-    ...mixed.map((r) => ({ kind: "mixed" as const, ...r, eventId: null, eventName: null, eventDate: null })),
+    ...mixed.map((r) => ({ kind: "mixed" as const, ...r })),
   ];
   return NextResponse.json({ groups });
+}
+
+/** Zasebni mečevi (competition_events) bez ijednog pojedinačnog rezultata i mik tima više nemaju smisla. */
+async function deleteEmptyEvents(compId: number) {
+  await db.delete(competitionEvents).where(and(
+    eq(competitionEvents.competitionId, compId),
+    notExists(db.select({ one: sql`1` }).from(results).where(eq(results.competitionEventId, competitionEvents.id))),
+    notExists(db.select({ one: sql`1` }).from(mixedTeamResults).where(eq(mixedTeamResults.competitionEventId, competitionEvents.id))),
+  ));
 }
 
 /**
@@ -84,23 +97,25 @@ async function handleDELETE(req: NextRequest, { params }: { params: Promise<{ id
   if (!Number.isInteger(disciplineId)) return NextResponse.json({ error: "Disciplina je obavezna" }, { status: 400 });
   const category: string | undefined = typeof body?.category === "string" ? body.category : undefined;
 
+  const hasEvent = body && "eventId" in body;
+  const eventId: number | null = hasEvent && body.eventId != null ? Number(body.eventId) : null;
+  if (hasEvent && body.eventId != null && !Number.isInteger(eventId)) {
+    return NextResponse.json({ error: "Neispravan meč" }, { status: 400 });
+  }
+
   if (body?.kind === "mixed") {
     const deleted = await db
       .delete(mixedTeamResults)
       .where(and(
         eq(mixedTeamResults.competitionId, compId),
         eq(mixedTeamResults.disciplineId, disciplineId),
+        hasEvent ? (eventId === null ? isNull(mixedTeamResults.competitionEventId) : eq(mixedTeamResults.competitionEventId, eventId)) : undefined,
         category ? eq(mixedTeamResults.category, category as never) : undefined,
       ))
       .returning({ id: mixedTeamResults.id });
+    await deleteEmptyEvents(compId);
     await refreshDisciplineGroups(compId);
     return NextResponse.json({ deleted: deleted.length });
-  }
-
-  const hasEvent = body && "eventId" in body;
-  const eventId: number | null = hasEvent && body.eventId != null ? Number(body.eventId) : null;
-  if (hasEvent && body.eventId != null && !Number.isInteger(eventId)) {
-    return NextResponse.json({ error: "Neispravan meč" }, { status: 400 });
   }
 
   const deleted = await db
@@ -113,11 +128,7 @@ async function handleDELETE(req: NextRequest, { params }: { params: Promise<{ id
     ))
     .returning({ shooterId: results.shooterId });
 
-  // Zasebni mečevi (competition_events) bez ijednog rezultata više nemaju smisla.
-  await db.delete(competitionEvents).where(and(
-    eq(competitionEvents.competitionId, compId),
-    notExists(db.select({ one: sql`1` }).from(results).where(eq(results.competitionEventId, competitionEvents.id))),
-  ));
+  await deleteEmptyEvents(compId);
 
   await refreshDisciplineGroups(compId);
   await recomputeFormaCache([...new Set(deleted.map((row) => row.shooterId))]);

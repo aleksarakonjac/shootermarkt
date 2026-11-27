@@ -2,6 +2,17 @@
 import type { SiusEscSoloAthlete, SiusExtraRemarks } from "@shootermarkt/adapters/sius/public-adapter";
 import type { AgeCategory, EscSoloCode, ReviewRow, StageRemarks } from "@shootermarkt/db/pdf-import-types";
 import { buildSiusFinalDetails } from "@/lib/final-detail";
+import { matchEventName } from "@/lib/match-name";
+
+/**
+ * Meč SIUS mik tima. Prvi meč ide u glavni meč, kao kod live praćenja i PDF uvoza (inače bi isti timovi bili u
+ * dva meča). Kasniji dan je zaseban meč; ponovljen događaj istog dana → null (ne sme da prepiše prvi).
+ */
+export function mixedTeamMatch(match: number, matchCount: number | undefined, date: string | undefined): { eventName: string | null; eventDate: string | null } | null {
+  if (match === 1) return { eventName: null, eventDate: null };
+  if ((matchCount ?? 1) <= 1 || !date) return null;
+  return { eventName: matchEventName(match, date), eventDate: date };
+}
 
 /** Only the non-empty penalty / shoot-off / record marks, or undefined when there are none. */
 export function stageRemarks(r: SiusExtraRemarks): StageRemarks | undefined {

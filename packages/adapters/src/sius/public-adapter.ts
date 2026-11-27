@@ -407,6 +407,10 @@ export interface SiusTeamResult extends SiusExtraRemarks {
 export interface SiusMixedTeamData {
   qual: SiusTeamResult[];
   final: SiusTeamResult[];
+  /** Datum početka SIUS događaja (YYYY-MM-DD, UTC) */
+  date?: string;
+  /** Koliko mečeva te discipline takmičenje ima po SIUS rasporedu (različiti dani) */
+  matchCount?: number;
 }
 
 /** A team row can retain an athlete's historical federation (e.g. RUS), while
@@ -516,7 +520,7 @@ export async function fetchLiveSiusMixedTeamResults(
   disciplineCodes: string[],
   opts: FetchOpts = {}
 ): Promise<Map<string, SiusMixedTeamData>> {
-  const out = new Map<string, SiusMixedTeamData>();
+  const fetched: Array<{ eventCode: string; startDate: string; data: SiusMixedTeamData }> = [];
 
   const allEvents = await fetchSiusEvents(compUuid);
   const relevantEvents = allEvents.filter((e) => disciplineCodes.includes(e.eventCode));
@@ -551,17 +555,32 @@ export async function fetchLiveSiusMixedTeamResults(
       );
       data.final = finalResults.flat();
 
-      if (data.qual.length > 0 || data.final.length > 0) {
-        // ponovljen događaj (drugi meč) ne prepisuje prvi — dobija ključ "ARMT#2" (vidi parseSiusMatchKey)
-        const n = relevantEvents
-          .filter((e) => e.eventCode === event.eventCode)
-          .sort((a, b) => a.startDate.localeCompare(b.startDate))
-          .indexOf(event) + 1;
-        out.set(n === 1 ? event.eventCode : `${event.eventCode}#${n}`, data);
-      }
+      if (data.qual.length > 0 || data.final.length > 0) fetched.push({ eventCode: event.eventCode, startDate: event.startDate, data });
     })
   );
 
+  return assignMixedTeamMatches(fetched);
+}
+
+/**
+ * Kao assignSiusMatches: svaki događaj sa kvalifikacijom je meč ("ARMT", "ARMT#2"…, hronološki), a događaj
+ * bez kvalifikacije (finale objavljeno posebno) nastavlja prethodni meč. Meč nosi datum kvalifikacija i broj mečeva discipline.
+ */
+export function assignMixedTeamMatches(events: Array<{ eventCode: string; startDate: string; data: SiusMixedTeamData }>): Map<string, SiusMixedTeamData> {
+  const out = new Map<string, SiusMixedTeamData>();
+  const count = new Map<string, number>();
+  for (const { eventCode, startDate, data } of [...events].sort((a, b) => a.startDate.localeCompare(b.startDate))) {
+    const n = count.get(eventCode) ?? 0;
+    const key = (m: number) => (m === 1 ? eventCode : `${eventCode}#${m}`);
+    const current = n ? out.get(key(n)) : undefined;
+    if (current && data.qual.length === 0) {
+      if (data.final.length > 0) current.final = data.final;
+      continue;
+    }
+    count.set(eventCode, n + 1);
+    out.set(key(n + 1), { ...data, date: startDate.slice(0, 10) });
+  }
+  for (const [key, data] of out) data.matchCount = count.get(key.split("#")[0]);
   return out;
 }
 

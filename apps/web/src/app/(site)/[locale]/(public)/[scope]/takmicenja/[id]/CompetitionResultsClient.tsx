@@ -27,7 +27,7 @@ import { startNavigationProgress, finishNavigationProgress } from "@/components/
 import { isOlympicDiscipline } from "@/lib/olympic-disciplines";
 import { isQualOnlyDiscipline, shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
 import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
-import { categoryLabel } from "@/lib/match-name";
+import { categoryLabel, localizeMatchName } from "@/lib/match-name";
 import { disciplineFamily, filterOptions, matchesFilters, type Facets, type Family, type Filters, type Gender } from "@/lib/competition-result-filters";
 import { todayKey } from "./ScheduleSection";
 import { SheetInsightsProvider, type SheetForma, type SheetOtherResult } from "@/components/result-display/SheetInsights";
@@ -80,7 +80,11 @@ export type DisciplineGroup = {
 };
 
 export type MixedTeamGroup = {
+  /** Kod za izbor i link: "ARMT", ili "ARMT@<event>" za zaseban meč */
+  key: string;
   code: string;
+  /** Naziv zasebnog meča; null = glavni meč */
+  eventName: string | null;
   category: AgeCategory;
   name: string;
   apparatus: string | null;
@@ -280,7 +284,7 @@ function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel,
     if (params.get("result") === "mixed") {
       // Linkovi bez kategorije (stariji) vode na senior.
       const mixedCategory = category ?? "senior";
-      return mixedGroups.some((group) => group.code === disciplineCode && group.category === mixedCategory)
+      return mixedGroups.some((group) => group.key === disciplineCode && group.category === mixedCategory)
         ? { kind: "mixed", disciplineCode, category: mixedCategory, stage, elimRound }
         : null;
     }
@@ -559,7 +563,7 @@ function CompetitionOverview({
       }),
 
       // Mixed team disciplines
-      ...shownMixed.map((g) => ({ key: `${g.code}|${g.category}`, code: g.code, date: g.date, node: (
+      ...shownMixed.map((g) => ({ key: `${g.key}|${g.category}`, code: g.code, date: g.date, node: (
         <div>
           <div className="flex items-center gap-2.5 mb-2.5">
             <span
@@ -571,6 +575,7 @@ function CompetitionOverview({
             <span className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
               <span className="text-base sm:text-lg font-bold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
               {(g.category !== "senior" || filters.category != null) && <span className="text-sm sm:text-base font-semibold text-[var(--brand-primary)]">{categoryLabel(g.category, locale)}</span>}
+              {g.eventName && <span className="text-sm sm:text-base font-semibold text-[var(--ink)]">{localizeMatchName(g.eventName, locale)}</span>}
               {g.date && !byDay && <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm sm:text-base font-medium text-[var(--muted)]">{ddmm(g.date)}</span>}
             </span>
             <span className="shrink-0 text-[0.8rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
@@ -580,7 +585,7 @@ function CompetitionOverview({
 
           <div className="rounded-xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
             <button
-              onClick={() => onSelectMixed(g.code, g.category, "qual")}
+              onClick={() => onSelectMixed(g.key, g.category, "qual")}
               className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
             >
               <div className="flex items-center gap-2.5 min-w-0">
@@ -592,7 +597,7 @@ function CompetitionOverview({
               </div>
               <ChevronRight size={14} className="shrink-0 text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
             </button>
-            {mixedFinalStages(g.teams).map((stage) => <button key={stage} onClick={() => onSelectMixed(g.code, g.category, stage)} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"><div className="flex items-center gap-2.5 min-w-0"><PhaseBadge label={stage === "final" ? "F" : stage === "gold" ? "G" : "B"} accent /><span className="text-sm font-semibold text-[var(--ink)]">{stage === "final" ? (PHASE_LABELS[locale] ?? PHASE_LABELS.en).final : (MATCH_LABELS[locale] ?? MATCH_LABELS.en)[stage]}</span><span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">{stage === "final" ? g.teams.filter((t) => t.finalRank != null || t.finalTotal != null).length : matchTeams(g.teams, stage).length}</span></div><ChevronRight size={14} className="shrink-0 text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" /></button>)}
+            {mixedFinalStages(g.teams).map((stage) => <button key={stage} onClick={() => onSelectMixed(g.key, g.category, stage)} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"><div className="flex items-center gap-2.5 min-w-0"><PhaseBadge label={stage === "final" ? "F" : stage === "gold" ? "G" : "B"} accent /><span className="text-sm font-semibold text-[var(--ink)]">{stage === "final" ? (PHASE_LABELS[locale] ?? PHASE_LABELS.en).final : (MATCH_LABELS[locale] ?? MATCH_LABELS.en)[stage]}</span><span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">{stage === "final" ? g.teams.filter((t) => t.finalRank != null || t.finalTotal != null).length : matchTeams(g.teams, stage).length}</span></div><ChevronRight size={14} className="shrink-0 text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" /></button>)}
           </div>
         </div>
       ) })),
@@ -916,7 +921,7 @@ function CompetitionDetail({
     : { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const };
 
   if (selection.kind === "mixed") {
-    const mixedGroup = mixedGroups.find((g) => g.code === selection.disciplineCode && g.category === selection.category);
+    const mixedGroup = mixedGroups.find((g) => g.key === selection.disciplineCode && g.category === selection.category);
     const finalStages = mixedGroup ? mixedFinalStages(mixedGroup.teams) : [];
     const mixedStage = selection.stage;
     const stageTeams = mixedGroup ? (mixedStage === "gold" || mixedStage === "bronze" ? matchTeams(mixedGroup.teams, mixedStage) : mixedGroup.teams) : [];
@@ -924,7 +929,7 @@ function CompetitionDetail({
     const shownTeams = mixedSearchable && query.trim()
       ? stageTeams.filter((t) => matchesSearch(query, t.shooter1Name, t.shooter2Name, nocKeywords(t.nocCode)))
       : stageTeams;
-    const showMixedMedals = shouldShowFinalMedals(finalSlots.find((slot) => slot.disciplineCode === selection.disciplineCode && slot.category === selection.category), [], now);
+    const showMixedMedals = shouldShowFinalMedals(finalSlots.find((slot) => slot.disciplineCode === (mixedGroup?.code ?? selection.disciplineCode) && slot.category === selection.category), [], now);
 
     return (
       <div>
@@ -942,13 +947,13 @@ function CompetitionDetail({
               className="font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] font-bold px-2 py-0.5 rounded shrink-0"
               style={{ background: "var(--brand-primary)", color: "#fff", letterSpacing: "0.06em" }}
             >
-              {selection.disciplineCode}
+              {mixedGroup?.code ?? selection.disciplineCode}
             </span>
             <h3
               className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase truncate"
               style={{ fontSize: "1.5rem", letterSpacing: "-0.02em", lineHeight: 1.2 }}
             >
-              {mixedGroup ? disciplineName(mixedGroup.code, locale) : ""}{selection.category !== "senior" && ` · ${categoryLabel(selection.category, locale)}`}
+              {mixedGroup ? disciplineName(mixedGroup.code, locale) : ""}{selection.category !== "senior" && ` · ${categoryLabel(selection.category, locale)}`}{mixedGroup?.eventName && ` · ${localizeMatchName(mixedGroup.eventName, locale)}`}
             </h3>
             <RefreshButton onRefresh={onRefresh} refreshing={refreshing} locale={locale} />
           </div>

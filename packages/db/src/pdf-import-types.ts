@@ -41,6 +41,9 @@ export interface MixedTeamEntry {
   disciplineCode: DisciplineCode;
   /** Izostavljeno = senior. */
   category?: AgeCategory;
+  /** Zaseban meč takmičenja (naziv + datum); null/izostavljeno = glavni meč. */
+  eventName?: string | null;
+  eventDate?: string | null;
   qualRank: number | null;
   qualTotal: number | null;
   inners: number | null;

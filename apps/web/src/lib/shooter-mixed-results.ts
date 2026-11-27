@@ -1,7 +1,7 @@
 import { and, eq, inArray, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@shootermarkt/db";
-import { competitions, countries, disciplines, mixedTeamResults, shooters } from "@shootermarkt/db/schema";
+import { competitionEvents, competitions, countries, disciplines, mixedTeamResults, shooters } from "@shootermarkt/db/schema";
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 import type { ResultRowData } from "@/components/result-display/ResultsHistoryTable";
 
@@ -28,6 +28,10 @@ export type MixedRowInput = {
   qualTotal: string | null;
   qualInners: number | null;
   qualRank: number | null;
+  /** Zaseban meč tima (drugi dan, memorijal); null = glavni meč. */
+  competitionEventId?: number | null;
+  eventName?: string | null;
+  eventDate?: string | null;
   qualified: boolean | null;
   finalTotal: string | null;
   finalRank: number | null;
@@ -95,8 +99,10 @@ export function toMixedHistoryRow(row: MixedRowInput, shooterId: number): Result
     mixedDetail: { own: isFirst ? row.shooter1Detail : row.shooter2Detail, partner: isFirst ? row.shooter2Detail : row.shooter1Detail },
     competitionId: row.competitionId,
     competitionName: row.competitionName,
-    competitionDate: row.competitionDate,
-    competitionDateEnd: row.competitionDateEnd,
+    competitionDate: row.eventDate ?? row.competitionDate,
+    competitionDateEnd: row.eventDate ? null : row.competitionDateEnd,
+    competitionEventId: row.competitionEventId ?? null,
+    eventName: row.eventName ?? null,
     competitionLocation: row.competitionLocation,
     competitionCountry: row.competitionCountry,
     competitionCountryCode2: row.competitionCountryCode2,
@@ -163,6 +169,9 @@ export async function getShooterMixedRows(shooterId: number, competitionIds?: nu
       finalRank: mixedTeamResults.finalRank,
       disciplineCode: disciplines.code,
       category: mixedTeamResults.category,
+      competitionEventId: mixedTeamResults.competitionEventId,
+      eventName: competitionEvents.name,
+      eventDate: competitionEvents.date,
       competitionId: competitions.id,
       competitionName: competitions.name,
       competitionDate: competitions.date,
@@ -174,6 +183,7 @@ export async function getShooterMixedRows(shooterId: number, competitionIds?: nu
     .from(mixedTeamResults)
     .innerJoin(competitions, eq(mixedTeamResults.competitionId, competitions.id))
     .innerJoin(disciplines, eq(mixedTeamResults.disciplineId, disciplines.id))
+    .leftJoin(competitionEvents, eq(mixedTeamResults.competitionEventId, competitionEvents.id))
     .leftJoin(countries, eq(competitions.countryId, countries.id))
     .leftJoin(partner1, eq(mixedTeamResults.shooter1Id, partner1.id))
     .leftJoin(partner2, eq(mixedTeamResults.shooter2Id, partner2.id))

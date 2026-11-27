@@ -60,3 +60,14 @@ describe("mergeCompetitionIds", () => {
     expect(merged).toEqual([{ id: 4, date: "2026-03-01" }, { id: 3, date: "2026-03-01" }]);
   });
 });
+
+describe("toMixedHistoryRow match", () => {
+  it("uses the date and name of the team's own match", () => {
+    const row = toMixedHistoryRow({ ...BASE, eventName: "Salona Trophy 2026 · mešoviti timovi", eventDate: "2026-10-23" }, 10);
+    expect(row).toMatchObject({ competitionDate: "2026-10-23", eventName: "Salona Trophy 2026 · mešoviti timovi" });
+  });
+
+  it("keeps the competition date in the main match", () => {
+    expect(toMixedHistoryRow({ ...BASE, eventName: null, eventDate: null }, 10)).toMatchObject({ competitionDate: "2026-08-03", eventName: null });
+  });
+});
