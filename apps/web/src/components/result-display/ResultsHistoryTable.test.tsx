@@ -138,3 +138,31 @@ describe("ResultsHistoryTable", () => {
     expect(screen.getByText("313.9")).toBeInTheDocument();
   });
 });
+
+describe("ResultsHistoryTable: klupska ekipa", () => {
+  const club: ResultRowData = {
+    ...result, id: 3, rowKey: "t:3", kind: "team", disciplineCode: "APM", teamName: "Pancevo 1813", qualTotal: "1691.0", qualRank: 1, finalTotal: null, finalRank: null,
+    teamMembers: [{ shooterId: 7, name: "Ninkovic Velimir", series: [93, 97], total: 565, inners: 15 }, { shooterId: null, name: "Kondic Jovan", series: [], total: 564, inners: 8 }],
+  };
+
+  it("shows the team beside the shooter's own result, with a medal for its place", () => {
+    render(<ResultsHistoryTable results={[{ ...result, disciplineCode: "APM", qualTotal: "560", finalRank: null, finalTotal: null }, club]} />);
+    expect(screen.getByText("Pancevo 1813")).toBeInTheDocument();
+    expect(screen.getByText("560")).toBeInTheDocument();
+    expect(screen.getByText("1691")).toBeInTheDocument();
+    expect(screen.getByText("Ekipno")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mesto 1")).toBeInTheDocument();
+  });
+
+  it("expands to the whole team and links to the team standings", () => {
+    render(<ResultsHistoryTable results={[club]} />);
+    fireEvent.click(screen.getByRole("button", { name: /10m vazdušni pištolj/ }));
+    expect(screen.getByText("Ninkovic Velimir")).toBeInTheDocument();
+    expect(screen.getByText("Kondic Jovan")).toBeInTheDocument();
+    expect(screen.getByText("Ekipni plasman")).toBeInTheDocument();
+  });
+
+  it("sorts a club team after individual and mixed rows", () => {
+    expect(sortHistoryRows([club, result]).map((r) => r.kind)).toEqual(["individual", "team"]);
+  });
+});

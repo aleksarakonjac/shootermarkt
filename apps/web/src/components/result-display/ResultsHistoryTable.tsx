@@ -35,9 +35,12 @@ type MixedSlot = { series: number[]; inners?: number | null; total: number };
 
 export type ResultRowData = {
   id: number;
-  /** Jedinstven ključ reda: "r:<results.id>" ili "m:<mixed_team_results.id>" (id-jevi iz dve tabele se preklapaju). */
+  /** Jedinstven ključ reda: "r:<results.id>", "m:<mixed_team_results.id>" ili "t:<team_results.id>" (id-jevi se preklapaju). */
   rowKey: string;
-  kind: "individual" | "mixed" | "esc";
+  kind: "individual" | "mixed" | "team" | "esc";
+  /** Klupska ekipa: naziv i članovi; qualRank/qualTotal reda su ekipni. */
+  teamName?: string | null;
+  teamMembers?: { shooterId: number | null; name: string; series: number[]; total: number; inners: number | null }[];
   /** Mešoviti tim: partner ("Ž. Petrović"). */
   partnerName?: string | null;
   /** Mešoviti tim: puno ime partnera i strelca (desktop), kratko ime strelca (telefon), id partnera za link. */
@@ -79,13 +82,13 @@ export type ResultRowData = {
   finalDetail: FinalDetail | null;
 };
 
-const KIND_ORDER: Record<ResultRowData["kind"], number> = { individual: 0, mixed: 1, esc: 2 };
+const KIND_ORDER: Record<ResultRowData["kind"], number> = { individual: 0, mixed: 1, team: 2, esc: 3 };
 const disciplineIndex = (code: string) => {
   const index = DISCIPLINE_DISPLAY_ORDER.indexOf(code);
   return index === -1 ? DISCIPLINE_DISPLAY_ORDER.length : index;
 };
 
-/** Unutar takmičenja: pojedinačno (po programu) → mešoviti tim → ESC. Stabilno za redosled takmičenja. */
+/** Unutar takmičenja: pojedinačno (po programu) → mešoviti tim → klupska ekipa → ESC. Stabilno za redosled takmičenja. */
 export function sortHistoryRows(rows: ResultRowData[]): ResultRowData[] {
   return [...rows].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || disciplineIndex(a.disciplineCode) - disciplineIndex(b.disciplineCode));
 }
@@ -235,8 +238,10 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                     const isExpanded = expanded === r.rowKey;
                     const isSolo = r.kind === "esc";
                     const isMixed = r.kind === "mixed";
+                    const isTeam = r.kind === "team";
                     const canExpand = isMixed
                       ? r.mixedDetail?.own != null || r.mixedDetail?.partner != null
+                      : isTeam ? !!r.teamMembers?.length
                       : r.elimDetail != null || r.elimTotal != null || r.qualDetail != null || (r.finalDetail != null && finalSeriesValues(r.finalDetail) != null);
                     const qualDecimals = qualHasDecimals(r.disciplineCode);
                     const finalDecimals = !isSolo && (r.disciplineCode.startsWith("AR") || r.disciplineCode.startsWith("R3P") || r.disciplineCode.startsWith("AP"));
@@ -248,7 +253,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                     const ageLabel = r.category && r.category !== "senior" ? categoryLabel(r.category as AgeCategory, en ? "en" : "sr") : null;
                     const extra = isMixed
                       ? (r.partnerName ? `${en ? "with" : "sa"} ${r.partnerName}` : null)
-                      : isSolo ? "ESC Challenge" : null;
+                      : isTeam ? r.teamName : isSolo ? "ESC Challenge" : null;
                     const soloFinal = isSolo && r.finalDetail && "opponentTotal" in r.finalDetail ? r.finalDetail : null;
                     const placement = isSolo ? escSoloPlacement(r) : null;
                     // Q / QG / QB iz poslednje odstreljane Solo kvalifikacije
@@ -258,9 +263,9 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                     const statusMark = r.qualRemark && /^(DSQ|DNS|DNF)$/.test(r.qualRemark) ? r.qualRemark : null;
                     const shootOff = r.remarkDetails?.final?.shootOff ? " SO" : "";
                     // Druga linija na telefonu samo kad ima šta da pokaže (dodatak ili finale/meč).
-                    const hasFinalCell = isSolo ? placement != null || r.finalTotal != null : r.finalTotal != null || r.finalRank != null;
+                    const hasFinalCell = isTeam || (isSolo ? placement != null || r.finalTotal != null : r.finalTotal != null || r.finalRank != null);
                     const hasLine2 = Boolean(extra || ageLabel || r.eventName || hasFinalCell);
-                    const phaseHref = (stage: "elim" | "qual" | "final") => `/${activeLocale}${scopedHref(`/takmicenja/${r.competitionId}?result=individual&disc=${r.competitionEventId ? `${r.disciplineCode}@${r.competitionEventId}` : r.disciplineCode}&category=${r.category ?? "senior"}&stage=${stage}${stage === "elim" && r.elimRound != null ? `&round=${r.elimRound}` : ""}`)}`;
+                    const phaseHref = (stage: "elim" | "qual" | "final" | "team") => `/${activeLocale}${scopedHref(`/takmicenja/${r.competitionId}?result=individual&disc=${r.competitionEventId ? `${r.disciplineCode}@${r.competitionEventId}` : r.disciplineCode}&category=${r.category ?? "senior"}&stage=${stage}${stage === "elim" && r.elimRound != null ? `&round=${r.elimRound}` : ""}`)}`;
 
                     return (
                       <Fragment key={r.rowKey}>
@@ -288,12 +293,14 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                                 {statusMark && (canExpand
                                   ? <span className={`font-bold uppercase tracking-wide ${statusMark === "DSQ" ? "text-[var(--danger)]" : "text-[var(--muted)]"}`}>{statusMark}</span>
                                   : <RemarkBadge remark={statusMark} details={r.remarkDetails?.qual} label={r.competitionName} className="text-[0.8rem]" />)}
-                                <span className="text-[0.65rem] text-[var(--subtle)]">{isSolo && r.finalRank == null ? "" /* ispao pre meča: plasman stoji kao "N. mesto" */ : r.qualRank != null ? `#${r.qualRank}` : r.elimRank != null ? `#${r.elimRank}` : ""}</span>
+                                <span className="text-[0.65rem] text-[var(--subtle)]">{isSolo && r.finalRank == null ? "" /* ispao pre meča: plasman stoji kao "N. mesto" */ : isTeam ? "" /* ekipni plasman stoji desno, sa medaljom */ : r.qualRank != null ? `#${r.qualRank}` : r.elimRank != null ? `#${r.elimRank}` : ""}</span>
                                 {soloMark && <span className="text-[0.65rem] font-bold text-[var(--brand-primary)]">{soloMark}</span>}
                                 {canExpand && !hasLine2 && <ChevronDown size={14} className={`shrink-0 self-center text-[var(--muted)] transition-transform duration-200 sm:hidden ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true" />}
                               </span>
                               <span className={`order-4 ${hasLine2 ? "flex" : "max-sm:hidden sm:flex"} items-center justify-end gap-1.5 whitespace-nowrap font-[family-name:var(--font-jetbrains-mono)] text-[0.7rem] tabular-nums text-[var(--muted)] sm:text-xs`}>
-                                {isSolo ? (
+                                {isTeam ? (
+                                  <><span className="text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{en ? "Team" : "Ekipno"}</span><MedalOrRank rank={r.qualRank} locale={locale} /></>
+                                ) : isSolo ? (
                                   soloFinal && r.finalTotal != null
                                     ? <><MedalOrRank rank={r.finalRank} locale={locale} /><span>{en ? "match" : "meč"} {Math.round(parseFloat(r.finalTotal))} : {soloFinal.opponentTotal ?? "—"}{shootOff}</span></>
                                     : placement != null ? <span>{en ? `place ${placement}` : `${placement}. mesto`}</span> : null
@@ -318,6 +325,12 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                                           ? <button type="button" onClick={() => setPartnerSheet(r)} className="max-w-full truncate uppercase tracking-wider underline decoration-[var(--border-strong)] underline-offset-2 transition-colors hover:text-[var(--ink)] hover:decoration-current"><PersonName short={r.partnerName} full={r.partnerFullName} /></button>
                                           : <PersonName short={r.partnerName} full={r.partnerFullName} />
                                         : "Partner"} series={r.mixedDetail.partner.series} total={r.mixedDetail.partner.total} inners={showInners ? r.mixedDetail.partner.inners : null} />}
+                                    </div>
+                                  ) : isTeam ? (
+                                    <div className="flex flex-col gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-3 pb-3 pt-2 sm:px-4">
+                                      {r.teamMembers?.map((m, i) => <MemberSeries key={i} fmt={fmtSeries} series={m.series} total={m.total} inners={showInners ? m.inners : null}
+                                        label={m.shooterId ? <Link href={`/${activeLocale}${scopedHref(`/strelci/${m.shooterId}`)}`} className="underline decoration-[var(--border-strong)] underline-offset-2 hover:text-[var(--ink)]">{m.name}</Link> : m.name} />)}
+                                      <Link href={phaseHref("team")} className="w-fit text-sm font-semibold text-[var(--brand-primary)] hover:underline">{en ? "Team standings" : "Ekipni plasman"}</Link>
                                     </div>
                                   ) : isSolo && r.qualDetail && "format" in r.qualDetail ? (
                                     <div className="space-y-2.5 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-3.5">
