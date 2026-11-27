@@ -1,39 +1,7 @@
-import { DISCIPLINE_META, type DisciplineCode, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
-import type { AgeCategory } from "@shootermarkt/db/schema";
+import { DISCIPLINE_META, type MixedTeamEntry } from "@shootermarkt/db/pdf-import-types";
 import { NocFlag } from "./ReviewTable";
 
-export interface MixedTeamEntry {
-  skip: boolean;
-  nocCode: string;
-  teamNumber: number;
-  disciplineCode: DisciplineCode;
-  /** Izostavljeno = senior. */
-  category?: AgeCategory;
-  qualRank: number | null;
-  qualTotal: number | null;
-  inners: number | null;
-  qualRemark?: string | null;
-  qualExtras?: StageRemarks;
-  qualified: boolean;
-  finalRank: number | null;
-  finalTotal: number | null;
-  finalRemark?: string | null;
-  finalExtras?: StageRemarks;
-  mIssfId: string | null;
-  mLastName: string;
-  mFirstName: string;
-  m_series: number[];
-  mInners: number | null;
-  mTotal: number;
-  fIssfId: string | null;
-  fLastName: string;
-  fFirstName: string;
-  f_series: number[];
-  fInners: number | null;
-  fTotal: number;
-  mFinalSeries?: number[];
-  fFinalSeries?: number[];
-}
+export type { MixedTeamEntry };
 
 const eventKey = (e: MixedTeamEntry) => `${e.disciplineCode}|${e.category ?? "senior"}`;
 const isJunior = (e: MixedTeamEntry) => (e.category ?? "senior") !== "senior";

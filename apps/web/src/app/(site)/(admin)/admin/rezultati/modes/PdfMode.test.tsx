@@ -45,3 +45,35 @@ describe("PdfMode: zaseban meč", () => {
     await waitFor(() => expect(bodies["/api/admin/import/commit"]?.rows[0]).toMatchObject({ eventName: "Memorijal", eventDate: "2026-11-22" }));
   });
 });
+
+describe("PdfMode: mešoviti timovi", () => {
+  it("shows the teams of the bulletin, checks them against the database and imports them", async () => {
+    const team = {
+      skip: false, nocCode: "SRB", teamNumber: 1, disciplineCode: "APMT", category: "senior", qualRank: 2, qualTotal: 572, inners: 21, qualified: true, finalRank: 1, finalTotal: 475.7,
+      mIssfId: null, mLastName: "Mikec", mFirstName: "Damir", m_series: [100, 96, 98], mInners: 16, mTotal: 294,
+      fIssfId: null, fLastName: "Mikec", fFirstName: "Tea", f_series: [96, 89, 93], fInners: 5, fTotal: 278,
+    };
+    const sent: { url: string; body: Record<string, unknown> }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { body?: string }) => {
+      if (init?.body) sent.push({ url, body: JSON.parse(init.body) });
+      const data = url.endsWith("/jobs/1") ? { ...job, result: { rows: [], eventsCount: 0, skippedDisciplines: [], mixedTeams: [team], warnings: ["Mešoviti tim ARMT: strana nije pročitana"] } }
+        : url.endsWith("/preview") ? { added: 1, changed: 0, same: 0, items: [] }
+        : url.endsWith("/commit-mixed") ? { inserted: 1, skipped: 0, errors: [], written: ["SRB#1"], updated: [] }
+        : [];
+      return { ok: true, json: async () => data };
+    }));
+    localStorage.setItem("pdfImportJobId", "1");
+    render(<PdfMode />);
+
+    expect(await screen.findByText("Mešoviti timovi")).toBeInTheDocument();
+    expect(screen.getByText("Mešoviti tim ARMT: strana nije pročitana")).toBeInTheDocument();
+    await waitFor(() => expect(sent.find((r) => r.url.endsWith("/preview"))?.body.teams).toHaveLength(1), { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: /potvrdi i unesi 1 rezultat/i }));
+
+    await waitFor(() => expect(sent.filter((r) => r.url.endsWith("/commit-mixed")).map((r) => r.body.isFinals)).toEqual([false, true]));
+    expect(sent.some((r) => r.url === "/api/admin/import/commit")).toBe(false);
+    expect(await screen.findByText(/rezultata uneto/)).toBeInTheDocument();
+  });
+});
+

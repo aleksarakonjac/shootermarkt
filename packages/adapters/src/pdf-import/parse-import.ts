@@ -3,6 +3,7 @@ import { clubs, shooters } from "@shootermarkt/db/schema";
 import { matchShooter, foldName } from "@shootermarkt/db/name-match";
 import { parsePdfWithGemini } from "./gemini-adapter";
 import { parseSiusPdf } from "./sius-pdf";
+import { resolveGuessedNames } from "./sius-names";
 import { DISCIPLINE_META, IMPORTED_DISCIPLINE_CODES, dedupeRowsByCategory, mergeFinalsIntoRows, type ParsedShooterResult, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 
 export async function parsePdfImport(pdfBuffer: Buffer) {
@@ -29,7 +30,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
         const g = await parsePdfWithGemini(pdfBuffer);
         // finala koja je SIUS parser već pročitao imaju prednost nad Gemini čitanjem
         const parsed = new Set(sius.events.filter((e) => e.stage === "final").map((e) => e.discipline));
-        return { events: [...sius.events, ...g.events.filter((e) => e.stage === "final" && !parsed.has(e.discipline))] };
+        return { ...sius, events: [...sius.events, ...g.events.filter((e) => e.stage === "final" && !parsed.has(e.discipline))] };
       } catch (e) {
         finalsError = e instanceof Error ? e.message : String(e);
         return sius;
@@ -38,6 +39,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
     db.select().from(clubs),
     db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, clubId: shooters.clubId }).from(shooters),
   ]);
+  resolveGuessedNames(bilten, allShooters);
   const rows: ReviewRow[] = [];
   const skippedDisciplines = new Set<string>();
 
@@ -96,6 +98,8 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
     skippedDisciplines: Array.from(skippedDisciplines),
     matchedFinals: finals.matchedFinals,
     unmatchedFinals: finals.unmatchedFinals,
+    mixedTeams: bilten.mixedTeams ?? [],
+    warnings: bilten.warnings ?? [],
     finalsError,
     siusError,
   };

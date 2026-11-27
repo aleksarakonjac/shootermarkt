@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ReviewRow } from "@shootermarkt/db/pdf-import-types";
+import type { MixedTeamEntry, ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import type { ImportDiff } from "@/lib/import-diff";
 import { ImportDiffPanel } from "./ImportDiffPanel";
 
 /** Poredi redove za unos sa bazom (posle pauze u kucanju) i upozorava kad bi unos prepisao postojeće rezultate. */
-export function OverwriteCheck({ competitionId, rows }: { competitionId: number; rows: ReviewRow[] }) {
-  const body = JSON.stringify({ competitionId, rows: rows.filter((r) => !r.skip) });
+export function OverwriteCheck({ competitionId, rows, teams }: { competitionId: number; rows: ReviewRow[]; teams: MixedTeamEntry[] }) {
+  const body = JSON.stringify({ competitionId, rows: rows.filter((r) => !r.skip), teams: teams.filter((t) => !t.skip) });
   // Odgovor važi samo za telo zahteva sa kojim je tražen, pa se zastareli nikad ne prikazuje.
   const [checked, setChecked] = useState<{ body: string; diff: ImportDiff | null } | null>(null);
 

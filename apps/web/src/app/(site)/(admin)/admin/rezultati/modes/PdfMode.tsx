@@ -3,12 +3,14 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 
-import type { ReviewRow, CommitPayload } from "@shootermarkt/db/pdf-import-types";
+import type { ReviewRow, CommitPayload, MixedTeamEntry } from "@shootermarkt/db/pdf-import-types";
 import { CompetitionSearchSelect } from "@/components/ui/CompetitionSearchSelect";
 import { ReviewTable } from "../_shared/ReviewTable";
 import { NewShootersPanel } from "../_shared/NewShootersPanel";
 import { DonePanel } from "../_shared/DonePanel";
 import { OverwriteCheck } from "../_shared/OverwriteCheck";
+import { MixedTeamQualTable, MixedTeamFinalsTable } from "../_shared/MixedTeamReviewTable";
+import { commitMixedTeams } from "../_shared/commitMixedTeams";
 import { PdfImportJobsPanel, type PdfImportJobSummary } from "./PdfImportJobsPanel";
 
 type Step = "upload" | "review" | "done";
@@ -16,9 +18,9 @@ type Step = "upload" | "review" | "done";
 type PdfRow = ReviewRow & { fromMain?: boolean };
 
 
-interface ParseInfo { eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number; finalsError?: string }
-interface CommitResult { inserted: number; skipped: number; errors: string[]; competitionId: number }
-interface PdfImportJob { id: number; competitionId: number; tags: string[]; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number; finalsError?: string } | null; error: string | null }
+interface ParseInfo { eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number; finalsError?: string; warnings?: string[] }
+interface CommitResult { inserted: number; updated?: number; unchanged?: number; skipped: number; errors: string[]; competitionId: number }
+interface PdfImportJob { id: number; competitionId: number; tags: string[]; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number; finalsError?: string; mixedTeams?: MixedTeamEntry[]; warnings?: string[] } | null; error: string | null }
 
 export function PdfMode() {
   const [step, setStep] = useState<Step>("upload");
@@ -39,6 +41,7 @@ export function PdfMode() {
   });
 
   const [rows, setRows] = useState<PdfRow[]>([]);
+  const [teams, setTeams] = useState<MixedTeamEntry[]>([]);
   const [parseInfo, setParseInfo] = useState<ParseInfo | null>(null);
   const [nocFilter, setNocFilter] = useState("");
   const [result, setResult] = useState<CommitResult | null>(null);
@@ -51,12 +54,14 @@ export function PdfMode() {
       if (!response.ok) throw new Error(job.error ?? "Job nije pronađen");
       if (job.status === "completed" && job.result) {
         setRows(job.result.rows);
+        setTeams(job.result.mixedTeams ?? []);
         setParseInfo({
           eventsCount: job.result.eventsCount,
           skippedDisciplines: job.result.skippedDisciplines,
           matchedFinals: job.result.matchedFinals,
           unmatchedFinals: job.result.unmatchedFinals,
           finalsError: job.result.finalsError,
+          warnings: job.result.warnings,
         });
         setSelectedCompId(job.competitionId);
         setImportTags(job.tags);
@@ -119,13 +124,28 @@ export function PdfMode() {
     setError(null);
     const payload: CommitPayload = { competitionId: selectedCompId, tags: importTags, rows };
     try {
-      const res = await fetch("/api/admin/import/commit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Commit error");
+      let data: CommitResult = { inserted: 0, updated: 0, unchanged: 0, skipped: 0, errors: [], competitionId: selectedCompId };
+      if (rows.length > 0) {
+        const res = await fetch("/api/admin/import/commit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error ?? "Commit error");
+        data = body;
+      }
+      if (teams.length > 0) {
+        const mixed = await commitMixedTeams(selectedCompId, teams);
+        data = {
+          ...data,
+          inserted: data.inserted + mixed.inserted,
+          updated: (data.updated ?? 0) + mixed.updated,
+          unchanged: (data.unchanged ?? 0) + mixed.unchanged,
+          skipped: data.skipped + mixed.skipped,
+          errors: [...data.errors, ...mixed.errors],
+        };
+      }
       setResult(data);
       setStep("done");
     } catch (e) {
@@ -154,12 +174,14 @@ export function PdfMode() {
       if (!response.ok) throw new Error(job.error ?? "Job nije pronađen");
       if (job.status !== "completed" || !job.result) throw new Error("Rezultat ovog posla još nije dostupan");
       setRows(job.result.rows);
+      setTeams(job.result.mixedTeams ?? []);
       setParseInfo({
         eventsCount: job.result.eventsCount,
         skippedDisciplines: job.result.skippedDisciplines,
         matchedFinals: job.result.matchedFinals,
         unmatchedFinals: job.result.unmatchedFinals,
           finalsError: job.result.finalsError,
+          warnings: job.result.warnings,
       });
       setSelectedCompId(job.competitionId);
       setSelectedCompName(jobSummary.competitionName);
@@ -176,6 +198,7 @@ export function PdfMode() {
   function reset() {
     setStep("upload");
     setRows([]);
+    setTeams([]);
     setParseInfo(null);
     setResult(null);
     setError(null);
@@ -190,7 +213,8 @@ export function PdfMode() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  const activeCount = rows.filter((r) => !r.skip).length;
+  const activeCount = rows.filter((r) => !r.skip).length + teams.filter((t) => !t.skip).length;
+  const toggleTeamSkip = (index: number) => setTeams((prev) => prev.map((t, i) => (i === index ? { ...t, skip: !t.skip } : t)));
   const eventNames = [...new Set(rows.flatMap((r) => (r.eventName != null ? [r.eventName] : [])))];
   const isSeparate = rows.some((r) => r.fromMain);
   const unnamedMatch = rows.some((r) => r.eventName != null && !r.eventName.trim());
@@ -342,7 +366,14 @@ export function PdfMode() {
             </div>
           )}
 
-          {selectedCompId && activeCount > 0 && !unnamedMatch && <OverwriteCheck competitionId={selectedCompId} rows={rows} />}
+          {selectedCompId && activeCount > 0 && !unnamedMatch && <OverwriteCheck competitionId={selectedCompId} rows={rows} teams={teams} />}
+
+          {!!parseInfo?.warnings?.length && (
+            <div className="rounded-lg border px-4 py-3 text-xs text-[var(--ink)] space-y-1" style={{ borderColor: "var(--warning)" }}>
+              <p className="font-semibold">Nije uvezeno iz biltena:</p>
+              {parseInfo.warnings.map((warning) => <div key={warning}>{warning}</div>)}
+            </div>
+          )}
 
           <NewShootersPanel rows={rows} onRowChange={updateRow} />
 
@@ -353,6 +384,21 @@ export function PdfMode() {
             onNocFilterChange={setNocFilter}
             onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))}
           />
+
+          {teams.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-sm font-semibold text-[var(--ink)]">Mešoviti timovi</h2>
+                <button type="button" onClick={() => { const skip = teams.some((t) => !t.skip); setTeams((prev) => prev.map((t) => ({ ...t, skip }))); }}
+                  className="text-xs font-semibold text-[var(--brand-primary)] hover:underline">
+                  {teams.some((t) => !t.skip) ? "Preskoči sve timove" : "Uključi sve timove"}
+                </button>
+              </div>
+              <p className="text-xs text-[var(--muted)]">Za mešovite timove takmičenje čuva samo jedan meč, bez naziva. Ako su timovi prvog dana već uneti, ove preskoči.</p>
+              <MixedTeamQualTable entries={teams} onToggleSkip={toggleTeamSkip} />
+              <MixedTeamFinalsTable entries={teams} onToggleSkip={toggleTeamSkip} />
+            </div>
+          )}
 
           <div className="flex gap-3">
             <button

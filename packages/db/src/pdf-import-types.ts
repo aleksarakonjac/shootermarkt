@@ -33,6 +33,43 @@ export const isThreePositionCode = (code: string | null | undefined): boolean =>
 export const MIXED_TEAM_CODES = ["ARMT", "APMT"] as const;
 export type MixedTeamCode = typeof MIXED_TEAM_CODES[number];
 
+/** Jedan mešoviti tim u pregledu uvoza (SIUS, ISSF, PDF). */
+export interface MixedTeamEntry {
+  skip: boolean;
+  nocCode: string;
+  teamNumber: number;
+  disciplineCode: DisciplineCode;
+  /** Izostavljeno = senior. */
+  category?: AgeCategory;
+  qualRank: number | null;
+  qualTotal: number | null;
+  inners: number | null;
+  qualRemark?: string | null;
+  qualExtras?: StageRemarks;
+  qualified: boolean;
+  finalRank: number | null;
+  finalTotal: number | null;
+  finalRemark?: string | null;
+  finalExtras?: StageRemarks;
+  mIssfId: string | null;
+  mLastName: string;
+  mFirstName: string;
+  /** Ceo zapis imena kad je podela na ime i prezime samo pretpostavka (PDF uvoz). */
+  mFullName?: string;
+  m_series: number[];
+  mInners: number | null;
+  mTotal: number;
+  fIssfId: string | null;
+  fLastName: string;
+  fFirstName: string;
+  fFullName?: string;
+  f_series: number[];
+  fInners: number | null;
+  fTotal: number;
+  mFinalSeries?: number[];
+  fFinalSeries?: number[];
+}
+
 // Vrednosti moraju odgovarati DB enumu `age_category` (schema.ts).
 export type AgeCategory =
   | "pionir" | "kadet" | "mladji_junior" | "junior"
@@ -106,6 +143,8 @@ export interface ParsedShooterResult {
   qualified?: boolean | null;
   /** ISSF/SIUS remark: RPO, DSQ, DNS, DNF, SO */
   remark?: string | null;
+  /** Ceo zapis imena kad je podela samo pretpostavka. */
+  fullName?: string;
 }
 
 /**
@@ -170,6 +209,8 @@ export interface ParsedFinalResult {
   total: number | null;
   /** DNS/DNF/DSQ ili "SO" (ispao posle shoot-off-a) */
   remark?: string | null;
+  /** Ceo zapis imena kad je podela samo pretpostavka. */
+  fullName?: string;
   /** Zbirovi po seriji/fazi finala iz biltena. */
   series?: number[] | null;
   /** Nazivi serija/faza koji odgovaraju polju series. */
@@ -197,6 +238,9 @@ export interface ParsedEvent {
 
 export interface ParsedBilten {
   events: ParsedEvent[];
+  mixedTeams?: MixedTeamEntry[];
+  /** Delovi biltena koji nisu uvezeni — prikazuju se adminu. */
+  warnings?: string[];
   rawText?: string;
   /** SIUS parser preskočio finala (različiti formati) — traže poseban izvor. */
   hasFinals?: boolean;
