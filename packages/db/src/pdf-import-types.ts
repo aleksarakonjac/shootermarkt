@@ -317,6 +317,8 @@ export interface ParsedEvent {
 export interface ParsedBilten {
   events: ParsedEvent[];
   mixedTeams?: MixedTeamEntry[];
+  /** Najraniji dan biltena = dan glavnog meča (SIUS PDF). */
+  mainDate?: string;
   /** Klupske ekipe (SIUS PDF). */
   teamResults?: TeamResultEntry[];
   /** Delovi biltena koji nisu uvezeni — prikazuju se adminu. */

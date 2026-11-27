@@ -107,6 +107,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
     unmatchedFinals: finals.unmatchedFinals,
     mixedTeams: teams.mixed,
     teamResults: teams.teamResults,
+    bulletinDate: "mainDate" in bilten ? bilten.mainDate : undefined,
     warnings: bilten.warnings ?? [],
     finalsError,
     siusError,

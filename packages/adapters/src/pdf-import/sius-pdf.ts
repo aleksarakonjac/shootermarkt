@@ -170,7 +170,7 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
   useFinalNameSplit(all, mixed.entries);
   const warnings = [...mixed.warnings, ...clubWarnings, ...clubs.warnings];
   return {
-    events: all, hasFinals,
+    events: all, hasFinals, mainDate: firstDate ?? undefined,
     ...(mixed.entries.length ? { mixedTeams: mixed.entries } : {}),
     ...(clubs.entries.length ? { teamResults: clubs.entries } : {}),
     ...(warnings.length ? { warnings } : {}),

@@ -31,6 +31,8 @@ describe("parseSiusPdf — club teams of the Niš cup", async () => {
     expect(teams("ARW")).toHaveLength(11);
   });
 
+  it("tells the day of the main match, for naming a later match", () => expect(bilten.mainDate).toBe("2026-10-17"));
+
   it("puts every team in the same match and category as its shooters", () => {
     expect(bilten.teamResults!.length).toBeGreaterThan(0);
     for (const t of bilten.teamResults!) {

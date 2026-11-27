@@ -6,6 +6,10 @@ import type { ReviewRow } from "@shootermarkt/db/pdf-import-types";
 interface Props {
   rows: ReviewRow[];
   onRowChange: (idx: number, patch: Partial<ReviewRow>) => void;
+  /** Od ovog indeksa redovi su članovi timova (godište, klub i preskakanje se tu ne menjaju). */
+  memberFrom?: number;
+  /** Od ovog indeksa su članovi mešovitih timova, čiji se pol bira. */
+  mixedFrom?: number;
 }
 
 type Group = {
@@ -31,7 +35,7 @@ function buildGroups(rows: ReviewRow[]): Group[] {
 const inputCls =
   "w-full rounded-md border border-[var(--border)] px-2.5 py-1.5 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]";
 
-export function NewShootersPanel({ rows, onRowChange }: Props) {
+export function NewShootersPanel({ rows, onRowChange, memberFrom = Infinity, mixedFrom = Infinity }: Props) {
   const [bulkNoc, setBulkNoc] = useState("");
   const groups = buildGroups(rows);
   if (groups.length === 0) return null;
@@ -94,6 +98,9 @@ export function NewShootersPanel({ rows, onRowChange }: Props) {
         {groups.map((g) => {
           const r = g.row;
           const discs = Array.from(new Set(g.idxs.map((i) => rows[i].disciplineCode)));
+          const teamOnly = g.idxs.every((i) => i >= memberFrom);
+          // pol se bira samo kad ga ne zna nijedna pojedinačna ni klupska lista
+          const pickGender = g.idxs.every((i) => i >= mixedFrom);
           return (
             <div
               key={g.idxs[0]}
@@ -133,6 +140,7 @@ export function NewShootersPanel({ rows, onRowChange }: Props) {
                   </label>
                   <input
                     type="number"
+                    disabled={teamOnly}
                     value={r.birthYear ?? ""}
                     placeholder="—"
                     min={1940}
@@ -151,6 +159,7 @@ export function NewShootersPanel({ rows, onRowChange }: Props) {
                   </label>
                   <input
                     value={r.clubAbbr ?? ""}
+                    disabled={teamOnly}
                     placeholder="—"
                     onChange={(e) => patchGroup(g.idxs, { clubAbbr: e.target.value })}
                     className={inputCls}
@@ -194,6 +203,17 @@ export function NewShootersPanel({ rows, onRowChange }: Props) {
                     </span>
                   ))}
                 </div>
+                {pickGender && (
+                  <select
+                    aria-label={`Pol: ${r.lastName} ${r.firstName}`}
+                    value={r.gender ?? "M"}
+                    onChange={(e) => patchGroup(g.idxs, { gender: e.target.value as "M" | "F" })}
+                    className={`${inputCls} !w-16`}
+                  >
+                    <option value="M">M</option>
+                    <option value="F">Ž</option>
+                  </select>
+                )}
                 {r.suggestedShooterId ? (
                   <div className="flex items-center gap-2">
                     <span className="text-[0.7rem] text-[var(--muted)] whitespace-nowrap">
@@ -215,7 +235,7 @@ export function NewShootersPanel({ rows, onRowChange }: Props) {
                       Poveži
                     </button>
                   </div>
-                ) : (
+                ) : teamOnly ? null : (
                   <button
                     onClick={() => patchGroup(g.idxs, { skip: !r.skip })}
                     className="text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] transition-colors whitespace-nowrap"

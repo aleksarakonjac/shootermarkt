@@ -53,3 +53,10 @@ describe("mixed pair and unranked team", () => {
     expect(screen.getByText("DNS")).toBeInTheDocument();
   });
 });
+
+describe("club of a domestic team", () => {
+  it("shows it next to the nation", () => {
+    render(<MixedTeamQualTable entries={[{ ...entry, nocCode: "SRB", clubName: "Pancevo 1813" }]} onToggleSkip={vi.fn()} />);
+    expect(screen.getByText("Pancevo 1813")).toBeInTheDocument();
+  });
+});
