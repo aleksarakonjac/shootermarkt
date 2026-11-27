@@ -26,6 +26,15 @@ export type MixedTeamRow = {
   qualRank: number | null; qualTotal: string | null; qualInners: number | null; qualRemark: string | null; qualified: boolean | null; finalRank: number | null; finalTotal: string | null; finalRemark: string | null; remarkDetails?: RemarkDetails | null;
 };
 
+/** Zastava i naziv po državi; par iz dve države ("HUN/GBR") ima obe. */
+function teamCountry(nocCode: string) {
+  const noc = displayNoc(nocCode) ?? nocCode;
+  const entries = noc.split("/").map((code) => NOC_LIST.find((country) => country.noc === code));
+  const name = noc.split("/").map((code, i) => (code !== "AIN" && entries[i]?.name) || code).join(" / ");
+  const flags = entries.map((entry) => entry?.alpha2 && <span key={entry.noc} className={`fi fi-${entry.alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }} />);
+  return { noc, name, flags };
+}
+
 const STATUS_MARKS = new Set(["DSQ", "DNS", "DNF", "RPO"]);
 
 // showMedals: false dok finale traje — prva tri mesta bez medalja.
@@ -149,7 +158,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
       const si = sheetId == null ? -1 : sorted.findIndex((t) => t.id === sheetId);
       const st = si >= 0 ? sorted[si] : null;
       if (!st) return { st: null, title: "", body: null };
-      const stNoc = displayNoc(st.nocCode); const stCountry = NOC_LIST.find((c) => c.noc === stNoc)?.name; const title = `${stCountry && stNoc !== "AIN" ? stCountry : stNoc} ${st.teamNumber}`;
+      const title = `${teamCountry(st.nocCode).name} ${st.teamNumber}`;
       const stRank = isUnranked(st) ? null : rank(st); const stMark = remark(st) ?? remarkLabel(null, stageDetails(st), remarkCodes[si]);
       const stRounds = isMatch ? roundOutcomes(st) : null; const label = `${st.shooter1Name ?? ""} / ${st.shooter2Name ?? ""}`;
       const members = [
@@ -245,7 +254,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
         const r1 = 2 + index * 3; const r2 = r1 + 1; const accordionRow = r1 + 2;
         const cell = `flex items-center px-2 py-2.5 text-sm transition-colors sm:px-3 ${!isLast || isExpanded ? "border-b border-[var(--border)]" : ""}`;
         const memberCell = `flex min-w-0 items-center px-2 py-1.5 text-sm transition-colors sm:px-3`;
-        const rounds = isMatch ? roundOutcomes(team) : null; const noc = displayNoc(team.nocCode); const nocEntry = NOC_LIST.find((country) => country.noc === noc); const alpha2 = nocEntry?.alpha2;
+        const rounds = isMatch ? roundOutcomes(team) : null; const { noc, name: countryName, flags } = teamCountry(team.nocCode);
         // DSQ/DNS/DNF/RPO idu uz ukupan zbir: bez zbira (0.0 ne nosi informaciju) zamenjuju ga, a sa zbirom stoje kao mali label iznad.
         const status = remark(team) && STATUS_MARKS.has(remark(team)!) ? remark(team)! : null;
         const hasTotal = total(team) != null && Number(total(team)) > 0;
@@ -255,11 +264,11 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
           <div role="row" className={`group ${hasSeries || desktop ? "cursor-pointer" : ""} ${flashing.has(team.id) ? "result-row-flash" : ""}`} style={{ display: "contents" }} onClick={desktop ? () => setSheetId(sheetId === team.id ? null : team.id) : hasSeries ? () => toggle(team.id) : undefined}>
             <div className={`${cell} max-sm:!px-1.5 justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{teamRank == null ? <span className="text-[var(--subtle)]">—</span> : isFinal && showMedals && teamRank <= 3 ? <span className="flex w-full justify-center"><MedalIcon rank={teamRank} /></span> : <span className={teamRank <= 3 && !isFinal ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>{teamRank}</span>}</div>
             <div className={`${cell} min-w-0 group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
-              <span className="hidden sm:inline min-w-0 truncate text-sm text-[var(--ink)]">{nocEntry?.name && noc !== "AIN" ? nocEntry.name : noc} {team.teamNumber}</span>
+              <span className="hidden sm:inline min-w-0 truncate text-sm text-[var(--ink)]">{countryName} {team.teamNumber}</span>
             </div>
             <div className={`${cell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
-              <button type="button" onClick={(event) => { event.stopPropagation(); setSheetId(team.id); }} aria-label={`${en ? "Details" : "Detalji"}: ${noc} ${team.teamNumber}`} className="flex min-h-11 items-center sm:hidden"><span className="flex shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">{alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }} />}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span></button>
-              <span className="hidden shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)] sm:flex">{alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }} />}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setSheetId(team.id); }} aria-label={`${en ? "Details" : "Detalji"}: ${noc} ${team.teamNumber}`} className="flex min-h-11 items-center sm:hidden"><span className="flex shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">{flags}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span></button>
+              <span className="hidden shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)] sm:flex">{flags}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span>
             </div>
             <div className={`${memberCell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}><TeamMember id={team.shooter1Id} name={team.shooter1Name} onOpen={() => setSheetId(desktop && sheetId === team.id ? null : team.id)} /></div>
             {hasSeries && seriesHeaders.map((_, i) => { const s1 = detail1(team)?.series; const v = s1?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s1 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}

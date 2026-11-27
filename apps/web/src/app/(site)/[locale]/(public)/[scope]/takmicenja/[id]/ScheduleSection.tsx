@@ -58,7 +58,7 @@ const STAGE_LABELS: Record<string, Record<string, string>> = {
 
 const CATEGORY_SHORT: Record<string, Record<string, string>> = {
   sr: { junior: "Jun.", youth: "Om.", cadet: "Kad." },
-  en: { junior: "Jun.", youth: "Yth.", cadet: "Cad." },
+  en: { junior: "Jun.", youth: "U18", cadet: "U16" },
 };
 
 function fmtCountdown(ms: number, locale: string): string {

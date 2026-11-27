@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { ReviewRow } from "@shootermarkt/db/pdf-import-types";
 
 interface Props {
@@ -23,13 +24,15 @@ function buildGroups(rows: ReviewRow[]): Group[] {
     if (g) g.idxs.push(idx);
     else map.set(sig, { sig, idxs: [idx], row: r });
   });
-  return Array.from(map.values());
+  // pretpostavljena nacija ide na vrh — njih admin mora da pogleda
+  return Array.from(map.values()).sort((a, b) => Number(!!b.row.nationAssumed) - Number(!!a.row.nationAssumed));
 }
 
 const inputCls =
   "w-full rounded-md border border-[var(--border)] px-2.5 py-1.5 text-sm text-[var(--ink)] bg-[var(--bg)] focus:outline-none focus:border-[var(--brand-primary)]";
 
 export function NewShootersPanel({ rows, onRowChange }: Props) {
+  const [bulkNoc, setBulkNoc] = useState("");
   const groups = buildGroups(rows);
   if (groups.length === 0) return null;
 
@@ -38,6 +41,8 @@ export function NewShootersPanel({ rows, onRowChange }: Props) {
   };
 
   const activeGroups = groups.filter((g) => !g.row.skip);
+  const assumed = activeGroups.filter((g) => g.row.nationAssumed);
+  const confirmed = { nationAssumed: false, warning: undefined };
 
   return (
     <div className="rounded-xl border-2 border-[var(--warning)] bg-[var(--surface)] overflow-hidden">
@@ -59,13 +64,39 @@ export function NewShootersPanel({ rows, onRowChange }: Props) {
         </span>
       </div>
 
+      {assumed.length > 0 && (
+        <div className="px-4 py-3 border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-3 bg-[var(--surface-2)]">
+          <p className="text-xs text-[var(--ink)]">
+            <strong>{assumed.length}</strong> strelaca ima pretpostavljenu naciju
+            ({Array.from(new Set(assumed.map((g) => g.row.teamNoc || "nepoznata"))).join(", ")}): bilten navodi
+            samo klub. Proveri da li su domaći.
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="Nacija za sve pretpostavljene"
+              value={bulkNoc}
+              maxLength={3}
+              placeholder="NOC"
+              onChange={(e) => setBulkNoc(e.target.value.toUpperCase())}
+              className={`${inputCls} !w-20 font-[family-name:var(--font-jetbrains-mono)] uppercase`}
+            />
+            <button
+              onClick={() => assumed.forEach((g) => patchGroup(g.idxs, { ...(bulkNoc ? { teamNoc: bulkNoc } : {}), ...confirmed }))}
+              className="text-xs font-semibold text-white bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] rounded px-2 py-1.5 transition-colors whitespace-nowrap"
+            >
+              Postavi i potvrdi ({assumed.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="divide-y divide-[var(--border)]">
         {groups.map((g) => {
           const r = g.row;
           const discs = Array.from(new Set(g.idxs.map((i) => rows[i].disciplineCode)));
           return (
             <div
-              key={g.sig}
+              key={g.idxs[0]}
               className={`px-4 py-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end ${
                 r.skip ? "opacity-40" : ""
               }`}
@@ -141,6 +172,16 @@ export function NewShootersPanel({ rows, onRowChange }: Props) {
 
               {/* Meta + akcije */}
               <div className="flex items-center gap-2 justify-between sm:justify-end">
+                {r.nationAssumed && (
+                  <button
+                    onClick={() => patchGroup(g.idxs, confirmed)}
+                    title="Nacija je pretpostavljena — klikni kad proveriš"
+                    className="text-xs font-semibold text-white rounded px-2 py-1 whitespace-nowrap"
+                    style={{ background: "var(--warning)" }}
+                  >
+                    Potvrdi naciju
+                  </button>
+                )}
                 <div className="flex gap-1">
                   {discs.map((d) => (
                     <span

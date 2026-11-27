@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 
-import type { ReviewRow, CommitPayload, MixedTeamEntry } from "@shootermarkt/db/pdf-import-types";
+import { numberTeams, type ReviewRow, type CommitPayload, type MixedTeamEntry } from "@shootermarkt/db/pdf-import-types";
 import { formatDateSr } from "@/lib/date-utils";
 import { CompetitionSearchSelect } from "@/components/ui/CompetitionSearchSelect";
 import { ReviewTable } from "../_shared/ReviewTable";
@@ -236,6 +236,11 @@ export function PdfMode() {
     setTeamMatch(on ? { name: individualMatch ? `${individualMatch} · mešoviti timovi` : "", date: dates[0] ?? "" } : null);
   }
   const toggleTeamSkip = (index: number) => setTeams((prev) => prev.map((t, i) => (i === index ? { ...t, skip: !t.skip } : t)));
+  const setTeamNation = (index: number, nocCode: string, nationAssumed: boolean) => setTeams((prev) => {
+    const next = prev.map((t, i) => (i === index ? { ...t, nocCode, nationAssumed } : { ...t }));
+    numberTeams(next); // država i redni broj su ključ tima u bazi
+    return next;
+  });
   const eventNames = [...new Set(rows.flatMap((r) => (r.eventName != null ? [r.eventName] : [])))];
   const isSeparate = rows.some((r) => r.fromMain);
   const unnamedMatch = rows.some((r) => r.eventName != null && !r.eventName.trim());
@@ -433,7 +438,7 @@ export function PdfMode() {
                   ) : null}
                 </div>
               )}
-              <MixedTeamQualTable entries={teams} onToggleSkip={toggleTeamSkip} />
+              <MixedTeamQualTable entries={teams} onToggleSkip={toggleTeamSkip} onNationChange={setTeamNation} />
               <MixedTeamFinalsTable entries={teams} onToggleSkip={toggleTeamSkip} />
             </div>
           )}

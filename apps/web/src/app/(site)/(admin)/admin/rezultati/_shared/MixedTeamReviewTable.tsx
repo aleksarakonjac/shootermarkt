@@ -1,4 +1,5 @@
 import { DISCIPLINE_META, type MixedTeamEntry } from "@shootermarkt/db/pdf-import-types";
+import { TEAM_NOC } from "./commitMixedTeams";
 import { NocFlag } from "./ReviewTable";
 
 export type { MixedTeamEntry };
@@ -18,7 +19,7 @@ const fmtFinal = (v: number) => v.toFixed(1);
 function TeamLabel({ nocCode, teamNumber, showNumber }: { nocCode: string; teamNumber: number; showNumber: boolean }) {
   return (
     <span className="flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] text-xs font-semibold text-[var(--muted)]">
-      <NocFlag noc={nocCode} />
+      {nocCode.split("/").map((code) => <NocFlag key={code} noc={code} />)}
       {nocCode}
       {showNumber && <span className="text-[var(--subtle)]">{teamNumber}</span>}
     </span>
@@ -30,15 +31,25 @@ function TeamLabel({ nocCode, teamNumber, showNumber }: { nocCode: string; teamN
 export function MixedTeamQualTable({
   entries,
   onToggleSkip,
+  onNationChange,
 }: {
   entries: MixedTeamEntry[];
   onToggleSkip: (index: number) => void;
+  /** Bez ovoga su države samo za čitanje (uvoz gde su uvek poznate). */
+  onNationChange?: (index: number, nocCode: string, assumed: boolean) => void;
 }) {
   const byEvent = Array.from(new Set(entries.map(eventKey)));
   const seriesCount = 3;
 
+  const assumed = onNationChange ? entries.filter((e) => e.nationAssumed).length : 0;
+
   return (
     <div className="space-y-5">
+      {assumed > 0 && (
+        <p className="rounded-lg border border-[var(--brand-primary)] px-4 py-2 text-xs font-semibold text-[var(--ink)]">
+          Timovi sa pretpostavljenom nacijom: {assumed}. Proveri državu i potvrdi.
+        </p>
+      )}
       {byEvent.map((key) => {
         const discEntries = entries.flatMap((e, index) => (eventKey(e) === key ? [{ e, index }] : []));
         const discipline = discEntries[0].e.disciplineCode;
@@ -74,14 +85,25 @@ export function MixedTeamQualTable({
                     <tr key={`${index}-m`} className={e.skip ? "opacity-40" : "hover:bg-[var(--surface)]"}>
                       <td rowSpan={2} className="px-3 py-2 text-right align-middle font-[family-name:var(--font-jetbrains-mono)] text-xs text-[var(--muted)]">{e.qualRank ?? "—"}</td>
                       <td rowSpan={2} className="px-3 py-2 text-center align-middle"><input type="checkbox" checked={e.skip} onChange={() => onToggleSkip(index)} className="accent-[var(--brand-primary)]" /></td>
-                      <td rowSpan={2} className="px-3 py-2 align-middle"><TeamLabel nocCode={e.nocCode} teamNumber={e.teamNumber} showNumber={(nocCounts.get(e.nocCode) ?? 0) > 1} /></td>
+                      <td rowSpan={2} className="px-3 py-2 align-middle">
+                        <TeamLabel nocCode={e.nocCode} teamNumber={e.teamNumber} showNumber={(nocCounts.get(e.nocCode) ?? 0) > 1} />
+                        {onNationChange && (e.nationAssumed || !TEAM_NOC.test(e.nocCode)) && (
+                          <span className="mt-1.5 flex items-center gap-1.5">
+                            <input value={e.nocCode} maxLength={7} aria-label={`Nacija tima ${e.mLastName} / ${e.fLastName}`}
+                              onChange={(event) => onNationChange(index, event.target.value.toUpperCase(), true)}
+                              className="w-24 rounded border border-[var(--brand-primary)] bg-transparent px-1.5 py-0.5 text-xs uppercase text-[var(--ink)]" />
+                            <button type="button" disabled={!TEAM_NOC.test(e.nocCode)} onClick={() => onNationChange(index, e.nocCode, false)}
+                              className="text-xs font-semibold text-[var(--brand-primary)] hover:underline disabled:opacity-40">Potvrdi</button>
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 font-medium text-[var(--ink)] whitespace-nowrap">{e.mLastName} {e.mFirstName}</td>
                       {Array.from({ length: seriesCount }, (_, s) => (
                         <td key={s} className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{e.m_series[s] != null ? fmtScore(e.m_series[s], discipline) : "—"}</td>
                       ))}
                       {hasInners && <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-xs tabular-nums text-[var(--muted)]">{e.mInners != null ? `${e.mInners}×` : "—"}</td>}
                       <td className="px-3 py-2 text-right font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]">{e.mTotal ? fmtScore(e.mTotal, discipline) : "—"}</td>
-                      <td rowSpan={2} className={`${stickyCell} ${stickyDivider} right-0 w-24 px-3 py-2 text-right align-middle font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]`}>{e.qualTotal != null ? fmtScore(e.qualTotal, discipline) : "—"}</td>
+                      <td rowSpan={2} className={`${stickyCell} ${stickyDivider} right-0 w-24 px-3 py-2 text-right align-middle font-[family-name:var(--font-jetbrains-mono)] text-sm font-semibold text-[var(--ink)]`}>{e.qualTotal != null ? fmtScore(e.qualTotal, discipline) : e.qualRemark ?? "—"}</td>
                     </tr>,
                     <tr key={`${index}-f`} className={e.skip ? "border-t border-[var(--border)] opacity-40" : "border-t border-[var(--border)] hover:bg-[var(--surface)]"}>
                       <td className="px-3 py-2 font-medium text-[var(--ink)] whitespace-nowrap">{e.fLastName} {e.fFirstName}</td>

@@ -1,16 +1,24 @@
 /** Mešoviti timovi (ARMT/APMT) iz SIUS biltena: kvalifikaciona lista i finale, po dva strelca u timu. */
-import type { MixedTeamCode, MixedTeamEntry, ParsedShooterResult } from "@shootermarkt/db/pdf-import-types";
+import { matchEventName, numberTeams, type MixedTeamCode, type MixedTeamEntry, type ParsedShooterResult } from "@shootermarkt/db/pdf-import-types";
 import { splitName } from "./sius-names";
-import { clubNation, SCORE, topmost, type Item } from "./sius-layout";
+import { clubNation, NOCS, SCORE, topmost, type Item } from "./sius-layout";
 
 export interface TeamPage { discipline: MixedTeamCode; isFinal: boolean; junior: boolean; date: string; items: Item[] }
 
 type Scores = { series: number[]; total: number; inners: number | null };
-type Athlete = Scores & { name: string };
-type Team = { rank: number; label: string; total: number; inners: number | null; qualified: boolean; athletes: Athlete[] };
+type Athlete = Scores & { name: string; bib: string };
+type Team = { rank: number | null; label: string; total: number | null; inners: number | null; qualified: boolean; remark?: string; athletes: Athlete[] };
 
 const near = (a: number, b: number) => Math.abs(a - b) < 0.05;
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
+
+const UNRANKED = /^(DNS|DNF|DSQ)$/;
+const stripNumber = (label: string) => label.replace(/\s*\d+$/, "");
+/** Finala i međunarodne liste ponavljaju naziv ("BHSE 1 - BHSE"); gost "KLUB - BUL" ostaje ceo. */
+const teamName = (label: string) => {
+  const [, head, again] = /^(.+?) - (.+)$/.exec(label) ?? [];
+  return head && stripNumber(head) === stripNumber(again) ? head : label;
+};
 
 /** Timovi jedne strane; null ako se zbirovi ne slažu ili tim nema tačno dva strelca. */
 function parseTeamPage(items: Item[], isFinal: boolean): Team[] | null {
@@ -26,10 +34,17 @@ function parseTeamPage(items: Item[], isFinal: boolean): Team[] | null {
   const end = header("Summary")?.y ?? header("Legend")?.y ?? items.find((it) => it.str.startsWith("Version of"))?.y ?? 0;
   const body = items.filter((it) => it.y < rank.y - 3 && it.y > end + 3);
   const anchors = body.filter((it) => it.x < bibLeft && /^\d+$/.test(it.str)).sort((a, b) => b.y - a.y);
+  // tim bez plasmana (DNS) stoji ispod poslednjeg rangiranog: njegov naslov zatvara blok prethodnog
+  const startsAthlete = (it: Item) => it.x >= bibLeft && it.x < bibLeft + 25 && /^\d+(\s|$)/.test(it.str);
+  const unranked = body.filter((it) => UNRANKED.test(it.str)
+    && !body.some((other) => Math.abs(other.y - it.y) <= 3 && startsAthlete(other))
+    && !anchors.some((anchor) => Math.abs(anchor.y - it.y) <= 3));
 
   const teams: Team[] = [];
-  for (const [i, anchor] of anchors.entries()) {
-    const nextY = anchors[i + 1]?.y ?? -Infinity;
+  const starts = [...anchors, ...unranked].sort((a, b) => b.y - a.y);
+  for (const [i, anchor] of starts.entries()) {
+    const ranked = anchors.includes(anchor);
+    const nextY = starts[i + 1]?.y ?? -Infinity;
     const block = body.filter((it) => it.y <= anchor.y + 3 && it.y > nextY + 3);
     const line = (y: number) => block.filter((it) => Math.abs(it.y - y) <= 3).sort((a, b) => a.x - b.x);
     const name = (y: number) => line(y).filter((it) => it.x >= bibLeft && it.x < scoresX).map((it) => it.str).join(" ");
@@ -39,22 +54,23 @@ function parseTeamPage(items: Item[], isFinal: boolean): Team[] | null {
       return total ? { series: found.slice(0, -1).map((m) => Number(m[1])), total: Number(total[1]), inners: total[2] ? Number(total[2]) : null } : null;
     };
 
-    const athletes = block.filter((it) => it.x >= bibLeft && it.x < bibLeft + 25 && /^\d+(\s|$)/.test(it.str))
+    const athletes = block.filter(startsAthlete)
       .sort((a, b) => b.y - a.y)
       .map((it) => {
-        const own = scores(it.y);
-        return own && { ...own, name: name(it.y).replace(/^\d+\s*/, "") };
+        // u timu bez plasmana strelac ume da nema nijedan rezultat (DNS)
+        const own = scores(it.y) ?? (ranked ? null : { series: [], total: 0, inners: null });
+        return own && { ...own, name: name(it.y).replace(/^\d+\s*/, ""), bib: /^\d+/.exec(it.str)![0] };
       });
-    const team = scores(anchor.y);
-    const valid = team && athletes.length === 2 && athletes.every((a) => a && a.name && near(sum(a.series), a.total))
-      && near(sum(athletes.map((a) => a!.total)), team.total);
-    if (!valid) return null;
+    const team = ranked ? scores(anchor.y) : null;
+    const complete = athletes.length === 2 && athletes.every((a) => a && a.name && (!a.series.length || near(sum(a.series), a.total)));
+    if (!complete || (ranked && !(team && near(sum(athletes.map((a) => a!.total)), team.total)))) return null;
     teams.push({
-      rank: Number(anchor.str),
-      label: name(anchor.y).replace(/\s*-\s*$/, ""),
-      total: team.total,
-      inners: team.inners,
-      qualified: block.some((it) => it.str === "Q"),
+      rank: ranked ? Number(anchor.str) : null,
+      label: teamName(name(anchor.y).replace(/\s*-\s*$/, "")),
+      total: team?.total ?? null,
+      inners: team?.inners ?? null,
+      qualified: ranked && block.some((it) => it.str === "Q"),
+      ...(ranked ? {} : { remark: line(anchor.y).find((it) => UNRANKED.test(it.str))!.str }),
       athletes: athletes as Athlete[],
     });
   }
@@ -62,9 +78,15 @@ function parseTeamPage(items: Item[], isFinal: boolean): Team[] | null {
 }
 
 const athleteKey = (name: string) => name.toLowerCase();
-const teamKey = (t: Team) => t.athletes.map((a) => athleteKey(a.name)).sort().join("|");
+// startni brojevi: finale skraćuje imena ("PÉNI I.")
+const teamKey = (t: Team) => t.athletes.map((a) => a.bib).sort().join("|");
 /** "SLO-ŠKOFJA LOKA 3" i "ŠKOFJA LOKA 3" → "ŠKOFJA LOKA" */
-const clubStem = (label: string) => label.replace(/^[A-Za-z]{3}\s*-\s*/, "").replace(/\s*\d+$/, "").trim();
+const clubStem = (label: string) => stripNumber(label.replace(/^[A-Za-z]{3}\s*-\s*/, "")).trim();
+/** Država ispred crtice: "CZE-DUK 2", "ESP - Spain", "LUX 1 - Luxembourg". Mora biti stvarna oznaka države. */
+const prefixNoc = (label: string) => {
+  const code = /^([A-Za-z]{3})(?:\s*\d+)?\s*-/.exec(label)?.[1].toUpperCase();
+  return code && NOCS.has(code) ? code : undefined;
+};
 
 export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterResult[]) {
   const warnings: string[] = [];
@@ -77,11 +99,27 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
 
   // Međunarodni bilten štampa državu uz klub; kad je izostavi, nalazi se preko istog kluba ili strelca.
   const nationByClub = new Map<string, string>();
-  for (const { teams } of parsed) for (const t of teams) if (/^[A-Za-z]{3}\s*-/.test(t.label)) nationByClub.set(clubStem(t.label), clubNation(t.label).teamNoc);
-  const nationByAthlete = new Map(individuals.map((r) => [athleteKey(r.fullName ?? `${r.lastName} ${r.firstName}`), r.teamNoc]));
-  const nationOf = (t: Team) => /^[A-Za-z]{3}\s*-/.test(t.label) ? clubNation(t.label).teamNoc
-    : nationByClub.size === 0 ? clubNation(t.label).teamNoc
-    : nationByClub.get(clubStem(t.label)) ?? t.athletes.map((a) => nationByAthlete.get(athleteKey(a.name))).find(Boolean);
+  for (const { teams } of parsed) for (const t of teams) {
+    const noc = prefixNoc(t.label);
+    if (noc) nationByClub.set(clubStem(t.label), noc);
+  }
+  const nationByAthlete = new Map(individuals.filter((r) => !r.nationUnstated)
+    .map((r) => [athleteKey(r.fullName ?? `${r.lastName} ${r.firstName}`), r.teamNoc]));
+  /** Država iz biltena; kad je nema, `nationUnstated` pa je rešava resolveNations. */
+  const nationOf = (t: Team): { nocCode: string; nationUnstated?: boolean; nationAssumed?: boolean; teamLabel?: string } => {
+    const prefix = prefixNoc(t.label);
+    if (prefix) {
+      // "FIN-CZE": možda par iz dve države — proverava se, osim ako resolveNations zna države strelaca
+      const second = /^[A-Za-z]{3}-([A-Z]{3})\b/.exec(t.label)?.[1];
+      return second && NOCS.has(second) && second !== prefix ? { nocCode: `${prefix}/${second}`, nationAssumed: true } : { nocCode: prefix };
+    }
+    const own = clubNation(t.label);
+    const teamLabel = clubStem(t.label);
+    // bez ijedne države uz klub: domaći format, "SRB" važi dok resolveNations ne prepozna strani bilten
+    if (nationByClub.size === 0) return own.nationUnstated ? { nocCode: own.teamNoc, nationUnstated: true, teamLabel } : { nocCode: own.teamNoc };
+    const found = nationByClub.get(teamLabel) ?? t.athletes.map((a) => nationByAthlete.get(athleteKey(a.name))).find(Boolean);
+    return found ? { nocCode: found } : { nocCode: "", nationUnstated: true, teamLabel };
+  };
 
   // finale objavljeno kasnije od kvalifikacija pripada poslednjem danu kvalifikacija do svog datuma
   for (const page of parsed.filter((p) => p.isFinal)) {
@@ -96,20 +134,15 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
     const [discipline, age, date] = day.split("|") as [MixedTeamCode, string, string];
     const match = parsed.filter((p) => dayKey(p) === day);
     // prvi dan discipline ide u glavni meč; svaki sledeći je zaseban meč, inače bi prepisao prvi
-    // (isti oblik naziva kao matchEventName u apps/web/src/lib/match-name.ts)
     const nth = days.filter((d) => d.startsWith(`${discipline}|${age}|`)).indexOf(day) + 1;
-    const eventName = nth > 1 ? `${nth}. meč · ${date.slice(8, 10)}.${date.slice(5, 7)}.` : null;
+    const eventName = nth > 1 ? matchEventName(nth, date) : null;
     const category = match[0].junior ? "junior" : "senior";
-    const numbers = new Map<string, number>();
-    const byKey = new Map<string, MixedTeamEntry>();
+    const byKey = new Map<string, { entry: MixedTeamEntry; firstBib: string }>();
 
-    const entry = (t: Team): MixedTeamEntry | null => {
-      const nocCode = nationOf(t);
-      if (!nocCode) { warnings.push(`Mešoviti tim ${discipline}: nepoznata država za "${t.label}"`); return null; }
-      numbers.set(nocCode, (numbers.get(nocCode) ?? 0) + 1);
+    const entry = (t: Team): MixedTeamEntry => {
       const [m, f] = t.athletes.map((a) => splitName(a.name));
       return {
-        skip: false, nocCode, teamNumber: numbers.get(nocCode)!, disciplineCode: discipline, category,
+        skip: false, ...nationOf(t), teamNumber: 1, disciplineCode: discipline, category,
         eventName, eventDate: date,
         qualRank: null, qualTotal: null, inners: null, qualified: true, finalRank: null, finalTotal: null,
         mIssfId: null, mLastName: m.lastName, mFirstName: m.firstName, mFullName: m.fullName, m_series: [], mInners: null, mTotal: 0,
@@ -117,29 +150,29 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
       };
     };
 
-    for (const t of match.filter((p) => !p.isFinal).flatMap((p) => p.teams).sort((a, b) => a.rank - b.rank)) {
+    for (const t of match.filter((p) => !p.isFinal).flatMap((p) => p.teams).sort((a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9))) {
       const e = entry(t);
-      if (!e) continue;
       const [m, f] = t.athletes;
       Object.assign(e, {
-        qualRank: t.rank, qualTotal: t.total, inners: t.inners, qualified: t.qualified,
+        qualRank: t.rank, qualTotal: t.total, inners: t.inners, qualified: t.qualified, qualRemark: t.remark,
         m_series: m.series, mInners: m.inners, mTotal: m.total, f_series: f.series, fInners: f.inners, fTotal: f.total,
       });
-      byKey.set(teamKey(t), e);
+      byKey.set(teamKey(t), { entry: e, firstBib: m.bib });
     }
     for (const t of match.filter((p) => p.isFinal).flatMap((p) => p.teams)) {
-      let e = byKey.get(teamKey(t));
-      // finale ume da navede strelce drugim redom nego kvalifikacije
-      const swapped = e ? athleteKey(t.athletes[0].name) !== athleteKey(`${e.mLastName} ${e.mFirstName}`) : false;
-      if (!e) {
-        e = entry(t) ?? undefined;
-        if (!e) continue;
-        byKey.set(teamKey(t), e);
+      let found = byKey.get(teamKey(t));
+      if (!found) {
+        found = { entry: entry(t), firstBib: t.athletes[0].bib };
+        byKey.set(teamKey(t), found);
       }
+      const e = found.entry;
+      // finale ume da navede strelce drugim redom nego kvalifikacije
+      const swapped = found.firstBib !== t.athletes[0].bib;
       const [first, second] = swapped ? [t.athletes[1], t.athletes[0]] : t.athletes;
-      Object.assign(e, { finalRank: t.rank, finalTotal: t.total, mFinalSeries: first.series, fFinalSeries: second.series });
+      Object.assign(e, { finalRank: t.rank, finalTotal: t.total, finalRemark: t.remark, mFinalSeries: first.series, fFinalSeries: second.series });
     }
-    entries.push(...byKey.values());
+    entries.push(...[...byKey.values()].map((v) => v.entry));
   }
+  numberTeams(entries);
   return { entries, warnings };
 }

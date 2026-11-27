@@ -18,7 +18,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import type { Metadata } from "next";
 import { ScopedLink } from "../../../components/ScopedLink";
-import { CATEGORY_LABEL, CATEGORY_RANK } from "@shootermarkt/db/pdf-import-types";
+import { CATEGORY_RANK } from "@shootermarkt/db/pdf-import-types";
 import { categoryLabel, localizeMatchName } from "@/lib/match-name";
 import { LEVEL_STYLE, getLevelLabel } from "@/lib/competition-utils";
 import {
@@ -207,7 +207,8 @@ export default async function CompetitionPage({ params }: Props) {
       .from(shooters)
       .where(inArray(foldNameSql(shooters.lastName), [...new Set(unmatched.map((u) => foldName(u.lastName)))]));
     for (const { r, slot, firstName, lastName } of unmatched) {
-      const match = matchShooter(firstName, lastName, r.nocCode, candidates);
+      // par iz dve države ("HUN/GBR"): ne zna se koja je čija, poklapa se samo po imenu
+      const match = matchShooter(firstName, lastName, r.nocCode.includes("/") ? null : r.nocCode, candidates);
       if (match.kind === "exact") r[slot === 1 ? "shooter1Id" : "shooter2Id"] = match.id;
     }
   }
@@ -300,7 +301,7 @@ export default async function CompetitionPage({ params }: Props) {
         name: r.disciplineName,
         eventName: r.eventName ?? null,
         // datum ide u svoju oznaku, pa se skida sa kraja naziva ("2. meč · 22.01." → "2. meč")
-        label: localizeMatchName((split ? `${categoryLabel(r.category, CATEGORY_LABEL[r.category], locale)} · ${r.eventName ?? "1. meč"}` : r.eventName)?.replace(/ · \d{2}\.\d{2}\.$/, "") ?? "", locale) || null,
+        label: localizeMatchName((split ? `${categoryLabel(r.category, locale)} · ${r.eventName ?? "1. meč"}` : r.eventName)?.replace(/ · \d{2}\.\d{2}\.$/, "") ?? "", locale) || null,
         date: matchDate(r),
         apparatus: r.apparatus,
         categories: [],

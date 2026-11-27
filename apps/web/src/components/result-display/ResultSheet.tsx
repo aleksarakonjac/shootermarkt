@@ -15,10 +15,12 @@ const MONO = "font-[family-name:var(--font-jetbrains-mono)]";
 export function NocChip({ nationality }: { nationality: string | null | undefined }) {
   const noc = nationality ? displayNoc(nationality) : null;
   if (!noc) return null;
-  const alpha2 = NOC_LIST.find((n) => n.noc === noc)?.alpha2;
   return (
     <span className={`flex items-center gap-1.5 ${MONO} font-semibold text-[var(--ink)]`}>
-      {alpha2 && <span className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "18px", height: "13px", display: "inline-block" }} />}
+      {noc.split("/").map((code) => {
+        const alpha2 = NOC_LIST.find((n) => n.noc === code)?.alpha2;
+        return alpha2 && <span key={code} className={`fi fi-${alpha2.toLowerCase()}`} style={{ width: "18px", height: "13px", display: "inline-block" }} />;
+      })}
       {noc}
     </span>
   );

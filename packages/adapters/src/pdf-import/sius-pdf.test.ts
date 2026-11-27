@@ -77,4 +77,28 @@ describe("parseSiusPages — two matches in one bulletin", () => {
       ["MEMORIJAL ZORAN ZOKI STOJILKOVIC", "2026-10-18", 103.9],
     ]);
   });
+
+  it("reads a numbered second-day list and names the repeated match by its date", () => {
+    const bilten = parseSiusPages([
+      page("XXII. Hungarian Open", "Q100000IA1911260825.1.ARM.0.001.pdf", "104.3"),
+      page("XXII. Hungarian Open", "Q100000IA2111260825.1.ARM2.0.001.pdf", "103.9"),
+    ])!;
+    expect(bilten.events.map((e) => [e.discipline, e.eventName, e.eventDate])).toEqual([
+      ["ARM", null, null],
+      ["ARM", "2. meč · 21.11.", "2026-11-21"],
+    ]);
+  });
+
+  it("reads junior lists (ARMJ) as a separate junior category", () => {
+    const bilten = parseSiusPages([
+      page("XXII. Hungarian Open", "Q100000IA1911260825.1.ARM.0.001.pdf", "104.3"),
+      page("XXII. Hungarian Open", "Q100000IA1911261000.1.ARMJ.0.001.pdf", "103.1"),
+      page("XXII. Hungarian Open", "Q100000IA2111261000.1.ARMJ2.0.001.pdf", "102.8"),
+    ])!;
+    expect(bilten.events.map((e) => [e.discipline, e.category, e.eventName])).toEqual([
+      ["ARM", "senior", null],
+      ["ARM", "junior", null],
+      ["ARM", "junior", "2. meč · 21.11."],
+    ]);
+  });
 });

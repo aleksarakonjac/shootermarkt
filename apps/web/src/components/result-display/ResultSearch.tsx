@@ -9,9 +9,11 @@ import { countryKeywords, foldSearch } from "@/lib/country-search";
 /** Termini za državu: NOC (i AIN za neutralne), srpski naziv iz liste, sr/en naziv iz Intl. */
 export function nocKeywords(noc: string | null | undefined): string {
   if (!noc) return "";
-  const shown = displayNoc(noc);
-  const entry = NOC_LIST.find((n) => n.noc === shown);
-  return countryKeywords(entry?.alpha2, noc, shown, entry?.name);
+  return noc.split("/").map((code) => {
+    const shown = displayNoc(code);
+    const entry = NOC_LIST.find((n) => n.noc === shown);
+    return countryKeywords(entry?.alpha2, code, shown, entry?.name);
+  }).join(" ");
 }
 
 /** Svaka reč upita mora da se nađe u nekom od delova (bez obzira na redosled, velika slova i dijakritike). */

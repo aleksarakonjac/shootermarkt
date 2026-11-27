@@ -670,7 +670,8 @@ export const mixedTeamResults = pgTable(
     disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
     // senior and junior mixed team are separate events of the same discipline
     category: ageCategoryEnum("category").notNull().default("senior"),
-    nocCode: varchar("noc_code", { length: 3 }).notNull(),
+    // "HUN", ili "HUN/GBR" za par iz dve države
+    nocCode: varchar("noc_code", { length: 7 }).notNull(),
     // A nation can enter 2 teams (e.g. "China 1", "China 2") — distinguishes them.
     teamNumber: smallint("team_number").notNull().default(1),
     // Zaseban meč istog takmičenja (drugi dan, memorijal); null = glavni meč. Isto kao results.competitionEventId.

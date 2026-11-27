@@ -1,5 +1,5 @@
 import { getDocumentProxy } from "unpdf";
-import { isUnrankedRemark, parseCategory, type AgeCategory, type MixedTeamEntry, type ParsedBilten, type ParsedEvent, type ParsedFinalResult, type ParsedShooterResult } from "@shootermarkt/db/pdf-import-types";
+import { isUnrankedRemark, matchEventName, parseCategory, type AgeCategory, type MixedTeamEntry, type ParsedBilten, type ParsedEvent, type ParsedFinalResult, type ParsedShooterResult } from "@shootermarkt/db/pdf-import-types";
 import { normalizeDisciplineCode } from "@shootermarkt/db/discipline";
 import { glyphFixes } from "./sius-fonts";
 import { clubNation, SCORE, topmost, type Item } from "./sius-layout";
@@ -62,11 +62,13 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
     if (!file) continue; // naslovna, protokol, službe…
     sawSius = true;
     const [, stage, kind, dd, mm, yy, listCode, discRaw] = file;
-    const discipline = normalizeDisciplineCode(discRaw);
+    // sufiksi u kodu vazdušnih: "J" = juniorska lista (ARMJ, ARMTJ), broj = ponovljeni meč (ARM2 je drugi dan)
+    const [, airCode, juniorCode] = /^(A[RP](?:[MW]|MT))(J?)\d?$/.exec(discRaw) ?? [];
+    const discipline = normalizeDisciplineCode(airCode ?? discRaw);
     if (kind === "T") {
       // klupske ekipe se ignorišu; od ekipnih samo mešoviti timovi
       if ((discipline === "ARMT" || discipline === "APMT") && (stage === "Q" || stage === "F")) {
-        teamPages.push({ discipline, isFinal: stage === "F", junior: listCode === "20" || items.some((it) => it.str === "Junior"), date: `20${yy}-${mm}-${dd}`, items });
+        teamPages.push({ discipline, isFinal: stage === "F", junior: !!juniorCode || listCode === "20" || items.some((it) => it.str === "Junior"), date: `20${yy}-${mm}-${dd}`, items });
       }
       continue;
     }
@@ -82,7 +84,9 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
     if (!event) {
       // podnaslov stoji samo na prvoj strani liste; apsolutna međunarodna: sam kod discipline ("ARM") ili "Individual"
       const absolute = finalRows || items.some((it) => it.str === discRaw || it.str === "Individual");
-      const list = LIST_CODES[listCode] ?? subtitleList(items) ?? (absolute ? { category: "senior" as const } : null);
+      // tip liste "1" ne razlikuje uzrast, pa J iz koda discipline ima prednost
+      const list = juniorCode ? { category: "junior" as const, guest: LIST_CODES[listCode]?.guest }
+        : LIST_CODES[listCode] ?? subtitleList(items) ?? (absolute ? { category: "senior" as const } : null);
       if (!list) return null;
       // naslov meča je red iznad "RESULTS" / "FINAL RESULTS"; datum iz imena fajla (DDMMYY)
       const results = items.find((it) => it.str === "RESULTS" || it.str === "FINAL RESULTS");
@@ -123,13 +127,22 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
   const byDate = [...(quals.length ? quals : all)].sort((a, b) => matchKey(a).localeCompare(matchKey(b)));
   const mainTitle = byDate[0]?.eventName;
   const taken = new Set<string>();
+  const slotOf = (e: ParsedEvent) => `${e.discipline}|${e.category}|${e.guest}`;
   const main = new Set(byDate.filter((e) => {
-    const slot = `${e.discipline}|${e.category}|${e.guest}`;
+    const slot = slotOf(e);
     if (e.eventName !== mainTitle || taken.has(slot)) return false;
     taken.add(slot);
     return true;
   }));
   const isMain = new Map(all.map((e) => [e, main.has(ownQual.get(e) ?? e)]));
+  // Naslov isti kao glavni nije ime ponovljenog meča — dobija redni broj i datum.
+  const repeats = new Map<string, number>();
+  for (const e of byDate) {
+    if (e.eventName !== mainTitle) continue;
+    const n = (repeats.get(slotOf(e)) ?? 0) + 1;
+    repeats.set(slotOf(e), n);
+    if (n > 1) e.eventName = matchEventName(n, e.eventDate!);
+  }
   for (const [final, own] of ownQual) if (own) { final.eventName = own.eventName; final.eventDate = own.eventDate; }
   for (const e of all) if (isMain.get(e)) { e.eventName = null; e.eventDate = null; }
   const mixed = parseMixedTeams(teamPages, quals.flatMap((e) => e.results as ParsedShooterResult[]));
@@ -245,11 +258,11 @@ function parseAirFinalRows(items: Item[]): ParsedFinalResult[] | null {
     const verified = total == null ? isUnrankedRemark(remark) : Math.abs(shotSum - total) < 0.05;
     if (Number(anchor.str) !== i + 1 || !fullName || !verified) return null;
 
-    const { teamNoc } = clubNation(col(noc.x - 10, stage.x - 5).map((it) => it.str).join(" "));
+    const nation = clubNation(col(noc.x - 10, stage.x - 5).map((it) => it.str).join(" "));
     rows.push({
       rank: i + 1,
       ...splitName(fullName),
-      teamNoc,
+      ...nation,
       total,
       cumulative: total == null ? null : cumulative,
       // S1, S2 (po 5 hitaca), pa parovi 11–12, 13–14… — isti nazivi kao u lib/final-detail.ts

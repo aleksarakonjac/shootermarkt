@@ -220,5 +220,6 @@ const NEUTRAL_STATUS_NOCS = new Set(["RUS", "BLR", "URS"]);
 
 export function displayNoc(noc: string | null | undefined): string | null {
   if (!noc) return noc ?? null;
-  return NEUTRAL_STATUS_NOCS.has(noc) ? "AIN" : noc;
+  // mešoviti par iz dve države: "HUN/GBR"
+  return noc.split("/").map((code) => (NEUTRAL_STATUS_NOCS.has(code) ? "AIN" : code)).join("/");
 }

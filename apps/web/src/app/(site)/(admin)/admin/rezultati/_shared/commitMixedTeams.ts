@@ -15,12 +15,20 @@ export const toFinalCommit = (e: MixedTeamEntry): MixedCommitEntry => ({
   nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark, mFinalSeries: e.mFinalSeries, fFinalSeries: e.fFinalSeries, extras: e.finalExtras,
 });
 
+/** Država tima, ili dve za par iz dve države. */
+export const TEAM_NOC = /^[A-Z]{3}(\/[A-Z]{3})?$/;
+
 /** Commits qualification, then finals, per discipline, category and match. Counts are teams, not stages. */
 export async function commitMixedStages(entries: MixedTeamEntry[], commit: (input: StageInput) => Promise<StageResult>) {
   let inserted = 0, updated = 0, unchanged = 0, skipped = 0;
   const errors: string[] = [];
   const byEvent = new Map<string, MixedTeamEntry[]>();
   for (const entry of entries) {
+    // država je deo ključa tima u bazi
+    if (!entry.skip && !TEAM_NOC.test(entry.nocCode)) {
+      errors.push(`Tim bez nacije nije upisan: ${entry.mLastName} / ${entry.fLastName}`);
+      continue;
+    }
     const key = `${entry.disciplineCode}|${entry.category ?? "senior"}|${entry.eventName?.trim() ?? ""}`;
     byEvent.set(key, [...(byEvent.get(key) ?? []), entry]);
   }
@@ -35,7 +43,7 @@ export async function commitMixedStages(entries: MixedTeamEntry[], commit: (inpu
       errors.push(`${discipline}: ${error instanceof Error ? error.message : String(error)}`);
       continue;
     }
-    const finalists = rows.filter((e) => !e.skip && e.finalRank != null);
+    const finalists = rows.filter((e) => !e.skip && (e.finalRank != null || e.finalRemark));
     if (finalists.length) {
       try {
         finals = await commit({ discipline, category, eventName, eventDate, isFinals: true, entries: finalists.map(toFinalCommit) });

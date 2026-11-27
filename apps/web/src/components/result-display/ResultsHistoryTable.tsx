@@ -8,7 +8,8 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { SheetCells, SheetGroup, SheetPerson, SheetStats } from "./ResultSheet";
 import { useParams } from "next/navigation";
 import type { ElimDetail, QualDetail, FinalDetail } from "@shootermarkt/db/schema";
-import { CATEGORY_LABEL, escSoloPlacement, qualHasDecimals, type AgeCategory, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
+import { escSoloPlacement, qualHasDecimals, type AgeCategory, type RemarkDetails } from "@shootermarkt/db/pdf-import-types";
+import { categoryLabel } from "@/lib/match-name";
 import { DISCIPLINE_DISPLAY_ORDER, disciplineName } from "@shootermarkt/db/discipline-names";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useScopedHref } from "@/hooks/use-scoped-href";
@@ -89,9 +90,6 @@ export function sortHistoryRows(rows: ResultRowData[]): ResultRowData[] {
   return [...rows].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || disciplineIndex(a.disciplineCode) - disciplineIndex(b.disciplineCode));
 }
 
-const CATEGORY_LABEL_EN: Partial<Record<AgeCategory, string>> = {
-  pionir: "Pioneer", kadet: "Cadet (U16)", mladji_junior: "Youth (U18)", junior: "Junior (U21)", mladji_senior: "U23", master: "Master", open: "Open",
-};
 
 /** R3P varijanta iz broja serija: 3x20 ima 2 serije po stavu (6 ukupno), 3x40 ima 4 (12). */
 function r3pVariant(detail: QualDetail | null): "3x20" | "3x40" | undefined {
@@ -247,7 +245,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                     const fmtSeries = (v: number) => (qualDecimals && !isSolo ? v.toFixed(1) : Math.round(v).toString());
                     const fmtFinal = (v: string) => finalDecimals ? parseFloat(v).toFixed(1) : Math.round(parseFloat(v)).toString();
                     const showElimInsteadOfQual = r.qualTotal == null && r.elimTotal != null;
-                    const categoryLabel = r.category && r.category !== "senior" ? (en ? CATEGORY_LABEL_EN[r.category as AgeCategory] : CATEGORY_LABEL[r.category as AgeCategory]) ?? null : null;
+                    const ageLabel = r.category && r.category !== "senior" ? categoryLabel(r.category as AgeCategory, en ? "en" : "sr") : null;
                     const extra = isMixed
                       ? (r.partnerName ? `${en ? "with" : "sa"} ${r.partnerName}` : null)
                       : isSolo ? "ESC Challenge" : null;
@@ -261,7 +259,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                     const shootOff = r.remarkDetails?.final?.shootOff ? " SO" : "";
                     // Druga linija na telefonu samo kad ima šta da pokaže (dodatak ili finale/meč).
                     const hasFinalCell = isSolo ? placement != null || r.finalTotal != null : r.finalTotal != null || r.finalRank != null;
-                    const hasLine2 = Boolean(extra || categoryLabel || r.eventName || hasFinalCell);
+                    const hasLine2 = Boolean(extra || ageLabel || r.eventName || hasFinalCell);
                     const phaseHref = (stage: "elim" | "qual" | "final") => `/${activeLocale}${scopedHref(`/takmicenja/${r.competitionId}?result=individual&disc=${r.competitionEventId ? `${r.disciplineCode}@${r.competitionEventId}` : r.disciplineCode}&category=${r.category ?? "senior"}&stage=${stage}${stage === "elim" && r.elimRound != null ? `&round=${r.elimRound}` : ""}`)}`;
 
                     return (
@@ -274,7 +272,7 @@ export function ResultsHistoryTable({ results, allLabel = "Sve", locale = "sr", 
                             >
                               <span className="order-1 min-w-0 font-medium leading-snug text-[var(--ink)]">{rowName(r, locale)}</span>
                               <span className="order-3 min-w-0 truncate text-[0.7rem] text-[var(--muted)] sm:order-2 sm:text-xs">
-                                {[extra, categoryLabel].filter(Boolean).join(" · ")}
+                                {[extra, ageLabel].filter(Boolean).join(" · ")}
                                 {r.eventName && <span className="ml-1 font-semibold text-[var(--brand-primary)]" title={r.eventName}>{localizeMatchName(r.eventName, locale)}</span>}
                               </span>
                               {/* Desktop: serije kvalifikacije u sredini reda umesto praznog prostora */}
