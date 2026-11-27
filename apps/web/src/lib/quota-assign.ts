@@ -46,6 +46,25 @@ export function rankInfo(basis: QuotaBasis, finalRank: number | null, qualRank: 
   return { rank: finalRank, stage: "final" };
 }
 
+/**
+ * Redosled dodele: discipline po terminu iz ISSF satnice u kom se kvota odlučuje (finale, odnosno poslednja
+ * kvalifikaciona faza za osnovu "qualification"). Strelac može osvojiti samo jednu kvotu, pa je dobija u disciplini
+ * koja je ranije odlučena. Disciplina bez termina ide na kraj, u zadatom redosledu.
+ */
+export function orderByDecision<T extends { disciplineId: number; basis: string }>(
+  allocations: readonly T[],
+  schedule: ReadonlyArray<{ disciplineId: number; stage: string; startTime: Date }>,
+): T[] {
+  const decidedAt = (a: T) => {
+    const times = schedule
+      .filter((s) => s.disciplineId === a.disciplineId && (a.basis === "qualification" ? s.stage.startsWith("qual") : s.stage === "final"))
+      .map((s) => s.startTime.getTime());
+    return times.length ? Math.max(...times) : Infinity;
+  };
+  // Infinity - Infinity je NaN, pa `|| 0`.
+  return [...allocations].sort((a, b) => decidedAt(a) - decidedAt(b) || 0);
+}
+
 export type QuotaCandidate = { resultId: number; shooterId: number; nationality: string | null; rank: number; qualTotal?: number | null };
 
 /**

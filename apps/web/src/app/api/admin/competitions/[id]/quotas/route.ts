@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
-import { competitions, disciplines, olympicQuotaAllocations, olympicQuotas, results, shooters } from "@shootermarkt/db/schema";
+import { competitions, competitionSchedule, disciplines, olympicQuotaAllocations, olympicQuotas, results, shooters } from "@shootermarkt/db/schema";
 import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
-import { assignQuotas, candidateRank, MAX_QUOTAS_PER_NOC, maxQuotasPerNocAtEvent, meetsMqs, MQS, rankInfo, type QuotaBasis } from "@/lib/quota-assign";
+import { assignQuotas, candidateRank, MAX_QUOTAS_PER_NOC, maxQuotasPerNocAtEvent, meetsMqs, MQS, orderByDecision, rankInfo, type QuotaBasis } from "@/lib/quota-assign";
 import { requireAdmin } from "@/lib/admin-auth";
 import { revalidatesPublicSite } from "@/lib/revalidate-public";
 import { GAMES, NON_OLYMPIC, allHoldings, holdingsFor } from "@/lib/quota-holdings";
@@ -224,7 +224,7 @@ export const DELETE = revalidatesPublicSite(async (req: NextRequest, ctx: Ctx) =
 
 /**
  * Automatska dodela: za svaku disciplinu sa alokacijom popunjava slobodna mesta po plasmanu na kom se kvote dele
- * (finale ili kvalifikacije), po pravilima iz assignQuotas. Poziva se kad je rangiranje gotovo; dodeljeno se ručno može menjati.
+ * (finale ili kvalifikacije), po pravilima iz assignQuotas, disciplinu po disciplinu redom kojim su odlučene (orderByDecision). Poziva se kad je rangiranje gotovo; dodeljeno se ručno može menjati.
  */
 export const PATCH = revalidatesPublicSite(async (_req: NextRequest, ctx: Ctx) => {
   const denied = await requireAdmin();
@@ -241,7 +241,11 @@ export const PATCH = revalidatesPublicSite(async (_req: NextRequest, ctx: Ctx) =
 
   const maxPerEvent = await maxPerEventFor(compId);
   let assigned = 0;
-  for (const a of allocations) {
+  const schedule = await db
+    .select({ disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, startTime: competitionSchedule.startTime })
+    .from(competitionSchedule)
+    .where(and(eq(competitionSchedule.competitionId, compId), eq(competitionSchedule.category, "senior")));
+  for (const a of orderByDecision(allocations, schedule)) {
     // Stanje se čita ponovo po disciplini: strelac koji je upravo dobio kvotu ne sme dobiti drugu.
     const h = holdingsFor(await allHoldings(), compId, a.disciplineId);
     const rows = await db
