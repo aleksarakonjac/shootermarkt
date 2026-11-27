@@ -682,6 +682,8 @@ export const mixedTeamResults = pgTable(
     // ISSF athlete IDs (for athletes not yet in our DB)
     shooter1IssfId: varchar("shooter1_issf_id", { length: 50 }),
     shooter2IssfId: varchar("shooter2_issf_id", { length: 50 }),
+    // Naziv kluba/tima kako piše u domaćem biltenu; null = tim države
+    clubName: varchar("club_name", { length: 200 }),
     shooter1Name: varchar("shooter1_name", { length: 200 }),
     shooter2Name: varchar("shooter2_name", { length: 200 }),
     // Individual shooter series within the mixed team event (separate from individual discipline results)
@@ -710,6 +712,51 @@ export const mixedTeamResults = pgTable(
     unique("mixed_team_results_comp_event_disc_cat_noc_unique")
       .on(t.competitionId, t.competitionEventId, t.disciplineId, t.category, t.nocCode, t.teamNumber)
       .nullsNotDistinct(),
+  ]
+);
+
+// ── Team Results ──────────────────────────────────────────────────────────────
+// Klupski ekipni plasman iz biltena (npr. 3 strelca po ekipi). Ništa se ne računa: mesto, zbir i sastav su iz biltena.
+
+export const teamResults = pgTable(
+  "team_results",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull().references(() => competitions.id, { onDelete: "cascade" }),
+    competitionEventId: integer("competition_event_id").references(() => competitionEvents.id),
+    disciplineId: integer("discipline_id").notNull().references(() => disciplines.id),
+    category: ageCategoryEnum("category").notNull().default("senior"),
+    teamName: varchar("team_name", { length: 200 }).notNull(),
+    rank: integer("rank"),
+    total: decimal("total", { precision: 7, scale: 1 }),
+    inners: integer("inners"),
+    remark: varchar("remark", { length: 10 }),
+    source: resultSourceEnum("source").notNull().default("pdf_import"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("team_results_comp_idx").on(t.competitionId),
+    unique("team_results_comp_event_disc_cat_name_unique")
+      .on(t.competitionId, t.competitionEventId, t.disciplineId, t.category, t.teamName).nullsNotDistinct(),
+  ]
+);
+
+/** Članovi čiji rezultat ulazi u zbir ekipe. */
+export const teamResultMembers = pgTable(
+  "team_result_members",
+  {
+    id: serial("id").primaryKey(),
+    teamResultId: integer("team_result_id").notNull().references(() => teamResults.id, { onDelete: "cascade" }),
+    position: smallint("position").notNull(),
+    shooterId: integer("shooter_id").references(() => shooters.id, { onDelete: "set null" }),
+    name: varchar("name", { length: 200 }).notNull(),
+    series: jsonb("series").$type<number[]>().notNull(),
+    total: decimal("total", { precision: 6, scale: 1 }).notNull(),
+    inners: integer("inners"),
+  },
+  (t) => [
+    index("team_result_members_team_idx").on(t.teamResultId),
+    index("team_result_members_shooter_idx").on(t.shooterId),
   ]
 );
 

@@ -43,11 +43,58 @@ export function numberTeams(teams: MixedTeamEntry[]) {
   }
 }
 
+/** Član klupske ekipe u pregledu PDF uvoza. */
+export interface TeamMemberEntry {
+  firstName: string;
+  lastName: string;
+  /** Ceo zapis imena kad je podela na ime i prezime samo pretpostavka. */
+  fullName?: string;
+  teamNoc: string;
+  nationAssumed?: boolean;
+  nationUnstated?: boolean;
+  series: number[];
+  total: number;
+  inners: number | null;
+  shooterId?: number;
+  isNew?: boolean;
+  suggestedShooterId?: number;
+  suggestedName?: string;
+}
+
+/** Jedna klupska ekipa iz biltena: plasman, zbir i članovi koji ulaze u zbir. */
+export interface TeamResultEntry {
+  skip: boolean;
+  disciplineCode: DisciplineCode;
+  category: AgeCategory;
+  eventName?: string | null;
+  eventDate?: string | null;
+  teamName: string;
+  rank: number | null;
+  total: number | null;
+  inners: number | null;
+  remark?: string | null;
+  members: TeamMemberEntry[];
+}
+
 /** Jedan mešoviti tim u pregledu uvoza (SIUS, ISSF, PDF). */
 export interface MixedTeamEntry {
   skip: boolean;
   nocCode: string;
   teamNumber: number;
+  /** Naziv kluba/tima iz domaćeg biltena (upisuje se u bazu). */
+  clubName?: string;
+  /** PDF uvoz: članove bez veze sa profilom commit pravi kao nove strelce. */
+  createMissing?: boolean;
+  mShooterId?: number;
+  mIsNew?: boolean;
+  mSuggestedShooterId?: number;
+  mSuggestedName?: string;
+  mGender?: "M" | "F";
+  fShooterId?: number;
+  fIsNew?: boolean;
+  fSuggestedShooterId?: number;
+  fSuggestedName?: string;
+  fGender?: "M" | "F";
   /** PDF uvoz: bilten ne navodi državu tima; `teamLabel` je naziv tima bez rednog broja. */
   nationUnstated?: boolean;
   teamLabel?: string;
@@ -270,6 +317,8 @@ export interface ParsedEvent {
 export interface ParsedBilten {
   events: ParsedEvent[];
   mixedTeams?: MixedTeamEntry[];
+  /** Klupske ekipe (SIUS PDF). */
+  teamResults?: TeamResultEntry[];
   /** Delovi biltena koji nisu uvezeni — prikazuju se adminu. */
   warnings?: string[];
   rawText?: string;
