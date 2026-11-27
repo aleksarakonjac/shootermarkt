@@ -2,7 +2,7 @@
 export { mergeSiusFinals, type SiusFinalEntry } from "@/lib/sius-merge";
 import { fetchSiusEvents, fetchLiveSiusResults, fetchLiveSiusMixedTeamResults, fetchSiusEscSoloResults, escSoloCodeFromEvent, mixedTeamIdentity, isJuniorEventCode, parseSiusMatchKey, MIXED_TEAM_CODES } from "@shootermarkt/adapters/sius/public-adapter";
 import { matchEventName } from "@/lib/competition-events";
-import { shooterResultCount } from "@/lib/import-commit";
+import { shooterResultCount } from "@/lib/ensure-shooter";
 import { db } from "@shootermarkt/db";
 import { competitions, shooters } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";

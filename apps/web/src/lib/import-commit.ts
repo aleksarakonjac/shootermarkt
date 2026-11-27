@@ -5,15 +5,11 @@ import { ensureCompetitionEvent } from "@/lib/competition-events";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { eventTypeFromName, groupsFromName } from "@/lib/competition-filters";
 import { refreshDisciplineGroups } from "@/lib/discipline-groups";
-import { matchShooter } from "@shootermarkt/db/name-match";
+import { ensureShooter, loadKnownShooters } from "@/lib/ensure-shooter";
 import { DISCIPLINE_META, type CommitPayload, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import { changedColumns, changedParts, resultColumns, upsertedResult, type ImportStatus } from "@/lib/import-diff";
 
 export class CommitValidationError extends Error {}
-
-/** Broj rezultata strelca — za matchShooter (dvosmislena varijanta imena → aktivan strelac). */
-// Sirov SQL: Drizzle u select listi ne kvalifikuje kolone, pa bi "id" u podupitu značio results.id.
-export const shooterResultCount = sql<number>`(select count(*)::int from results r where r.shooter_id = "shooters"."id")`;
 
 export type CommitResult = {
   /** Upisani redovi: novi + izmenjeni. */
@@ -101,14 +97,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
   }
 
   const disciplineMap = Object.fromEntries((await db.select().from(disciplines)).map((d) => [d.code, d.id]));
-  const allShooters = await db.select({
-    id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName,
-    previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames,
-    nationality: shooters.nationality, clubId: shooters.clubId,
-    birthYear: shooters.birthYear, apparatus: shooters.apparatus, issfId: shooters.issfId,
-    resultCount: shooterResultCount,
-  }).from(shooters);
-  const shooterByIssfId = new Map(allShooters.filter((s) => s.issfId).map((s) => [s.issfId!, s]));
+  const known = await loadKnownShooters();
   let inserted = 0;
   let updated = 0;
   let unchanged = 0;
@@ -143,53 +132,18 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
 
       let shooterId = row.shooterId;
       if (!shooterId) {
-        // issfId (ISSF import) pre imena; ime se ne prihvata ako taj strelac ima drugi issfId — druga osoba
-        const issfId = rowIssfId;
-        const match = matchShooter(row.firstName, row.lastName, row.teamNoc || null, allShooters);
-        const byName = match.kind === "exact" ? allShooters.find((shooter) => shooter.id === match.id) : undefined;
-        const existing = (issfId && shooterByIssfId.get(issfId))
-          || (byName && (!issfId || !byName.issfId) ? byName : undefined);
-        if (existing) {
-          shooterId = existing.id;
-          const patch: Partial<typeof shooters.$inferInsert> = {};
-          // Samo po imenu (matchShooter pušta SRB/AIN/praznu naciju) → issfId tek uz istu naciju
-          if (issfId && !existing.issfId && (existing !== byName || existing.nationality === row.teamNoc)) {
-            patch.issfId = issfId;
-            existing.issfId = issfId;
-            shooterByIssfId.set(issfId, existing);
-          }
-          if (!existing.clubId && clubId) patch.clubId = clubId;
-          if (!existing.birthYear && row.birthYear) patch.birthYear = row.birthYear;
-          if (!existing.apparatus && (row.apparatus ?? DISCIPLINE_META[row.disciplineCode]?.apparatus)) {
-            patch.apparatus = row.apparatus ?? DISCIPLINE_META[row.disciplineCode].apparatus;
-          }
-          if (Object.keys(patch).length) await db.update(shooters).set(patch).where(eq(shooters.id, existing.id));
-        } else {
-          const meta = DISCIPLINE_META[row.disciplineCode];
-          const [created] = await db.insert(shooters).values({
-            firstName: row.firstName, lastName: row.lastName, nationality: row.teamNoc || null,
-            birthYear: row.birthYear ?? null, gender: row.gender ?? meta?.gender ?? null,
-            apparatus: row.apparatus ?? meta?.apparatus ?? null, clubId: clubId ?? null,
-            createdBySelf: false, verified: false, issfId,
-          }).returning({ id: shooters.id });
-          shooterId = created.id;
-          const added = {
-            id: created.id, firstName: row.firstName, lastName: row.lastName,
-            previousLastNames: null, previousFirstNames: null,
-            nationality: row.teamNoc || null, clubId: clubId ?? null,
-            birthYear: row.birthYear ?? null, apparatus: row.apparatus ?? meta?.apparatus ?? null, issfId,
-            resultCount: 1,
-          };
-          allShooters.push(added);
-          if (issfId) shooterByIssfId.set(issfId, added);
-        }
-      } else if (rowIssfId && !shooterByIssfId.has(rowIssfId)) {
+        const meta = DISCIPLINE_META[row.disciplineCode];
+        shooterId = await ensureShooter({
+          firstName: row.firstName, lastName: row.lastName, teamNoc: row.teamNoc, birthYear: row.birthYear,
+          gender: row.gender ?? meta?.gender, apparatus: row.apparatus ?? meta?.apparatus, clubId, issfId: rowIssfId,
+        }, known);
+      } else if (rowIssfId && !known.byIssfId.has(rowIssfId)) {
         // Strelac izabran u review-u (ili po imenu u ingest-u) — poveži ga sa ISSF ID-jem iz reda
-        const chosen = allShooters.find((shooter) => shooter.id === shooterId);
+        const chosen = known.all.find((shooter) => shooter.id === shooterId);
         if (chosen && !chosen.issfId) {
           await db.update(shooters).set({ issfId: rowIssfId }).where(eq(shooters.id, chosen.id));
           chosen.issfId = rowIssfId;
-          shooterByIssfId.set(rowIssfId, chosen);
+          known.byIssfId.set(rowIssfId, chosen);
         }
       }
 

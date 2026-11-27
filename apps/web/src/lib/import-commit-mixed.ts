@@ -5,7 +5,7 @@ import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_share
 import { eventTypeFromName } from "@/lib/competition-filters";
 import { ensureCompetitionEvent } from "@/lib/competition-events";
 import { formatDateSr } from "@/lib/date-utils";
-import { shooterResultCount } from "@/lib/import-commit";
+import { shooterResultCount } from "@/lib/ensure-shooter";
 import { linkTeamMembers } from "@/lib/mixed-team-link";
 import { changedColumns, changedParts, type ImportStatus } from "@/lib/import-diff";
 import { commitMixedStages, toFinalCommit, toQualCommit } from "@/app/(site)/(admin)/admin/rezultati/_shared/commitMixedTeams";
