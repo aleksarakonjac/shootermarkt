@@ -42,6 +42,8 @@ export function PdfMode() {
 
   const [rows, setRows] = useState<PdfRow[]>([]);
   const [teams, setTeams] = useState<MixedTeamEntry[]>([]);
+  /** Zaseban meč za timove koji bi išli u glavni meč (pucali su drugog dana od pojedinačnih istog meča). */
+  const [teamMatch, setTeamMatch] = useState<{ name: string; date: string } | null>(null);
   const [parseInfo, setParseInfo] = useState<ParseInfo | null>(null);
   const [nocFilter, setNocFilter] = useState("");
   const [result, setResult] = useState<CommitResult | null>(null);
@@ -55,6 +57,7 @@ export function PdfMode() {
       if (job.status === "completed" && job.result) {
         setRows(job.result.rows);
         setTeams(job.result.mixedTeams ?? []);
+        setTeamMatch(null);
         setParseInfo({
           eventsCount: job.result.eventsCount,
           skippedDisciplines: job.result.skippedDisciplines,
@@ -120,6 +123,8 @@ export function PdfMode() {
     if (!selectedCompId) { setError("Izaberi takmičenje iz baze"); return; }
     if (rows.some((r) => r.eventName != null && !r.eventName.trim())) { setError("Svaki dodatni meč mora imati naziv"); return; }
     if (rows.some((r) => r.eventName != null && !r.eventDate)) { setError("Svaki dodatni meč mora imati datum"); return; }
+    if (teamMatch && !teamMatch.name.trim()) { setError("Svaki dodatni meč mora imati naziv"); return; }
+    if (teamMatch && !teamMatch.date) { setError("Svaki dodatni meč mora imati datum"); return; }
     setLoading(true);
     setError(null);
     const payload: CommitPayload = { competitionId: selectedCompId, tags: importTags, rows };
@@ -136,7 +141,7 @@ export function PdfMode() {
         data = body;
       }
       if (teams.length > 0) {
-        const mixed = await commitMixedTeams(selectedCompId, teams);
+        const mixed = await commitMixedTeams(selectedCompId, matchedTeams);
         data = {
           ...data,
           inserted: data.inserted + mixed.inserted,
@@ -175,6 +180,7 @@ export function PdfMode() {
       if (job.status !== "completed" || !job.result) throw new Error("Rezultat ovog posla još nije dostupan");
       setRows(job.result.rows);
       setTeams(job.result.mixedTeams ?? []);
+      setTeamMatch(null);
       setParseInfo({
         eventsCount: job.result.eventsCount,
         skippedDisciplines: job.result.skippedDisciplines,
@@ -199,6 +205,7 @@ export function PdfMode() {
     setStep("upload");
     setRows([]);
     setTeams([]);
+    setTeamMatch(null);
     setParseInfo(null);
     setResult(null);
     setError(null);
@@ -214,6 +221,16 @@ export function PdfMode() {
   }
 
   const activeCount = rows.filter((r) => !r.skip).length + teams.filter((t) => !t.skip).length;
+  // timovi glavnog meča dobijaju zaseban meč timova kad je uključen; kasniji dani već imaju svoj meč iz parsera
+  const matchedTeams = teamMatch
+    ? teams.map((t) => (t.eventName == null ? { ...t, eventName: teamMatch.name.trim(), eventDate: teamMatch.date } : t))
+    : teams;
+  const mainTeams = teams.filter((t) => t.eventName == null);
+  function toggleTeamMatch(on: boolean) {
+    const individualMatch = rows.find((r) => r.fromMain)?.eventName?.trim();
+    const dates = mainTeams.map((t) => t.eventDate).filter((d): d is string => !!d).sort();
+    setTeamMatch(on ? { name: individualMatch ? `${individualMatch} · mešoviti timovi` : "", date: dates[0] ?? "" } : null);
+  }
   const toggleTeamSkip = (index: number) => setTeams((prev) => prev.map((t, i) => (i === index ? { ...t, skip: !t.skip } : t)));
   const eventNames = [...new Set(rows.flatMap((r) => (r.eventName != null ? [r.eventName] : [])))];
   const isSeparate = rows.some((r) => r.fromMain);
@@ -366,7 +383,7 @@ export function PdfMode() {
             </div>
           )}
 
-          {selectedCompId && activeCount > 0 && !unnamedMatch && <OverwriteCheck competitionId={selectedCompId} rows={rows} teams={teams} />}
+          {selectedCompId && activeCount > 0 && !unnamedMatch && !(teamMatch && !teamMatch.name.trim()) && <OverwriteCheck competitionId={selectedCompId} rows={rows} teams={matchedTeams} />}
 
           {!!parseInfo?.warnings?.length && (
             <div className="rounded-lg border px-4 py-3 text-xs text-[var(--ink)] space-y-1" style={{ borderColor: "var(--warning)" }}>
@@ -395,6 +412,24 @@ export function PdfMode() {
                 </button>
               </div>
               <p className="text-xs text-[var(--muted)]">Za mešovite timove takmičenje čuva samo jedan meč, bez naziva. Ako su timovi prvog dana već uneti, ove preskoči.</p>
+              {mainTeams.length > 0 && (
+                <div className="space-y-2 rounded-lg border border-[var(--border)] px-4 py-3 text-sm">
+                  <label className="flex items-start gap-2 text-[var(--ink)]">
+                    <input type="checkbox" checked={!!teamMatch} onChange={(e) => toggleTeamMatch(e.target.checked)} className="mt-1 accent-[var(--brand-primary)]" />
+                    <span>Mešoviti timovi su zaseban meč (pucani drugog dana od pojedinačnih)</span>
+                  </label>
+                  {teamMatch ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input value={teamMatch.name} onChange={(e) => setTeamMatch({ ...teamMatch, name: e.target.value })} aria-label="Naziv meča timova"
+                        className="min-w-[280px] flex-1 rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[var(--ink)]" />
+                      <input type="date" value={teamMatch.date} onChange={(e) => setTeamMatch({ ...teamMatch, date: e.target.value })} aria-label="Datum meča timova"
+                        className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[var(--ink)]" />
+                    </div>
+                  ) : isSeparate ? (
+                    <p className="text-xs text-[var(--muted)]">Timovi idu u glavni meč, bez naziva i datuma.</p>
+                  ) : null}
+                </div>
+              )}
               <MixedTeamQualTable entries={teams} onToggleSkip={toggleTeamSkip} />
               <MixedTeamFinalsTable entries={teams} onToggleSkip={toggleTeamSkip} />
             </div>
