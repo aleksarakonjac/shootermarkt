@@ -6,6 +6,7 @@ import { recomputeFormaCache } from "@/lib/forma-cache";
 import { eventTypeFromName, groupsFromName } from "@/lib/competition-filters";
 import { refreshDisciplineGroups } from "@/lib/discipline-groups";
 import { ensureShooter, loadKnownShooters } from "@/lib/ensure-shooter";
+import { asIssfId } from "@shootermarkt/db/name-match";
 import { DISCIPLINE_META, type CommitPayload, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import { changedColumns, changedParts, resultColumns, upsertedResult, type ImportStatus } from "@/lib/import-diff";
 
@@ -116,7 +117,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
   for (const row of rows) {
     if (row.skip) { skipped++; continue; }
     // SIUS redovi u issfId nose lokalni SIUS ID (npr. "S35/21945") — u shooters.issf_id sme samo pravi ISSF ID
-    const rowIssfId = row.issfId?.startsWith("SH") ? row.issfId : null;
+    const rowIssfId = asIssfId(row.issfId);
     try {
       let clubId = row.clubId;
       if (!clubId && row.clubAbbr) {
@@ -136,7 +137,7 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
         shooterId = await ensureShooter({
           firstName: row.firstName, lastName: row.lastName, teamNoc: row.teamNoc, birthYear: row.birthYear,
           gender: row.gender ?? meta?.gender, apparatus: row.apparatus ?? meta?.apparatus, clubId, issfId: rowIssfId,
-        }, known);
+        }, known, { category: row.category, date: row.eventDate ?? competitionDate });
       } else if (rowIssfId && !known.byIssfId.has(rowIssfId)) {
         // Strelac izabran u review-u (ili po imenu u ingest-u) — poveži ga sa ISSF ID-jem iz reda
         const chosen = known.all.find((shooter) => shooter.id === shooterId);

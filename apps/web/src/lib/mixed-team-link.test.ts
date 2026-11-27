@@ -32,4 +32,19 @@ describe("linkTeamMembers", () => {
     expect(linkTeamMembers({ m_firstName: "Damir", m_lastName: "Mikec", f_firstName: "Petar", f_lastName: "Gorsa" }, "CRO", shooters))
       .toEqual({ shooter1Id: null, shooter2Id: 3 });
   });
+
+  it("links by ISSF id first and never to a namesake with another id", () => {
+    const list = [
+      { id: 1, firstName: "Pushpender", lastName: "SINGH", nationality: "IND", issfId: "SHINDM0206198601" },
+      { id: 2, firstName: "Pushpender", lastName: "SINGH", nationality: "IND", issfId: "SHINDM2208200401" },
+    ];
+    const team = { m_firstName: "Pushpender", m_lastName: "Singh", mIssfId: "SHINDM2208200401", f_firstName: "Pushpender", f_lastName: "Singh", fIssfId: "SHINDM0101200901" };
+    expect(linkTeamMembers(team, "IND", list)).toEqual({ shooter1Id: 2, shooter2Id: null });
+  });
+
+  it("does not link a junior team member to a namesake who is too old", () => {
+    const list = [{ id: 1, firstName: "Damir", lastName: "MIKEC", nationality: "SRB", birthYear: 1984 }, { id: 2, firstName: "Tea", lastName: "MIKEC", nationality: "SRB", birthYear: 2007 }];
+    expect(linkTeamMembers({ m_firstName: "Damir", m_lastName: "Mikec", f_firstName: "Tea", f_lastName: "Mikec" }, "SRB", list, { category: "junior", date: "2026-11-14" }))
+      .toEqual({ shooter1Id: null, shooter2Id: 2 });
+  });
 });

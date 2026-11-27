@@ -1,7 +1,7 @@
 import { eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { mixedTeamResults, results, shooters } from "@shootermarkt/db/schema";
-import { foldName, foldNameSql, matchShooter, normalizeNoc, NOC_ALIASES, type MatchCandidate } from "@shootermarkt/db/name-match";
+import { asIssfId, foldName, foldNameSql, matchAthlete, normalizeNoc, NOC_ALIASES, type AgeContext, type MatchCandidate } from "@shootermarkt/db/name-match";
 
 export type RosterShooter = MatchCandidate & { issfId: string | null };
 
@@ -32,27 +32,27 @@ export function createShooterRoster(known: RosterShooter[], queries: RosterQueri
     return rows;
   };
 
-  const match = async (firstName: string, lastName: string, noc: string | null) => {
-    const exact = matchShooter(firstName, lastName, noc, known, { exactOnly: true });
+  const match = async (firstName: string, lastName: string, noc: string | null, issfId: string | null = null, age?: AgeContext) => {
+    const exact = matchAthlete(issfId, firstName, lastName, noc, known, { exactOnly: true, age });
     if (exact.kind === "exact") return exact;
     const [sameNation, sameLastName] = await Promise.all([nationRows(normalizeNoc(noc)), queries.byFoldedLastName(foldName(lastName))]);
     // Bez duplikata: varijanta imena se auto-povezuje samo kad je kandidat jedinstven.
     const candidates = new Map([...known, ...sameNation, ...sameLastName].map((shooter) => [shooter.id, shooter]));
-    return matchShooter(firstName, lastName, noc, [...candidates.values()]);
+    return matchAthlete(issfId, firstName, lastName, noc, [...candidates.values()], { age });
   };
 
-  const matchIssf = async (issfId: string | null, firstName: string, lastName: string, noc: string | null) => {
+  const matchIssf = async (issfId: string | null, firstName: string, lastName: string, noc: string | null, age?: AgeContext) => {
     if (issfId) {
       const linked = known.find((shooter) => shooter.issfId === issfId) ?? await queries.byIssfId(issfId);
       if (linked) return linked.id;
     }
-    const result = await match(firstName, lastName, noc);
+    const result = await match(firstName, lastName, noc, issfId, age);
     return result.kind === "exact" ? result.id : null;
   };
 
   // SIUS identifikator je nekad ISSF ID ("SH…"), nekad lokalni broj organizatora — samo prvi važi kao issfId
-  const matchSius = (athlete: { siusAthleteId?: string | null; firstName: string; lastName: string; nation?: string }) =>
-    matchIssf(athlete.siusAthleteId?.startsWith("SH") ? athlete.siusAthleteId : null, athlete.firstName, athlete.lastName, athlete.nation ?? null);
+  const matchSius = (athlete: { siusAthleteId?: string | null; firstName: string; lastName: string; nation?: string }, age?: AgeContext) =>
+    matchIssf(asIssfId(athlete.siusAthleteId), athlete.firstName, athlete.lastName, athlete.nation ?? null, age);
 
   return { match, matchIssf, matchSius, add: (shooter: RosterShooter) => void known.push(shooter) };
 }
@@ -65,6 +65,7 @@ const columns = {
   previousFirstNames: shooters.previousFirstNames,
   nationality: shooters.nationality,
   issfId: shooters.issfId,
+  birthYear: shooters.birthYear,
 };
 
 /** Strelci već vezani za takmičenja i svi sa ranijim prezimenom (malo ih je, a prezime ih inače ne bi našlo). */

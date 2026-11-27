@@ -95,7 +95,7 @@ export async function commitTeamResults(competitionId: number, entries: TeamResu
         links.push(pickMemberShooter(m, before, own) ?? await ensureShooter({
           firstName: m.firstName, lastName: m.lastName, teamNoc: m.teamNoc,
           gender: meta.gender ?? undefined, apparatus: meta.apparatus, clubId: club?.id,
-        }, known));
+        }, known, { category: e.category, date: e.eventDate ?? competition?.date }));
       }
 
       const next = snapshot(e, links);

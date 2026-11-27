@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { shooters } from "@shootermarkt/db/schema";
-import { matchShooter } from "@shootermarkt/db/name-match";
+import { matchAthlete, type AgeContext } from "@shootermarkt/db/name-match";
 
 /** Broj rezultata strelca — za matchShooter (dvosmislena varijanta imena → aktivan strelac). */
 // Sirov SQL: Drizzle u select listi ne kvalifikuje kolone, pa bi "id" u podupitu značio results.id.
@@ -27,18 +27,16 @@ export async function loadKnownShooters() {
 export type KnownShooters = Awaited<ReturnType<typeof loadKnownShooters>>;
 
 /** Postojeći strelac (dopunjen praznim poljima iz `draft`) ili novi neverifikovan; vraća njegov id. */
-export async function ensureShooter(draft: ShooterDraft, known: KnownShooters): Promise<number> {
-  // issfId (ISSF import) pre imena; ime se ne prihvata ako taj strelac ima drugi issfId — druga osoba
+export async function ensureShooter(draft: ShooterDraft, known: KnownShooters, age?: AgeContext): Promise<number> {
+  // ISSF ID odlučuje; po imenu se ne uzima strelac sa drugim ID-em ni prestar za kategoriju
   const issfId = draft.issfId ?? null;
   const clubId = draft.clubId ?? null;
-  const match = matchShooter(draft.firstName, draft.lastName, draft.teamNoc || null, known.all);
-  const byName = match.kind === "exact" ? known.all.find((shooter) => shooter.id === match.id) : undefined;
-  const existing = (issfId && known.byIssfId.get(issfId))
-    || (byName && (!issfId || !byName.issfId) ? byName : undefined);
+  const match = matchAthlete(issfId, draft.firstName, draft.lastName, draft.teamNoc || null, known.all, { age });
+  const existing = match.kind === "exact" ? known.all.find((shooter) => shooter.id === match.id) : undefined;
   if (existing) {
     const patch: Partial<typeof shooters.$inferInsert> = {};
-    // Samo po imenu (matchShooter pušta SRB/AIN/praznu naciju) → issfId tek uz istu naciju
-    if (issfId && !existing.issfId && (existing !== byName || existing.nationality === draft.teamNoc)) {
+    // Bez ID-a na profilu pogodak je po imenu (pušta SRB/AIN/praznu naciju) → issfId tek uz istu naciju
+    if (issfId && !existing.issfId && existing.nationality === draft.teamNoc) {
       patch.issfId = issfId;
       existing.issfId = issfId;
       known.byIssfId.set(issfId, existing);

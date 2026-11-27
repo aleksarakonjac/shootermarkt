@@ -8,6 +8,7 @@ import { formatDateSr } from "@/lib/date-utils";
 import { ensureShooter, loadKnownShooters, shooterResultCount } from "@/lib/ensure-shooter";
 import { pickMemberShooter } from "@/lib/team-member-link";
 import { linkTeamMembers } from "@/lib/mixed-team-link";
+import { asIssfId } from "@shootermarkt/db/name-match";
 import { changedColumns, changedParts, type ImportStatus } from "@/lib/import-diff";
 import { commitMixedStages, toFinalCommit, toQualCommit } from "@/app/(site)/(admin)/admin/rezultati/_shared/commitMixedTeams";
 import { isUnrankedRemark, type CompetitionLevel, type EventType, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
@@ -27,11 +28,13 @@ export interface MixedCommitEntry {
   qualified?: boolean | null;
   m_lastName?: string;
   m_firstName?: string;
+  mIssfId?: string | null;
   m_series?: number[];
   mInners?: number | null;
   mTotal?: number;
   f_lastName?: string;
   f_firstName?: string;
+  fIssfId?: string | null;
   f_series?: number[];
   fInners?: number | null;
   fTotal?: number;
@@ -197,8 +200,9 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
   const candidates = isFinals ? [] : await db.select({
     id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName,
     previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames,
-    nationality: shooters.nationality, resultCount: shooterResultCount,
+    nationality: shooters.nationality, resultCount: shooterResultCount, issfId: shooters.issfId, birthYear: shooters.birthYear,
   }).from(shooters);
+  const matchDate = isFinals ? null : eventDate ?? (await db.query.competitions.findFirst({ where: eq(competitions.id, competitionId), columns: { date: true } }))?.date;
   const creating = !isFinals && entries.some((e) => e.createMissing && !e.skip);
   const known = creating ? await loadKnownShooters() : null;
   // pojedinačni nastupi istim oružjem na ovom takmičenju (ARMT → ARM/ARW)
@@ -211,15 +215,15 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
     try {
       const key = teamKey(e.nocCode, e.teamNumber);
       const old = existing.get(key);
-      const links: { shooter1Id?: number | null; shooter2Id?: number | null } = isFinals ? {} : linkTeamMembers(e, e.nocCode, candidates);
+      const links: { shooter1Id?: number | null; shooter2Id?: number | null } = isFinals ? {} : linkTeamMembers(e, e.nocCode, candidates, { category, date: matchDate });
       if (known && e.createMissing) {
         const [mNoc, fNoc = mNoc] = e.nocCode.split("/");
-        const member = async (firstName: string, lastName: string, shooterId: number | undefined, before: unknown, linked: number | null | undefined, teamNoc: string, gender: "M" | "F") =>
+        const member = async (firstName: string, lastName: string, shooterId: number | undefined, before: unknown, linked: number | null | undefined, teamNoc: string, gender: "M" | "F", issfId: string | null) =>
           pickMemberShooter({ firstName, lastName, shooterId }, (before as number | null) ?? null, individuals)
           ?? linked
-          ?? (firstName.trim() && lastName.trim() ? await ensureShooter({ firstName, lastName, teamNoc, gender, apparatus: disc.apparatus }, known) : null);
-        links.shooter1Id = await member(e.m_firstName ?? "", e.m_lastName ?? "", e.mShooterId, old?.shooter1Id, links.shooter1Id, mNoc, e.mGender ?? "M");
-        links.shooter2Id = await member(e.f_firstName ?? "", e.f_lastName ?? "", e.fShooterId, old?.shooter2Id, links.shooter2Id, fNoc, e.fGender ?? "F");
+          ?? (firstName.trim() && lastName.trim() ? await ensureShooter({ firstName, lastName, teamNoc, gender, apparatus: disc.apparatus, issfId }, known, { category, date: matchDate }) : null);
+        links.shooter1Id = await member(e.m_firstName ?? "", e.m_lastName ?? "", e.mShooterId, old?.shooter1Id, links.shooter1Id, mNoc, e.mGender ?? "M", asIssfId(e.mIssfId));
+        links.shooter2Id = await member(e.f_firstName ?? "", e.f_lastName ?? "", e.fShooterId, old?.shooter2Id, links.shooter2Id, fNoc, e.fGender ?? "F", asIssfId(e.fIssfId));
       }
       // nova veza sa profilom je izmena i kad su rezultati isti (timovi uvezeni pre povezivanja)
       const newLink = old && !isFinals && ((!old.shooter1Id && links.shooter1Id) || (!old.shooter2Id && links.shooter2Id));

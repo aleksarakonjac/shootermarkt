@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { isUnrankedRemark, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
 import { escSoloReviewRows, mixedTeamMatch, stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
-import { matchShooter } from "@shootermarkt/db/name-match";
+import { matchAthlete, type AgeContext } from "@shootermarkt/db/name-match";
 
 /** ESC Solo SIUS eventi (juniorske varijante se ne nagađaju dok se ne pojave u podacima). */
 export const ESC_SOLO_EVENT_CODES = ["ARM-ECH-SOLO", "ARW-ECH-SOLO", "APM-ECH-SOLO", "APW-ECH-SOLO", "ARMJ-ECH-SOLO", "ARWJ-ECH-SOLO", "APMJ-ECH-SOLO", "APWJ-ECH-SOLO"];
@@ -41,8 +41,12 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   const mixedCodes = requested.filter((c) => MIXED_TEAM_CODES.has(splitEventCode(c).code));
 
   const allShooters = await db
-    .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, resultCount: shooterResultCount })
+    .select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, resultCount: shooterResultCount, issfId: shooters.issfId, birthYear: shooters.birthYear })
     .from(shooters);
+  const matchId = (athleteId: string | null, firstName: string, lastName: string, noc: string, age: AgeContext) => {
+    const match = matchAthlete(athleteId, firstName, lastName, noc, allShooters, { age });
+    return match.kind === "exact" ? match.id : undefined;
+  };
 
   let siusData: Awaited<ReturnType<typeof fetchLiveSiusResults>> = new Map();
   if (codes.length > 0) {
@@ -70,10 +74,9 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
       soloEventCount = soloEvents.length;
       for (const event of soloEvents) {
         const athletes = await fetchSiusEscSoloResults(siusId, event.runningId);
-        soloRows.push(...escSoloReviewRows(athletes, escSoloCodeFromEvent(event.eventCode)!, /J-ECH-SOLO$/.test(event.eventCode) ? "junior" : "senior", (first, last, noc) => {
-          const m = matchShooter(first, last, noc, allShooters);
-          return m.kind === "exact" ? m.id : undefined;
-        }));
+        const category = /J-ECH-SOLO$/.test(event.eventCode) ? "junior" : "senior";
+        soloRows.push(...escSoloReviewRows(athletes, escSoloCodeFromEvent(event.eventCode)!, category,
+          (id, first, last, noc) => matchId(id, first, last, noc, { category, date: event.startDate })));
       }
     } catch (e) {
       throw new SiusImportError(`SIUS ESC Solo fetch failed: ${e}`, 502);
@@ -104,8 +107,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
     // Qual rows
     const discRows: ReviewRow[] = [];
     for (const r of data.qual) {
-      const match = matchShooter(r.firstName, r.lastName, r.nation, allShooters);
-      const shooterId = match.kind === "exact" ? match.id : undefined;
+      const shooterId = matchId(r.siusAthleteId, r.firstName, r.lastName, r.nation, { category, date: data.date });
 
       discRows.push({
         shooterId,
@@ -144,8 +146,7 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
         );
         if (!row) {
           if (data.qual.length > 0 && e.rank !== null) continue; // qual exists but shooter not found — skip (DSQ/DNS stay visible)
-          const match = matchShooter(e.firstName, e.lastName, e.nation, allShooters);
-          const shooterId = match.kind === "exact" ? match.id : undefined;
+          const shooterId = matchId(e.siusAthleteId, e.firstName, e.lastName, e.nation, { category, date: data.date });
           row = {
             shooterId,
             issfId: e.siusAthleteId ?? undefined,

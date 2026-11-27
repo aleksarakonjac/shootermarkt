@@ -46,11 +46,13 @@ export async function POST(req: NextRequest) {
 
   const [allClubs, allShooters] = await Promise.all([
     db.select().from(clubs),
-    db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality }).from(shooters),
+    db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, birthYear: shooters.birthYear }).from(shooters),
   ]);
 
   const rows = parsed.rows.map((row) => {
-    const match = matchShooter(row.firstName, row.lastName, row.teamNoc || null, allShooters);
+    const match = matchShooter(row.firstName, row.lastName, row.teamNoc || null, allShooters, {
+      age: { category: row.category, date: row.eventDate ?? parsed.competition?.date },
+    });
     const club = row.clubAbbr
       ? allClubs.find((candidate) =>
           candidate.nocCode?.toLowerCase() === row.clubAbbr?.toLowerCase() ||
