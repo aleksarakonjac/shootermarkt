@@ -24,3 +24,22 @@ describe("fetchLiveSiusMixedTeamResults", () => {
     expect(out.get("ARMT#2")).toMatchObject({ date: "2026-10-24", matchCount: 2 });
   });
 });
+
+describe("fetchLiveSiusMixedTeamResults: final published as its own event", () => {
+  it("attaches a final without qualification to the previous match", async () => {
+    const events = [
+      { RunningId: "q1", State: "Finished", Startdate: "2026-10-23T14:00:00+02:00", CompetitionEventType: { EventCode: "ARMT", Name: "10m AIR RIFLE MIXED TEAM" } },
+      { RunningId: "f1", State: "Finished", Startdate: "2026-10-24T09:00:00+02:00", CompetitionEventType: { EventCode: "ARMT", Name: "10m AIR RIFLE MIXED TEAM FINAL" } },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      const body = url.includes("/subevents")
+        ? [{ RunningId: url.includes("/q1/") ? "q" : "f", Name: url.includes("/q1/") ? "Qualification" : "Final", State: "Finished", Hidden: false }]
+        : url.includes("/series") ? SERIES : events;
+      return { ok: true, status: 200, json: async () => body };
+    }));
+    const out = await fetchLiveSiusMixedTeamResults("c", ["ARMT"]);
+    expect([...out.keys()]).toEqual(["ARMT"]);
+    expect(out.get("ARMT")).toMatchObject({ date: "2026-10-23", matchCount: 1, qual: [{ nocCode: "SRB" }], final: [{ nocCode: "SRB" }] });
+  });
+});
+

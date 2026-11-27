@@ -8,7 +8,7 @@ import { competitions, shooters } from "@shootermarkt/db/schema";
 import { eq } from "drizzle-orm";
 import { isUnrankedRemark, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
-import { escSoloReviewRows, stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
+import { escSoloReviewRows, mixedTeamMatch, stageRemarks, type SiusFinalEntry } from "@/lib/sius-merge";
 import { matchShooter } from "@shootermarkt/db/name-match";
 
 /** ESC Solo SIUS eventi (juniorske varijante se ne nagađaju dok se ne pojave u podacima). */
@@ -215,9 +215,12 @@ export async function buildSiusImport(siusId: string, disciplineCodes?: string[]
   for (const [key, data] of mixedData) {
     const { eventCode, match } = parseSiusMatchKey(key);
     const { code, category } = splitEventCode(eventCode);
-    // drugi meč mik tima (drugi dan) je zaseban meč takmičenja, kao kod pojedinačnih
-    const eventName = (data.matchCount ?? 1) > 1 && data.date ? matchEventName(match, data.date) : null;
-    const eventDate = eventName ? data.date! : null;
+    const teamMatch = mixedTeamMatch(match, data.matchCount, data.date);
+    if (!teamMatch) {
+      errors.push(`${code}: ${match}. meč istog dana nije uvezen — prepisao bi prvi meč`);
+      continue;
+    }
+    const { eventName, eventDate } = teamMatch;
     const disciplineCode = code as MixedTeamEntry["disciplineCode"];
     if (data.qual.length === 0 && data.final.length === 0) {
       errors.push(`${disciplineCode}: no results`);

@@ -411,7 +411,6 @@ export function PdfMode() {
                   {teams.some((t) => !t.skip) ? "Preskoči sve timove" : "Uključi sve timove"}
                 </button>
               </div>
-              <p className="text-xs text-[var(--muted)]">Za mešovite timove takmičenje čuva samo jedan meč, bez naziva. Ako su timovi prvog dana već uneti, ove preskoči.</p>
               {mainTeams.length > 0 && (
                 <div className="space-y-2 rounded-lg border border-[var(--border)] px-4 py-3 text-sm">
                   <label className="flex items-start gap-2 text-[var(--ink)]">

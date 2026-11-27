@@ -66,6 +66,8 @@ describe("PdfMode: mešoviti timovi", () => {
     render(<PdfMode />);
 
     expect(await screen.findByText("Mešoviti timovi")).toBeInTheDocument();
+    // timovi drugog dana se sada uvoze, pa pregled ne sme da savetuje da se preskoče
+    expect(screen.queryByText(/čuva samo jedan meč|ove preskoči/)).toBeNull();
     expect(screen.getByText("Mešoviti tim ARMT: strana nije pročitana")).toBeInTheDocument();
     await waitFor(() => expect(sent.find((r) => r.url.endsWith("/preview"))?.body.teams).toHaveLength(1), { timeout: 3000 });
 

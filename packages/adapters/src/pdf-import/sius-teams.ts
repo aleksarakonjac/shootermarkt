@@ -83,6 +83,11 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
     : nationByClub.size === 0 ? clubNation(t.label).teamNoc
     : nationByClub.get(clubStem(t.label)) ?? t.athletes.map((a) => nationByAthlete.get(athleteKey(a.name))).find(Boolean);
 
+  // finale objavljeno kasnije od kvalifikacija pripada poslednjem danu kvalifikacija do svog datuma
+  for (const page of parsed.filter((p) => p.isFinal)) {
+    const qualDays = parsed.filter((p) => !p.isFinal && p.discipline === page.discipline && p.junior === page.junior && p.date <= page.date).map((p) => p.date).sort();
+    if (qualDays.length) page.date = qualDays.at(-1)!;
+  }
   // svaki dan discipline je svoj meč: timovi, numeracija po državi i finale se vezuju samo unutar dana
   const days = [...new Set(parsed.map((p) => `${p.discipline}|${p.date}`))].sort((a, b) => a.split("|")[1].localeCompare(b.split("|")[1]));
   for (const day of days) {

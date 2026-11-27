@@ -80,6 +80,16 @@ describe("parseSiusPdf — Salona Trophy + DC Open 2026", async () => {
     expect(parsed.warnings ?? []).toEqual([]);
   });
 
+  it("keeps a final printed on a later day with its qualification", async () => {
+    const pages = await extractSiusPages(fixture);
+    const finalNextDay = pages.map((items) => items.map((it) => ({ ...it, str: it.str.replace(/^F200000TA231026(\d{4}\.1\.ARMT\.)/, "F200000TA241026$1") })));
+    const parsed = parseSiusPages(finalNextDay)!;
+    const armt = parsed.mixedTeams!.filter((t) => t.disciplineCode === "ARMT");
+    expect(armt).toHaveLength(19);
+    expect(armt.filter((t) => t.finalRank != null)).toHaveLength(4);
+    expect(new Set(armt.map((t) => `${t.eventDate}|${t.eventName}`))).toEqual(new Set(["2026-10-23|null"]));
+  });
+
   it("numbers teams of one nation and finds the nation of a team printed without it", () => {
     for (const code of ["ARMT", "APMT"]) {
       const keys = teams(code).map((t) => `${t.nocCode}#${t.teamNumber}`);

@@ -18,6 +18,16 @@ describe("linkTeamMembers", () => {
       .toEqual({ shooter1Id: null, shooter2Id: 2 });
   });
 
+  it("does not link a Serbian team member to a shooter of another nation", () => {
+    expect(linkTeamMembers({ m_firstName: "Petar", m_lastName: "Gorsa", f_firstName: "Tea", f_lastName: "Mikec" }, "SRB", shooters))
+      .toEqual({ shooter1Id: null, shooter2Id: 2 });
+  });
+
+  it("does not link a shooter without a nation", () => {
+    expect(linkTeamMembers({ m_firstName: "Ana", m_lastName: "Anic", f_firstName: "Tea", f_lastName: "Mikec" }, "SRB", [...shooters, { id: 4, firstName: "Ana", lastName: "ANIC", nationality: null }]))
+      .toEqual({ shooter1Id: null, shooter2Id: 2 });
+  });
+
   it("does not link the same name from another nation", () => {
     expect(linkTeamMembers({ m_firstName: "Damir", m_lastName: "Mikec", f_firstName: "Petar", f_lastName: "Gorsa" }, "CRO", shooters))
       .toEqual({ shooter1Id: null, shooter2Id: 3 });
