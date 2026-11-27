@@ -28,7 +28,8 @@ const REMARKS = /^(Q|DNS|DNF|DSQ|RPO|DN|S|F)$/;
 const AIR = /^(AR|AP)[MW]$/;
 const DECIMAL = /^\d+(?:\.\d)?$/;
 
-export async function parseSiusPdf(pdfBuffer: Buffer): Promise<ParsedBilten | null> {
+/** Tekst svake strane sa koordinatama, sa vraćenim slovima (vidi sius-fonts.ts). */
+export async function extractSiusPages(pdfBuffer: Buffer): Promise<Item[][]> {
   // fontExtraProperties: glyphFixes čita tabele fonta
   const pdf = await getDocumentProxy(new Uint8Array(pdfBuffer), { verbosity: 0, fontExtraProperties: true });
   const pages: Item[][] = [];
@@ -43,7 +44,11 @@ export async function parseSiusPdf(pdfBuffer: Buffer): Promise<ParsedBilten | nu
       return str ? [{ x: it.transform[4], y: it.transform[5], str }] : [];
     }));
   }
-  return parseSiusPages(pages);
+  return pages;
+}
+
+export async function parseSiusPdf(pdfBuffer: Buffer): Promise<ParsedBilten | null> {
+  return parseSiusPages(await extractSiusPages(pdfBuffer));
 }
 
 export function parseSiusPages(pages: Item[][]): ParsedBilten | null {

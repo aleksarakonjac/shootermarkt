@@ -83,14 +83,15 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
     : nationByClub.size === 0 ? clubNation(t.label).teamNoc
     : nationByClub.get(clubStem(t.label)) ?? t.athletes.map((a) => nationByAthlete.get(athleteKey(a.name))).find(Boolean);
 
-  for (const discipline of new Set(parsed.map((p) => p.discipline))) {
-    const own = parsed.filter((p) => p.discipline === discipline);
-    // ponytail: mixed_team_results nema competition_event_id — uvozi se samo prvi meč, ostali se prijavljuju
-    const firstDate = own.map((p) => p.date).sort()[0];
-    for (const date of new Set(own.filter((p) => p.date !== firstDate).map((p) => p.date))) {
-      warnings.push(`Mešoviti tim ${discipline} ${date}: drugi meč nije uvezen (mešoviti tim nema više mečeva)`);
-    }
-    const match = own.filter((p) => p.date === firstDate);
+  // svaki dan discipline je svoj meč: timovi, numeracija po državi i finale se vezuju samo unutar dana
+  const days = [...new Set(parsed.map((p) => `${p.discipline}|${p.date}`))].sort((a, b) => a.split("|")[1].localeCompare(b.split("|")[1]));
+  for (const day of days) {
+    const [discipline, date] = day.split("|") as [MixedTeamCode, string];
+    const match = parsed.filter((p) => p.discipline === discipline && p.date === date);
+    // prvi dan discipline ide u glavni meč; svaki sledeći je zaseban meč, inače bi prepisao prvi
+    // (isti oblik naziva kao matchEventName u apps/web/src/lib/competition-events.ts)
+    const nth = days.filter((d) => d.startsWith(`${discipline}|`)).indexOf(day) + 1;
+    const eventName = nth > 1 ? `${nth}. meč · ${date.slice(8, 10)}.${date.slice(5, 7)}.` : null;
     const category = match[0].junior ? "junior" : "senior";
     const numbers = new Map<string, number>();
     const byKey = new Map<string, MixedTeamEntry>();
@@ -102,6 +103,7 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
       const [m, f] = t.athletes.map((a) => splitName(a.name));
       return {
         skip: false, nocCode, teamNumber: numbers.get(nocCode)!, disciplineCode: discipline, category,
+        eventName, eventDate: date,
         qualRank: null, qualTotal: null, inners: null, qualified: true, finalRank: null, finalTotal: null,
         mIssfId: null, mLastName: m.lastName, mFirstName: m.firstName, mFullName: m.fullName, m_series: [], mInners: null, mTotal: 0,
         fIssfId: null, fLastName: f.lastName, fFirstName: f.firstName, fFullName: f.fullName, f_series: [], fInners: null, fTotal: 0,

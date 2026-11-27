@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { foldName } from "@shootermarkt/db/name-match";
 import { mergeFinalsIntoRows, type ParsedFinalResult, type ParsedShooterResult, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
-import { parseSiusPdf, splitGuessedName } from "./sius-pdf";
+import { extractSiusPages, parseSiusPages, parseSiusPdf, splitGuessedName } from "./sius-pdf";
 import { resolveGuessedNames } from "./sius-names";
 
 // Međunarodni SIUS format, PDF presložen Ghostscript-om (fontovi bez mape slova).
@@ -59,6 +59,25 @@ describe("parseSiusPdf — Salona Trophy + DC Open 2026", async () => {
     expect(teams("ARMT").filter((t) => t.finalRank != null).map((t) => [t.finalRank, t.finalTotal, t.nocCode]).sort()).toEqual([
       [1, 499, "CRO"], [2, 495.9, "CRO"], [3, 433.4, "CRO"], [4, 367, "CRO"],
     ]);
+  });
+
+  it("gives every team the date of its match day, in the main match", () => {
+    expect(new Set(bilten.mixedTeams!.map((t) => `${t.eventDate}|${t.eventName}`))).toEqual(new Set(["2026-10-23|null"]));
+  });
+
+  it("keeps a second day of mixed teams as its own match", async () => {
+    const pages = await extractSiusPages(fixture);
+    // isti ARMT timovi, još jednom pucani 24.10.
+    const nextDay = pages
+      .filter((items) => items.some((it) => /^[QF]200000TA231026\d{4}\.1\.ARMT\./.test(it.str)))
+      .map((items) => items.map((it) => ({ ...it, str: it.str.replace("TA231026", "TA241026") })));
+    const parsed = parseSiusPages([...pages, ...nextDay])!;
+    const armt = parsed.mixedTeams!.filter((t) => t.disciplineCode === "ARMT");
+    expect(armt).toHaveLength(38);
+    expect(armt.filter((t) => t.eventDate === "2026-10-24" && t.eventName === "2. meč · 24.10.")).toHaveLength(19);
+    expect(armt.filter((t) => t.eventDate === "2026-10-23" && t.eventName === null)).toHaveLength(19);
+    expect(armt.filter((t) => t.eventDate === "2026-10-24" && t.finalRank != null)).toHaveLength(4);
+    expect(parsed.warnings ?? []).toEqual([]);
   });
 
   it("numbers teams of one nation and finds the nation of a team printed without it", () => {
