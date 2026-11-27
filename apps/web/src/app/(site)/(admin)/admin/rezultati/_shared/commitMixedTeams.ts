@@ -9,6 +9,7 @@ export const toQualCommit = (e: MixedTeamEntry): MixedCommitEntry => ({
   skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber, qualRank: e.qualRank, qualTotal: e.qualTotal, qualInners: e.inners, qualRemark: e.qualRemark, qualified: e.qualified, extras: e.qualExtras,
   m_lastName: e.mLastName, m_firstName: e.mFirstName, m_series: e.m_series, mInners: e.mInners, mTotal: e.mTotal,
   f_lastName: e.fLastName, f_firstName: e.fFirstName, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
+  clubName: e.clubName, createMissing: e.createMissing, mShooterId: e.mShooterId, fShooterId: e.fShooterId, mGender: e.mGender, fGender: e.fGender,
 });
 
 export const toFinalCommit = (e: MixedTeamEntry): MixedCommitEntry => ({

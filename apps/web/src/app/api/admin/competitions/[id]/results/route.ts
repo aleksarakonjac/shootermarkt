@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
-import { competitionEvents, disciplines, mixedTeamResults, results } from "@shootermarkt/db/schema";
+import { competitionEvents, disciplines, mixedTeamResults, results, teamResults } from "@shootermarkt/db/schema";
 import { and, asc, count, eq, isNull, notExists, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { recomputeFormaCache } from "@/lib/forma-cache";
@@ -77,6 +77,7 @@ async function deleteEmptyEvents(compId: number) {
     eq(competitionEvents.competitionId, compId),
     notExists(db.select({ one: sql`1` }).from(results).where(eq(results.competitionEventId, competitionEvents.id))),
     notExists(db.select({ one: sql`1` }).from(mixedTeamResults).where(eq(mixedTeamResults.competitionEventId, competitionEvents.id))),
+    notExists(db.select({ one: sql`1` }).from(teamResults).where(eq(teamResults.competitionEventId, competitionEvents.id))),
   ));
 }
 
@@ -127,6 +128,14 @@ async function handleDELETE(req: NextRequest, { params }: { params: Promise<{ id
       category ? eq(results.category, category as never) : undefined,
     ))
     .returning({ shooterId: results.shooterId });
+
+  // ekipni plasman iste discipline ide zajedno sa pojedinačnim
+  await db.delete(teamResults).where(and(
+    eq(teamResults.competitionId, compId),
+    eq(teamResults.disciplineId, disciplineId),
+    hasEvent ? (eventId === null ? isNull(teamResults.competitionEventId) : eq(teamResults.competitionEventId, eventId)) : undefined,
+    category ? eq(teamResults.category, category as never) : undefined,
+  ));
 
   await deleteEmptyEvents(compId);
 
