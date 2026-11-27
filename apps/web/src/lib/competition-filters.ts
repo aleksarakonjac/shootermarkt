@@ -2,12 +2,48 @@ import type { CompetitionEventType } from "@/lib/forma";
 /**
  * Model filtera na /takmicenja: dve ose sa višestrukim izborom.
  *  - nivo       -> kolona competitions.level (grupisano za prikaz)
- *  - disciplina -> kolona competitions.discipline_groups ('air' | 'smallbore')
+ *  - disciplina -> grupa (competitions.discipline_groups) ili konkretna disciplina
+ *    (rezultati i satnica takmičenja), bez podele na muške i ženske
  * Izvor (SSS / ISSF / ESC) nije filter; to je kolona `organizer` i interna stvar.
  */
 
 export const DISCIPLINE_GROUPS = ["air", "smallbore"] as const;
 export type DisciplineGroup = (typeof DISCIPLINE_GROUPS)[number];
+
+export const DISCIPLINE_EVENTS = [
+  { key: "ar", codes: ["ARM", "ARW"] },
+  { key: "ap", codes: ["APM", "APW"] },
+  { key: "armixed", codes: ["ARMT"] },
+  { key: "apmixed", codes: ["APMT"] },
+  { key: "arsolo", codes: ["SOLOARM", "SOLOARW"] },
+  { key: "apsolo", codes: ["SOLOAPM", "SOLOAPW"] },
+  { key: "r3p", codes: ["R3PM", "R3PW", "R3JM", "R3JW"] },
+  { key: "prone", codes: ["RPRM", "RPRW"] },
+  { key: "sp", codes: ["SPM", "SPW"] },
+  { key: "rfp", codes: ["RFPM"] },
+  { key: "stp", codes: ["STPM", "STPW"] },
+  { key: "fp", codes: ["FPM", "FPW"] },
+  { key: "r3p300", codes: ["R3P300M", "R3P300W"] },
+  { key: "prone300", codes: ["RPR300M", "RPR300W"] },
+  { key: "std300", codes: ["STR300"] },
+] as const;
+export type DisciplineEventKey = (typeof DISCIPLINE_EVENTS)[number]["key"];
+export type DisciplineFilter = DisciplineGroup | DisciplineEventKey;
+
+const DISCIPLINE_FILTERS: readonly string[] = [...DISCIPLINE_GROUPS, ...DISCIPLINE_EVENTS.map((e) => e.key)];
+
+/** Discipline (redom iz DISCIPLINE_EVENTS) koje se pojavljuju među datim kodovima. */
+export function eventsFromCodes(codes: Iterable<string>): DisciplineEventKey[] {
+  const set = new Set(codes);
+  return DISCIPLINE_EVENTS.filter((e) => e.codes.some((code) => set.has(code))).map((e) => e.key);
+}
+
+/** Bez izbora prolazi sve; inače je dovoljno poklapanje sa jednom izabranom grupom ili disciplinom. */
+export function matchesDiscipline(selected: readonly DisciplineFilter[], groups: readonly string[], codes: Iterable<string>): boolean {
+  if (!selected.length) return true;
+  const have: string[] = [...groups, ...eventsFromCodes(codes)];
+  return selected.some((key) => have.includes(key));
+}
 
 export const LEVEL_GROUPS = [
   { key: "world", levels: ["olympic", "world"] },
@@ -43,11 +79,11 @@ export function parseLevelParam(value: string | undefined): LevelGroupKey[] {
   return [...keys];
 }
 
-/** `disc=air,smallbore`; stari `tag=10m|MK|50m|25m` se mapiraju na grupe. */
-export function parseDisciplineParam(disc: string | undefined, legacyTag?: string): DisciplineGroup[] {
-  const groups = new Set<DisciplineGroup>();
+/** `disc=air,r3p`; stari `tag=10m|MK|50m|25m` se mapiraju na grupe. */
+export function parseDisciplineParam(disc: string | undefined, legacyTag?: string): DisciplineFilter[] {
+  const groups = new Set<DisciplineFilter>();
   for (const part of splitList(disc)) {
-    if ((DISCIPLINE_GROUPS as readonly string[]).includes(part)) groups.add(part as DisciplineGroup);
+    if (DISCIPLINE_FILTERS.includes(part)) groups.add(part as DisciplineFilter);
   }
   const legacy = legacyTag ? DISCIPLINE_FROM_LEGACY_TAG[legacyTag] : undefined;
   if (legacy) groups.add(legacy);

@@ -74,7 +74,24 @@
         "continental": "Kontinentalno",
         "international": "Međunarodno",
         "national": "Državno",
-        "regional": "Regionalno / klupsko"
+        "regional": "Regionalno"
+      },
+      "disciplineEvents": {
+        "ar": "10m vazdušna puška",
+        "ap": "10m vazdušni pištolj",
+        "armixed": "10m puška miks",
+        "apmixed": "10m pištolj miks",
+        "arsolo": "10m puška solo",
+        "apsolo": "10m pištolj solo",
+        "r3p": "50m puška trostav",
+        "prone": "50m puška ležeći",
+        "sp": "25m sportski pištolj",
+        "rfp": "25m pištolj brza paljba",
+        "stp": "25m standardni pištolj",
+        "fp": "50m slobodni pištolj",
+        "r3p300": "300m puška trostav",
+        "prone300": "300m puška ležeći",
+        "std300": "300m standardna puška"
       },
       "disciplineGroups": {
         "air": "Vazdušno",
