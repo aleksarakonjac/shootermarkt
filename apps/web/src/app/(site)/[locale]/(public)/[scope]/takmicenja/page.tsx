@@ -64,33 +64,6 @@ function groupByMonth<T extends { date: string }>(comps: T[]): Map<string, T[]> 
   return map;
 }
 
-function daysUntil(dateStr: string): number {
-  const target = new Date(dateStr + "T00:00:00");
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - now.getTime()) / 86400000);
-}
-
-function formatCountdown(days: number, locale: string): string {
-  if (locale === "en") {
-    if (days <= 0) return "live";
-    if (days === 1) return "tomorrow";
-    if (days < 7) return `in ${days} days`;
-    if (days < 14) return "in 1 week";
-    if (days < 21) return "in 2 weeks";
-    if (days < 30) return "in 3 weeks";
-    if (days < 45) return "in 1 month";
-    return `in ${Math.floor(days / 30)} months`;
-  }
-  if (days <= 0) return "u toku";
-  if (days === 1) return "sutra";
-  if (days < 7) return `za ${days} dana`;
-  if (days < 14) return "za nedelju";
-  if (days < 21) return "za 2 ned.";
-  if (days < 30) return "za 3 ned.";
-  if (days < 45) return "za mesec";
-  return `za ${Math.floor(days / 30)} mes.`;
-}
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface CompItem {
@@ -154,7 +127,6 @@ function CompRow({
   animStyle?: CSSProperties;
 }) {
   const levelStyle = LEVEL_STYLE[comp.level] ?? FALLBACK_BADGE;
-  const countdown = status === "next" || status === "upcoming" ? formatCountdown(daysUntil(comp.date), locale) : null;
 
   return (
     <ScopedLink
@@ -173,11 +145,6 @@ function CompRow({
           {formatDate(comp.date, comp.dateEnd, locale)}
         </span>
         <StatusPill status={status} locale={locale} />
-        {countdown && (
-          <span className="text-[0.65rem] font-semibold text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)] leading-none">
-            {countdown}
-          </span>
-        )}
       </div>
 
       {/* Name + location */}
@@ -188,7 +155,7 @@ function CompRow({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
           <span className="sm:hidden flex items-center gap-1.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] text-[var(--subtle)] tabular-nums">
             <StatusPill status={status} locale={locale} />
-            {formatDate(comp.date, comp.dateEnd, locale)}{countdown ? ` · ${countdown}` : ""}
+            {formatDate(comp.date, comp.dateEnd, locale)}
           </span>
           {(comp.location || comp.countryCode2) && (
             <span className="flex w-full sm:w-auto items-center gap-1 text-xs text-[var(--subtle)] min-w-0">
@@ -240,6 +207,12 @@ function CompRow({
 // ── Month blocks ──────────────────────────────────────────────────────────────
 
 function MonthGroup({ mk, comps, idx, locale, fullName }: { mk: string; comps: RowItem[]; idx: number; locale: string; fullName: string }) {
+  const blocks: RowItem[][] = [];
+  for (const c of comps) {
+    const last = blocks.at(-1);
+    if (last && (last[0].status === "live") === (c.status === "live")) last.push(c);
+    else blocks.push([c]);
+  }
   return (
     <div className="comp-month" style={{ '--month-idx': idx } as CSSProperties}>
       <div className="flex items-center gap-3 mb-2">
@@ -250,19 +223,19 @@ function MonthGroup({ mk, comps, idx, locale, fullName }: { mk: string; comps: R
         <div className="flex-1 h-px bg-[var(--border)]" />
         <span className="text-[0.65rem] text-[var(--subtle)] font-[family-name:var(--font-jetbrains-mono)]">{comps.length}</span>
       </div>
-      {/* U toku: zaseban blok na vrhu meseca, odvojen od hronološkog niza ispod */}
-      {[comps.filter((c) => c.status === "live"), comps.filter((c) => c.status !== "live")]
-        .filter((block) => block.length > 0)
-        .map((block, b) => (
+      {/* Hronološki; uzastopni redovi „u toku" dobijaju zaseban uokviren blok */}
+      <div className="space-y-3">
+        {blocks.map((block) => (
           <div
-            key={b}
-            className={`rounded-xl border overflow-hidden ${block[0].status === "live" ? "mb-3 border-[var(--live-border)]" : "border-[var(--border)]"}`}
+            key={block[0].id}
+            className={`rounded-xl border overflow-hidden ${block[0].status === "live" ? "border-[var(--live-border)]" : "border-[var(--border)]"}`}
           >
             {block.map((c, i) => (
               <CompRow key={c.id} comp={c} isLast={i === block.length - 1} status={c.status} locale={locale} levelLabel={getLevelLabel(c.level, locale)} animClass="comp-row" animStyle={{ '--month-idx': idx, '--row-idx': comps.indexOf(c) } as CSSProperties} />
             ))}
           </div>
         ))}
+      </div>
     </div>
   );
 }
@@ -452,16 +425,12 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
 
   // Jedna hronološka lista bez preseka: status reda nosi „u toku" / „sledeće".
   const nextDate = upcoming[0]?.date;
-  // U svakom mesecu: takmičenja u toku na vrhu, ostalo po datumu.
   const rowsAll: RowItem[] = translatedFiltered
     .map((c): RowItem => ({
       ...c,
       status: (c.dateEnd ?? c.date) < todayStr ? "past" : c.date <= todayStr ? "live" : c.date === nextDate ? "next" : "upcoming",
     }))
-    .sort((a, b) =>
-      a.date.slice(0, 7).localeCompare(b.date.slice(0, 7)) ||
-      Number(b.status === "live") - Number(a.status === "live") ||
-      a.date.localeCompare(b.date));
+    .sort((a, b) => a.date.localeCompare(b.date));
   const byMonth = groupByMonth(rowsAll);
   const months = [...byMonth.keys()].sort();
   // Tekuća sezona: stariji meseci (sve održano) se sažimaju; prošli i tekući mesec ostaju razvijeni.
@@ -514,11 +483,6 @@ export default async function TakmicenjaPage({ params, searchParams }: Props) {
               >
                 {getLevelLabel(hero.level, locale)}
               </span>
-              {!hero.isLive && (
-                <span className="text-xs font-semibold text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)]">
-                  {formatCountdown(daysUntil(hero.date), locale)}
-                </span>
-              )}
             </div>
 
             {/* Name */}
