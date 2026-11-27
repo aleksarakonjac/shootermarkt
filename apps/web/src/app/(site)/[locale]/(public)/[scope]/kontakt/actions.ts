@@ -4,14 +4,14 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Update `from` once shootermarkt.com is verified in Resend dashboard
-const FROM = "Shootermarkt <onboarding@resend.dev>";
-const TO = "kontakt@shootermarkt.com";
+// MX for shootermarkt.com points to Resend, so TO lands in the Resend receiving inbox.
+const FROM = "Shootermarkt <form@shootermarkt.com>";
+const TO = "contact@shootermarkt.com";
 
 export type ContactState =
   | { status: "idle" }
   | { status: "success" }
-  | { status: "error"; message: string };
+  | { status: "error" };
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -25,14 +25,14 @@ export async function sendContactMessage(data: {
 }): Promise<ContactState> {
   const { name, email, topic, message } = data;
 
-  if (!name.trim() || !email.trim() || !topic || !message.trim()) {
-    return { status: "error", message: "Sva polja su obavezna." };
-  }
-  if (!isValidEmail(email)) {
-    return { status: "error", message: "Email adresa nije ispravna." };
-  }
-  if (message.trim().length < 20) {
-    return { status: "error", message: "Poruka mora imati najmanje 20 karaktera." };
+  // The client shows field errors; this only guards direct calls to the action.
+  if (
+    !name.trim() || name.length > 200 ||
+    !isValidEmail(email) || email.length > 320 ||
+    !topic || topic.length > 100 ||
+    message.trim().length < 20 || message.length > 5000
+  ) {
+    return { status: "error" };
   }
 
   try {
@@ -52,12 +52,12 @@ export async function sendContactMessage(data: {
 
     if (error) {
       console.error("Resend error:", error);
-      return { status: "error", message: "Greška pri slanju. Pokušajte ponovo." };
+      return { status: "error" };
     }
 
     return { status: "success" };
   } catch (err) {
     console.error("Contact form error:", err);
-    return { status: "error", message: "Greška pri slanju. Pokušajte ponovo." };
+    return { status: "error" };
   }
 }

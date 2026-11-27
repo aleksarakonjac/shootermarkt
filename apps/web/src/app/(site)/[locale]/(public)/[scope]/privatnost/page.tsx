@@ -15,9 +15,9 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   };
 }
 
-const UPDATED_SR = "5. jula 2026.";
-const UPDATED_EN = "July 5, 2026";
-const CONTACT_EMAIL = "kontakt@shootermarkt.com";
+const UPDATED_SR = "27. novembra 2026.";
+const UPDATED_EN = "November 27, 2026";
+const CONTACT_EMAIL = "contact@shootermarkt.com";
 
 // ── Prose primitives ──────────────────────────────────────────────────────────
 
@@ -133,7 +133,7 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
             className="text-[0.9375rem] text-[var(--ink)] mt-4 leading-relaxed"
             style={{ textWrap: "pretty" } as React.CSSProperties}
           >
-            Shootermarkt processes personal data exclusively for the purpose of tracking and displaying
+            Shootermarkt processes athletes&apos; personal data exclusively for the purpose of tracking and displaying
             public shooting results of Serbian athletes. The data displayed on the
             platform is retrieved from official bulletins of the Serbian Shooting Union (SSS)
             and international results portals of the ISSF, which are publicly available documents.
@@ -145,7 +145,7 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
             className="text-[0.9375rem] text-[var(--ink)] mt-4 leading-relaxed"
             style={{ textWrap: "pretty" } as React.CSSProperties}
           >
-            Shootermarkt obrađuje lične podatke isključivo u svrhu praćenja i prikaza
+            Shootermarkt obrađuje lične podatke sportista isključivo u svrhu praćenja i prikaza
             javnih streljačkih rezultata srpskih sportista. Podaci koji se prikazuju na
             platformi preuzimaju se iz zvaničnih biltena Streljačkog saveza Srbije (SSS)
             i međunarodnih rezultatskih portala ISSF-a, koji su javno dostupni dokumenti.
@@ -216,6 +216,9 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
                 <P>
                   Note: the platform does not collect special categories of personal data (health data, biometric characteristics, etc.).
                 </P>
+                <P>
+                  If you contact us through the contact form or by email, we also process your name, email address, the topic and the content of your message.
+                </P>
               </Section>
             </div>
 
@@ -230,6 +233,9 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
                 </P>
                 <P>
                   <strong>Balance test:</strong> processing is limited to data already published in official documents; no sensitive data categories are processed; athletes have the right to object and request deletion.
+                </P>
+                <P>
+                  <strong>Messages you send us:</strong> used only to answer your inquiry or handle your request, based on our legitimate interest in responding (Art. 6(1)(f) GDPR) and, for data subject requests, our legal obligation (Art. 6(1)(c) GDPR).
                 </P>
               </Section>
             </div>
@@ -246,6 +252,9 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
                     </>,
                     <>
                       <strong>Vercel Inc.</strong> (San Francisco, USA) — hosting and web content delivery provider; standard EU contractual clauses apply
+                    </>,
+                    <>
+                      <strong>Plus Five Five, Inc. (Resend)</strong> (San Francisco, USA) — email sending and receiving provider; processes the name, email address, topic and content of messages sent through the contact form or to our email address; data is processed in the USA, under EU standard contractual clauses
                     </>,
                   ]}
                 />
@@ -301,13 +310,23 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
             {/* 07 */}
             <div className="pt-10">
               <Section num={7} title="Cookies and Technical Data">
+                <P>Shootermarkt stores only the following in your browser:</P>
+                <Ul
+                  items={[
+                    <>
+                      <strong>pref_locale</strong> and <strong>pref_scope</strong> cookies — remember the language and data scope you chose, for one year; set only when you change them
+                    </>,
+                    "the light or dark theme setting, kept in your browser's local storage",
+                    "a session cookie set by Supabase for administrator authentication — not set for other visitors",
+                  ]}
+                />
                 <P>
-                  Shootermarkt uses only a <strong>session cookie</strong> set by Supabase for administrator account authentication. The cookie is technically necessary and is not set for non-administrative visitors.
+                  To measure traffic and page speed we use <strong>Vercel Web Analytics</strong> and <strong>Speed Insights</strong>. They collect the page address, referrer, approximate location, device type, operating system, browser and page performance metrics. According to Vercel, this data is not tied to any individual or IP address; Web Analytics distinguishes visitors by a hash created from the request and discards the visitor session after 24 hours.
                 </P>
                 <P>We do not use:</P>
                 <Ul
                   items={[
-                    "analytical services (Google Analytics, Plausible, etc.)",
+                    "Google Analytics or services that track you across other websites",
                     "tracking pixels or advertising networks",
                     "third-party cookies",
                   ]}
@@ -390,6 +409,10 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
                   Napomena: platforma ne prikuplja posebne kategorije ličnih podataka u smislu
                   člana 17. ZZPL (podaci o zdravlju, biometrijskim karakteristikama i sl.).
                 </P>
+                <P>
+                  Ako nas kontaktirate putem kontakt forme ili emailom, obrađujemo i vaše ime,
+                  email adresu, temu i sadržaj poruke.
+                </P>
               </Section>
             </div>
 
@@ -402,7 +425,7 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
                   streljačkih rezultata u Srbiji i svetu.
                 </P>
                 <P>
-                  <strong>Pravni osnov:</strong> Obrada se vrši na osnovu <strong>legitimnog interesa</strong> rukovaoca (čl. 12. st. 1. tač. 6)
+                  <strong>Pravni osnov:</strong> Obrada se vrši na osnovu <strong>legitimnog interesa</strong>{" "}rukovaoca (čl. 12. st. 1. tač. 6)
                   Zakona o zaštiti podataka o ličnosti — &ldquo;Sl. glasnik RS&rdquo;, br. 87/2018), u
                   skladu sa čl. 6. st. 1. tač. f) Opšte uredbe o zaštiti podataka (GDPR
                   2016/679). Legitimni interes se sastoji u vođenju evidencije o javno
@@ -414,6 +437,12 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
                   <strong>Balansni test:</strong> obrada se ograničava na podatke koji su već
                   objavljeni u zvaničnim dokumentima; ne obrađuju se osetljive kategorije
                   podataka; sportisti imaju pravo prigovora i brisanja.
+                </P>
+                <P>
+                  <strong>Poruke koje nam pošaljete:</strong> koriste se isključivo za odgovor na
+                  upit ili obradu zahteva, na osnovu legitimnog interesa da odgovorimo (čl. 12.
+                  st. 1. tač. 6) ZZPL), a kod zahteva u vezi sa vašim podacima i radi
+                  ispunjenja zakonske obaveze (čl. 12. st. 1. tač. 3) ZZPL).
                 </P>
               </Section>
             </div>
@@ -435,6 +464,13 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
                       <strong>Vercel Inc.</strong> (San Francisco, SAD) — pružalac usluge
                       hostinga i isporuke web sadržaja putem edge mreže; primenjuju se
                       standardne ugovorne klauzule EU
+                    </>,
+                    <>
+                      <strong>Plus Five Five, Inc. (Resend)</strong> (San Francisco, SAD) —
+                      pružalac usluge slanja i prijema email poruka; obrađuje ime, email
+                      adresu, temu i sadržaj poruka poslatih putem kontakt forme ili na našu
+                      email adresu; podaci se obrađuju u SAD, uz primenu standardnih
+                      ugovornih klauzula EU
                     </>,
                   ]}
                 />
@@ -497,16 +533,31 @@ export default async function PrivatnostPage({ params }: { params: Promise<{ loc
             {/* 07 */}
             <div className="pt-10">
               <Section num={7} title="Kolačići i tehnički podaci">
+                <P>Shootermarkt u vašem pregledaču čuva samo sledeće:</P>
+                <Ul
+                  items={[
+                    <>
+                      kolačiće <strong>pref_locale</strong> i <strong>pref_scope</strong> — pamte
+                      izabrani jezik i opseg podataka godinu dana; postavljaju se samo kada ih
+                      promenite
+                    </>,
+                    "izbor svetle ili tamne teme, u lokalnoj memoriji pregledača (local storage)",
+                    "sesijski kolačić koji postavlja Supabase za autentifikaciju administratora — ne postavlja se ostalim posetiocima",
+                  ]}
+                />
                 <P>
-                  Shootermarkt koristi isključivo <strong>session kolačić</strong> koji
-                  postavlja Supabase u svrhu autentifikacije administratorskog naloga. Kolačić
-                  je tehnički neophodan i ne postavlja se posetiocima bez administratorske
-                  uloge.
+                  Za merenje posećenosti i brzine stranica koristimo{" "}
+                  <strong>Vercel Web Analytics</strong> i <strong>Speed Insights</strong>. Oni
+                  prikupljaju adresu stranice, izvor posete, približnu lokaciju, tip uređaja,
+                  operativni sistem, pregledač i pokazatelje performansi stranice. Prema navodima
+                  Vercela, ovi podaci se ne vezuju za pojedinca niti IP adresu; Web Analytics
+                  razlikuje posetioce pomoću heš vrednosti izvedene iz zahteva, a sesija
+                  posetioca se odbacuje posle 24 sata.
                 </P>
                 <P>Ne koristimo:</P>
                 <Ul
                   items={[
-                    "analitičke servise (Google Analytics, Plausible i sl.)",
+                    "Google Analytics niti servise koji vas prate na drugim sajtovima",
                     "piksele za praćenje ili reklamne mreže",
                     "kolačiće treće strane",
                   ]}

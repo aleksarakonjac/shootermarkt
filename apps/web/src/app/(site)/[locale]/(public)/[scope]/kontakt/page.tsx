@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   };
 }
 
-const CONTACT_EMAIL = "kontakt@shootermarkt.com";
+const CONTACT_EMAIL = "contact@shootermarkt.com";
 
 function MailLink({
   email,

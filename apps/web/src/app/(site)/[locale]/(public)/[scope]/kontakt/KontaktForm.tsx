@@ -241,6 +241,7 @@ export function KontaktForm() {
           </label>
           <input
             id="cf-name"
+            maxLength={200}
             type="text"
             autoComplete="name"
             value={name}
@@ -309,6 +310,7 @@ export function KontaktForm() {
         </label>
         <textarea
           id="cf-message"
+          maxLength={5000}
           rows={5}
           value={message}
           placeholder={t("form.messagePlaceholder")}
@@ -334,7 +336,7 @@ export function KontaktForm() {
       {state.status === "error" && (
         <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>{state.message || t("form.errorGlobal")}</span>
+          <span>{t("form.errorGlobal")}</span>
         </div>
       )}
 
