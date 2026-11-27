@@ -32,3 +32,11 @@ describe("MixedTeamQualTable — 2025 medal match final", () => {
     for (const el of screen.getAllByText("20.0")) expect(el.className).toContain("font-semibold");
   });
 });
+
+describe("MixedTeamQualTable — pair from two countries", () => {
+  it("shows both flags", () => {
+    const { container } = render(<MixedTeamQualTable teams={[team("HUN/GBR", 1, "16.0")]} apparatus="air_rifle" stage="final" />);
+    expect(container.querySelector(".fi-hu")).toBeTruthy();
+    expect(container.querySelector(".fi-gb")).toBeTruthy();
+  });
+});

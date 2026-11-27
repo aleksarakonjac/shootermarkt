@@ -4,7 +4,7 @@ import { NOC_LIST } from "@shootermarkt/db/noc-list";
 export type Item = { x: number; y: number; str: string };
 
 export const SCORE = /^(\d+(?:\.\d)?)(?:-\s*(\d+)x)?$/;
-const NOCS = new Set<string>(NOC_LIST.map((c) => c.noc));
+export const NOCS = new Set<string>(NOC_LIST.map((c) => c.noc));
 
 /** Zaglavlje je najviše na strani; legenda u podnožju ponavlja iste reči. */
 export const topmost = (items: Item[]) => (label: string) => items.filter((it) => it.str === label).sort((a, b) => b.y - a.y)[0];
@@ -16,5 +16,7 @@ export function clubNation(club: string) {
   // međunarodna oznaka nosi (skraćen) naziv kluba ili reprezentacije — od nje se ne pravi klub u bazi
   if (foreign && NOCS.has(foreign)) return { teamNoc: foreign, clubName: undefined };
   const guest = /^(.*?)\s*-\s*([A-Z]{3})$/.exec(club);
-  return { teamNoc: guest ? guest[2] : "SRB", clubName: (guest ? guest[1] : club) || undefined };
+  if (guest) return { teamNoc: guest[2], clubName: guest[1] || undefined };
+  // država nije navedena: SRB važi za domaći bilten, strani ispravlja resolveNations
+  return { teamNoc: "SRB", clubName: club || undefined, nationUnstated: true };
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "mixed_team_results" ALTER COLUMN "noc_code" SET DATA TYPE varchar(7);

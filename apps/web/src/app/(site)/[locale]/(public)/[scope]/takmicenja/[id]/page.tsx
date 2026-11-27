@@ -207,7 +207,8 @@ export default async function CompetitionPage({ params }: Props) {
       .from(shooters)
       .where(inArray(foldNameSql(shooters.lastName), [...new Set(unmatched.map((u) => foldName(u.lastName)))]));
     for (const { r, slot, firstName, lastName } of unmatched) {
-      const match = matchShooter(firstName, lastName, r.nocCode, candidates);
+      // par iz dve države ("HUN/GBR"): ne zna se koja je čija, poklapa se samo po imenu
+      const match = matchShooter(firstName, lastName, r.nocCode.includes("/") ? null : r.nocCode, candidates);
       if (match.kind === "exact") r[slot === 1 ? "shooter1Id" : "shooter2Id"] = match.id;
     }
   }

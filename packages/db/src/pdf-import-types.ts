@@ -33,11 +33,26 @@ export const isThreePositionCode = (code: string | null | undefined): boolean =>
 export const MIXED_TEAM_CODES = ["ARMT", "APMT"] as const;
 export type MixedTeamCode = typeof MIXED_TEAM_CODES[number];
 
+/** Redni brojevi timova po državi (po disciplini, kategoriji i meču), redom kojim su navedeni. */
+export function numberTeams(teams: MixedTeamEntry[]) {
+  const counts = new Map<string, number>();
+  for (const t of teams) {
+    const key = `${t.disciplineCode}|${t.category ?? "senior"}|${t.eventName ?? ""}|${t.nocCode}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    t.teamNumber = counts.get(key)!;
+  }
+}
+
 /** Jedan mešoviti tim u pregledu uvoza (SIUS, ISSF, PDF). */
 export interface MixedTeamEntry {
   skip: boolean;
   nocCode: string;
   teamNumber: number;
+  /** PDF uvoz: bilten ne navodi državu tima; `teamLabel` je naziv tima bez rednog broja. */
+  nationUnstated?: boolean;
+  teamLabel?: string;
+  /** Država je pretpostavljena (domaćin) ili nepoznata — admin proverava. */
+  nationAssumed?: boolean;
   disciplineCode: DisciplineCode;
   /** Izostavljeno = senior. */
   category?: AgeCategory;
@@ -148,6 +163,16 @@ export interface ParsedShooterResult {
   remark?: string | null;
   /** Ceo zapis imena kad je podela samo pretpostavka. */
   fullName?: string;
+  /** Bilten ne navodi državu (samo klub ili goli kod). */
+  nationUnstated?: boolean;
+  /** Država je pretpostavljena (domaćin) — admin proverava. */
+  nationAssumed?: boolean;
+}
+
+/** Naziv ponovljenog meča bez sopstvenog imena: "2. meč · 22.01." (datum razdvaja seniore/juniore koji pucaju različitih dana). */
+export function matchEventName(match: number, date: string): string {
+  const [, m, d] = date.split("-");
+  return `${match}. meč · ${d}.${m}.`;
 }
 
 /**
@@ -208,6 +233,9 @@ export interface ParsedFinalResult {
   lastName: string;
   firstName: string;
   teamNoc: string;
+  clubName?: string;
+  nationUnstated?: boolean;
+  nationAssumed?: boolean;
   /** null kad finalista nije pucao (DNS) */
   total: number | null;
   /** DNS/DNF/DSQ ili "SO" (ispao posle shoot-off-a) */
@@ -263,6 +291,8 @@ export interface ReviewRow {
   lastName: string;
   /** Country/team IOC code — used as nationality */
   teamNoc: string;
+  /** Nacija nije iz biltena ni iz baze nego pretpostavljena (domaćin) — admin potvrđuje u review-u. */
+  nationAssumed?: boolean;
   /** Godište rođenja iz biltena (editabilno u review-u), ako postoji */
   birthYear?: number | null;
   /** Pol izveden iz discipline (M/F) — za kreiranje novog strelca */

@@ -60,8 +60,9 @@ function stageColumns(e: MixedCommitEntry, isFinals: boolean) {
   return {
     shooter1Name: `${e.m_lastName} ${e.m_firstName}`.trim() || null,
     shooter2Name: `${e.f_lastName} ${e.f_firstName}`.trim() || null,
-    shooter1Detail: { series: e.m_series ?? [], inners: e.mInners ?? null, total: e.mTotal ?? 0 },
-    shooter2Detail: { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
+    // strelac tima bez plasmana koji nije pucao nema rezultat (umesto lažne nule)
+    shooter1Detail: isUnrankedRemark(e.qualRemark) && !e.m_series?.length && !e.mTotal ? null : { series: e.m_series ?? [], inners: e.mInners ?? null, total: e.mTotal ?? 0 },
+    shooter2Detail: isUnrankedRemark(e.qualRemark) && !e.f_series?.length && !e.fTotal ? null : { series: e.f_series ?? [], inners: e.fInners ?? null, total: e.fTotal ?? 0 },
     qualRank: isUnrankedRemark(e.qualRemark) ? null : e.qualRank ?? null,
     qualTotal: e.qualTotal != null ? String(e.qualTotal) : null,
     qualInners: e.qualInners ?? null,

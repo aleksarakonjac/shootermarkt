@@ -4,6 +4,7 @@ import { matchShooter, foldName } from "@shootermarkt/db/name-match";
 import { parsePdfWithGemini } from "./gemini-adapter";
 import { parseSiusPdf } from "./sius-pdf";
 import { resolveGuessedNames } from "./sius-names";
+import { resolveNations } from "./sius-nations";
 import { DISCIPLINE_META, IMPORTED_DISCIPLINE_CODES, dedupeRowsByCategory, mergeFinalsIntoRows, type ParsedShooterResult, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 
 export async function parsePdfImport(pdfBuffer: Buffer) {
@@ -40,6 +41,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
     db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, clubId: shooters.clubId }).from(shooters),
   ]);
   resolveGuessedNames(bilten, allShooters);
+  resolveNations(bilten, allShooters);
   const rows: ReviewRow[] = [];
   const skippedDisciplines = new Set<string>();
 
@@ -85,6 +87,9 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
         // ponytail: gosti nemaju svoje polje u bazi — preskočeni po defaultu, admin može da ih uključi
         row.skip = true;
         row.warning = "Gost (van konkurencije) — preskočen";
+      } else if (!shooterId && result.nationAssumed) {
+        row.nationAssumed = true;
+        row.warning = nationality ? `Pretpostavljena nacija ${nationality} — proveri` : "Nacija nepoznata — upiši";
       } else if (!shooterId) row.warning = match.kind === "suggestion" ? `Možda: ${match.name}` : event.isInternational ? `Novi strelac (${nationality}) — biće kreiran` : "Novi strelac — biće kreiran";
       rows.push(row);
     }
