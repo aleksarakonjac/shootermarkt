@@ -95,10 +95,10 @@ const fmtRange = (from: string, to: string | null) => (to && to !== from ? `${fm
 const MONO = "font-[family-name:var(--font-jetbrains-mono)]";
 const DISPLAY = "font-[family-name:var(--font-barlow-condensed)]";
 
-/** 3 položaja: naziv bez varijante (3x20/3x40), jer se format menjao i ne znamo ga za LA 2028. */
+/** Trostav: naziv bez varijante (3x20/3x40), jer se format menjao i ne znamo ga za LA 2028. */
 function disciplineLabel(code: string, en: boolean) {
   if (code === "R3PM" || code === "R3PW") {
-    const base = en ? "50m Rifle 3 Positions" : "50m puška 3 položaja";
+    const base = en ? "50m Rifle 3 Positions" : "50m puška trostav";
     const women = code === "R3PW";
     return en ? `${base} ${women ? "Women" : "Men"}` : `${base} – ${women ? "seniorke" : "seniori"}`;
   }
@@ -518,11 +518,11 @@ export default async function OlympicQuotasPage({ params }: Props) {
                 {serbian.length === 0 ? (
                   <p className="text-sm text-[var(--muted)]">{t.serbiaNone}</p>
                 ) : (
-                  <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)]">
+                  <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] lg:grid lg:grid-cols-2 lg:gap-3 lg:rounded-none lg:border-0">
                     {serbian.map(({ code, slot, holder }) => {
                       const src = sourceByKey.get(slot.sourceKey)!;
                       return (
-                        <li key={`${holder.shooterId}-${code}`} className="flex min-w-0 items-center gap-3 px-4 py-3">
+                        <li key={`${holder.shooterId}-${code}`} className="flex min-w-0 items-center gap-3 px-4 py-3 lg:rounded-xl lg:border lg:border-[var(--border)]">
                           <ShooterAvatar firstName={holder.firstName} lastName={holder.lastName} avatarUrl={holder.avatarUrl} size="md" />
                           <div className="min-w-0">
                             <ScopedLink href={`/strelci/${holder.shooterId}`} className="block truncate font-semibold text-[var(--ink)] hover:text-[var(--brand-primary)] transition-colors">
