@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignQuotas, candidateRank, maxQuotasPerNocAtEvent, meetsMqs, type QuotaCandidate } from "./quota-assign";
+import { assignQuotas, candidateRank, maxQuotasPerNocAtEvent, meetsMqs, type QuotaCandidate, orderByDecision } from "./quota-assign";
 
 const c = (resultId: number, shooterId: number, nationality: string, rank: number): QuotaCandidate => ({ resultId, shooterId, nationality, rank });
 const none = { shooterIds: new Set<number>(), eventNocCounts: new Map<string, number>(), maxPerNocAtEvent: 1, nocCounts: new Map<string, number>() };
@@ -91,5 +91,30 @@ describe("candidateRank", () => {
       ],
     });
     expect(eligible.map((w) => w.resultId)).toEqual([3]);
+  });
+});
+
+describe("orderByDecision", () => {
+  const slot = (disciplineId: number, stage: string, iso: string) => ({ disciplineId, stage, startTime: new Date(iso) });
+
+  it("orders disciplines by final time, not by input order", () => {
+    const allocations = [{ disciplineId: 1, basis: "final" }, { disciplineId: 2, basis: "final" }];
+    const schedule = [
+      slot(1, "qual", "2026-11-20T09:00:00Z"),
+      slot(1, "final", "2026-11-26T16:00:00Z"),
+      slot(2, "final", "2026-11-23T18:00:00Z"),
+    ];
+    expect(orderByDecision(allocations, schedule).map((a) => a.disciplineId)).toEqual([2, 1]);
+  });
+
+  it("uses the last qualification stage when quotas are decided by qualification, and puts unscheduled ones last", () => {
+    const allocations = [{ disciplineId: 3, basis: "final" }, { disciplineId: 1, basis: "qualification" }, { disciplineId: 2, basis: "final" }];
+    const schedule = [
+      slot(1, "qual_precision", "2026-11-22T09:00:00Z"),
+      slot(1, "qual_rapid", "2026-11-24T09:00:00Z"),
+      slot(1, "final", "2026-11-28T09:00:00Z"),
+      slot(2, "final", "2026-11-25T09:00:00Z"),
+    ];
+    expect(orderByDecision(allocations, schedule).map((a) => a.disciplineId)).toEqual([1, 2, 3]);
   });
 });
