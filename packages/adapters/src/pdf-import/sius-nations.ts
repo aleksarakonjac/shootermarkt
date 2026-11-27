@@ -25,6 +25,12 @@ export function resolveNations(bilten: ParsedBilten, known: Omit<MatchCandidate,
     t.nationAssumed = false;
   }
   numberTeams(bilten.mixedTeams ?? []);
+  // član klupske ekipe ima državu svog pojedinačnog reda, inače iz baze
+  for (const m of (bilten.teamResults ?? []).flatMap((t) => t.members)) {
+    if (!m.nationUnstated) continue;
+    const noc = individual.get(nameKey(m.firstName, m.lastName)) ?? fromDb(m);
+    if (noc) m.teamNoc = noc;
+  }
 }
 
 /** Država sa pojedinačnih redova, samo gde nije pretpostavljena. */

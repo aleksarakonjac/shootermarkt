@@ -1,9 +1,9 @@
 /** Mešoviti timovi (ARMT/APMT) iz SIUS biltena: kvalifikaciona lista i finale, po dva strelca u timu. */
-import { matchEventName, numberTeams, type MixedTeamCode, type MixedTeamEntry, type ParsedShooterResult } from "@shootermarkt/db/pdf-import-types";
+import { matchEventName, numberTeams, type AgeCategory, type MixedTeamCode, type MixedTeamEntry, type ParsedShooterResult } from "@shootermarkt/db/pdf-import-types";
 import { splitName } from "./sius-names";
 import { clubNation, NOCS, SCORE, topmost, type Item } from "./sius-layout";
 
-export interface TeamPage { discipline: MixedTeamCode; isFinal: boolean; junior: boolean; date: string; items: Item[] }
+export interface TeamPage { discipline: MixedTeamCode; isFinal: boolean; category: AgeCategory; date: string; items: Item[] }
 
 type Scores = { series: number[]; total: number; inners: number | null };
 type Athlete = Scores & { name: string; bib: string };
@@ -123,12 +123,12 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
 
   // finale objavljeno kasnije od kvalifikacija pripada poslednjem danu kvalifikacija do svog datuma
   for (const page of parsed.filter((p) => p.isFinal)) {
-    const qualDays = parsed.filter((p) => !p.isFinal && p.discipline === page.discipline && p.junior === page.junior && p.date <= page.date).map((p) => p.date).sort();
+    const qualDays = parsed.filter((p) => !p.isFinal && p.discipline === page.discipline && p.category === page.category && p.date <= page.date).map((p) => p.date).sort();
     if (qualDays.length) page.date = qualDays.at(-1)!;
   }
   // svaki dan discipline je svoj meč: timovi, numeracija po državi i finale se vezuju samo unutar dana
   // dani se broje po disciplini i uzrastu: juniori pucani drugog dana od seniora su i dalje svoj prvi meč
-  const dayKey = (p: TeamPage) => `${p.discipline}|${p.junior ? "junior" : "senior"}|${p.date}`;
+  const dayKey = (p: TeamPage) => `${p.discipline}|${p.category}|${p.date}`;
   const days = [...new Set(parsed.map(dayKey))].sort((a, b) => a.split("|")[2].localeCompare(b.split("|")[2]));
   for (const day of days) {
     const [discipline, age, date] = day.split("|") as [MixedTeamCode, string, string];
@@ -136,13 +136,14 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
     // prvi dan discipline ide u glavni meč; svaki sledeći je zaseban meč, inače bi prepisao prvi
     const nth = days.filter((d) => d.startsWith(`${discipline}|${age}|`)).indexOf(day) + 1;
     const eventName = nth > 1 ? matchEventName(nth, date) : null;
-    const category = match[0].junior ? "junior" : "senior";
+    const category = match[0].category;
     const byKey = new Map<string, { entry: MixedTeamEntry; firstBib: string }>();
 
     const entry = (t: Team): MixedTeamEntry => {
       const [m, f] = t.athletes.map((a) => splitName(a.name));
       return {
-        skip: false, ...nationOf(t), teamNumber: 1, disciplineCode: discipline, category,
+        // domaći naziv tima je klub; sa državom uz naziv ("SLO-…") tim predstavlja državu
+        skip: false, ...nationOf(t), ...(prefixNoc(t.label) ? {} : { clubName: t.label }), teamNumber: 1, disciplineCode: discipline, category,
         eventName, eventDate: date,
         qualRank: null, qualTotal: null, inners: null, qualified: true, finalRank: null, finalTotal: null,
         mIssfId: null, mLastName: m.lastName, mFirstName: m.firstName, mFullName: m.fullName, m_series: [], mInners: null, mTotal: 0,

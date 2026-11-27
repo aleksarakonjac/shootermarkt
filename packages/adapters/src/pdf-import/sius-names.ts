@@ -41,7 +41,9 @@ export function resolveGuessedNames(bilten: ParsedBilten, known: Person[]) {
   const people = bilten.events.flatMap((e) => e.results as (ParsedShooterResult | ParsedFinalResult)[]);
   // nedvosmislena imena iz samog biltena dopunjuju bazu
   const isFirstName = firstNameChecker([...known, ...people.filter((p) => !p.fullName)]);
-  for (const p of people) if (p.fullName) Object.assign(p, splitGuessedName(p.fullName, isFirstName));
+  // članovi klupskih ekipa se ispravljaju isto kao redovi lista
+  const named: (Person & { fullName?: string })[] = [...people, ...(bilten.teamResults ?? []).flatMap((t) => t.members)];
+  for (const p of named) if (p.fullName) Object.assign(p, splitGuessedName(p.fullName, isFirstName));
   for (const t of bilten.mixedTeams ?? []) {
     if (t.mFullName) ({ lastName: t.mLastName, firstName: t.mFirstName } = splitGuessedName(t.mFullName, isFirstName));
     if (t.fFullName) ({ lastName: t.fLastName, firstName: t.fFirstName } = splitGuessedName(t.fFullName, isFirstName));
@@ -50,7 +52,7 @@ export function resolveGuessedNames(bilten: ParsedBilten, known: Person[]) {
   // bilten ume da zameni ime i prezime ("MAKSIMILIJAN ŽARIĆ"): važi zapis strelca iz baze
   const byName = new Map(known.map((p) => [nameKey(p.firstName, p.lastName), p]));
   const reversed = (first: string, last: string) => (byName.has(nameKey(first, last)) ? undefined : byName.get(nameKey(last, first)));
-  for (const p of people) {
+  for (const p of named) {
     const own = reversed(p.firstName, p.lastName);
     if (own) Object.assign(p, { firstName: own.firstName, lastName: own.lastName, fullName: undefined });
   }
