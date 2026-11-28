@@ -77,7 +77,6 @@ export function FirstVisitIntro() {
           >
             {t("title")}
           </h2>
-          <p className="mt-1 hidden max-w-prose text-sm leading-relaxed text-[var(--muted)] sm:block">{t("body")}</p>
         </div>
 
         <ul className="mt-1 flex flex-wrap gap-x-5 lg:mt-0 lg:shrink-0">

@@ -504,8 +504,7 @@
   },
   "intro": {
     "eyebrow": "Prvi put ovde?",
-    "title": "Rezultati streljaštva na jednom mestu",
-    "body": "Sva takmičenja sa serijama, finalima i plasmanom, uz profil svakog strelca sa celom istorijom nastupa.",
+    "title": "Rezultati strelaca na jednom mestu",
     "close": "Zatvori",
     "links": {
       "competitions": {
