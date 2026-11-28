@@ -9,7 +9,9 @@
 }
 
 /* ── Brand tokens ──────────────────────────────────────────────────────────── */
-:root {
+/* .light-tokens: deo koji i u dark modu izgleda kao u light (ticker traka je uvek crvena). */
+:root,
+html.dark .light-tokens {
   /* Primary — red accent */
   --brand-primary:        #C20000;
   --brand-primary-hover: #A00000;

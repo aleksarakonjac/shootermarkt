@@ -89,8 +89,10 @@ export function Ticker({
       className="w-full"
       style={{ borderTop: "2px solid var(--brand-primary)", borderBottom: "1px solid var(--border)" }}
     >
+      <div className="light-tokens">
       {cycleItems.length > 0 && <UpperBar items={cycleItems} live={t("live")} upcoming={t("upcoming")} nextLabel={t("next")} review={t("results")} inProgress={t("inProgress")} locale={locale} />}
       {marqueeItems.length > 0 && <UpcomingBar items={marqueeItems} upcoming={t("upcoming")} locale={locale} />}
+      </div>
     </div>
   );
 }

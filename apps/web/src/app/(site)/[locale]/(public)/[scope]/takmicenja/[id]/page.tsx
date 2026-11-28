@@ -199,7 +199,7 @@ export default async function CompetitionPage({ params }: Props) {
     .orderBy(asc(teamResults.rank));
   const teamMembers = teamRows.length
     ? await db
-      .select({ teamResultId: teamResultMembers.teamResultId, shooterId: teamResultMembers.shooterId, name: teamResultMembers.name, firstName: shooters.firstName, lastName: shooters.lastName, series: teamResultMembers.series, total: teamResultMembers.total, inners: teamResultMembers.inners })
+      .select({ teamResultId: teamResultMembers.teamResultId, shooterId: teamResultMembers.shooterId, name: teamResultMembers.name, firstName: shooters.firstName, lastName: shooters.lastName, nationality: shooters.nationality, series: teamResultMembers.series, total: teamResultMembers.total, inners: teamResultMembers.inners })
       .from(teamResultMembers)
       .leftJoin(shooters, eq(teamResultMembers.shooterId, shooters.id))
       .where(inArray(teamResultMembers.teamResultId, teamRows.map((t) => t.id)))

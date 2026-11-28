@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attachTeams, type CompetitionTeam } from "./competition-teams";
+import { attachTeams, teamNoc, type CompetitionTeam } from "./competition-teams";
 import type { DisciplineGroup } from "@/app/(site)/[locale]/(public)/[scope]/takmicenja/[id]/CompetitionResultsClient";
 
 const team = (over: Partial<CompetitionTeam> = {}): CompetitionTeam => ({
@@ -35,5 +35,22 @@ describe("attachTeams", () => {
     const original = group();
     attachTeams([original], [team()], "sr");
     expect(original.categories[0].teams).toBeUndefined();
+  });
+});
+
+describe("teamNoc", () => {
+  const members = (...nocs: (string | null)[]) => nocs.map((nationality) => ({ shooterId: null, name: "X", nationality, series: [], total: "0", inners: null }));
+
+  it("reads the country from a national team name, in either language", () => {
+    expect(["France", "Bugarska", "Serbia 2", "AIN"].map((teamName) => teamNoc({ teamName, members: [] }))).toEqual(["FRA", "BUL", "SRB", "AIN"]);
+  });
+
+  it("uses the shooters' country for a club only when all of them share a known one", () => {
+    const club = (...nocs: (string | null)[]) => teamNoc({ teamName: "Pancevo 1813", members: members(...nocs) });
+    expect(club("SRB", "SRB", "SRB")).toBe("SRB");
+    expect(club("RUS", "BLR")).toBe("AIN");
+    expect(club("SRB", "HUN")).toBeNull();
+    expect(club("SRB", null)).toBeNull();
+    expect(club()).toBeNull();
   });
 });

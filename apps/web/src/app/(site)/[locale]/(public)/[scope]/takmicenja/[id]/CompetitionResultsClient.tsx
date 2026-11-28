@@ -517,7 +517,7 @@ function CompetitionOverview({
               </span>
               <span className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
                 <span className="text-base sm:text-lg font-bold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
-                {g.label && <span className="text-sm sm:text-base font-semibold text-[var(--brand-primary)]">{g.label}</span>}
+                <MatchLabel group={g} className="text-sm sm:text-base font-semibold" />
                 {subCategory && <span className="text-sm sm:text-base font-semibold text-[var(--brand-primary)]">{categoryLabel(subCategory, locale)}</span>}
                 {g.date && !byDay && <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm sm:text-base font-medium text-[var(--muted)]">{ddmm(g.date)}</span>}
               </span>
@@ -583,7 +583,8 @@ function CompetitionOverview({
             <span className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
               <span className="text-base sm:text-lg font-bold text-[var(--ink)]">{disciplineName(g.code, locale)}</span>
               {(g.category !== "senior" || filters.category != null) && <span className="text-sm sm:text-base font-semibold text-[var(--brand-primary)]">{categoryLabel(g.category, locale)}</span>}
-              {g.eventName && <span className="text-sm sm:text-base font-semibold text-[var(--ink)]">{localizeMatchName(g.eventName, locale)}</span>}
+              {/* datum ima svoje mesto (naslov dana ili oznaka), pa se skida sa kraja naziva, kao kod pojedinačnih */}
+              {g.eventName && <span className="text-sm sm:text-base font-semibold text-[var(--ink)]">{localizeMatchName(g.date ? g.eventName.replace(/ · \d{2}\.\d{2}\.$/, "") : g.eventName, locale)}</span>}
               {g.date && !byDay && <span className="font-[family-name:var(--font-jetbrains-mono)] text-sm sm:text-base font-medium text-[var(--muted)]">{ddmm(g.date)}</span>}
             </span>
             <span className="shrink-0 text-[0.8rem] font-[family-name:var(--font-jetbrains-mono)] text-[var(--subtle)] ml-auto">
@@ -620,14 +621,17 @@ function CompetitionOverview({
 
   const isDaySection = (section: string) => /^\d/.test(section);
   // Naslovi sekcija zavise od celog takmičenja, da filter ne ukloni kontekst.
-  const showHeadings = new Set([...groups, ...mixedGroups].map(sectionOf)).size > 1;
+  // Dan se naslovljava i kad je jedini, jer blokovi tada nemaju svoj datum.
+  const allSections = [...new Set([...groups, ...mixedGroups].map(sectionOf))];
+  const showHeadings = allSections.length > 1 || allSections.some(isDaySection);
+  const showDayNav = allSections.filter(isDaySection).length > 0 && allSections.length > 1;
   const daySections = sections.filter(isDaySection);
   const en = locale === "en";
   const hasFilterBar = Object.values(options).some((values) => values.length > 0);
 
   return (
     <div className="flex flex-col gap-10">
-      {(hasFilterBar || (showHeadings && daySections.length > 0)) && (
+      {(hasFilterBar || (showDayNav && daySections.length > 0)) && (
         <div className="-mb-4 flex flex-col gap-2">
           {hasFilterBar && (
             <div className="flex flex-wrap gap-2">
@@ -636,7 +640,7 @@ function CompetitionOverview({
               <FilterGroup label={en ? "Gender" : "Pol"} options={options.gender} text={(g) => (GENDER_LABELS[locale] ?? GENDER_LABELS.en)[g]} value={filters.gender} onChange={(gender) => onFiltersChange({ ...filters, gender })} />
             </div>
           )}
-          {showHeadings && daySections.length > 0 && (
+          {showDayNav && daySections.length > 0 && (
             // Prečice do dana: sidra (rade i bez JS-a), skrol bez menjanja URL-a
             <nav
               ref={navRef}
@@ -826,6 +830,21 @@ function SingleCatRows({
   );
 }
 
+// ── Match label ───────────────────────────────────────────────────────────────
+
+/** Kategorija crvena, naziv meča crn. Podeljen blok (id ≠ key) ima oznaku "Kategorija · meč". */
+function MatchLabel({ group, className }: { group: DisciplineGroup; className: string }) {
+  if (!group.label) return null;
+  const parts = group.label.split(" · ");
+  const category = group.id !== group.key ? parts.shift() : null;
+  return (
+    <>
+      {category && <span className={`${className} text-[var(--brand-primary)]`}>{category}</span>}
+      {parts.length > 0 && <span className={`${className} text-[var(--ink)]`}>{parts.join(" · ")}</span>}
+    </>
+  );
+}
+
 // ── Phase badge ───────────────────────────────────────────────────────────────
 
 function PhaseBadge({
@@ -985,7 +1004,7 @@ function CompetitionDetail({
               className="font-[family-name:var(--font-barlow-condensed)] font-bold text-[var(--ink)] uppercase truncate"
               style={{ fontSize: "1.5rem", letterSpacing: "-0.02em", lineHeight: 1.2 }}
             >
-              {mixedGroup ? disciplineName(mixedGroup.code, locale) : ""}{selection.category !== "senior" && ` · ${categoryLabel(selection.category, locale)}`}{mixedGroup?.eventName && ` · ${localizeMatchName(mixedGroup.eventName, locale)}`}
+              {mixedGroup ? disciplineName(mixedGroup.code, locale) : ""}{selection.category !== "senior" && <> · <span className="text-[var(--brand-primary)]">{categoryLabel(selection.category, locale)}</span></>}{mixedGroup?.eventName && ` · ${localizeMatchName(mixedGroup.eventName, locale)}`}
             </h3>
             <RefreshButton onRefresh={onRefresh} refreshing={refreshing} locale={locale} />
           </div>
@@ -1189,14 +1208,12 @@ function CompetitionDetail({
           >
             {disciplineName(group?.code ?? selection.disciplineCode, locale)}
           </h3>
-          {group?.label && (
-            <span className="text-base sm:text-lg font-semibold text-[var(--brand-primary)]">{group.label}</span>
-          )}
+          {group && <MatchLabel group={group} className="text-base sm:text-lg font-semibold" />}
           {group?.date && (
             <span className="font-[family-name:var(--font-jetbrains-mono)] text-base font-medium text-[var(--muted)]">{ddmm(group.date)}</span>
           )}
           {showCategory && (
-            <span className="text-lg sm:text-xl font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <span className="text-lg sm:text-xl font-[family-name:var(--font-barlow-condensed)] font-semibold uppercase tracking-wide text-[var(--brand-primary)]">
               {categoryLabel(selection.category, locale)}
             </span>
           )}
