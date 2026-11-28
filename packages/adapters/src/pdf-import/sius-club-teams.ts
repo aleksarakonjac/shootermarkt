@@ -14,6 +14,8 @@ type TeamRow = { series: number[]; total: number; inners: number | null };
 const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
 const near = (a: number, b: number) => Math.abs(a - b) < 0.05;
 
+const MAX_LISTED = 10;
+
 /**
  * Članovi koji čine zbir ekipe: oni bez zagrade kad se slažu sa redom ekipe. Omladinski bilten ekipu sastavlja
  * od najboljih među navedenima (i onih u zagradi) bez oznake — tada se traži jedina grupa iste veličine čiji
@@ -21,6 +23,8 @@ const near = (a: number, b: number) => Math.abs(a - b) < 0.05;
  */
 function lineUp(all: TeamMemberEntry[], unbracketed: TeamMemberEntry[], team: TeamRow): TeamMemberEntry[] | null {
   if (near(sum(unbracketed.map((m) => m.total)), team.total)) return unbracketed;
+  // ekipa navodi najviše šačicu strelaca; duži blok je loše pročitana strana, a kombinacija bi bilo previše
+  if (all.length > MAX_LISTED) return null;
   const groups = (from: number, size: number): TeamMemberEntry[][] => (size === 0 ? [[]]
     : all.slice(from).flatMap((m, i) => groups(from + i + 1, size - 1).map((rest) => [m, ...rest])));
   const fits = groups(0, unbracketed.length).filter((g) => g.length > 0

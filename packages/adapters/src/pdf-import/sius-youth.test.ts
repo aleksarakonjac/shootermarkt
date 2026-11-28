@@ -73,6 +73,20 @@ describe("youth team list", () => {
     expect(parsedTeam.teamResults![0].members.map((m) => m.lastName)).toEqual(["Prvi", "Treci", "Cetvrti"]);
   });
 
+  it("does not search for a line-up in an implausibly long block", () => {
+    // više od 10 navedenih uz jednu ekipu znači pogrešno pročitanu stranu; broj kombinacija bi rastao bez granice
+    const extra = Array.from({ length: 8 }, (_, i) => member(554 - i * 12, `${10 + i}`, `VISAK${i} Ana`, "U16", [80, 80, 80, 80, 80, 80], "(480- 1x) 2011"));
+    const items = page([
+      ...row(656, "72:1", "112:Klub", "462:1675-6x"), ...series(656, 310, [279, 279, 279, 279, 279, 280]),
+      ...member(639, "1", "PRVI Ana", "U16", [93, 93, 93, 93, 93, 94], "559- 2x 2012"),
+      ...member(622, "2", "SLAB Iva", "U16", [90, 90, 90, 90, 90, 90], "540- 1x 2011"),
+      ...member(605, "3", "TRECI Mia", "U16", [93, 93, 93, 93, 93, 91], "556- 2x 2010"),
+      ...member(588, "4", "CETVRTI Lea", "U16", [93, 93, 93, 93, 93, 95], "(560- 2x) 2011"),
+      ...extra.flat(),
+    ]);
+    expect(parseSiusPages([items])!.warnings).toEqual(["Ekipe APM: strana nije pročitana (2026-11-27)"]);
+  });
+
   it("files the whole list under the oldest age group listed on it", () => {
     expect(parsed().teamResults!.map((t) => [t.teamName, t.category])).toEqual([["Klub Mladih", "junior"], ["Drugi Klub", "junior"]]);
   });
