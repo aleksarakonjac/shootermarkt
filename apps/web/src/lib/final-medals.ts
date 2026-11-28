@@ -20,6 +20,13 @@ export const isQualOnlyDiscipline = (code: string | null | undefined) => code !=
 
 export type FinalSlot = { startTime: string; endTime: string | null };
 
+/** Admin oznaka "nema finala" (`competitions.no_final_groups`): "ARM|senior", zaseban meč "ARM@12|senior". */
+export const noFinalKey = (code: string, eventId: number | null, category: string) => `${eventId ? `${code}@${eventId}` : code}|${category}`;
+
+/** Ima li disciplina + kategorija oznaku u bilo kom meču (In focus kartica spaja mečeve u jednu listu). */
+export const hasNoFinalMark = (marks: string[], code: string, category: string) =>
+  marks.some((mark) => mark.replace(/@\d+/, "") === `${code}|${category}`);
+
 const OVERRUN_MS = 10 * 60_000;
 const DEFAULT_FINAL_MS = 75 * 60_000;
 const THREE_POSITION_ENTRIES = 4 + 5;
@@ -44,4 +51,9 @@ function isFinalInProgress(slot: FinalSlot | undefined, now: Date) {
 export function shouldShowFinalMedals(slot: FinalSlot | undefined, detailsByRank: Array<FinalDetail | null>, now = new Date()) {
   if (looksComplete(detailsByRank)) return true;
   return !isFinalInProgress(slot, now);
+}
+
+/** Medalje iz kvalifikacija: tek kad su svi termini (partije) počeli i nijedan nije u toku. Bez satnice odmah. */
+export function shouldShowQualMedals(slots: FinalSlot[], now = new Date()) {
+  return slots.every((slot) => new Date(slot.startTime).getTime() <= now.getTime() && !isFinalInProgress(slot, now));
 }

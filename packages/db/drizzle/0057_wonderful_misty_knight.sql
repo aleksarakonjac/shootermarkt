@@ -1,0 +1,1 @@
+ALTER TABLE "competitions" ADD COLUMN "no_final_groups" varchar(40)[] DEFAULT '{}' NOT NULL;

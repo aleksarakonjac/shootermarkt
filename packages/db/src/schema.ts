@@ -488,6 +488,8 @@ export const competitions = pgTable(
     // Grupe disciplina za filter na /takmicenja: 'air' (10m vazdušno) i/ili 'smallbore' (MK: 25m / 50m).
     // Izvor istine su rezultati (disciplines.distance); za buduća takmičenja se izvodi iz naziva ili postavlja ručno.
     disciplineGroups: varchar("discipline_groups", { length: 12 }).array().notNull().default([]),
+    // Admin oznake "nema finala" (medalje posle kvalifikacija): "ARM|senior", zaseban meč "ARM@12|senior".
+    noFinalGroups: varchar("no_final_groups", { length: 40 }).array().notNull().default([]),
     timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },

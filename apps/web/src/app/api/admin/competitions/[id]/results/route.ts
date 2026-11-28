@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@shootermarkt/db";
-import { competitionEvents, disciplines, mixedTeamResults, results, teamResults } from "@shootermarkt/db/schema";
+import { competitionEvents, competitions, disciplines, mixedTeamResults, results, teamResults } from "@shootermarkt/db/schema";
 import { and, asc, count, eq, isNull, notExists, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/admin-auth";
 import { recomputeFormaCache } from "@/lib/forma-cache";
 import { refreshDisciplineGroups } from "@/lib/discipline-groups";
 import { revalidatesPublicSite } from "@/lib/revalidate-public";
+import { noFinalKey } from "@/lib/final-medals";
 
 export type CompetitionResultGroup = {
   kind: "individual" | "mixed";
@@ -17,6 +18,8 @@ export type CompetitionResultGroup = {
   eventDate: string | null;
   category: string;
   count: number;
+  /** Admin oznaka "nema finala"; samo pojedinačni rezultati. */
+  noFinal?: boolean;
 };
 
 /** Rezultati jednog takmičenja grupisani: disciplina × zaseban meč × kategorija (pojedinačno i mešoviti tim). */
@@ -27,7 +30,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const compId = parseInt((await params).id);
   if (isNaN(compId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
-  const [individual, mixed] = await Promise.all([
+  const [[comp], individual, mixed] = await Promise.all([
+    db.select({ noFinalGroups: competitions.noFinalGroups }).from(competitions).where(eq(competitions.id, compId)),
     db
       .select({
         disciplineId: results.disciplineId,
@@ -65,7 +69,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   ]);
 
   const groups: CompetitionResultGroup[] = [
-    ...individual.map((r) => ({ kind: "individual" as const, ...r })),
+    ...individual.map((r) => ({ kind: "individual" as const, ...r, noFinal: comp?.noFinalGroups.includes(noFinalKey(r.code, r.eventId, r.category)) ?? false })),
     ...mixed.map((r) => ({ kind: "mixed" as const, ...r })),
   ];
   return NextResponse.json({ groups });
@@ -146,3 +150,31 @@ async function handleDELETE(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export const DELETE = revalidatesPublicSite(handleDELETE);
+
+/** Uključuje/isključuje oznaku "nema finala" za jednu grupu. Body: { key: "ARM|senior" | "ARM@12|senior", noFinal } */
+async function handlePATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
+  const compId = parseInt((await params).id);
+  if (isNaN(compId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+  const body = await req.json().catch(() => null);
+  const key: unknown = body?.key;
+  if (typeof key !== "string" || key.length > 40 || !/^[A-Z0-9]+(@\d+)?\|[a-z0-9_]+$/.test(key) || typeof body.noFinal !== "boolean") {
+    return NextResponse.json({ error: "Neispravan zahtev" }, { status: 400 });
+  }
+
+  // jedan UPDATE: remove pa append, bez duplikata i bez trke između dva klika
+  const without = sql`array_remove(${competitions.noFinalGroups}, ${key}::varchar)`;
+  const updated = await db
+    .update(competitions)
+    .set({ noFinalGroups: body.noFinal ? sql`array_append(${without}, ${key}::varchar)` : without })
+    .where(eq(competitions.id, compId))
+    .returning({ id: competitions.id });
+  if (!updated.length) return NextResponse.json({ error: "Takmičenje ne postoji" }, { status: 404 });
+
+  return NextResponse.json({ ok: true });
+}
+
+export const PATCH = revalidatesPublicSite(handlePATCH);

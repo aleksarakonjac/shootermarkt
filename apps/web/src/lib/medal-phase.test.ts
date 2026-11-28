@@ -25,6 +25,13 @@ describe("medalStage", () => {
   it("međunarodno bez finala u bazi: bez medalja", () => {
     expect(medalStage({ ...base, discCode: "ARM", level: "world", competitionOver: true, qual: done })).toBeNull();
   });
+  it("admin oznaka bez finala: kvalifikacije, i na međunarodnom i uz finale u satnici", () => {
+    const marked = { ...base, discCode: "ARM", level: "world", markedNoFinal: true };
+    expect(medalStage({ ...marked, qual: done })).toBe("qual");
+    expect(medalStage({ ...marked, finalScheduled: true, qual: done })).toBe("qual");
+    expect(medalStage({ ...marked, qual: live })).toBeNull();
+    expect(medalStage({ ...marked, finalScheduled: true, final: done, qual: done })).toBe("final");
+  });
   it("samo elim → nikad medalje", () => {
     expect(medalStage({ ...base, discCode: "R3P300M", competitionOver: true })).toBeNull();
   });
