@@ -52,7 +52,8 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
     for (const rawResult of event.results) {
       const result = rawResult as ParsedShooterResult;
       const nationality = result.teamNoc.toUpperCase();
-      const match = matchShooter(result.firstName, result.lastName, nationality, allShooters);
+      const date = event.eventDate ?? ("mainDate" in bilten ? bilten.mainDate : undefined);
+      const match = matchShooter(result.firstName, result.lastName, nationality, allShooters, { age: { category: event.category, date } });
       const shooterId = match.kind === "exact" ? match.id : undefined;
       const shooterClubId = shooterId ? allShooters.find((shooter) => shooter.id === shooterId)?.clubId : undefined;
       let club = shooterClubId ? allClubs.find((candidate) => candidate.id === shooterClubId) : undefined;
