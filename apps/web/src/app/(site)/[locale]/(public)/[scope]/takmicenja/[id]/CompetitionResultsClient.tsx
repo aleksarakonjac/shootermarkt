@@ -1151,7 +1151,7 @@ function CompetitionDetail({
   const searching = searchable && query.trim() !== "";
   const shownElimRows = searching ? elimRows.filter(rowMatches) : elimRows;
   const shownQualRows = searching ? qualRows.filter(rowMatches) : qualRows;
-  const shownTeamRows = searching ? teamRows.filter((team) => matchesSearch(query, team.teamName, ...team.members.map((m) => m.name))) : teamRows;
+  const shownTeamRows = searching ? teamRows.filter((team) => matchesSearch(query, team.teamName, ...team.members.flatMap((m) => [m.name, m.firstName, m.lastName]))) : teamRows;
   const [searchCount, searchTotal] = effectiveStage === "team" ? [shownTeamRows.length, teamRows.length]
     : [(effectiveStage === "elim" ? shownElimRows : shownQualRows).length, stageRows.length];
 

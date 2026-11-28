@@ -3,7 +3,8 @@ import type { AgeCategory } from "@shootermarkt/db/schema";
 import { categoryLabel, localizeMatchName } from "@/lib/match-name";
 import type { DisciplineGroup } from "@/app/(site)/[locale]/(public)/[scope]/takmicenja/[id]/CompetitionResultsClient";
 
-export type TeamMemberRow = { shooterId: number | null; name: string; series: number[]; total: string; inners: number | null };
+/** `firstName`/`lastName` su sa povezanog profila; `name` je zapis iz biltena. */
+export type TeamMemberRow = { shooterId: number | null; name: string; firstName?: string | null; lastName?: string | null; series: number[]; total: string; inners: number | null };
 export type TeamRow = { id: number; teamName: string; rank: number | null; total: string | null; inners: number | null; remark: string | null; members: TeamMemberRow[] };
 export type CompetitionTeam = TeamRow & {
   disciplineCode: string; disciplineName: string; apparatus: string | null; category: AgeCategory;

@@ -1,14 +1,15 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, getTableColumns, inArray } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
-import { competitionEvents, competitions, countries, disciplines, teamResultMembers, teamResults } from "@shootermarkt/db/schema";
+import { competitionEvents, competitions, countries, disciplines, shooters, teamResultMembers, teamResults } from "@shootermarkt/db/schema";
 import type { ResultRowData } from "@/components/result-display/ResultsHistoryTable";
+import { fullDisplayName } from "@/lib/shooter-mixed-results";
 
 export type TeamHistoryInput = {
   id: number; teamName: string; rank: number | null; total: string | null; inners: number | null; remark: string | null;
   disciplineCode: string; category: string | null; competitionId: number; competitionName: string; competitionDate: string; competitionDateEnd: string | null;
   competitionLocation: string | null; competitionCountry: string | null; competitionCountryCode2: string | null;
   competitionEventId: number | null; eventName: string | null; eventDate: string | null;
-  members: { shooterId: number | null; name: string; series: number[]; total: string; inners: number | null }[];
+  members: { shooterId: number | null; name: string; firstName?: string | null; lastName?: string | null; series: number[]; total: string; inners: number | null }[];
 };
 
 /** Ekipni nastup kao red istorije strelca: plasman i zbir su ekipni, članovi se vide u proširenom redu. */
@@ -18,7 +19,10 @@ export function toTeamHistoryRow(row: TeamHistoryInput): ResultRowData {
     rowKey: `t:${row.id}`,
     kind: "team",
     teamName: row.teamName,
-    teamMembers: row.members.map((m) => ({ ...m, total: Number(m.total) })),
+    // imena kao kod miks tima: sa profila, a bez veze iz zapisa u biltenu
+    teamMembers: row.members.map((m) => ({
+      shooterId: m.shooterId, name: fullDisplayName(m.firstName ?? null, m.lastName ?? null, m.name) ?? m.name, series: m.series, total: Number(m.total), inners: m.inners,
+    })),
     competitionId: row.competitionId,
     competitionName: row.competitionName,
     competitionDate: row.eventDate ?? row.competitionDate,
@@ -67,7 +71,8 @@ export async function getShooterTeamRows(shooterId: number, competitionIds?: num
     .leftJoin(competitionEvents, eq(teamResults.competitionEventId, competitionEvents.id))
     .where(and(teamForShooter(shooterId), competitionIds ? inArray(competitions.id, competitionIds) : undefined));
   if (!rows.length) return [];
-  const members = await db.select().from(teamResultMembers)
+  const members = await db.select({ ...getTableColumns(teamResultMembers), firstName: shooters.firstName, lastName: shooters.lastName })
+    .from(teamResultMembers).leftJoin(shooters, eq(teamResultMembers.shooterId, shooters.id))
     .where(inArray(teamResultMembers.teamResultId, rows.map((r) => r.id))).orderBy(teamResultMembers.position);
   return rows.map((row) => toTeamHistoryRow({ ...row, members: members.filter((m) => m.teamResultId === row.id) }));
 }

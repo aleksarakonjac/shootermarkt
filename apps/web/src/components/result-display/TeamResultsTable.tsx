@@ -4,12 +4,21 @@ import { useState } from "react";
 import { useLocale } from "next-intl";
 import { ChevronDown } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import type { TeamRow } from "@/lib/competition-teams";
+import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
+import type { TeamMemberRow, TeamRow } from "@/lib/competition-teams";
 import { MedalIcon } from "./MedalIcon";
 
 const mono = "font-[family-name:var(--font-jetbrains-mono)] tabular-nums";
 /** Pištolj je ceo broj, puška decimalna; zapis iz baze je uvek sa jednom decimalom. */
 const score = (v: string | number) => String(v).replace(/\.0$/, "");
+
+/** Kao u pojedinačnim rezultatima: ime sa profila, prezime istaknuto, ime prigušeno. */
+function MemberName({ member }: { member: TeamMemberRow }) {
+  const { lastName, firstName } = member.lastName ? { lastName: member.lastName, firstName: member.firstName ?? "" } : splitDisplayName(member.name);
+  const content = <><span className="max-w-full shrink-0 truncate font-medium text-[var(--ink)] transition-colors group-hover/name:text-[var(--brand-primary)]">{lastName}</span>{" "}<span className="min-w-0 truncate text-[var(--muted)]">{firstName}</span></>;
+  const cls = "group/name flex min-w-0 items-baseline gap-1.5";
+  return member.shooterId ? <Link href={`/strelci/${member.shooterId}`} className={cls}>{content}</Link> : <span className={cls}>{content}</span>;
+}
 
 /** Klupski ekipni plasman iz biltena; klik na ekipu otvara njene strelce, jedan ispod drugog. */
 export function TeamResultsTable({ teams }: { teams: TeamRow[] }) {
@@ -42,9 +51,7 @@ export function TeamResultsTable({ teams }: { teams: TeamRow[] }) {
               <ul aria-label={`${en ? "Shooters" : "Strelci"}: ${team.teamName}`} className="border-t border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
                 {team.members.map((m, i) => (
                   <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 pl-13 sm:px-4 sm:pl-14">
-                    <span className="min-w-0 flex-1 truncate text-sm text-[var(--ink)]">
-                      {m.shooterId ? <Link href={`/strelci/${m.shooterId}`} className="hover:text-[var(--brand-primary)] hover:underline">{m.name}</Link> : m.name}
-                    </span>
+                    <span className="flex min-w-0 flex-1 text-sm"><MemberName member={m} /></span>
                     <span className={`order-last flex w-full gap-2 text-xs text-[var(--muted)] sm:order-none sm:w-auto ${mono}`}>
                       {m.series.map((s, n) => <span key={n}>{s}</span>)}
                     </span>
