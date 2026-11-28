@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useLocale } from "next-intl";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link } from "@/i18n/navigation";
@@ -33,6 +33,20 @@ function teamCountry(nocCode: string) {
   const name = noc.split("/").map((code, i) => (code !== "AIN" && entries[i]?.name) || code).join(" / ");
   const flags = entries.map((entry) => entry?.alpha2 && <span key={entry.noc} className={`fi fi-${entry.alpha2.toLowerCase()}`} style={{ width: "14px", height: "10px", borderRadius: "1px", display: "inline-block" }} />);
   return { noc, name, flags };
+}
+
+/** Zastava, NOC i redni broj tima; par iz dve države se lomi u red po državi, da kolona ne gura imena. */
+function NationChip({ noc, flags, teamNumber, className }: { noc: string; flags: ReactNode[]; teamNumber: number; className: string }) {
+  const codes = noc.split("/");
+  return (
+    <span className={`${className} shrink-0 flex-col items-start gap-0.5 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]`}>
+      {codes.map((code, i) => (
+        <span key={code} className="flex items-center gap-1 whitespace-nowrap">
+          {flags[i]}{code}{i === codes.length - 1 && <>{" "}<span className="text-[var(--subtle)]">{teamNumber}</span></>}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 const STATUS_MARKS = new Set(["DSQ", "DNS", "DNF", "RPO"]);
@@ -267,8 +281,8 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
               <span className="hidden sm:inline min-w-0 truncate text-sm text-[var(--ink)]">{team.clubName ?? `${countryName} ${team.teamNumber}`}</span>
             </div>
             <div className={`${cell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
-              <button type="button" onClick={(event) => { event.stopPropagation(); setSheetId(team.id); }} aria-label={`${en ? "Details" : "Detalji"}: ${noc} ${team.teamNumber}`} className="flex min-h-11 min-w-0 items-center sm:hidden"><span className="flex shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]">{flags}{team.clubName ? <span className="max-w-20 truncate">{team.clubName}</span> : <>{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></>}</span></button>
-              <span className="hidden shrink-0 items-center gap-1 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)] sm:flex">{flags}{noc} <span className="text-[var(--subtle)]">{team.teamNumber}</span></span>
+              <button type="button" onClick={(event) => { event.stopPropagation(); setSheetId(team.id); }} aria-label={`${en ? "Details" : "Detalji"}: ${noc} ${team.teamNumber}`} className="flex min-h-11 min-w-0 items-center sm:hidden"><NationChip noc={noc} flags={flags} teamNumber={team.teamNumber} className="flex" /></button>
+              <NationChip noc={noc} flags={flags} teamNumber={team.teamNumber} className="hidden sm:flex" />
             </div>
             <div className={`${memberCell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}><TeamMember id={team.shooter1Id} name={team.shooter1Name} onOpen={() => setSheetId(desktop && sheetId === team.id ? null : team.id)} /></div>
             {hasSeries && seriesHeaders.map((_, i) => { const s1 = detail1(team)?.series; const v = s1?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r1, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s1 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}
