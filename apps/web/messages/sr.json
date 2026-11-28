@@ -501,5 +501,24 @@
     "en": "English",
     "switchToEn": "Switch to English",
     "switchToSr": "Prebaci na srpski"
+  },
+  "intro": {
+    "eyebrow": "Prvi put ovde?",
+    "title": "Rezultati strelaca na jednom mestu",
+    "close": "Zatvori",
+    "links": {
+      "competitions": {
+        "label": "Takmičenja",
+        "desc": "rezultati po disciplini"
+      },
+      "shooters": {
+        "label": "Strelci",
+        "desc": "profil i svi nastupi"
+      },
+      "ranking": {
+        "label": "Rangiranje",
+        "desc": "forma po disciplini"
+      }
+    }
   }
 }

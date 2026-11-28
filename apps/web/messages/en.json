@@ -501,5 +501,24 @@
     "en": "English",
     "switchToEn": "Switch to English",
     "switchToSr": "Switch to Serbian"
+  },
+  "intro": {
+    "eyebrow": "First time here?",
+    "title": "Shooting results in one place",
+    "close": "Close",
+    "links": {
+      "competitions": {
+        "label": "Competitions",
+        "desc": "results by event"
+      },
+      "shooters": {
+        "label": "Shooters",
+        "desc": "profiles and every match"
+      },
+      "ranking": {
+        "label": "Rankings",
+        "desc": "form by event"
+      }
+    }
   }
 }
