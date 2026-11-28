@@ -48,13 +48,11 @@ export function FirstVisitIntro() {
   return (
     <section
       aria-labelledby="first-visit-intro-title"
-      className="first-visit-intro mb-6 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 pt-3 pb-2 text-[var(--ink)] sm:px-6 sm:pt-4"
+      className="first-visit-intro mb-6 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 pt-2.5 pb-4 text-[var(--ink)] sm:px-6 sm:pt-3.5 sm:pb-5"
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)]">
-          {t("eyebrow")}
-        </p>
-        <div className="flex items-center gap-1">
+        <p className="text-[0.95rem] font-semibold text-[var(--brand-primary)]">{t("eyebrow")}</p>
+        <div className="-my-1 flex items-center gap-1">
           <LocaleSwitcher />
           <button
             type="button"
@@ -69,27 +67,28 @@ export function FirstVisitIntro() {
         </div>
       </div>
 
-      <div className="mt-1 lg:flex lg:items-end lg:justify-between lg:gap-8">
-        <div className="min-w-0">
-          <h2
-            id="first-visit-intro-title"
-            className="text-[1.35rem] leading-[1.05] font-extrabold uppercase font-[family-name:var(--font-display)] text-balance sm:text-[1.75rem]"
-          >
-            {t("title")}
-          </h2>
-        </div>
+      <div className="mt-1.5 flex flex-col gap-3 lg:flex-row lg:items-baseline lg:justify-between lg:gap-8">
+        <h2
+          id="first-visit-intro-title"
+          className="text-[1.5rem] leading-[1.05] font-extrabold uppercase font-[family-name:var(--font-display)] text-balance sm:text-[1.75rem]"
+        >
+          {t("title")}
+        </h2>
 
-        <ul className="mt-1 flex flex-wrap gap-x-5 lg:mt-0 lg:shrink-0">
+        {/* -my-3 cancels the 44px hit area so the visible text sits on the panel's padding */}
+        <ul className="-my-3 flex flex-wrap gap-x-5 lg:shrink-0">
           {LINKS.map(({ href, key }) => (
             <li key={key}>
               <ScopedLink
                 href={href}
                 onClick={markSeen}
                 title={t(`links.${key}.desc`)}
-                className="flex min-h-11 items-center gap-1.5 text-sm font-semibold hover:text-[var(--brand-primary)]"
+                className="group flex min-h-11 items-center gap-1 text-[0.95rem] font-semibold hover:text-[var(--brand-primary)]"
               >
                 {t(`links.${key}.label`)}
-                <span aria-hidden="true" className="text-[var(--brand-primary)]">→</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-[var(--brand-primary)] transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
               </ScopedLink>
             </li>
           ))}
