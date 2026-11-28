@@ -51,6 +51,16 @@ describe("matchTeamMembers", () => {
     expect(matchTeamMembers([junior], [], [], senior, "2026-11-27").teamResults[0].members[0].shooterId).toBeUndefined();
   });
 
+  it("takes gender from the individual list when the woman is listed first", () => {
+    // međunarodni miks navodi ženu prvu; partner bez pojedinačnog reda dobija suprotan pol
+    const rows = [{ firstName: "Ana", lastName: "Petrovic", teamNoc: "SRB", gender: "F", isNew: false, disciplineCode: "ARW" }] as ReviewRow[];
+    const first = { nocCode: "SRB", disciplineCode: "ARMT", mFirstName: "Ana", mLastName: "Petrovic", fFirstName: "Mila", fLastName: "Ilic" } as MixedTeamEntry;
+    const second = { ...first, mFirstName: "Mila", mLastName: "Ilic", fFirstName: "Ana", fLastName: "Petrovic" };
+    const [a, b] = matchTeamMembers([], [first, second], rows, shooters).mixed;
+    expect([a.mGender, a.fGender]).toEqual(["F", "M"]);
+    expect([b.mGender, b.fGender]).toEqual(["M", "F"]);
+  });
+
   it("prepares mixed members to be created, man first, each with its own nation of a pair", () => {
     const pair = { nocCode: "SRB/HUN", mFirstName: "Ana", mLastName: "Petrovic", fFirstName: "Mila", fLastName: "Ilic" } as MixedTeamEntry;
     const [entry] = matchTeamMembers([], [pair], [], shooters).mixed;
