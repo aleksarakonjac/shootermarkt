@@ -48,7 +48,7 @@ export function SheetPerson({ firstName, lastName, avatarUrl, birthYear, nationa
 export function SheetStickyBar({ title }: { title: string }) {
   return (
     <div className="hidden h-11 shrink-0 items-center rounded-t-[11px] border-b border-[var(--border)] px-3 pr-11 sm:flex">
-      <p className="min-w-0 truncate text-sm font-semibold text-[var(--ink)]">{title}</p>
+      <p className="min-w-0 truncate text-sm font-bold text-[var(--ink)]">{title}</p>
     </div>
   );
 }
