@@ -91,12 +91,12 @@
   .live-dot { animation: none; }
 }
 
-/* First-visit intro: slides up once, no motion when reduced */
+/* First-visit intro: fades in once, no motion when reduced */
 .first-visit-intro {
   animation: first-visit-intro-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 @keyframes first-visit-intro-in {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .first-visit-intro { animation: none; }
