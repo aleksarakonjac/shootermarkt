@@ -169,6 +169,32 @@ describe.skipIf(!url)("mixed team re-import", () => {
     ]);
   });
 
+  it("PDF import with createMissing creates each new shooter once and keeps pairs on their rows", async () => {
+    const { team, importTeams, rows } = await setup();
+    const P = [["Prva", "PDFNOVA"], ["Drugi", "PDFNOVI"]];
+    const Q = [["Treca", "PDFTRECA"], ["Cetvrti", "PDFCETVRTI"]];
+    const created = (teamNumber: number, pair: string[][]) => team(teamNumber, pair, { createMissing: true });
+    const links = async () => (await rows()).map((r) => [r.shooter1Id, r.shooter2Id]);
+    const shooters = async () => (await database.select().from(schema.shooters)).length;
+    await importTeams(created(1, P), created(2, Q));
+    const first = await links();
+    expect(first.flat().every(Boolean)).toBe(true);
+    const before = await shooters();
+    await importTeams(created(1, Q), created(2, P));
+    expect(await links()).toEqual(first);
+    expect(await shooters()).toBe(before);
+  });
+
+  it("PDF import with createMissing gives a replaced member an own profile, not the stored one", async () => {
+    const { ids: [a1, a2], team, importTeams, rows } = await setup();
+    await importTeams(team(1, A));
+    await importTeams(team(1, [A[0], ["Zamena", "PDFZAMENA"]], { createMissing: true }));
+    const [row] = await rows();
+    expect(row.shooter1Id).toBe(a1);
+    expect(row.shooter2Id).not.toBeNull();
+    expect(row.shooter2Id).not.toBe(a2);
+  });
+
   it("live fetch upsert: a new link wins, an empty one keeps the old only for the same name", async () => {
     const { noc, ids: [a1, , b1], competitionId } = await setup();
     const { teamLinkOnConflict } = await import("./mixed-team-link");

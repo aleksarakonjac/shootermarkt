@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 
-import { numberTeams, type ReviewRow, type CommitPayload, type MixedTeamEntry } from "@shootermarkt/db/pdf-import-types";
+import { matchEventName, numberTeams, type ReviewRow, type CommitPayload, type MixedTeamEntry, type TeamResultEntry } from "@shootermarkt/db/pdf-import-types";
 import { formatDateSr } from "@/lib/date-utils";
 import { CompetitionSearchSelect } from "@/components/ui/CompetitionSearchSelect";
 import { ReviewTable } from "../_shared/ReviewTable";
@@ -12,16 +12,19 @@ import { DonePanel } from "../_shared/DonePanel";
 import { OverwriteCheck } from "../_shared/OverwriteCheck";
 import { MixedTeamQualTable, MixedTeamFinalsTable } from "../_shared/MixedTeamReviewTable";
 import { commitMixedTeams } from "../_shared/commitMixedTeams";
+import { TeamReviewTable } from "../_shared/TeamReviewTable";
+import { applyMemberPatch, memberRows } from "../_shared/teamMemberRows";
 import { PdfImportJobsPanel, type PdfImportJobSummary } from "./PdfImportJobsPanel";
 
 type Step = "upload" | "review" | "done";
 /** `fromMain`: red koji je admin prebacio iz glavnog meča u zaseban, da bi se izbor mogao poništiti. */
 type PdfRow = ReviewRow & { fromMain?: boolean };
+type PdfTeam = TeamResultEntry & { fromMain?: boolean };
 
 
 interface ParseInfo { eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number; finalsError?: string; warnings?: string[] }
 interface CommitResult { inserted: number; updated?: number; unchanged?: number; skipped: number; errors: string[]; competitionId: number }
-interface PdfImportJob { id: number; competitionId: number; tags: string[]; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number; finalsError?: string; mixedTeams?: MixedTeamEntry[]; warnings?: string[] } | null; error: string | null }
+interface PdfImportJob { id: number; competitionId: number; tags: string[]; status: "queued" | "processing" | "completed" | "failed"; result: { rows: ReviewRow[]; eventsCount: number; skippedDisciplines: string[]; matchedFinals?: number; unmatchedFinals?: number; finalsError?: string; mixedTeams?: MixedTeamEntry[]; teamResults?: TeamResultEntry[]; bulletinDate?: string; warnings?: string[] } | null; error: string | null }
 
 export function PdfMode() {
   const [step, setStep] = useState<Step>("upload");
@@ -45,6 +48,9 @@ export function PdfMode() {
   const [teams, setTeams] = useState<MixedTeamEntry[]>([]);
   /** Zaseban meč za timove koji bi išli u glavni meč (pucali su drugog dana od pojedinačnih istog meča). */
   const [teamMatch, setTeamMatch] = useState<{ name: string; date: string } | null>(null);
+  const [teamResults, setTeamResults] = useState<PdfTeam[]>([]);
+  /** Dan glavnog meča biltena — predlog za naziv i datum kad admin bilten izdvoji u zaseban meč. */
+  const [bulletinDate, setBulletinDate] = useState<string | undefined>();
   const [parseInfo, setParseInfo] = useState<ParseInfo | null>(null);
   const [nocFilter, setNocFilter] = useState("");
   const [result, setResult] = useState<CommitResult | null>(null);
@@ -59,6 +65,8 @@ export function PdfMode() {
         setRows(job.result.rows);
         setTeams(job.result.mixedTeams ?? []);
         setTeamMatch(null);
+        setTeamResults(job.result.teamResults ?? []);
+        setBulletinDate(job.result.bulletinDate);
         setParseInfo({
           eventsCount: job.result.eventsCount,
           skippedDisciplines: job.result.skippedDisciplines,
@@ -122,8 +130,9 @@ export function PdfMode() {
 
   async function handleCommit() {
     if (!selectedCompId) { setError("Izaberi takmičenje iz baze"); return; }
-    if (rows.some((r) => r.eventName != null && !r.eventName.trim())) { setError("Svaki dodatni meč mora imati naziv"); return; }
-    if (rows.some((r) => r.eventName != null && !r.eventDate)) { setError("Svaki dodatni meč mora imati datum"); return; }
+    const matches = [...rows, ...teamResults];
+    if (matches.some((r) => r.eventName != null && !r.eventName.trim())) { setError("Svaki dodatni meč mora imati naziv"); return; }
+    if (matches.some((r) => r.eventName != null && !r.eventDate)) { setError("Svaki dodatni meč mora imati datum"); return; }
     if (teamMatch && !teamMatch.name.trim()) { setError("Svaki dodatni meč mora imati naziv"); return; }
     if (teamMatch && !teamMatch.date) { setError("Svaki dodatni meč mora imati datum"); return; }
     // jedan meč ima jedan datum: isti naziv kao meč pojedinačnih bi timovima tiho dao datum pojedinačnih
@@ -153,6 +162,23 @@ export function PdfMode() {
           unchanged: (data.unchanged ?? 0) + mixed.unchanged,
           skipped: data.skipped + mixed.skipped,
           errors: [...data.errors, ...mixed.errors],
+        };
+      }
+      // posle pojedinačnih: ekipa se vezuje za strelce koje su oni upravo napravili
+      if (teamResults.length > 0) {
+        const res = await fetch("/api/admin/import/commit-teams", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ competitionId: selectedCompId, entries: teamResults }),
+        });
+        const club = await res.json() as CommitResult & { error?: string };
+        data = !res.ok ? { ...data, errors: [...data.errors, club.error ?? "Upis ekipa nije uspeo"] } : {
+          ...data,
+          inserted: data.inserted + club.inserted,
+          updated: (data.updated ?? 0) + (club.updated ?? 0),
+          unchanged: (data.unchanged ?? 0) + (club.unchanged ?? 0),
+          skipped: data.skipped + club.skipped,
+          errors: [...data.errors, ...club.errors],
         };
       }
       setResult(data);
@@ -185,6 +211,8 @@ export function PdfMode() {
       setRows(job.result.rows);
       setTeams(job.result.mixedTeams ?? []);
       setTeamMatch(null);
+      setTeamResults(job.result.teamResults ?? []);
+      setBulletinDate(job.result.bulletinDate);
       setParseInfo({
         eventsCount: job.result.eventsCount,
         skippedDisciplines: job.result.skippedDisciplines,
@@ -208,6 +236,8 @@ export function PdfMode() {
   function reset() {
     setStep("upload");
     setRows([]);
+    setTeamResults([]);
+    setBulletinDate(undefined);
     setTeams([]);
     setTeamMatch(null);
     setParseInfo(null);
@@ -224,7 +254,17 @@ export function PdfMode() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  const activeCount = rows.filter((r) => !r.skip).length + teams.filter((t) => !t.skip).length;
+  const activeCount = rows.filter((r) => !r.skip).length + teams.filter((t) => !t.skip).length + teamResults.filter((t) => !t.skip).length;
+  const members = memberRows(teamResults, teams);
+  const clubMembers = memberRows(teamResults, []).length;
+  /** Indeksi posle pojedinačnih redova su članovi timova (prvo klupski, pa mešoviti). */
+  function updateReviewRow(index: number, patch: Partial<ReviewRow>) {
+    const member = index - rows.length;
+    if (member < 0) updateRow(index, patch);
+    else if (member < clubMembers) setTeamResults((prev) => applyMemberPatch(prev, [], member, patch).teamResults);
+    else setTeams((prev) => applyMemberPatch([], prev, member - clubMembers, patch).mixed);
+  }
+  const toggleClubSkip = (index: number) => setTeamResults((prev) => prev.map((x, i) => (i === index ? { ...x, skip: !x.skip } : x)));
   // timovi glavnog meča dobijaju zaseban meč timova kad je uključen; kasniji dani već imaju svoj meč iz parsera
   const matchedTeams = teamMatch
     ? teams.map((t) => (t.eventName == null ? { ...t, eventName: teamMatch.name.trim(), eventDate: teamMatch.date } : t))
@@ -241,15 +281,20 @@ export function PdfMode() {
     numberTeams(next); // država i redni broj su ključ tima u bazi
     return next;
   });
-  const eventNames = [...new Set(rows.flatMap((r) => (r.eventName != null ? [r.eventName] : [])))];
-  const isSeparate = rows.some((r) => r.fromMain);
-  const unnamedMatch = rows.some((r) => r.eventName != null && !r.eventName.trim());
+  const matchRows = [...rows, ...teamResults];
+  const eventNames = [...new Set(matchRows.flatMap((r) => (r.eventName != null ? [r.eventName] : [])))];
+  const isSeparate = matchRows.some((r) => r.fromMain);
+  const unnamedMatch = matchRows.some((r) => r.eventName != null && !r.eventName.trim());
 
   function toggleSeparate(on: boolean) {
-    setRows((prev) => prev.map((r) =>
-      on && r.eventName == null ? { ...r, eventName: "", eventDate: "", fromMain: true }
+    // isti naziv koji bi dao kompletan bilten, da kasniji uvoz ne napravi drugi meč
+    const proposed = bulletinDate ? { eventName: matchEventName(2, bulletinDate), eventDate: bulletinDate } : { eventName: "", eventDate: "" };
+    const move = <T extends PdfRow | PdfTeam>(r: T): T =>
+      on && r.eventName == null ? { ...r, ...proposed, fromMain: true }
       : !on && r.fromMain ? { ...r, eventName: null, eventDate: null, fromMain: false }
-      : r));
+      : r;
+    setRows((prev) => prev.map(move));
+    setTeamResults((prev) => prev.map(move));
   }
 
   if (step === "done" && result) {
@@ -364,7 +409,7 @@ export function PdfMode() {
           )}
 
           <label className="flex items-start gap-2 text-sm text-[var(--ink)]">
-            <input type="checkbox" checked={isSeparate} disabled={!isSeparate && rows.every((r) => r.eventName != null)}
+            <input type="checkbox" checked={isSeparate} disabled={!isSeparate && matchRows.every((r) => r.eventName != null)}
               onChange={(e) => toggleSeparate(e.target.checked)} className="mt-1 accent-[var(--brand-primary)]" />
             <span>
               Ovaj bilten je zaseban meč istog takmičenja (drugi dan, memorijal…)
@@ -378,8 +423,11 @@ export function PdfMode() {
                 Zasebni mečevi — upisuju se u isto takmičenje kao posebne discipline sa svojim nazivom i datumom:
               </p>
               {eventNames.map((name, i) => {
-                const date = rows.find((r) => r.eventName === name)?.eventDate ?? "";
-                const rename = (patch: Partial<ReviewRow>) => setRows((prev) => prev.map((r) => (r.eventName === name ? { ...r, ...patch } : r)));
+                const date = matchRows.find((r) => r.eventName === name)?.eventDate ?? "";
+                const rename = (patch: { eventName?: string; eventDate?: string }) => {
+                  setRows((prev) => prev.map((r) => (r.eventName === name ? { ...r, ...patch } : r)));
+                  setTeamResults((prev) => prev.map((x) => (x.eventName === name ? { ...x, ...patch } : x)));
+                };
                 return (
                   <div key={i} className="flex flex-wrap items-center gap-2">
                     <input value={name} onChange={(e) => rename({ eventName: e.target.value })} aria-label="Naziv meča"
@@ -392,7 +440,7 @@ export function PdfMode() {
             </div>
           )}
 
-          {selectedCompId && activeCount > 0 && !unnamedMatch && !(teamMatch && !teamMatch.name.trim()) && <OverwriteCheck competitionId={selectedCompId} rows={rows} teams={matchedTeams} />}
+          {selectedCompId && activeCount > 0 && !unnamedMatch && !(teamMatch && !teamMatch.name.trim()) && <OverwriteCheck competitionId={selectedCompId} rows={rows} teams={matchedTeams} teamResults={teamResults} />}
 
           {!!parseInfo?.warnings?.length && (
             <div className="rounded-lg border px-4 py-3 text-xs text-[var(--ink)] space-y-1" style={{ borderColor: "var(--warning)" }}>
@@ -401,7 +449,7 @@ export function PdfMode() {
             </div>
           )}
 
-          <NewShootersPanel rows={rows} onRowChange={updateRow} />
+          <NewShootersPanel rows={[...rows, ...members]} onRowChange={updateReviewRow} memberFrom={rows.length} mixedFrom={rows.length + clubMembers} />
 
           <ReviewTable
             rows={rows}
@@ -410,6 +458,13 @@ export function PdfMode() {
             onNocFilterChange={setNocFilter}
             onSkipNoc={(noc) => setRows(prev => prev.map(r => r.teamNoc === noc ? { ...r, skip: true } : r))}
           />
+
+          {teamResults.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-[var(--ink)]">Klupske ekipe</h2>
+              <TeamReviewTable entries={teamResults} onToggleSkip={toggleClubSkip} />
+            </div>
+          )}
 
           {teams.length > 0 && (
             <div className="space-y-2">

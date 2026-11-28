@@ -151,3 +151,35 @@ describe("PdfMode: naziv meča timova", () => {
   });
 });
 
+
+describe("PdfMode: klupske ekipe", () => {
+  it("imports teams after the individual rows, in the same separate match, and creates a renamed shooter once", async () => {
+    const shooter = { ...row, shooterId: undefined, isNew: true, firstName: "Mila", lastName: "Test" };
+    const club = { skip: false, disciplineCode: "ARW", category: "senior", teamName: "Klub", rank: 1, total: 628.4, inners: null, eventName: null, eventDate: null,
+      members: [{ firstName: "Mila", lastName: "Test", teamNoc: "SRB", series: [], total: 628.4, inners: null, isNew: true }] };
+    type Sent = { competitionId?: number; rows: Record<string, unknown>[]; entries: Record<string, unknown>[] };
+    const sent: { url: string; body: Sent }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { body?: string }) => {
+      if (init?.body) sent.push({ url, body: JSON.parse(init.body) });
+      const data = url.endsWith("/jobs/1") ? { ...job, result: { rows: [shooter], eventsCount: 1, skippedDisciplines: [], teamResults: [club], bulletinDate: "2026-11-27" } }
+        : url.endsWith("/preview") ? { added: 2, changed: 0, same: 0, items: [] }
+        : url.includes("/commit") ? { inserted: 1, updated: 0, unchanged: 0, skipped: 0, errors: [], competitionId: 5 }
+        : [];
+      return { ok: true, json: async () => data };
+    }));
+    localStorage.setItem("pdfImportJobId", "1");
+    render(<PdfMode />);
+
+    fireEvent.change((await screen.findAllByDisplayValue("Test", {}, { timeout: 3000 }))[0], { target: { value: "Testić" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /zaseban meč/i }));
+    expect(screen.getByLabelText("Naziv meča")).toHaveValue("2. meč · 27.11.");
+    expect(screen.getByLabelText("Datum meča")).toHaveValue("2026-11-27");
+    fireEvent.click(screen.getByRole("button", { name: /potvrdi i unesi 2/i }));
+
+    await waitFor(() => expect(sent.some((s) => s.url.endsWith("/commit-teams"))).toBe(true));
+    const commits = sent.filter((s) => s.url.includes("/commit"));
+    expect(commits.map((s) => s.url)).toEqual(["/api/admin/import/commit", "/api/admin/import/commit-teams"]);
+    expect(commits[0].body.rows[0]).toMatchObject({ lastName: "Testić", eventName: "2. meč · 27.11." });
+    expect(commits[1].body).toMatchObject({ competitionId: 5, entries: [{ eventName: "2. meč · 27.11.", eventDate: "2026-11-27", members: [{ lastName: "Testić" }] }] });
+  });
+});

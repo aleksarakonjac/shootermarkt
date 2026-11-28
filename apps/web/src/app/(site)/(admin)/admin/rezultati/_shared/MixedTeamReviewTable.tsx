@@ -87,6 +87,7 @@ export function MixedTeamQualTable({
                       <td rowSpan={2} className="px-3 py-2 text-center align-middle"><input type="checkbox" checked={e.skip} onChange={() => onToggleSkip(index)} className="accent-[var(--brand-primary)]" /></td>
                       <td rowSpan={2} className="px-3 py-2 align-middle">
                         <TeamLabel nocCode={e.nocCode} teamNumber={e.teamNumber} showNumber={(nocCounts.get(e.nocCode) ?? 0) > 1} />
+                        {e.clubName && <span className="mt-0.5 block text-xs text-[var(--ink)]">{e.clubName}</span>}
                         {onNationChange && (e.nationAssumed || !TEAM_NOC.test(e.nocCode)) && (
                           <span className="mt-1.5 flex items-center gap-1.5">
                             <input value={e.nocCode} maxLength={7} aria-label={`Nacija tima ${e.mLastName} / ${e.fLastName}`}

@@ -2,7 +2,8 @@ import { commitImportReview, previewImportRows } from "@/lib/import-commit";
 import { commitMixedTeamsDirect, previewMixedTeams } from "@/lib/import-commit-mixed";
 import { buildSiusImport, mergeSiusFinals } from "@/lib/sius-import";
 import { summarizeDiff, type ImportDiff } from "@/lib/import-diff";
-import type { ReviewRow } from "@shootermarkt/db/pdf-import-types";
+import type { ReviewRow, TeamResultEntry } from "@shootermarkt/db/pdf-import-types";
+import { previewTeamResults } from "@/lib/import-commit-teams";
 import type { MixedTeamEntry } from "@/app/(site)/(admin)/admin/rezultati/_shared/MixedTeamReviewTable";
 
 export interface SiusImportSummary {
@@ -29,16 +30,18 @@ export interface SiusImportResult extends SiusImportSummary {
 }
 
 /** Šta bi uvoz redova (sa već spojenim finalima) i timova uradio bazi, bez upisa. */
-export async function diffSiusImport(competitionId: number, rows: ReviewRow[], teams: MixedTeamEntry[]) {
-  const [individual, mixed] = await Promise.all([
+export async function diffSiusImport(competitionId: number, rows: ReviewRow[], teams: MixedTeamEntry[], teamResults: TeamResultEntry[] = []) {
+  const [individual, mixed, club] = await Promise.all([
     previewImportRows(competitionId, rows),
     teams.length ? previewMixedTeams(competitionId, teams) : [],
+    teamResults.length ? previewTeamResults(competitionId, teamResults) : [],
   ]);
   const event = (code: string, category: string | undefined, name?: string | null) =>
     [code, category && category !== "senior" ? category : null, name].filter(Boolean).join(" · ");
   return summarizeDiff([
     ...rows.map((r, i) => ({ label: `${r.lastName} ${r.firstName} (${r.teamNoc}) · ${event(r.disciplineCode, r.category, r.eventName)}`, ...individual[i] })),
     ...teams.map((t, i) => ({ label: `Tim ${t.nocCode} ${t.teamNumber} · ${event(t.disciplineCode, t.category, t.eventName)}`, ...mixed[i] })),
+    ...teamResults.map((t, i) => ({ label: `Ekipa ${t.teamName} · ${event(t.disciplineCode, t.category, t.eventName)}`, ...club[i] })),
   ]);
 }
 

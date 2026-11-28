@@ -393,6 +393,13 @@
       "when": 1795810993660,
       "tag": "0055_shallow_shriek",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1795812352140,
+      "tag": "0056_fearless_cannonball",
+      "breakpoints": true
     }
   ]
 }

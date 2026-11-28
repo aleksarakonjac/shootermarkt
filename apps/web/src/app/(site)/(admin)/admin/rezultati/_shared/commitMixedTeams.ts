@@ -9,6 +9,7 @@ export const toQualCommit = (e: MixedTeamEntry): MixedCommitEntry => ({
   skip: e.skip, nocCode: e.nocCode, teamNumber: e.teamNumber, qualRank: e.qualRank, qualTotal: e.qualTotal, qualInners: e.inners, qualRemark: e.qualRemark, qualified: e.qualified, extras: e.qualExtras,
   m_lastName: e.mLastName, m_firstName: e.mFirstName, mIssfId: e.mIssfId, m_series: e.m_series, mInners: e.mInners, mTotal: e.mTotal,
   f_lastName: e.fLastName, f_firstName: e.fFirstName, fIssfId: e.fIssfId, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
+  clubName: e.clubName, createMissing: e.createMissing, mShooterId: e.mShooterId, fShooterId: e.fShooterId, mGender: e.mGender, fGender: e.fGender,
 });
 
 // imena se u finalu ne upisuju; po njima se nalazi red tima

@@ -5,6 +5,7 @@ import { glyphFixes } from "./sius-fonts";
 import { clubNation, SCORE, topmost, type Item } from "./sius-layout";
 import { splitName } from "./sius-names";
 import { parseMixedTeams, type TeamPage } from "./sius-teams";
+import { parseClubTeams, type ClubTeamPage } from "./sius-club-teams";
 
 export { splitGuessedName } from "./sius-names";
 
@@ -56,6 +57,9 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
   let sawSius = false;
   let hasFinals = false;
   const teamPages: TeamPage[] = [];
+  const clubPages: ClubPage[] = [];
+  const clubCategories = new Map<string, AgeCategory>();
+  const clubWarnings: string[] = [];
 
   for (const items of pages) {
     const file = items.map((it) => SIUS_FILE.exec(it.str)).find(Boolean);
@@ -66,9 +70,18 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
     const [, airCode, juniorCode] = /^(A[RP](?:[MW]|MT))(J?)\d?$/.exec(discRaw) ?? [];
     const discipline = normalizeDisciplineCode(airCode ?? discRaw);
     if (kind === "T") {
-      // klupske ekipe se ignorišu; od ekipnih samo mešoviti timovi
-      if ((discipline === "ARMT" || discipline === "APMT") && (stage === "Q" || stage === "F")) {
-        teamPages.push({ discipline, isFinal: stage === "F", junior: !!juniorCode || listCode === "20" || items.some((it) => it.str === "Junior"), date: `20${yy}-${mm}-${dd}`, items });
+      const date = `20${yy}-${mm}-${dd}`;
+      if (discipline === "ARMT" || discipline === "APMT") {
+        const age = items.find((it) => /kadet|cadet|pionir|\bu-?\d\d\b/i.test(it.str));
+        const category = juniorCode || listCode === "20" || items.some((it) => it.str === "Junior") ? "junior" as const : parseCategory(age?.str);
+        if (stage === "Q" || stage === "F") teamPages.push({ discipline, isFinal: stage === "F", category, date, items });
+      } else if (discipline && (stage === "Q" || (stage === "I" && items.some((it) => it.str === "RESULTS")))) {
+        // klupske ekipe pojedinačne discipline; podnaslov kategorije stoji samo na prvoj strani liste
+        const category = clubCategories.get(file[0]) ?? (juniorCode ? "junior" as const
+          : LIST_CODES[listCode]?.category ?? subtitleList(items)?.category ?? (items.some((it) => it.str === discRaw) ? "senior" as const : undefined));
+        if (!category) { clubWarnings.push(`Ekipe ${discipline}: nepoznata kategorija liste (${date})`); continue; }
+        clubCategories.set(file[0], category);
+        clubPages.push({ discipline, category, date, title: listTitle(items), items });
       }
       continue;
     }
@@ -88,9 +101,8 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
       const list = juniorCode ? { category: "junior" as const, guest: LIST_CODES[listCode]?.guest }
         : LIST_CODES[listCode] ?? subtitleList(items) ?? (absolute ? { category: "senior" as const } : null);
       if (!list) return null;
-      // naslov meča je red iznad "RESULTS" / "FINAL RESULTS"; datum iz imena fajla (DDMMYY)
-      const results = items.find((it) => it.str === "RESULTS" || it.str === "FINAL RESULTS");
-      const title = results && items.filter((it) => it.y > results.y).sort((a, b) => a.y - b.y)[0]?.str;
+      // datum iz imena fajla (DDMMYY)
+      const title = listTitle(items);
       event = {
         discipline, stage: finalRows ? "final" : "qualification", category: list.category, guest: list.guest, isInternational: false,
         eventName: title ?? null, eventDate: `20${yy}-${mm}-${dd}`, results: [],
@@ -146,13 +158,24 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
   for (const [final, own] of ownQual) if (own) { final.eventName = own.eventName; final.eventDate = own.eventDate; }
   const shotOn = new Map(all.map((e) => [e, e.eventDate]));
   for (const e of all) if (isMain.get(e)) { e.eventName = null; e.eventDate = null; }
-  const firstDate = [...shotOn.values()].sort()[0];
+  // ekipa ide u meč svoje pojedinačne liste; bez nje: najraniji dan je glavni meč, ostali zasebni
+  const firstDate = [...shotOn.values(), ...clubPages.map((p) => p.date)].sort()[0];
+  const clubs = parseClubTeams(clubPages.map(({ title, date, ...page }) => {
+    const same = quals.filter((e) => !e.guest && e.discipline === page.discipline && e.category === page.category);
+    // kao kod finala: kad disciplina ima samo jedan meč, ekipna lista mu pripada i sa drugim datumom
+    const own = same.find((e) => shotOn.get(e) === date) ?? (same.length === 1 ? same[0] : undefined);
+    const match = own ? { eventName: own.eventName ?? null, eventDate: own.eventDate ?? date }
+      : { eventName: date === firstDate ? null : title && title !== mainTitle ? title : matchEventName(2, date), eventDate: date };
+    return { ...page, ...match };
+  }));
   const mixed = parseMixedTeams(teamPages, quals.flatMap((e) => e.results as ParsedShooterResult[]));
   useFinalNameSplit(all, mixed.entries);
+  const warnings = [...mixed.warnings, ...clubWarnings, ...clubs.warnings];
   return {
     events: all, hasFinals, mainDate: firstDate ?? undefined,
     ...(mixed.entries.length ? { mixedTeams: mixed.entries } : {}),
-    ...(mixed.warnings.length ? { warnings: mixed.warnings } : {}),
+    ...(clubs.entries.length ? { teamResults: clubs.entries } : {}),
+    ...(warnings.length ? { warnings } : {}),
   };
 }
 
@@ -170,6 +193,14 @@ function useFinalNameSplit(events: ParsedEvent[], teams: MixedTeamEntry[]) {
     if (m) Object.assign(t, { mFirstName: m.firstName, mLastName: m.lastName, mFullName: undefined });
     if (f) Object.assign(t, { fFirstName: f.firstName, fLastName: f.lastName, fFullName: undefined });
   }
+}
+
+type ClubPage = { discipline: ClubTeamPage["discipline"]; category: AgeCategory; date: string; title: string | undefined; items: Item[] };
+
+/** Naslov meča je red iznad "RESULTS" / "FINAL RESULTS". */
+function listTitle(items: Item[]) {
+  const results = items.find((it) => it.str === "RESULTS" || it.str === "FINAL RESULTS");
+  return results && items.filter((it) => it.y > results.y).sort((a, b) => a.y - b.y)[0]?.str;
 }
 
 function subtitleList(items: Item[]) {

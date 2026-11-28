@@ -92,6 +92,16 @@ describe("parseSiusPdf — Salona Trophy + DC Open 2026", async () => {
     expect(new Set(armt.map((t) => `${t.category}|${t.eventName}`))).toEqual(new Set(["senior|null", "junior|null"]));
   });
 
+  it("reads a U21 mixed list as junior and keeps the club of a team printed without a nation", async () => {
+    const pages = await extractSiusPages(fixture);
+    const u21 = pages.map((items) => (items.some((it) => /^[QF]200000TA231026\d{4}\.1\.ARMT\./.test(it.str)) ? [...items, { x: 280, y: 764, str: "U21" }] : items));
+    const parsed = parseSiusPages(u21)!;
+    expect(new Set(parsed.mixedTeams!.filter((x) => x.disciplineCode === "ARMT").map((x) => x.category))).toEqual(new Set(["junior"]));
+    const apmt = parsed.mixedTeams!.filter((x) => x.disciplineCode === "APMT");
+    expect(apmt.find((x) => x.qualRank === 13)!.clubName).toBeTruthy();
+    expect(apmt.some((x) => !x.clubName)).toBe(true);
+  });
+
   it("keeps a final printed on a later day with its qualification", async () => {
     const pages = await extractSiusPages(fixture);
     const finalNextDay = pages.map((items) => items.map((it) => ({ ...it, str: it.str.replace(/^F200000TA231026(\d{4}\.1\.ARMT\.)/, "F200000TA241026$1") })));

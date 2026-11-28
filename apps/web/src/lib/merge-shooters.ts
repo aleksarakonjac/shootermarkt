@@ -1,6 +1,6 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
-import { clubMemberships, competitions, disciplines, mixedTeamResults, nationalTeamMemberships, results, shooters } from "@shootermarkt/db/schema";
+import { clubMemberships, competitions, disciplines, mixedTeamResults, nationalTeamMemberships, results, shooters, teamResultMembers } from "@shootermarkt/db/schema";
 
 export class MergeError extends Error {}
 
@@ -102,6 +102,7 @@ export async function mergeShooters(keepId: number, dropId: number, opts: MergeO
     await tx.update(nationalTeamMemberships).set({ shooterId: keepId }).where(eq(nationalTeamMemberships.shooterId, dropId));
     await tx.update(mixedTeamResults).set({ shooter1Id: keepId }).where(eq(mixedTeamResults.shooter1Id, dropId));
     await tx.update(mixedTeamResults).set({ shooter2Id: keepId }).where(eq(mixedTeamResults.shooter2Id, dropId));
+    await tx.update(teamResultMembers).set({ shooterId: keepId }).where(eq(teamResultMembers.shooterId, dropId));
     await tx.delete(shooters).where(eq(shooters.id, dropId)); // unique issf_id/sius id se oslobađaju pre dopune
     await tx.update(shooters).set({
       firstName,

@@ -1,9 +1,10 @@
 import { and, desc, eq, gte, ilike, inArray, lte, lt, or } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
-import { competitions, competitionEvents, countries, disciplines, mixedTeamResults, results } from "@shootermarkt/db/schema";
+import { competitions, competitionEvents, countries, disciplines, mixedTeamResults, teamResults, results } from "@shootermarkt/db/schema";
 import { isEscSoloCode } from "@shootermarkt/db/pdf-import-types";
 import type { ResultRowData } from "@/components/result-display/ResultsHistoryTable";
 import { getShooterMixedRows, mergeCompetitionIds, mixedForShooter } from "@/lib/shooter-mixed-results";
+import { getShooterTeamRows, teamForShooter } from "@/lib/shooter-team-results";
 
 /** Red iz `results` → red istorije (Solo je zaseban `kind`). */
 export const toIndividualHistoryRow = <T extends { id: number; disciplineCode: string }>(r: T) =>
@@ -30,8 +31,8 @@ export async function getShooterResultsPage(shooterId: number, cursor?: ResultsC
       ilike(competitions.location, `%${filters.query}%`),
     ) : undefined,
   ];
-  // Takmičenja iz pojedinačnih i iz mešovitih rezultata (takmičenje samo sa mešovitim timom se ne gubi).
-  const [individualComps, mixedComps] = await Promise.all([
+  // Takmičenja iz pojedinačnih, mešovitih i ekipnih rezultata (takmičenje samo sa timom se ne gubi).
+  const [individualComps, mixedComps, teamComps] = await Promise.all([
     db.selectDistinct({ id: competitions.id, date: competitions.date })
       .from(results)
       .innerJoin(competitions, eq(results.competitionId, competitions.id))
@@ -44,14 +45,20 @@ export async function getShooterResultsPage(shooterId: number, cursor?: ResultsC
       .where(and(mixedForShooter(shooterId), ...filterConditions))
       .orderBy(desc(competitions.date), desc(competitions.id))
       .limit(SHOOTER_RESULTS_PAGE_SIZE + 1),
+    db.selectDistinct({ id: competitions.id, date: competitions.date })
+      .from(teamResults)
+      .innerJoin(competitions, eq(teamResults.competitionId, competitions.id))
+      .where(and(teamForShooter(shooterId), ...filterConditions))
+      .orderBy(desc(competitions.date), desc(competitions.id))
+      .limit(SHOOTER_RESULTS_PAGE_SIZE + 1),
   ]);
-  const competitionRows = mergeCompetitionIds(individualComps, mixedComps, SHOOTER_RESULTS_PAGE_SIZE);
+  const competitionRows = mergeCompetitionIds(individualComps, [...mixedComps, ...teamComps], SHOOTER_RESULTS_PAGE_SIZE);
 
   const visibleCompetitions = competitionRows.slice(0, SHOOTER_RESULTS_PAGE_SIZE);
   if (!visibleCompetitions.length) return { results: [] as ResultRowData[], nextCursor: null };
 
   const visibleIds = visibleCompetitions.map((competition) => competition.id);
-  const [resultRows, mixedRows] = await Promise.all([db
+  const [resultRows, mixedRows, teamRows] = await Promise.all([db
     .select({
       id: results.id,
       category: results.category,
@@ -88,9 +95,10 @@ export async function getShooterResultsPage(shooterId: number, cursor?: ResultsC
     .where(and(eq(results.shooterId, shooterId), inArray(competitions.id, visibleIds)))
     .orderBy(desc(competitions.date), desc(competitions.id), disciplines.code),
     getShooterMixedRows(shooterId, visibleIds),
+    getShooterTeamRows(shooterId, visibleIds),
   ]);
   const order = new Map(visibleIds.map((id, index) => [id, index]));
-  const rows: ResultRowData[] = [...resultRows.map(toIndividualHistoryRow), ...mixedRows]
+  const rows: ResultRowData[] = [...resultRows.map(toIndividualHistoryRow), ...mixedRows, ...teamRows]
     .sort((a, b) => order.get(a.competitionId)! - order.get(b.competitionId)!);
 
   const lastCompetition = visibleCompetitions.at(-1)!;

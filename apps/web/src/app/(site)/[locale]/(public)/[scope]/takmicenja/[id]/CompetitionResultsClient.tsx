@@ -23,6 +23,8 @@ import {
   matchTeams,
   type MixedTeamRow,
 } from "@/components/result-display/MixedTeamQualTable";
+import { TeamResultsTable } from "@/components/result-display/TeamResultsTable";
+import type { TeamRow } from "@/lib/competition-teams";
 import { startNavigationProgress, finishNavigationProgress } from "@/components/NavigationProgress";
 import { isOlympicDiscipline } from "@/lib/olympic-disciplines";
 import { isQualOnlyDiscipline, shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
@@ -76,6 +78,8 @@ export type DisciplineGroup = {
       remarkDetails: RemarkDetails | null;
       olympicQuota?: boolean;
     }>;
+    /** Klupske ekipe iste discipline i kategorije (faza "Ekipno"). */
+    teams?: TeamRow[];
   }>;
 };
 
@@ -93,7 +97,7 @@ export type MixedTeamGroup = {
   teams: MixedTeamRow[];
 };
 
-type Stage = "elim" | "qual" | "final" | "gold" | "bronze";
+type Stage = "elim" | "qual" | "final" | "team" | "gold" | "bronze";
 
 const MATCH_LABELS: Record<string, Record<"gold" | "bronze", string>> = {
   sr: { gold: "Zlatni meč", bronze: "Bronzani meč" },
@@ -215,8 +219,8 @@ const categoryChip = (category: AgeCategory, locale: string) => (category === "p
 // ── Phase labels ──────────────────────────────────────────────────────────────
 
 const PHASE_LABELS: Record<string, Record<string, string>> = {
-  sr: { elim: "Eliminacije", qual: "Kvalifikacije", final: "Finale" },
-  en: { elim: "Elimination", qual: "Qualification", final: "Final" },
+  sr: { elim: "Eliminacije", qual: "Kvalifikacije", final: "Finale", team: "Ekipno" },
+  en: { elim: "Elimination", qual: "Qualification", final: "Final", team: "Team" },
 };
 
 function eliminationRoundLabel(round: number, locale: string): string {
@@ -275,7 +279,7 @@ function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel,
     const params = new URLSearchParams(search);
     const disciplineCode = params.get("disc");
     const stage = params.get("stage");
-    if (!disciplineCode || (stage !== "elim" && stage !== "qual" && stage !== "final" && stage !== "gold" && stage !== "bronze")) return null;
+    if (!disciplineCode || (stage !== "elim" && stage !== "qual" && stage !== "final" && stage !== "team" && stage !== "gold" && stage !== "bronze")) return null;
 
     const round = Number(params.get("round"));
     const elimRound = stage === "elim" && Number.isInteger(round) && round > 0 ? round : undefined;
@@ -536,7 +540,7 @@ function CompetitionOverview({
                   return (
                     <button
                       key={cat.category}
-                      onClick={() => onSelectIndividual(g.key, cat.category, hasQual ? "qual" : "elim")}
+                      onClick={() => onSelectIndividual(g.key, cat.category, hasQual ? "qual" : hasElim ? "elim" : "team")}
                       className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -551,6 +555,7 @@ function CompetitionOverview({
                         {hasElim && <PhaseBadge label="E" elim />}
                         {hasQual && <PhaseBadge label="Q" active />}
                         {hasFinal && <PhaseBadge label="F" accent />}
+                        {!!cat.teams?.length && <PhaseBadge label="T" accent />}
                         <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150 ml-0.5" aria-hidden="true" />
                       </div>
                     </button>
@@ -795,6 +800,25 @@ function SingleCatRows({
           <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
         </button>
       )}
+
+      {/* Team */}
+      {!!catData.teams?.length && (
+        <button
+          onClick={() => onSelect("team")}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <PhaseBadge label="T" accent />
+            <span className="text-sm font-semibold text-[var(--ink)] truncate">
+              {(PHASE_LABELS[locale] ?? PHASE_LABELS.en).team}
+            </span>
+            <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-[0.68rem] text-[var(--muted)] leading-none self-center translate-y-px">
+              {catData.teams.length}
+            </span>
+          </div>
+          <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150" aria-hidden="true" />
+        </button>
+      )}
     </>
   );
 }
@@ -927,7 +951,7 @@ function CompetitionDetail({
     const stageTeams = mixedGroup ? (mixedStage === "gold" || mixedStage === "bronze" ? matchTeams(mixedGroup.teams, mixedStage) : mixedGroup.teams) : [];
     const mixedSearchable = selection.stage === "qual";
     const shownTeams = mixedSearchable && query.trim()
-      ? stageTeams.filter((t) => matchesSearch(query, t.shooter1Name, t.shooter2Name, nocKeywords(t.nocCode)))
+      ? stageTeams.filter((t) => matchesSearch(query, t.shooter1Name, t.shooter2Name, t.clubName, nocKeywords(t.nocCode)))
       : stageTeams;
     const showMixedMedals = shouldShowFinalMedals(finalSlots.find((slot) => slot.disciplineCode === (mixedGroup?.code ?? selection.disciplineCode) && slot.category === selection.category), [], now);
 
@@ -1101,13 +1125,16 @@ function CompetitionDetail({
     : undefined;
   const showQualMedals = selection.kind === "individual" && isQualOnlyDiscipline(selection.disciplineCode) && shouldShowFinalMedals(qualSlot, [], now);
 
-  // Build stage toggle options in correct order: Elim → Qual → Final
+  const teamRows = catGroup?.teams ?? [];
+
+  // Build stage toggle options in correct order: Elim → Qual → Final → Team
   type StageOption = { key: Stage; label: string; shortLabel: string; badge: React.ReactNode };
   const phaseL = PHASE_LABELS[locale] ?? PHASE_LABELS.en;
   const stageOptions: StageOption[] = [
     ...(hasElim ? [{ key: "elim" as Stage, label: phaseL.elim, shortLabel: "Elim.", badge: <PhaseBadge label="E" elim={selection.stage === "elim"} /> }] : []),
     ...(hasQual ? [{ key: "qual" as Stage, label: phaseL.qual, shortLabel: locale === "en" ? "Qual." : "Kval.", badge: <PhaseBadge label="Q" active={selection.stage === "qual"} /> }] : []),
     ...(hasFinal ? [{ key: "final" as Stage, label: phaseL.final, shortLabel: phaseL.final, badge: <PhaseBadge label="F" accent={selection.stage === "final"} /> }] : []),
+    ...(teamRows.length ? [{ key: "team" as Stage, label: phaseL.team, shortLabel: phaseL.team, badge: <PhaseBadge label="T" accent={selection.stage === "team"} /> }] : []),
   ];
 
   // ESC Solo nema Q/E/F tabove: jedna stranica sa mečevima i obe kvalifikacije.
@@ -1124,6 +1151,9 @@ function CompetitionDetail({
   const searching = searchable && query.trim() !== "";
   const shownElimRows = searching ? elimRows.filter(rowMatches) : elimRows;
   const shownQualRows = searching ? qualRows.filter(rowMatches) : qualRows;
+  const shownTeamRows = searching ? teamRows.filter((team) => matchesSearch(query, team.teamName, ...team.members.flatMap((m) => [m.name, m.firstName, m.lastName]))) : teamRows;
+  const [searchCount, searchTotal] = effectiveStage === "team" ? [shownTeamRows.length, teamRows.length]
+    : [(effectiveStage === "elim" ? shownElimRows : shownQualRows).length, stageRows.length];
 
   return (
     <div>
@@ -1171,7 +1201,7 @@ function CompetitionDetail({
       {!isSolo && (stageOptions.length > 1 || (effectiveStage === "elim" && elimRounds.length > 1)) && (
         <div className={`mb-4 flex w-full flex-col items-start sm:inline-flex sm:w-auto ${elimRounds.length > 1 ? "min-h-[5rem]" : ""}`}>
           {stageOptions.length > 1 && (
-            <div className={`${stageOptions.length === 3 ? "grid-cols-3" : "grid-cols-2"} grid w-full items-center gap-0.5 border border-[var(--border)] bg-[var(--surface)] p-1 sm:flex sm:w-auto ${effectiveStage === "elim" && elimRounds.length > 1 ? "rounded-t-lg rounded-br-lg rounded-bl-none" : "rounded-lg"}`}>
+            <div className={`${stageOptions.length === 4 ? "grid-cols-4" : stageOptions.length === 3 ? "grid-cols-3" : "grid-cols-2"} grid w-full items-center gap-0.5 border border-[var(--border)] bg-[var(--surface)] p-1 sm:flex sm:w-auto ${effectiveStage === "elim" && elimRounds.length > 1 ? "rounded-t-lg rounded-br-lg rounded-bl-none" : "rounded-lg"}`}>
               {stageOptions.map((opt) => (
                 <button
                   key={opt.key}
@@ -1241,7 +1271,7 @@ function CompetitionDetail({
         </div>
       )}
 
-      {searchable && stageRows.length > 0 && <ResultSearch value={query} onChange={setQuery} en={en} count={(effectiveStage === "elim" ? shownElimRows : shownQualRows).length} total={stageRows.length} className="mb-4 sm:ml-auto" />}
+      {searchable && searchTotal > 0 && <ResultSearch value={query} onChange={setQuery} en={en} count={searchCount} total={searchTotal} className="mb-4 sm:ml-auto" />}
       </div>
 
       {/* ── Table ────────────────────────────────────────────────── */}
@@ -1266,6 +1296,15 @@ function CompetitionDetail({
             exit={{ opacity: 0, transition: { duration: 0.16 } }}
           >
             {searching && shownQualRows.length === 0 ? <NoSearchMatch query={query} en={en} /> : <CompetitionQualTable results={shownQualRows} competitionLevel={competitionLevel} showMedals={showQualMedals} />}
+          </motion.div>
+        ) : effectiveStage === "team" ? (
+          <motion.div
+            key="team"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: 0.22 } }}
+            exit={{ opacity: 0, transition: { duration: 0.16 } }}
+          >
+            {searching && shownTeamRows.length === 0 ? <NoSearchMatch query={query} en={en} /> : <TeamResultsTable teams={shownTeamRows} />}
           </motion.div>
         ) : (
           <motion.div

@@ -30,6 +30,7 @@ import { ShooterAvatarLightbox } from "@/components/shooter/ShooterAvatarLightbo
 import { INVALID_REMARKS } from "@/lib/forma-query";
 import { countFormaAppearances, FORMA_DISCIPLINE_CODES, FULL_MATCH_MIN_RATIO } from "@/lib/forma";
 import { getShooterMixedRows } from "@/lib/shooter-mixed-results";
+import { getShooterTeamRows } from "@/lib/shooter-team-results";
 import { toIndividualHistoryRow } from "@/lib/shooter-results";
 
 type Props = { params: Promise<{ locale: string; id: string; scope: Scope }> };
@@ -68,7 +69,7 @@ export default async function ShooterPage({ params }: Props) {
   const shooterId = parseInt(id);
   if (!/^\d{1,9}$/.test(id)) notFound();
 
-  const [shooter, shooterResults, cacheRows, mixedRows] = await Promise.all([
+  const [shooter, shooterResults, cacheRows, mixedRows, teamRows] = await Promise.all([
     getShooter(shooterId),
     db
       .select({
@@ -134,14 +135,15 @@ export default async function ShooterPage({ params }: Props) {
       .from(shooterFormaCache)
       .where(eq(shooterFormaCache.shooterId, shooterId)),
     getShooterMixedRows(shooterId),
+    getShooterTeamRows(shooterId),
   ]);
   if (!shooter) notFound();
 
   const initials = `${shooter.firstName[0]}${shooter.lastName[0]}`;
 
   // ── Quick stats ──────────────────────────────────────────────────────────────
-  // Redovi istorije (pojedinačni, ESC Solo, mešoviti tim) — za link "svi rezultati".
-  const totalAppearances = shooterResults.length + mixedRows.length;
+  // Redovi istorije (pojedinačni, ESC Solo, mešoviti tim, klupska ekipa) — za link "svi rezultati".
+  const totalAppearances = shooterResults.length + mixedRows.length + teamRows.length;
   // Statistika "Nastupi" = samo nastupi koji ulaze u formu (bez Solo, mix, ležećeg, 300m…).
   const formaAppearances = countFormaAppearances(
     shooterResults.map((r) => ({ disciplineCode: r.disciplineCode, date: r.competitionDate, qualTotal: r.qualTotal, qualRemark: r.qualRemark, maxQualScore: r.maxQualScore })),
@@ -158,7 +160,7 @@ export default async function ShooterPage({ params }: Props) {
     }, null);
 
   // Istorija: pojedinačni + mešoviti redovi, hronološki (tabela sama okreće na najnovije).
-  const historyRows = [...shooterResults.map(toIndividualHistoryRow), ...mixedRows]
+  const historyRows = [...shooterResults.map(toIndividualHistoryRow), ...mixedRows, ...teamRows]
     .sort((a, b) => (a.competitionDate === b.competitionDate ? a.competitionId - b.competitionId : a.competitionDate < b.competitionDate ? -1 : 1));
   const activeSince = historyRows.length > 0 ? new Date(historyRows[0].competitionDate).getFullYear() : null;
   const recentCompetitionIds = new Set(

@@ -5,6 +5,7 @@ import { parsePdfWithGemini } from "./gemini-adapter";
 import { parseSiusPdf } from "./sius-pdf";
 import { resolveGuessedNames } from "./sius-names";
 import { resolveNations } from "./sius-nations";
+import { matchTeamMembers } from "./team-members";
 import { DISCIPLINE_META, IMPORTED_DISCIPLINE_CODES, dedupeRowsByCategory, mergeFinalsIntoRows, type ParsedShooterResult, type ReviewRow } from "@shootermarkt/db/pdf-import-types";
 
 export async function parsePdfImport(pdfBuffer: Buffer) {
@@ -98,13 +99,17 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
 
   const dedupedRows = dedupeRowsByCategory(rows, foldName);
   const finals = mergeFinalsIntoRows(dedupedRows, bilten.events, foldName);
+  const bulletinDate = "mainDate" in bilten ? bilten.mainDate : undefined;
+  const teams = matchTeamMembers(bilten.teamResults ?? [], bilten.mixedTeams ?? [], finals.rows, allShooters, bulletinDate);
   return {
     rows: finals.rows,
     eventsCount: bilten.events.length,
     skippedDisciplines: Array.from(skippedDisciplines),
     matchedFinals: finals.matchedFinals,
     unmatchedFinals: finals.unmatchedFinals,
-    mixedTeams: bilten.mixedTeams ?? [],
+    mixedTeams: teams.mixed,
+    teamResults: teams.teamResults,
+    bulletinDate,
     warnings: bilten.warnings ?? [],
     finalsError,
     siusError,

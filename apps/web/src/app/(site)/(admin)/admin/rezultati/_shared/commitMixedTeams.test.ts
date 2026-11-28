@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MixedTeamEntry } from "@shootermarkt/db/pdf-import-types";
-import { commitMixedStages } from "./commitMixedTeams";
+import { commitMixedStages, toQualCommit } from "./commitMixedTeams";
 
 const team = (over: Partial<MixedTeamEntry>): MixedTeamEntry => ({
   skip: false, nocCode: "SRB", teamNumber: 1, disciplineCode: "APMT", qualRank: 1, qualTotal: 572, inners: 21, qualified: true,
@@ -24,5 +24,12 @@ describe("commitMixedStages", () => {
       { isFinals: false, eventName: "Salona Trophy 2026 · mešoviti timovi", eventDate: "2026-10-23" },
       { isFinals: true, eventName: "Salona Trophy 2026 · mešoviti timovi", eventDate: "2026-10-23" },
     ]);
+  });
+});
+
+describe("toQualCommit", () => {
+  it("carries the club and what the review decided about new members", () => {
+    const over = { clubName: "Pancevo 1813", createMissing: true, mShooterId: 5, fShooterId: undefined, mGender: "F" as const, fGender: "M" as const };
+    expect(toQualCommit(team(over))).toMatchObject(over);
   });
 });
