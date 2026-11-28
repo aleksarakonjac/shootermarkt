@@ -418,7 +418,7 @@ export default async function CompetitionPage({ params }: Props) {
           {t("list.title")}
         </ScopedLink>
         <span className="text-[var(--subtle)]">/</span>
-        <span className="text-[var(--ink)] font-medium truncate max-w-[260px]">
+        <span className="text-[var(--ink)] font-medium truncate min-w-0">
           {compName}
         </span>
       </nav>
