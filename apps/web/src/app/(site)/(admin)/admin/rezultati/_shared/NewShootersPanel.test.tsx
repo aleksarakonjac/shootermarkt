@@ -32,3 +32,10 @@ describe("NewShootersPanel — pretpostavljena nacija", () => {
     expect(change.mock.calls).toEqual([1, 2].map((i) => [i, { nationAssumed: false, warning: undefined }]));
   });
 });
+
+describe("NewShootersPanel — članovi timova", () => {
+  it("offers no skip for a person a team will create anyway", () => {
+    render(<NewShootersPanel rows={[row("Kovacs"), row("Somogyi"), row("Kovacs")]} onRowChange={vi.fn()} memberFrom={2} />);
+    expect(screen.getAllByRole("button", { name: "Preskoči" })).toHaveLength(1);
+  });
+});

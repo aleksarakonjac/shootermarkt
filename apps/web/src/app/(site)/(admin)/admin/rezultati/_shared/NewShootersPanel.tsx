@@ -99,6 +99,8 @@ export function NewShootersPanel({ rows, onRowChange, memberFrom = Infinity, mix
           const r = g.row;
           const discs = Array.from(new Set(g.idxs.map((i) => rows[i].disciplineCode)));
           const teamOnly = g.idxs.every((i) => i >= memberFrom);
+          // član tima nastaje pri upisu tima, pa preskakanje ovde ne bi sprečilo profil
+          const inTeam = g.idxs.some((i) => i >= memberFrom);
           // pol se bira samo kad ga ne zna nijedna pojedinačna ni klupska lista
           const pickGender = g.idxs.every((i) => i >= mixedFrom);
           return (
@@ -235,7 +237,7 @@ export function NewShootersPanel({ rows, onRowChange, memberFrom = Infinity, mix
                       Poveži
                     </button>
                   </div>
-                ) : teamOnly ? null : (
+                ) : inTeam ? null : (
                   <button
                     onClick={() => patchGroup(g.idxs, { skip: !r.skip })}
                     className="text-xs font-semibold text-[var(--muted)] hover:text-[var(--ink)] transition-colors whitespace-nowrap"

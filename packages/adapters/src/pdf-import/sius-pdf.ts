@@ -161,9 +161,11 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
   // ekipa ide u meč svoje pojedinačne liste; bez nje: najraniji dan je glavni meč, ostali zasebni
   const firstDate = [...shotOn.values(), ...clubPages.map((p) => p.date)].sort()[0];
   const clubs = parseClubTeams(clubPages.map(({ title, date, ...page }) => {
-    const own = quals.find((e) => !e.guest && e.discipline === page.discipline && e.category === page.category && shotOn.get(e) === date);
+    const same = quals.filter((e) => !e.guest && e.discipline === page.discipline && e.category === page.category);
+    // kao kod finala: kad disciplina ima samo jedan meč, ekipna lista mu pripada i sa drugim datumom
+    const own = same.find((e) => shotOn.get(e) === date) ?? (same.length === 1 ? same[0] : undefined);
     const match = own ? { eventName: own.eventName ?? null, eventDate: own.eventDate ?? date }
-      : { eventName: date === firstDate ? null : title ?? matchEventName(2, date), eventDate: date };
+      : { eventName: date === firstDate ? null : title && title !== mainTitle ? title : matchEventName(2, date), eventDate: date };
     return { ...page, ...match };
   }));
   const mixed = parseMixedTeams(teamPages, quals.flatMap((e) => e.results as ParsedShooterResult[]));

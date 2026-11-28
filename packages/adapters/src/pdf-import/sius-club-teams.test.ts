@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseClubTeams, type ClubTeamPage } from "./sius-club-teams";
-import { parseSiusPdf } from "./sius-pdf";
+import { extractSiusPages, parseSiusPages, parseSiusPdf } from "./sius-pdf";
 import type { Item } from "./sius-layout";
 
 const fixture = readFileSync(new URL("./__fixtures__/sss-kup-10m-nis-2026.pdf", import.meta.url));
@@ -32,6 +32,13 @@ describe("parseSiusPdf — club teams of the Niš cup", async () => {
   });
 
   it("tells the day of the main match, for naming a later match", () => expect(bilten.mainDate).toBe("2026-10-17"));
+
+  it("keeps a team list printed a day later in the match of its only individual list", async () => {
+    const pages = await extractSiusPages(fixture);
+    const late = pages.map((items) => items.map((it) => ({ ...it, str: it.str.replace(/^(Q\d+TA)171026(\d{4}\.\d+\.ARM\.)/, "$1181026$2") })));
+    const arm = parseSiusPages(late)!.teamResults!.filter((t) => t.disciplineCode === "ARM" && t.category === "senior");
+    expect(arm.map((t) => [t.teamName, t.eventName])).toEqual([["Cika Mata", null], ["Novi Sad 1790", null], ["Jasenica", null]]);
+  });
 
   it("puts every team in the same match and category as its shooters", () => {
     expect(bilten.teamResults!.length).toBeGreaterThan(0);

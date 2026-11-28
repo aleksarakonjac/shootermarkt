@@ -39,7 +39,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
       }
     }),
     db.select().from(clubs),
-    db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, clubId: shooters.clubId }).from(shooters),
+    db.select({ id: shooters.id, firstName: shooters.firstName, lastName: shooters.lastName, previousLastNames: shooters.previousLastNames, previousFirstNames: shooters.previousFirstNames, nationality: shooters.nationality, clubId: shooters.clubId, birthYear: shooters.birthYear }).from(shooters),
   ]);
   resolveGuessedNames(bilten, allShooters);
   resolveNations(bilten, allShooters);
@@ -98,7 +98,8 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
 
   const dedupedRows = dedupeRowsByCategory(rows, foldName);
   const finals = mergeFinalsIntoRows(dedupedRows, bilten.events, foldName);
-  const teams = matchTeamMembers(bilten.teamResults ?? [], bilten.mixedTeams ?? [], finals.rows, allShooters);
+  const bulletinDate = "mainDate" in bilten ? bilten.mainDate : undefined;
+  const teams = matchTeamMembers(bilten.teamResults ?? [], bilten.mixedTeams ?? [], finals.rows, allShooters, bulletinDate);
   return {
     rows: finals.rows,
     eventsCount: bilten.events.length,
@@ -107,7 +108,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
     unmatchedFinals: finals.unmatchedFinals,
     mixedTeams: teams.mixed,
     teamResults: teams.teamResults,
-    bulletinDate: "mainDate" in bilten ? bilten.mainDate : undefined,
+    bulletinDate,
     warnings: bilten.warnings ?? [],
     finalsError,
     siusError,
