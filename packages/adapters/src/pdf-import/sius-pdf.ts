@@ -2,7 +2,7 @@ import { getDocumentProxy } from "unpdf";
 import { isUnrankedRemark, matchEventName, parseCategory, type AgeCategory, type MixedTeamEntry, type ParsedBilten, type ParsedEvent, type ParsedFinalResult, type ParsedShooterResult } from "@shootermarkt/db/pdf-import-types";
 import { normalizeDisciplineCode } from "@shootermarkt/db/discipline";
 import { glyphFixes } from "./sius-fonts";
-import { clubNation, SCORE, topmost, type Item } from "./sius-layout";
+import { clubNation, scoreText, SCORE, topmost, type Item } from "./sius-layout";
 import { splitName } from "./sius-names";
 import { parseMixedTeams, type TeamPage } from "./sius-teams";
 import { parseClubTeams, type ClubTeamPage } from "./sius-club-teams";
@@ -60,6 +60,9 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
   const clubPages: ClubPage[] = [];
   const clubCategories = new Map<string, AgeCategory>();
   const clubWarnings: string[] = [];
+  /** Najstarija grupa ("U16"…"U21") na ekipnoj listi po fajlu, i najstarije godište miks lista po disciplini. */
+  const oldestGroup = new Map<string, number>();
+  const oldestBorn = new Map<string, number>();
 
   for (const items of pages) {
     const file = items.map((it) => SIUS_FILE.exec(it.str)).find(Boolean);
@@ -74,14 +77,25 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
       if (discipline === "ARMT" || discipline === "APMT") {
         const age = items.find((it) => /kadet|cadet|pionir|\bu-?\d\d\b/i.test(it.str));
         const category = juniorCode || listCode === "20" || items.some((it) => it.str === "Junior") ? "junior" as const : parseCategory(age?.str);
+        for (const it of items) {
+          const born = Number(/^\d+(?:\.\d)?(?:-\s*\d+x)?\s+((?:19|20)\d\d)$/.exec(it.str)?.[1]);
+          // starost u godini takmičenja
+          if (born) oldestBorn.set(discipline, Math.max(oldestBorn.get(discipline) ?? 0, Number(`20${yy}`) - born));
+        }
         if (stage === "Q" || stage === "F") teamPages.push({ discipline, isFinal: stage === "F", category, date, items });
       } else if (discipline && (stage === "Q" || (stage === "I" && items.some((it) => it.str === "RESULTS")))) {
         // klupske ekipe pojedinačne discipline; podnaslov kategorije stoji samo na prvoj strani liste
+        if (items.some((it) => it.str === "Group")) {
+          for (const it of items) {
+            const group = Number(/^U(\d\d)$/.exec(it.str)?.[1]);
+            if (group) oldestGroup.set(file[0], Math.max(oldestGroup.get(file[0]) ?? 0, group));
+          }
+        }
         const category = clubCategories.get(file[0]) ?? (juniorCode ? "junior" as const
           : LIST_CODES[listCode]?.category ?? subtitleList(items)?.category ?? (items.some((it) => it.str === discRaw) ? "senior" as const : undefined));
         if (!category) { clubWarnings.push(`Ekipe ${discipline}: nepoznata kategorija liste (${date})`); continue; }
         clubCategories.set(file[0], category);
-        clubPages.push({ discipline, category, date, title: listTitle(items), items });
+        clubPages.push({ file: file[0], discipline, category, date, title: listTitle(items), items });
       }
       continue;
     }
@@ -160,7 +174,10 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
   for (const e of all) if (isMain.get(e)) { e.eventName = null; e.eventDate = null; }
   // ekipa ide u meč svoje pojedinačne liste; bez nje: najraniji dan je glavni meč, ostali zasebni
   const firstDate = [...shotOn.values(), ...clubPages.map((p) => p.date)].sort()[0];
-  const clubs = parseClubTeams(clubPages.map(({ title, date, ...page }) => {
+  const clubs = parseClubTeams(clubPages.map(({ file, title, date, ...listed }) => {
+    // ekipa od više uzrasta takmiči se u najstarijem navedenom
+    const group = oldestGroup.get(file);
+    const page = group ? { ...listed, category: parseCategory(`U${group}`) } : listed;
     const same = quals.filter((e) => !e.guest && e.discipline === page.discipline && e.category === page.category);
     // kao kod finala: kad disciplina ima samo jedan meč, ekipna lista mu pripada i sa drugim datumom
     const own = same.find((e) => shotOn.get(e) === date) ?? (same.length === 1 ? same[0] : undefined);
@@ -168,6 +185,8 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
       : { eventName: date === firstDate ? null : title && title !== mainTitle ? title : matchEventName(2, date), eventDate: date };
     return { ...page, ...match };
   }));
+  // omladinski miks nema "Junior" u naslovu: svi do 20 godina po godištima → juniorski (i finale, bez godišta)
+  for (const page of teamPages) if (page.category === "senior" && (oldestBorn.get(page.discipline) ?? 99) <= 20) page.category = "junior";
   const mixed = parseMixedTeams(teamPages, quals.flatMap((e) => e.results as ParsedShooterResult[]));
   useFinalNameSplit(all, mixed.entries);
   const warnings = [...mixed.warnings, ...clubWarnings, ...clubs.warnings];
@@ -195,7 +214,7 @@ function useFinalNameSplit(events: ParsedEvent[], teams: MixedTeamEntry[]) {
   }
 }
 
-type ClubPage = { discipline: ClubTeamPage["discipline"]; category: AgeCategory; date: string; title: string | undefined; items: Item[] };
+type ClubPage = { file: string; discipline: ClubTeamPage["discipline"]; category: AgeCategory; date: string; title: string | undefined; items: Item[] };
 
 /** Naslov meča je red iznad "RESULTS" / "FINAL RESULTS". */
 function listTitle(items: Item[]) {
@@ -220,6 +239,9 @@ function parseRows(items: Item[]): ParsedShooterResult[] {
   const scoresX = (firstSeries?.x ?? 340) - 20;
   const bib = header("Bib No")!;
   const fp = items.find((it) => it.str === "FP" && Math.abs(it.y - rank.y) < 3);
+  // "NOC / Code" je zasebna kolona sa državom, a "Team" tada nosi klub (omladinski kup)
+  const code = header("Code");
+  const codeColumn = !!code && !!team && Math.abs(code.x - noc.x) < 4 && team.x > noc.x;
   const end = items.find((it) => it.str === "Summary")?.y ?? items.find((it) => it.str.startsWith("Version of"))?.y ?? 0;
 
   const body = items.filter((it) => it.y < rank.y - 12 && it.y > end + 5);
@@ -238,11 +260,19 @@ function parseRows(items: Item[]): ParsedShooterResult[] {
 
     const rankStr = col(0, (fp ?? bib).x - 5)[0]?.str;
     const bibStr = col(bib.x - 5, name.x - 5)[0]?.str;
+    const text = (from: number, to: number) => joinWrapped(col(from, to).map((it) => it.str).join(" "), col(from, to, wrap).map((it) => it.str).join(" "));
     const clubTo = team && team.x > noc.x ? team.x - 5 : scoresX;
-    const club = joinWrapped(col(noc.x - 5, clubTo).map((it) => it.str).join(" "), col(noc.x - 5, clubTo, wrap).map((it) => it.str).join(" "));
+    const stated = codeColumn ? col(noc.x - 5, team!.x - 5)[0]?.str : undefined;
+    // za strance se od naziva tima ne pravi klub u bazi
+    const nation = stated ? { teamNoc: stated, clubName: stated === "SRB" ? text(team!.x - 5, scoresX) || undefined : undefined } : clubNation(text(noc.x - 5, clubTo));
 
     const right = col(scoresX, Infinity);
-    const scores = right.map((it) => SCORE.exec(it.str)).filter((m): m is RegExpExecArray => !!m);
+    const scored = right.filter((it) => SCORE.test(scoreText(it.str)));
+    const scores = scored.map((it) => SCORE.exec(scoreText(it.str))!);
+    // godište uz zbir; u uskoj koloni se prelama ("20" uz zbir, "11" red niže)
+    const [, year] = /\s((?:19|20)(?:\d\d)?)$/.exec(scored.at(-1)?.str ?? "") ?? [];
+    const rest = year?.length === 2 ? col(scoresX, Infinity, wrap).find((it) => /^\d\d$/.test(it.str))?.str : "";
+    const birthYear = year && rest !== undefined ? Number(year + rest) : null;
     const remarks = [...right, ...col(scoresX, Infinity, wrap)].map((it) => it.str).filter((s) => REMARKS.test(s));
     const remark = remarks.filter((r) => r !== "Q").join("") || null;
     const total = scores.at(-1);
@@ -251,8 +281,8 @@ function parseRows(items: Item[]): ParsedShooterResult[] {
       rank: rankStr && /^\d+$/.test(rankStr) ? Number(rankStr) : null,
       bibNumber: bibStr && /^\d+$/.test(bibStr) ? Number(bibStr) : undefined,
       ...splitName(anchor.str),
-      ...clubNation(club),
-      birthYear: null,
+      ...nation,
+      birthYear,
       series: scores.slice(0, -1).map((m) => Number(m[1])),
       total: total ? Number(total[1]) : null,
       inners: total?.[2] ? Number(total[2]) : null,

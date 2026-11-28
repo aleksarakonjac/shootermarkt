@@ -1,13 +1,34 @@
 /** Klupske ekipe iz SIUS ekipnih lista pojedinačnih disciplina: red ekipe, ispod njega strelci. */
 import type { AgeCategory, DisciplineCode, TeamMemberEntry, TeamResultEntry } from "@shootermarkt/db/pdf-import-types";
 import { splitName } from "./sius-names";
-import { clubNation, SCORE, topmost, type Item } from "./sius-layout";
+import { clubNation, countryNoc, scoreText, SCORE, topmost, type Item } from "./sius-layout";
 
 export interface ClubTeamPage { discipline: DisciplineCode; category: AgeCategory; eventName: string | null; eventDate: string; items: Item[] }
 
 type Team = Pick<TeamResultEntry, "teamName" | "rank" | "total" | "inners" | "remark" | "members">;
 
 const UNRANKED = /^(DNS|DNF|DSQ)$/;
+
+type TeamRow = { series: number[]; total: number; inners: number | null };
+
+const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
+const near = (a: number, b: number) => Math.abs(a - b) < 0.05;
+
+/**
+ * Članovi koji čine zbir ekipe: oni bez zagrade kad se slažu sa redom ekipe. Omladinski bilten ekipu sastavlja
+ * od najboljih među navedenima (i onih u zagradi) bez oznake — tada se traži jedina grupa iste veličine čiji
+ * zbir, serije i X daju red ekipe. Bez takve ili sa više njih: null (strana se prijavljuje).
+ */
+function lineUp(all: TeamMemberEntry[], unbracketed: TeamMemberEntry[], team: TeamRow): TeamMemberEntry[] | null {
+  if (near(sum(unbracketed.map((m) => m.total)), team.total)) return unbracketed;
+  const groups = (from: number, size: number): TeamMemberEntry[][] => (size === 0 ? [[]]
+    : all.slice(from).flatMap((m, i) => groups(from + i + 1, size - 1).map((rest) => [m, ...rest])));
+  const fits = groups(0, unbracketed.length).filter((g) => g.length > 0
+    && near(sum(g.map((m) => m.total)), team.total)
+    && team.series.every((s, i) => near(sum(g.map((m) => m.series[i] ?? 0)), s))
+    && (team.inners == null || sum(g.map((m) => m.inners ?? 0)) === team.inners));
+  return fits.length === 1 ? fits[0] : null;
+}
 
 /** Ekipe jedne strane; null ako neka ne može pouzdano da se pročita (zbir članova ≠ zbir ekipe). */
 function parsePage(items: Item[]): Team[] | null {
@@ -18,6 +39,9 @@ function parsePage(items: Item[]): Team[] | null {
   if (!rank || !bib || !firstSeries) return null;
   const bibLeft = bib.x - 3;
   const scoresX = firstSeries.x - 20;
+  // omladinske ekipe uz strelca štampaju uzrasnu grupu ("Shooter / Group") — nije deo imena
+  const group = header("Group") && header("Shooter");
+  const nameTo = group ? group.x - 5 : scoresX;
   const end = header("Summary")?.y ?? header("Legend")?.y ?? items.find((it) => it.str.startsWith("Version of"))?.y ?? 0;
   // red ispod zaglavlja su brojevi serija
   const body = items.filter((it) => it.y < firstSeries.y - 3 && it.y > end + 3);
@@ -33,28 +57,33 @@ function parsePage(items: Item[]): Team[] | null {
     const nextY = anchors[i + 1]?.y ?? -Infinity;
     const block = body.filter((it) => it.y <= anchor.y + 3 && it.y > nextY + 3);
     const line = (y: number) => block.filter((it) => Math.abs(it.y - y) <= 3).sort((a, b) => a.x - b.x);
-    const name = (y: number) => line(y).filter((it) => it.x >= bibLeft && it.x < scoresX && !UNRANKED.test(it.str)).map((it) => it.str).join(" ");
-    // uz zbir umeju da stoje oznake u istoj stavci: "630.2 J", "553.5 DNF J"
-    const scores = (y: number) => line(y).filter((it) => it.x >= scoresX).map((it) => SCORE.exec(it.str.replace(/(\s+[A-Z]+)+$/, ""))).filter((m): m is RegExpExecArray => !!m);
+    const name = (y: number) => line(y).filter((it) => it.x >= bibLeft && it.x < nameTo && !UNRANKED.test(it.str)).map((it) => it.str).join(" ");
+    // rezultat u zagradi se čita isto; da li ulazi u ekipu odlučuje red ekipe
+    const scores = (y: number) => line(y).filter((it) => it.x >= scoresX).map((it) => SCORE.exec(scoreText(it.str).replace(/^\((.*)\)$/, "$1"))).filter((m): m is RegExpExecArray => !!m);
     const isRanked = ranked.includes(anchor);
     const teamName = name(anchor.y);
-    const nation = clubNation(teamName);
+    const country = countryNoc(teamName);
+    const nation = country ? { teamNoc: country, nationUnstated: false } : clubNation(teamName);
 
-    const members: TeamMemberEntry[] = block.filter(startsMember).sort((a, b) => b.y - a.y).flatMap((it) => {
-      // rezultat u zagradi ne ulazi u zbir; bez rezultata (DNS) nema šta da uđe
-      if (line(it.y).some((x) => x.x >= scoresX && x.str.startsWith("("))) return [];
+    const listed = block.filter(startsMember).sort((a, b) => b.y - a.y).flatMap((it) => {
       const found = scores(it.y);
       const total = found.at(-1);
+      // bez rezultata (DNS) nema šta da uđe
       if (!total) return [];
-      return [{
+      const member: TeamMemberEntry = {
         ...splitName(name(it.y).replace(/^\d+\s*/, "")),
         teamNoc: nation.teamNoc, ...(nation.nationUnstated ? { nationUnstated: true } : {}),
         series: found.slice(0, -1).map((m) => Number(m[1])), total: Number(total[1]), inners: total[2] ? Number(total[2]) : null,
-      }];
+      };
+      return [{ member, bracketed: line(it.y).some((x) => x.x >= scoresX && x.str.startsWith("(")) }];
     });
 
-    const total = isRanked ? scores(anchor.y).at(-1) : undefined;
-    if (!teamName || (isRanked && !(total && members.length && Math.abs(members.reduce((sum, m) => sum + m.total, 0) - Number(total[1])) < 0.05))) return null;
+    const row = scores(anchor.y);
+    const total = isRanked ? row.at(-1) : undefined;
+    const unbracketed = listed.filter((m) => !m.bracketed).map((m) => m.member);
+    const members = !isRanked ? unbracketed
+      : total ? lineUp(listed.map((m) => m.member), unbracketed, { series: row.slice(0, -1).map((m) => Number(m[1])), total: Number(total[1]), inners: total[2] ? Number(total[2]) : null }) : null;
+    if (!teamName || !members || (isRanked && !members.length)) return null;
     teams.push({
       teamName,
       rank: isRanked ? Number(anchor.str) : null,
