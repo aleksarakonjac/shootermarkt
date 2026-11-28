@@ -8,7 +8,7 @@ import { Link } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
-import { NOC_LIST } from "@shootermarkt/db/noc-list";
+import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
 import { countryNames } from "@/lib/country-search";
 import { LEVEL_STYLE, LEVEL_LABEL } from "@/lib/competition-utils";
 import { useScopedHref } from "@/hooks/use-scoped-href";
@@ -288,7 +288,12 @@ function detectShortcuts(q: string, locale: string, scopedHref: (path: string) =
     // Lokacija ostaje srpski naziv (tako su upisana mesta takmičenja); prikaz se prevodi.
     const shown = isEn && code2 ? new Intl.DisplayNames(["en"], { type: "region" }).of(code2.toUpperCase()) ?? display : display;
     const ps = new URLSearchParams(); ps.set("zemlja", noc);
-    shortcuts.push({ icon:"flag", label:`${shootersLabel} · ${shown} (${noc})`, href: scopedHref(`/strelci?${ps}`), countryCode2: code2 });
+    // strelci neutralnih država idu pod AIN; lokacija takmičenja ispod ostaje država
+    const shooterNoc = displayNoc(noc)!;
+    if (shooterNoc !== noc) ps.set("zemlja", shooterNoc);
+    shortcuts.push(shooterNoc === noc
+      ? { icon:"flag", label:`${shootersLabel} · ${shown} (${noc})`, href: scopedHref(`/strelci?${ps}`), countryCode2: code2 }
+      : { icon:"flag", label:`${shootersLabel} · ${shooterNoc}`, href: scopedHref(`/strelci?${ps}`), countryCode2: shooterNoc.toLowerCase() });
     const pc = new URLSearchParams(); pc.set("location", display);
     shortcuts.push({ icon:"location", label:`${compsLabel} · ${shown} (${isEn ? "location" : "lokacija"})`, href: scopedHref(`/takmicenja?${pc}`), countryCode2: code2 });
   }

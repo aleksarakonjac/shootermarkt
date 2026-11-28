@@ -475,7 +475,8 @@ export async function getHomepageMain(scope: Scope) {
             return firstName ? `${lastName} ${firstName.charAt(0)}.` : lastName;
           })
           .join(" / ");
-        return rank != null && total != null ? [{ id: `team:${row.nocCode}:${names}`, firstName: "", lastName: names || row.nocCode, clubName: null, nationality: row.nocCode, countryCode2: row.countryCode2 ?? NOC_LIST.find((country) => country.noc === row.nocCode)?.alpha2 ?? null, rank, total: Number(total), round: null }] : [];
+        const nocCode = displayNoc(row.nocCode)!;
+        return rank != null && total != null ? [{ id: `team:${row.nocCode}:${names}`, firstName: "", lastName: names || nocCode, clubName: null, nationality: nocCode, countryCode2: nocCode === "AIN" ? "AIN" : row.countryCode2 ?? NOC_LIST.find((country) => country.noc === nocCode)?.alpha2 ?? null, rank, total: Number(total), round: null }] : [];
       });
       // Elimination relays are separate rankings (each relay advances its own
       // shooters), so every relay becomes its own phase instead of one merged list.
@@ -556,7 +557,7 @@ export async function getHomepageMain(scope: Scope) {
     return { ...competition, countryCode2: country?.code2 ?? null, nocCode: country?.nocCode ?? null, isLive: isCompetitionLive(competition.date, competition.dateEnd, today), collapsed: focusOverrideById.get(competition.id)?.collapsed ?? false, discResults };
   });
   const scores = groupTopFormaScores(scoreRows);
-  const map = (row: (typeof cacheRows)[number]) => ({ shooterId: row.shooterId, firstName: row.firstName, lastName: row.lastName, nationality: row.nationality, countryCode2: row.countryCode2, formaScore: Number(row.forma), trend: row.trend ?? "stable", peak: row.peakCareer == null ? null : Number(row.peakCareer), entriesCount: row.sampleSize, recentScores: scores.get(`${row.shooterId}:${row.discCode}`) ?? [] });
+  const map = (row: (typeof cacheRows)[number]) => ({ shooterId: row.shooterId, firstName: row.firstName, lastName: row.lastName, nationality: displayNoc(row.nationality), countryCode2: displayNoc(row.nationality) === "AIN" ? "AIN" : row.countryCode2, formaScore: Number(row.forma), trend: row.trend ?? "stable", peak: row.peakCareer == null ? null : Number(row.peakCareer), entriesCount: row.sampleSize, recentScores: scores.get(`${row.shooterId}:${row.discCode}`) ?? [] });
   return { recent, upcoming, topForma: Object.fromEntries(FORMA_DISC_CODES.map((code) => [code, topByDisc[code].map(map)])) as Record<typeof FORMA_DISC_CODES[number], ReturnType<typeof map>[]> };
 }
 

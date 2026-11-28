@@ -1,6 +1,7 @@
 import { db } from "@shootermarkt/db";
 import { competitions, countries, disciplines, olympicQuotaAllocations, olympicQuotas, results, shooters } from "@shootermarkt/db/schema";
 import { DISCIPLINE_DISPLAY_ORDER } from "@shootermarkt/db/discipline-names";
+import { displayNoc } from "@shootermarkt/db/noc-list";
 import { asc, eq, isNotNull } from "drizzle-orm";
 import { candidateRank, rankInfo } from "@/lib/quota-assign";
 
@@ -143,12 +144,12 @@ export async function getQuotaOverview(): Promise<QuotaOverview> {
         .sort((x, y) => (candidateRank(basis, x.rank, x.qualRank) ?? Infinity) - (candidateRank(basis, y.rank, y.qualRank) ?? Infinity))
         .map((h) => {
           const info = rankInfo(basis, h.rank, h.qualRank);
-          return { shooterId: h.shooterId, firstName: h.firstName, lastName: h.lastName, nationality: h.nationality, avatarUrl: h.avatarUrl, rank: info.rank, rankStage: info.stage };
+          return { shooterId: h.shooterId, firstName: h.firstName, lastName: h.lastName, nationality: displayNoc(h.nationality), avatarUrl: h.avatarUrl, rank: info.rank, rankStage: info.stage };
         });
     } else {
       holders = manualAwards
         .filter((w) => w.allocationId === a.allocationId)
-        .map((h) => ({ shooterId: h.shooterId, firstName: h.firstName, lastName: h.lastName, nationality: h.nationality, avatarUrl: h.avatarUrl, rank: null, rankStage: "final" as const }));
+        .map((h) => ({ shooterId: h.shooterId, firstName: h.firstName, lastName: h.lastName, nationality: displayNoc(h.nationality), avatarUrl: h.avatarUrl, rank: null, rankStage: "final" as const }));
     }
     const awarded = Math.min(holders.length, a.places);
     const slots: QuotaSlot[] = Array.from({ length: a.places }, (_, i) => ({ sourceKey: key, basis, holder: holders[i] ?? null }));

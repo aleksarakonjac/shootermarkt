@@ -330,7 +330,7 @@ export default async function ShooterPage({ params }: Props) {
                   <dt className="sr-only">{tProfile("nationality")}</dt>
                   <dd>
                     <ScopedLink
-                      href={`/strelci?zemlja=${encodeURIComponent(shooter.nationality!)}`}
+                      href={`/strelci?zemlja=${encodeURIComponent(displayedNoc!)}`}
                       className="flex items-center gap-1 text-[var(--ink)] transition-colors hover:text-[var(--brand-primary)]"
                     >
                     {nocEntry.alpha2 && (

@@ -216,10 +216,17 @@ export type NocEntry = (typeof NOC_LIST)[number];
 // pre-1992 Soviet code, folded in for old imported results). Display-only:
 // underlying nationality stays RUS/BLR/URS in the DB so admin can still tell
 // Russian and Belarusian shooters apart.
+// Kad zabrana istekne: obriši "RUS" i "BLR" iz skupa i deploy — ceo javni sajt vraća njihove oznake.
 const NEUTRAL_STATUS_NOCS = new Set(["RUS", "BLR", "URS"]);
 
 export function displayNoc(noc: string | null | undefined): string | null {
   if (!noc) return noc ?? null;
   // mešoviti par iz dve države: "HUN/GBR"
   return noc.split("/").map((code) => (NEUTRAL_STATUS_NOCS.has(code) ? "AIN" : code)).join("/");
+}
+
+/** Oznake iz baze koje se na sajtu prikazuju kao `noc` — za filter po državi (AIN → AIN, RUS, BLR, URS). */
+export function nocsShownAs(noc: string): string[] {
+  const shown = displayNoc(noc)!;
+  return shown === "AIN" ? ["AIN", ...NEUTRAL_STATUS_NOCS] : [shown];
 }
