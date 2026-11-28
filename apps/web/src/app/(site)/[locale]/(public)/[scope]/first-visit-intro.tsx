@@ -67,7 +67,7 @@ export function FirstVisitIntro() {
         </div>
       </div>
 
-      <div className="mt-1.5 flex flex-col gap-3 lg:flex-row lg:items-baseline lg:justify-between lg:gap-8">
+      <div className="mt-1.5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
         <h2
           id="first-visit-intro-title"
           className="text-[1.5rem] leading-[1.05] font-extrabold uppercase font-[family-name:var(--font-display)] text-balance sm:text-[1.75rem]"
