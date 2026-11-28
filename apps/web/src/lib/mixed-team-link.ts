@@ -6,7 +6,8 @@ import type { MixedCommitEntry } from "@/lib/import-commit-mixed";
 /**
  * shooterN_id pri ponovnom upisu reda tima. Redni broj tima nije stalan (prati plasman), pa isti red može dobiti
  * drugog strelca: stara veza važi samo dok je ime na tom mestu isto, inače se uzima nova (i kad je prazna).
- * `prefer` bira pobednika za isto ime: uvoz čuva postojeću (ručno povezivanje, cron), cron uzima novu ako je ima.
+ * `prefer` bira pobednika za isto ime: uvoz čuva postojeću (ručno povezivanje, cron) osim kad je nova nađena po
+ * ISSF ID-u; cron uzima novu ako je ima.
  */
 export function teamLinkOnConflict(slot: 1 | 2, prefer: "stored" | "incoming") {
   const id = slot === 1 ? mixedTeamResults.shooter1Id : mixedTeamResults.shooter2Id;
@@ -17,6 +18,10 @@ export function teamLinkOnConflict(slot: 1 | 2, prefer: "stored" | "incoming") {
   // bez imena na jednoj strani poređenje je null → važi kao isto ime
   return sql`case when ${foldNameSql(name)} <> ${foldNameSql(newName)} then ${newId} else ${same} end`;
 }
+
+/** Veza je nađena po ISSF ID-u: sigurna je, pa pri ponovnom uvozu zamenjuje i vezu na imenjaka sa istim imenom. */
+export const isIssfLink = (issfId: string | null | undefined, shooterId: number | null | undefined, shooters: MatchCandidate[]) =>
+  !!asIssfId(issfId) && shooters.some((s) => s.id === shooterId && s.issfId === issfId);
 
 /**
  * Članovi tima → strelci iz baze, samo za siguran pogodak: isti ISSF ID, inače tačno ime (bez varijanti) i ista država.

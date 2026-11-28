@@ -6,7 +6,7 @@ import { eventTypeFromName } from "@/lib/competition-filters";
 import { ensureCompetitionEvent } from "@/lib/competition-events";
 import { formatDateSr } from "@/lib/date-utils";
 import { shooterResultCount } from "@/lib/import-commit";
-import { linkTeamMembers, teamLinkOnConflict } from "@/lib/mixed-team-link";
+import { isIssfLink, linkTeamMembers, teamLinkOnConflict } from "@/lib/mixed-team-link";
 import { changedColumns, changedParts, type ImportStatus } from "@/lib/import-diff";
 import { commitMixedStages, toFinalCommit, toQualCommit } from "@/app/(site)/(admin)/admin/rezultati/_shared/commitMixedTeams";
 import { isUnrankedRemark, type CompetitionLevel, type EventType, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
@@ -199,8 +199,12 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
       const key = teamKey(e.nocCode, e.teamNumber);
       const old = existing.get(key);
       const links: { shooter1Id?: number | null; shooter2Id?: number | null } = isFinals ? {} : linkTeamMembers(e, e.nocCode, candidates, { category, date: matchDate });
-      // nova veza sa profilom je izmena i kad su rezultati isti (timovi uvezeni pre povezivanja)
-      const newLink = old && !isFinals && ((!old.shooter1Id && links.shooter1Id) || (!old.shooter2Id && links.shooter2Id));
+      const byIssfId = { 1: isIssfLink(e.mIssfId, links.shooter1Id, candidates), 2: isIssfLink(e.fIssfId, links.shooter2Id, candidates) };
+      // nova veza sa profilom (ili druga po ISSF ID-u) je izmena i kad su rezultati isti
+      const newLink = old && ([1, 2] as const).some((slot) => {
+        const next = links[`shooter${slot}Id`], prev = old[`shooter${slot}Id`];
+        return next && (!prev || (byIssfId[slot] && prev !== next));
+      });
       if (old && !newLink && teamChanges(old, e, isFinals).length === 0) { unchanged++; continue; }
       const columns = stageColumns(e, isFinals);
       await db
@@ -221,10 +225,10 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
           target: [mixedTeamResults.competitionId, mixedTeamResults.competitionEventId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
           set: {
             ...columns,
-            // postojeća veza (live cron, ručno povezivanje) se ne gazi dok je isti strelac na tom mestu
+            // postojeća veza (live cron, ručno povezivanje) se ne gazi dok je isti strelac na tom mestu i ISSF ID ne kaže drugo
             ...(isFinals ? {} : {
-              shooter1Id: teamLinkOnConflict(1, "stored"),
-              shooter2Id: teamLinkOnConflict(2, "stored"),
+              shooter1Id: teamLinkOnConflict(1, byIssfId[1] ? "incoming" : "stored"),
+              shooter2Id: teamLinkOnConflict(2, byIssfId[2] ? "incoming" : "stored"),
             }),
             remarkDetails: mergeRemarkDetails,
           },

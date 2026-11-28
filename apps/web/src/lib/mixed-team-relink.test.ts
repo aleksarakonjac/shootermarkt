@@ -70,6 +70,20 @@ describe.skipIf(!url)("mixed team re-import", () => {
     expect(a1).not.toBe(b1);
   });
 
+  it("replaces a namesake link once the ISSF id points to another profile", async () => {
+    const pair = [["Yejin", "KIM"], ["Jun", "PARK"]];
+    const add = async (issfId: string | null) => (await database.insert(schema.shooters)
+      .values({ firstName: "Yejin", lastName: "KIM", nationality: noc, issfId }).returning({ id: schema.shooters.id }))[0].id;
+    const namesake = await add(null);
+    await importQual(team(4, pair));
+    expect((await links()).at(-1)).toEqual([namesake, null]);
+    // isti rezultati, ali SIUS sada daje ID drugog profila
+    const issfId = `SHKORW${Date.now()}`;
+    const correct = await add(issfId);
+    await importQual({ ...team(4, pair), mIssfId: issfId } as ReturnType<typeof team>);
+    expect((await links()).at(-1)).toEqual([correct, null]);
+  });
+
   it("live fetch: new link wins, an empty one keeps the old only for the same name", async () => {
     const [a1, , b1] = ids;
     const { eq, sql } = await import("drizzle-orm");
