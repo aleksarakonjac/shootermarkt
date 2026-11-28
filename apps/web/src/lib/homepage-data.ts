@@ -1,12 +1,12 @@
 import { db } from "@shootermarkt/db";
-import { clubs, competitionSchedule, competitions, countries, disciplines, homepageFocusOverrides, mixedTeamResults, olympicQuotaAllocations, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@shootermarkt/db/schema";
+import { clubs, competitionEvents, competitionSchedule, competitions, countries, disciplines, homepageFocusOverrides, mixedTeamResults, olympicQuotaAllocations, results, shooterFormaCache, shooters, tickerCustomUpcoming, tickerLiveOverrides } from "@shootermarkt/db/schema";
 import { displayNoc, NOC_LIST } from "@shootermarkt/db/noc-list";
 import { isEscSoloCode, isSportPistolCode, qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
 import { effectiveFocusPriority } from "@/lib/competition-priority";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
 import { medalStage } from "@/lib/medal-phase";
-import { hasNoFinalMark, isQualOnlyDiscipline } from "@/lib/final-medals";
+import { isQualOnlyDiscipline, noFinalKey } from "@/lib/final-medals";
 import { getTickerSlotEnd, isTickerSlotLive } from "@/lib/ticker-schedule";
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
@@ -172,7 +172,7 @@ type ScheduleSlotLike = { discCode: string; disciplineId: number; stage: string;
 
 function slotsFromResults(
   competition: { date: string; dateEnd: string | null },
-  individualRows: Array<{ disciplineId: number; category: string; qualRank: number | null; elimRank: number | null; finalRank: number | null }>,
+  individualRows: Array<{ disciplineId: number; category: string; qualRank: number | null; elimRank?: number | null; finalRank: number | null }>,
   mixedRows: Array<{ disciplineId: number; category: string; qualRank: number | null; finalRank: number | null }>,
   codes: Map<number, string>,
 ): ScheduleSlotLike[] {
@@ -195,6 +195,45 @@ function slotsFromResults(
     if (r.finalRank != null) add(r.disciplineId, r.category, "final");
   }
   return [...found.values()];
+}
+
+type MatchRow = { disciplineId: number; category: string; competitionEventId: number | null; qualRank: number | null; elimRank?: number | null; finalRank: number | null };
+
+/**
+ * Termini sa oznakom meča (`eventId`; null = glavni meč), da dva meča iste discipline i kategorije ne budu
+ * jedna rang lista. Satnica ne zna za mečeve: termin pripada meču sa poslednjim datumom do tog dana.
+ * Takmičenje bez rasporeda, i meč bez ijednog svog termina, vode se po rezultatima.
+ */
+export function slotsPerMatch(
+  competition: { date: string; dateEnd: string | null; timezone: string | null },
+  events: Array<{ id: number; date: string }>,
+  schedule: ScheduleSlotLike[],
+  individualRows: MatchRow[],
+  mixedRows: MatchRow[],
+  codes: Map<number, string>,
+): Array<ScheduleSlotLike & { eventId: number | null }> {
+  const eventDates = new Map(events.map((event) => [event.id, event.date]));
+  const dateOf = (eventId: number | null) => (eventId != null ? eventDates.get(eventId) : undefined) ?? competition.date;
+  const dayOf = new Intl.DateTimeFormat("en-CA", { timeZone: competition.timezone ?? "UTC", year: "numeric", month: "2-digit", day: "2-digit" });
+  const matches = new Map<string, Set<number | null>>();
+  for (const row of [...individualRows, ...mixedRows]) {
+    const key = `${row.disciplineId}|${row.category}`;
+    matches.set(key, (matches.get(key) ?? new Set()).add(row.competitionEventId));
+  }
+  const assigned = schedule.flatMap((slot) => {
+    const ids = [...(matches.get(`${slot.disciplineId}|${slot.category}`) ?? [null])];
+    if (ids.length === 1) return [{ ...slot, eventId: ids[0] }];
+    const day = dayOf.format(slot.startTime);
+    const dates = ids.map(dateOf).sort();
+    const matchDay = dates.findLast((date) => date <= day) ?? dates[0];
+    return ids.filter((id) => dateOf(id) === matchDay).map((eventId) => ({ ...slot, eventId }));
+  });
+  const missing = [...new Set([...matches.values()].flatMap((ids) => [...ids]))].flatMap((eventId) =>
+    slotsFromResults({ date: dateOf(eventId), dateEnd: null }, individualRows.filter((row) => row.competitionEventId === eventId), mixedRows.filter((row) => row.competitionEventId === eventId), codes)
+      .filter((slot) => (!schedule.length || matches.get(`${slot.disciplineId}|${slot.category}`)!.size > 1)
+        && !assigned.some((a) => a.eventId === eventId && a.disciplineId === slot.disciplineId && a.category === slot.category))
+      .map((slot) => ({ ...slot, eventId })));
+  return [...assigned, ...missing];
 }
 
 function tickerStagePriority(stage: string) {
@@ -413,11 +452,12 @@ export async function getHomepageMain(scope: Scope) {
   const countryById = new Map(countryRows.map((country) => [country.id, country]));
   const recentIds = recentComps.map((competition) => competition.id);
   // Jedan upit po tabeli za sva izabrana takmičenja (ne 3 po takmičenju — pool ima 5 konekcija).
-  const [allSlots, allIndividualRows, allMixedRows] = recentIds.length ? await Promise.all([
+  const [allSlots, allIndividualRows, allMixedRows, allEvents] = recentIds.length ? await Promise.all([
     db.select({ competitionId: competitionSchedule.competitionId, discCode: disciplines.code, disciplineId: competitionSchedule.disciplineId, stage: competitionSchedule.stage, category: competitionSchedule.category, startTime: competitionSchedule.startTime, endTime: competitionSchedule.endTime }).from(competitionSchedule).innerJoin(disciplines, eq(competitionSchedule.disciplineId, disciplines.id)).where(inArray(competitionSchedule.competitionId, recentIds)).orderBy(asc(competitionSchedule.startTime), asc(competitionSchedule.id)),
-    db.select({ competitionId: results.competitionId, shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRound: results.elimRound, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, qualRemark: results.qualRemark, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(inArray(results.competitionId, recentIds)).orderBy(asc(results.id)),
-    db.select({ competitionId: mixedTeamResults.competitionId, disciplineId: mixedTeamResults.disciplineId, category: mixedTeamResults.category, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(inArray(mixedTeamResults.competitionId, recentIds)).orderBy(asc(mixedTeamResults.id)),
-  ]) : [[], [], []] as const;
+    db.select({ competitionId: results.competitionId, competitionEventId: results.competitionEventId, shooterId: results.shooterId, disciplineId: results.disciplineId, category: results.category, firstName: shooters.firstName, lastName: shooters.lastName, clubName: clubs.name, nationality: shooters.nationality, countryCode2: countries.code2, elimRound: results.elimRound, elimRank: results.elimRank, elimTotal: results.elimTotal, qualRank: results.qualRank, qualTotal: results.qualTotal, qualRemark: results.qualRemark, finalRank: results.finalRank, finalTotal: results.finalTotal }).from(results).innerJoin(shooters, eq(results.shooterId, shooters.id)).leftJoin(clubs, eq(results.clubId, clubs.id)).leftJoin(countries, eq(countries.nocCode, shooters.nationality)).where(inArray(results.competitionId, recentIds)).orderBy(asc(results.id)),
+    db.select({ competitionId: mixedTeamResults.competitionId, competitionEventId: mixedTeamResults.competitionEventId, disciplineId: mixedTeamResults.disciplineId, category: mixedTeamResults.category, nocCode: mixedTeamResults.nocCode, countryCode2: countries.code2, shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, qualRank: mixedTeamResults.qualRank, qualTotal: mixedTeamResults.qualTotal, finalRank: mixedTeamResults.finalRank, finalTotal: mixedTeamResults.finalTotal }).from(mixedTeamResults).leftJoin(countries, eq(countries.nocCode, mixedTeamResults.nocCode)).where(inArray(mixedTeamResults.competitionId, recentIds)).orderBy(asc(mixedTeamResults.id)),
+    db.select({ id: competitionEvents.id, competitionId: competitionEvents.competitionId, name: competitionEvents.name, date: competitionEvents.date }).from(competitionEvents).where(inArray(competitionEvents.competitionId, recentIds)),
+  ]) : [[], [], [], []] as const;
   // Discipline u kojima takmičenje deli olimpijske kvote (samo te dobijaju krugove na kartici).
   const quotaRows = recentIds.length ? await db.select({ competitionId: olympicQuotaAllocations.competitionId, disciplineId: olympicQuotaAllocations.disciplineId }).from(olympicQuotaAllocations).where(and(inArray(olympicQuotaAllocations.competitionId, recentIds), eq(olympicQuotaAllocations.games, "LA2028"))) : [];
   const quotaKeys = new Set(quotaRows.map((row) => `${row.competitionId}:${disciplineCodes.get(row.disciplineId)}`));
@@ -431,14 +471,13 @@ export async function getHomepageMain(scope: Scope) {
     // times (e.g. SPW: precizna + brza paljba are separate time slots but share
     // one combined qual ranking) — collapse to one slot per (discipline,
     // category, stage-kind) so the same phase isn't rendered twice.
-    // Takmičenje bez rasporeda (npr. rezultati uvezeni bez competition_schedule) se vodi po
-    // unetim rezultatima: jedna faza po (disciplina, kategorija, kvalifikacije/elim/finale).
-    const effectiveSlots = slots.length ? slots : slotsFromResults(competition, individualRows, mixedRows, disciplineCodes);
+    const events = allEvents.filter((row) => row.competitionId === competition.id);
+    const effectiveSlots = slotsPerMatch(competition, events, slots, individualRows, mixedRows, disciplineCodes);
     // Partije (relays) iste kvalifikacione liste su jedna zajednička rang lista: spajaju se u jednu
     // fazu koja je "u toku" ako je bilo koja partija u toku (raspon = prva početak … poslednja kraj).
     const slotGroups = new Map<string, typeof effectiveSlots>();
     for (const s of effectiveSlots) {
-      const key = `${s.disciplineId}|${s.category}|${s.stage.startsWith("qual") ? "qual" : s.stage}`;
+      const key = `${s.disciplineId}|${s.category}|${s.eventId}|${s.stage.startsWith("qual") ? "qual" : s.stage}`;
       slotGroups.set(key, [...(slotGroups.get(key) ?? []), s]);
     }
     const nowForSlots = new Date();
@@ -459,14 +498,14 @@ export async function getHomepageMain(scope: Scope) {
       const isLive = slot.isLive;
       const stageKind = slot.stage.startsWith("qual") ? "qual" : slot.stage;
       const individual = individualRows.flatMap((row): Entry[] => {
-        if (row.disciplineId !== slot.disciplineId || row.category !== slot.category) return [];
+        if (row.disciplineId !== slot.disciplineId || row.category !== slot.category || row.competitionEventId !== slot.eventId) return [];
         const rank = stageKind === "elimination" ? row.elimRank : stageKind === "final" ? row.finalRank : row.qualRank;
         const total = stageKind === "elimination" ? row.elimTotal : stageKind === "final" ? row.finalTotal : row.qualTotal;
         const nationality = displayNoc(row.nationality);
         return rank != null && total != null ? [{ id: `shooter:${row.shooterId}`, firstName: row.firstName, lastName: row.lastName, clubName: row.clubName ?? null, nationality, countryCode2: nationality === "AIN" ? "AIN" : row.countryCode2 ?? null, rank, total: Number(total), round: stageKind === "elimination" ? row.elimRound : null, rpo: stageKind === "qual" && row.qualRemark === "RPO" }] : [];
       });
       const mixed = stageKind === "elimination" ? [] : mixedRows.flatMap((row): Entry[] => {
-        if (row.disciplineId !== slot.disciplineId || row.category !== slot.category) return [];
+        if (row.disciplineId !== slot.disciplineId || row.category !== slot.category || row.competitionEventId !== slot.eventId) return [];
         const rank = stageKind === "final" ? row.finalRank : row.qualRank;
         const total = stageKind === "final" ? row.finalTotal : row.qualTotal;
         const names = [row.shooter1Name, row.shooter2Name]
@@ -500,12 +539,12 @@ export async function getHomepageMain(scope: Scope) {
       });
     });
 
-    // One discipline (each age category counted separately) is one homepage
+    // One discipline (each age category and each separate match counted separately) is one homepage
     // item — qual/elimination/final all stack inside it instead of each
     // phase competing separately for one of the top-4 slots.
     const phaseGroups = new Map<string, typeof rawPhases>();
     for (const phase of rawPhases) {
-      const key = `${phase.discCode}|${phase.category}`;
+      const key = `${phase.discCode}|${phase.category}|${phase.eventId}`;
       phaseGroups.set(key, [...(phaseGroups.get(key) ?? []), phase]);
     }
     const groups = [...phaseGroups.values()].map((phases) => {
@@ -517,6 +556,7 @@ export async function getHomepageMain(scope: Scope) {
         stage: representative.stage,
         isJunior: representative.isJunior,
         category: representative.category,
+        eventId: representative.eventId,
         isLive: phases.some((p) => p.isLive),
         hasSrb: phases.some((p) => p.hasSrb),
         startTime: representative.startTime,
@@ -529,13 +569,18 @@ export async function getHomepageMain(scope: Scope) {
       // Serbian shooter who appeared in E but has no qualification result.
       const visiblePhases = selectHomepageDisplayPhases(group.phases, scope);
       const stateOf = (phase?: (typeof group.phases)[number]) => phase && { isLive: phase.isLive, hasResults: phase.top3.length > 0 };
-      const markedNoFinal = hasNoFinalMark(competition.noFinalGroups, group.discCode, group.category);
+      const markedNoFinal = competition.noFinalGroups.includes(noFinalKey(group.discCode, group.eventId, group.category));
+      const sameList = (item: { discCode: string; category: string }) => item.discCode === group.discCode && item.category === group.category;
+      // Naziv meča samo kad ista disciplina i kategorija ima više mečeva; "· 22.01." na kraju naziva se skida.
+      const matchName = groups.filter(sameList).length > 1
+        ? (events.find((event) => event.id === group.eventId)?.name ?? "1. meč").replace(/ · \d{2}\.\d{2}\.$/, "")
+        : null;
       const medal = medalStage({
         markedNoFinal,
         discCode: group.discCode,
         level: competition.level,
         competitionOver: (competition.dateEnd ?? competition.date) < today,
-        finalScheduled: effectiveSlots.some((s) => s.discCode === group.discCode && s.category === group.category && s.stage === "final"),
+        finalScheduled: effectiveSlots.some((s) => sameList(s) && s.eventId === group.eventId && s.stage === "final"),
         final: stateOf(group.phases.find((p) => p.stage === "final")),
         qual: stateOf(group.phases.find((p) => p.stage.startsWith("qual"))),
       });
@@ -543,6 +588,8 @@ export async function getHomepageMain(scope: Scope) {
       discCode: group.discCode,
       isJunior: group.isJunior,
       category: group.category,
+      eventId: group.eventId,
+      matchName,
       isLive: group.isLive,
       noFinal: isQualOnlyDiscipline(group.discCode) || (markedNoFinal && !group.phases.some((p) => p.stage === "final" && p.top3.length > 0)),
       awardsQuota: group.category === "senior" && quotaKeys.has(`${competition.id}:${group.discCode}`),

@@ -23,10 +23,6 @@ export type FinalSlot = { startTime: string; endTime: string | null };
 /** Admin oznaka "nema finala" (`competitions.no_final_groups`): "ARM|senior", zaseban meč "ARM@12|senior". */
 export const noFinalKey = (code: string, eventId: number | null, category: string) => `${eventId ? `${code}@${eventId}` : code}|${category}`;
 
-/** Ima li disciplina + kategorija oznaku u bilo kom meču (In focus kartica spaja mečeve u jednu listu). */
-export const hasNoFinalMark = (marks: string[], code: string, category: string) =>
-  marks.some((mark) => mark.replace(/@\d+/, "") === `${code}|${category}`);
-
 const OVERRUN_MS = 10 * 60_000;
 const DEFAULT_FINAL_MS = 75 * 60_000;
 const THREE_POSITION_ENTRIES = 4 + 5;

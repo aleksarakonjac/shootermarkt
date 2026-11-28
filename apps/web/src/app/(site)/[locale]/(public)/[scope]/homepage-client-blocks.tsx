@@ -17,7 +17,7 @@ import { LEVEL_STYLE } from "@/lib/competition-utils";
 import { MainSkeleton, TickerSkeleton } from "./homepage-skeleton";
 import { isSportPistolCode, MIXED_TEAM_CODES, qualHasDecimals, type AgeCategory } from "@shootermarkt/db/pdf-import-types";
 import type { HomepageMainData } from "@/lib/homepage-data";
-import { categoryLabel } from "@/lib/match-name";
+import { categoryLabel, localizeMatchName } from "@/lib/match-name";
 
 type ResultPlace = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null; rpo?: boolean };
 
@@ -90,9 +90,9 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
   </div>;
 }
 
-function phaseHref(competitionId: number, discCode: string, stage: string, category: string) {
+function phaseHref(competitionId: number, discCode: string, stage: string, category: string, eventId?: number | null) {
   const urlStage = stage === "elimination" ? "elim" : stage.startsWith("qual") ? "qual" : stage;
-  const params = new URLSearchParams({ disc: discCode, stage: urlStage });
+  const params = new URLSearchParams({ disc: eventId ? `${discCode}@${eventId}` : discCode, stage: urlStage });
   if ((MIXED_TEAM_CODES as readonly string[]).includes(discCode)) params.set("result", "mixed");
   else params.set("category", category);
   return `/takmicenja/${competitionId}?${params.toString()}`;
@@ -229,8 +229,8 @@ function CompetitionPlace({ location, countryCode2, nocCode, className = "", dis
   );
 }
 
-function phaseRowKey(competitionId: number, discCode: string, isJunior: boolean, phase: PhaseKeyInput) {
-  return `${competitionId}:${discCode}:${isJunior}:${phase.stage}:${phase.elimRound ?? ""}:${phase.category}`;
+function phaseRowKey(competitionId: number, disc: { discCode: string; isJunior: boolean; eventId?: number | null }, phase: PhaseKeyInput) {
+  return `${competitionId}:${disc.discCode}:${disc.eventId ?? ""}:${disc.isJunior}:${phase.stage}:${phase.elimRound ?? ""}:${phase.category}`;
 }
 
 function LiveBadge({ children, className }: { children: ReactNode; className: string }) {
@@ -269,7 +269,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
       for (const disc of competition.discResults) {
         for (const phase of disc.phases) {
           const signature = [...phase.qualTop3.map((e) => `${e.lastName}:${e.qualTotal}:${e.finalTotal ?? ""}`), ...phase.srbHighlights.map((e) => `${e.lastName}:${e.qualTotal}:${e.finalTotal ?? ""}`)].join("|");
-          next.set(phaseRowKey(competition.id, disc.discCode, disc.isJunior, phase), signature);
+          next.set(phaseRowKey(competition.id, disc, phase), signature);
         }
       }
     }
@@ -317,7 +317,7 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
   type Shooter = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null; rpo?: boolean };
   type SrbHighlight = { firstName: string; lastName: string; clubName: string | null; qualRank: number | null; qualTotal: number; finalRank: number | null; finalTotal: number | null; round?: number | null };
   type Phase = { stage: string; elimRound?: number | null; category: string; isLive: boolean; awardsMedals: boolean; qualTop3: Shooter[]; srbHighlights: SrbHighlight[] };
-  type DiscResult = { awardsQuota?: boolean; noFinal?: boolean; discCode: string; isLive: boolean; isJunior: boolean; category: string; phases: Phase[] };
+  type DiscResult = { awardsQuota?: boolean; noFinal?: boolean; eventId?: number | null; matchName?: string | null; discCode: string; isLive: boolean; isJunior: boolean; category: string; phases: Phase[] };
 
   function renderDiscResults(discResults: DiscResult[], level: string, competitionId: number) {
     if (discResults.length === 0) return <p className="mt-4 text-sm italic text-[var(--muted)]">{t("noWinner")}</p>;
@@ -345,16 +345,16 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
           const junBadge = ageBadge ? <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>{ageBadge}</span> : null;
           const liveBadge = disc.isLive ? <LiveBadge className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-xs font-extrabold uppercase tracking-wider text-white">LIVE</LiveBadge> : null;
           return (
-            <div key={`${disc.discCode}:${disc.category}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
+            <div key={`${disc.discCode}:${disc.category}:${disc.eventId ?? ""}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
               {/* Naziv discipline vodi na prvu prikazanu fazu (finale ako postoji, inače kvalifikacije). */}
-              <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="relative flex w-fit max-w-full flex-wrap items-center gap-1 no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']">{discBadge}<span className="flex items-center gap-1">{junBadge}<ArrowUpRight size={15} strokeWidth={2.25} aria-hidden="true" className="shrink-0 text-[var(--muted)]" /></span>{disc.awardsQuota && <span title={locale === "en" ? "Olympic quota places awarded" : "Dodeljuju se olimpijske kvote"} className="ml-0.5 flex"><OlympicRings height={12} /></span>}</ScopedLink>
+              <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category, disc.eventId)} className="relative flex w-fit max-w-full flex-wrap items-center gap-1 no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']">{discBadge}<span className="flex items-center gap-1">{junBadge}{disc.matchName && <span className="text-xs font-semibold text-[var(--ink)]">{localizeMatchName(disc.matchName, locale)}</span>}<ArrowUpRight size={15} strokeWidth={2.25} aria-hidden="true" className="shrink-0 text-[var(--muted)]" /></span>{disc.awardsQuota && <span title={locale === "en" ? "Olympic quota places awarded" : "Dodeljuju se olimpijske kvote"} className="ml-0.5 flex"><OlympicRings height={12} /></span>}</ScopedLink>
               {shownPhases.map((phase) => {
                 const decimals = phase.stage === "elimination" || (!qualHasDecimals(disc.discCode) && phase.stage !== "final") || isSportPistolCode(disc.discCode) ? 0 : 1;
                 // Bez finala "Q" ne znači ništa: kvalifikacije su konačan poredak.
                 const hideStageBadge = phase.stage.startsWith("qual") && (disc.noFinal || phase.awardsMedals);
                 const stageBadge = hideStageBadge ? null : <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? `E${phase.elimRound ?? ""}` : phase.stage === "final" ? "F" : "Q"}</span>;
                 const hasFinal = shownPhases.some((item) => item.stage === "final");
-                const qualKey = `${competitionId}:${disc.discCode}:${phase.category}:qual`;
+                const qualKey = `${competitionId}:${disc.discCode}:${disc.eventId ?? ""}:${phase.category}:qual`;
                 const qualExpanded = expandedQual.has(qualKey);
                 const extraQualificationResults = phase.qualTop3.length - 1;
                 const isCollapsibleQual = !isDesktop && phase.stage.startsWith("qual") && hasFinal && phase.qualTop3.length > 1;
@@ -381,8 +381,8 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                 // Faza u toku bez ijednog rezultata u bazi: samo oznaka da je počela.
                 if (phase.qualTop3.length === 0 && phase.srbHighlights.length === 0) {
                   return (
-                    <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className={flashKeys.has(phaseRowKey(competitionId, disc.discCode, disc.isJunior, phase)) ? "w-full live-flash" : "w-full"} data-phase-row>
-                      <ScopedLink href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} className="flex w-fit items-center gap-1.5 no-underline hover:opacity-80 transition-opacity">
+                    <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className={flashKeys.has(phaseRowKey(competitionId, disc, phase)) ? "w-full live-flash" : "w-full"} data-phase-row>
+                      <ScopedLink href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category, disc.eventId)} className="flex w-fit items-center gap-1.5 no-underline hover:opacity-80 transition-opacity">
                         {stageBadge}{liveBadge}
                         <span className="text-xs italic text-[var(--muted)]">{t("liveResultsSoon")}</span>
                       </ScopedLink>
@@ -390,12 +390,12 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
                   );
                 }
                 return (
-                  <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className={flashKeys.has(phaseRowKey(competitionId, disc.discCode, disc.isJunior, phase)) ? "w-full live-flash" : "w-full"} data-phase-row>
+                  <div key={`${phase.stage}:${phase.elimRound ?? ""}`} className={flashKeys.has(phaseRowKey(competitionId, disc, phase)) ? "w-full live-flash" : "w-full"} data-phase-row>
                     <div className="min-w-0 w-fit max-w-full">
-                      {phase.qualTop3.length > 0 && <InlinePlaces href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} toggle={qualToggle} entries={phase.qualTop3} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} medals={phase.awardsMedals} reserveToggleSpace={qualToggle != null} collapsed={isCollapsibleQual && !qualExpanded} />}
+                      {phase.qualTop3.length > 0 && <InlinePlaces href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category, disc.eventId)} toggle={qualToggle} entries={phase.qualTop3} score={(entry) => entry.qualTotal} decimals={decimals} prefix={<>{stageBadge}{phase.isLive ? liveBadge : null}</>} renderAff={aff} medals={phase.awardsMedals} reserveToggleSpace={qualToggle != null} collapsed={isCollapsibleQual && !qualExpanded} />}
                     </div>
                     {phase.srbHighlights.length > 0 && (
-                      <ScopedLink href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category)} className="relative block no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-1 after:inset-x-0 after:content-['']">
+                      <ScopedLink href={phaseHref(competitionId, disc.discCode, phase.stage, phase.category, disc.eventId)} className="relative block no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-1 after:inset-x-0 after:content-['']">
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           {phase.srbHighlights.map((h, i) => {
                             const isFinalRow = h.finalRank != null && h.finalTotal != null;

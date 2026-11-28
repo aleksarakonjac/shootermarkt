@@ -28,6 +28,7 @@ import type { TeamRow } from "@/lib/competition-teams";
 import { startNavigationProgress, finishNavigationProgress } from "@/components/NavigationProgress";
 import { isOlympicDiscipline } from "@/lib/olympic-disciplines";
 import { isQualOnlyDiscipline, shouldShowFinalMedals, shouldShowQualMedals, type FinalSlot } from "@/lib/final-medals";
+import { findLinkedGroup } from "@/lib/linked-group";
 import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
 import { categoryLabel, localizeMatchName } from "@/lib/match-name";
 import { disciplineFamily, filterOptions, matchesFilters, type Facets, type Family, type Filters, type Gender } from "@/lib/competition-result-filters";
@@ -290,14 +291,13 @@ function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel,
     if (params.get("result") === "mixed") {
       // Linkovi bez kategorije (stariji) vode na senior.
       const mixedCategory = category ?? "senior";
-      return mixedGroups.some((group) => group.key === disciplineCode && group.category === mixedCategory)
-        ? { kind: "mixed", disciplineCode, category: mixedCategory, stage, elimRound }
-        : null;
+      const mixed = findLinkedGroup(mixedGroups, disciplineCode, (group) => group.category === mixedCategory);
+      return mixed ? { kind: "mixed", disciplineCode: mixed.key, category: mixedCategory, stage, elimRound } : null;
     }
 
-    return category && groups.some((group) => group.key === disciplineCode && group.categories.some((item) => item.category === category))
-      ? { kind: "individual", disciplineCode, category, stage, elimRound }
-      : null;
+    if (!category) return null;
+    const linked = findLinkedGroup(groups, disciplineCode, (group) => group.categories.some((item) => item.category === category));
+    return linked ? { kind: "individual", disciplineCode: linked.key, category, stage, elimRound } : null;
   }, [groups, mixedGroups, search]);
   const [selection, setSelection] = useState<Selection | null>(() => urlSelection);
 
