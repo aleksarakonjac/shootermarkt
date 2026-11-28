@@ -87,6 +87,20 @@ const partOf = (column: string) =>
 /** Imena kolona → delovi rezultata za prikaz adminu. */
 export const changedParts = (columns: string[]): string[] => [...new Set(columns.map(partOf))];
 
+export type MatchDateConflict = { name: string; existing: string; entered: string };
+
+/** Mečevi se prepoznaju po nazivu i imaju jedan datum: postojeći naziv sa drugim datumom zadržava stari. */
+export function matchDateConflicts(events: { name: string; date: string }[], entries: { eventName?: string | null; eventDate?: string | null }[]): MatchDateConflict[] {
+  const dates = new Map(events.map((e) => [e.name, e.date]));
+  const found = new Map<string, MatchDateConflict>();
+  for (const { eventName, eventDate } of entries) {
+    const name = eventName?.trim();
+    const existing = name ? dates.get(name) : undefined;
+    if (name && existing && eventDate && eventDate !== existing) found.set(`${name}|${eventDate}`, { name, existing, entered: eventDate });
+  }
+  return [...found.values()];
+}
+
 export function summarizeDiff(entries: { label: string; status: ImportStatus; changes: string[] }[]): ImportDiff {
   const diff: ImportDiff = { added: 0, changed: 0, same: 0, items: [] };
   for (const { label, status, changes } of entries) {

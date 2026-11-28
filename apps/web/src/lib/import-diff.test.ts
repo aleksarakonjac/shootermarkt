@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewRow } from "@shootermarkt/db/pdf-import-types";
-import { changedColumns, changedParts, resultColumns, summarizeDiff, upsertedResult } from "./import-diff";
+import { changedColumns, changedParts, matchDateConflicts, resultColumns, summarizeDiff, upsertedResult } from "./import-diff";
 
 const ROW: ReviewRow = {
   shooterId: 1, firstName: "Petar", lastName: "PETROVIC", teamNoc: "SRB", disciplineCode: "ARM", category: "senior",
@@ -49,5 +49,19 @@ describe("import diff", () => {
       { label: "b", status: "changed", changes: ["finale"] },
       { label: "c", status: "same", changes: [] },
     ])).toMatchObject({ added: 1, changed: 1, same: 1, items: [{ label: "a" }, { label: "b" }] });
+  });
+});
+
+describe("matchDateConflicts", () => {
+  const events = [{ name: "Grand Prix Smederevo", date: "2026-11-27" }];
+  const entry = (eventName: string | null, eventDate: string | null) => ({ eventName, eventDate });
+
+  it("reports an existing match name entered with another date, once", () => {
+    const rows = [entry(" Grand Prix Smederevo ", "2026-11-28"), entry("Grand Prix Smederevo", "2026-11-28")];
+    expect(matchDateConflicts(events, rows)).toEqual([{ name: "Grand Prix Smederevo", existing: "2026-11-27", entered: "2026-11-28" }]);
+  });
+
+  it("stays quiet for the same date, a new name, the main match or a missing date", () => {
+    expect(matchDateConflicts(events, [entry("Grand Prix Smederevo", "2026-11-27"), entry("Grand Prix Smederevo · 28.11.", "2026-11-28"), entry(null, "2026-11-28"), entry("Grand Prix Smederevo", null)])).toEqual([]);
   });
 });
