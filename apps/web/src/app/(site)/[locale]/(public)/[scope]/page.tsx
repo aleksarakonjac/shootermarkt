@@ -10,6 +10,7 @@ import { QuickH2HClient } from "./quick-h2h-client";
 import { HomepageBlockBoundary, HomepageMainClient, HomepageTickerClient } from "./homepage-client-blocks";
 import { HomepageDataStatusProvider, HomepageRetryNotice } from "./homepage-data-status";
 import { MainSkeleton } from "./homepage-skeleton";
+import { FirstVisitIntro } from "./first-visit-intro";
 import "./homepage.css";
 
 export const revalidate = 300;
@@ -47,5 +48,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         <aside className="flex flex-col gap-8"><HomepageBlockBoundary silent><Suspense fallback={null}><HomepageSidebarNews data={homepageData} /></Suspense></HomepageBlockBoundary><CalendarModule /><QuickH2HClient /></aside>
       </div>
     </div>
+    <FirstVisitIntro />
   </HomepageDataStatusProvider>;
 }
