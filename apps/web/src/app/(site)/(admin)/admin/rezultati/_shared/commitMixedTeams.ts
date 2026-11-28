@@ -11,8 +11,10 @@ export const toQualCommit = (e: MixedTeamEntry): MixedCommitEntry => ({
   f_lastName: e.fLastName, f_firstName: e.fFirstName, fIssfId: e.fIssfId, f_series: e.f_series, fInners: e.fInners, fTotal: e.fTotal,
 });
 
+// imena se u finalu ne upisuju; po njima se nalazi red tima
 export const toFinalCommit = (e: MixedTeamEntry): MixedCommitEntry => ({
   nocCode: e.nocCode, teamNumber: e.teamNumber, finalRank: e.finalRank, finalTotal: e.finalTotal, finalRemark: e.finalRemark, mFinalSeries: e.mFinalSeries, fFinalSeries: e.fFinalSeries, extras: e.finalExtras,
+  m_lastName: e.mLastName, m_firstName: e.mFirstName, f_lastName: e.fLastName, f_firstName: e.fFirstName,
 });
 
 /** Država tima, ili dve za par iz dve države. */

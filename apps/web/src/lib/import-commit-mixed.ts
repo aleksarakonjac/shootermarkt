@@ -6,7 +6,7 @@ import { eventTypeFromName } from "@/lib/competition-filters";
 import { ensureCompetitionEvent } from "@/lib/competition-events";
 import { formatDateSr } from "@/lib/date-utils";
 import { shooterResultCount } from "@/lib/import-commit";
-import { isIssfLink, linkTeamMembers, teamLinkOnConflict } from "@/lib/mixed-team-link";
+import { alignTeamNumbers, isIssfLink, linkTeamMembers, teamLinkOnConflict, type TeamRow } from "@/lib/mixed-team-link";
 import { changedColumns, changedParts, type ImportStatus } from "@/lib/import-diff";
 import { commitMixedStages, toFinalCommit, toQualCommit } from "@/app/(site)/(admin)/admin/rezultati/_shared/commitMixedTeams";
 import { isUnrankedRemark, type CompetitionLevel, type EventType, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
@@ -75,12 +75,23 @@ function stageColumns(e: MixedCommitEntry, isFinals: boolean) {
 
 const teamKey = (nocCode: string, teamNumber: number | undefined) => `${nocCode}#${teamNumber ?? 1}`;
 
+const memberName = (last?: string, first?: string) => [last, first].filter(Boolean).join(" ") || null;
+
+/** Timovi sa brojem reda u koji se upisuju (vidi alignTeamNumbers); `links` su profili članova, kad su poznati. */
+function alignEntries<T extends MixedCommitEntry>(entries: T[], stored: TeamRow[], links?: (e: T) => Pick<TeamRow, "shooter1Id" | "shooter2Id">) {
+  return alignTeamNumbers(entries.map((entry) => ({
+    entry, nocCode: entry.nocCode, teamNumber: entry.teamNumber ?? 1, ...links?.(entry),
+    shooter1Name: memberName(entry.m_lastName, entry.m_firstName),
+    shooter2Name: memberName(entry.f_lastName, entry.f_firstName),
+  })), stored);
+}
+
 async function loadTeams(competitionId: number, eventId: number | null, disciplineId: number, category: NonNullable<MixedCommitInput["category"]>) {
   const rows = await db.select().from(mixedTeamResults).where(and(
     eq(mixedTeamResults.competitionId, competitionId), eq(mixedTeamResults.disciplineId, disciplineId), eq(mixedTeamResults.category, category),
     eventId === null ? isNull(mixedTeamResults.competitionEventId) : eq(mixedTeamResults.competitionEventId, eventId),
   ));
-  return new Map<string, Record<string, unknown>>(rows.map((r) => [teamKey(r.nocCode, r.teamNumber), r]));
+  return new Map(rows.map((r) => [teamKey(r.nocCode, r.teamNumber), r]));
 }
 
 /** Kolone koje bi se promenile upisom faze u postojeći red tima. */
@@ -99,12 +110,24 @@ export async function previewMixedTeams(competitionId: number, entries: MixedTea
     db.select({ id: competitionEvents.id, name: competitionEvents.name }).from(competitionEvents).where(eq(competitionEvents.competitionId, competitionId)),
   ]);
   const eventIds = new Map(events.map((ev) => [ev.name, ev.id]));
+  // meč koji još ne postoji → svi njegovi timovi su novi
+  const eventIdOf = (e: MixedTeamEntry) => (e.eventName?.trim() ? eventIds.get(e.eventName.trim()) : null);
+  const groups = new Map<string, MixedTeamEntry[]>();
+  for (const e of entries) {
+    const key = `${e.disciplineCode}|${e.category ?? "senior"}|${eventIdOf(e)}`;
+    groups.set(key, [...(groups.get(key) ?? []), e]);
+  }
+  const previous = new Map<MixedTeamEntry, typeof rows[number]>();
+  for (const group of groups.values()) {
+    const { disciplineCode, category } = group[0];
+    const stored = rows.filter((r) => r.disciplineId === disciplineIds.get(disciplineCode) && r.category === (category ?? "senior") && r.competitionEventId === eventIdOf(group[0]));
+    alignEntries(group.map((e) => ({ ...toQualCommit(e), source: e })), stored).forEach(({ entry, teamNumber }) => {
+      const old = stored.find((r) => r.nocCode === entry.nocCode && r.teamNumber === teamNumber);
+      if (old) previous.set(entry.source, old);
+    });
+  }
   return entries.map((e) => {
-    const name = e.eventName?.trim();
-    // meč koji još ne postoji → svi njegovi timovi su novi
-    const eventId = name ? eventIds.get(name) : null;
-    const old = eventId === undefined ? undefined : rows.find((r) => r.disciplineId === disciplineIds.get(e.disciplineCode) && r.category === (e.category ?? "senior")
-      && r.competitionEventId === eventId && r.nocCode === e.nocCode && r.teamNumber === e.teamNumber);
+    const old = previous.get(e);
     if (!old) return { status: "new", changes: [] };
     const columns = teamChanges(old, toQualCommit(e), false);
     if (e.finalRank != null) columns.push(...teamChanges(old, toFinalCommit(e), true));
@@ -193,12 +216,15 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
   }).from(shooters);
   const matchDate = isFinals ? null : eventDate ?? (await db.query.competitions.findFirst({ where: eq(competitions.id, competitionId), columns: { date: true } }))?.date;
 
-  for (const e of entries) {
-    if (e.skip) { skipped++; continue; }
+  const active = entries.filter((e) => !e.skip);
+  skipped = entries.length - active.length;
+  const linksOf = new Map(isFinals ? [] : active.map((e) => [e, linkTeamMembers(e, e.nocCode, candidates, { category, date: matchDate })]));
+
+  for (const { entry: e, teamNumber } of alignEntries(active, [...existing.values()], (e) => linksOf.get(e) ?? {})) {
     try {
-      const key = teamKey(e.nocCode, e.teamNumber);
+      const key = teamKey(e.nocCode, teamNumber);
       const old = existing.get(key);
-      const links: { shooter1Id?: number | null; shooter2Id?: number | null } = isFinals ? {} : linkTeamMembers(e, e.nocCode, candidates, { category, date: matchDate });
+      const links: { shooter1Id?: number | null; shooter2Id?: number | null } = linksOf.get(e) ?? {};
       const byIssfId = { 1: isIssfLink(e.mIssfId, links.shooter1Id, candidates), 2: isIssfLink(e.fIssfId, links.shooter2Id, candidates) };
       // nova veza sa profilom (ili druga po ISSF ID-u) je izmena i kad su rezultati isti
       const newLink = old && ([1, 2] as const).some((slot) => {
@@ -214,7 +240,7 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
           disciplineId: disc.id,
           category,
           nocCode: e.nocCode,
-          teamNumber: e.teamNumber ?? 1,
+          teamNumber,
           competitionEventId,
           ...columns,
           ...links,

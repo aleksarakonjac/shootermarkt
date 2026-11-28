@@ -13,7 +13,7 @@ import { recomputeFormaCache } from "@/lib/forma-cache";
 import { FORMA_DISCIPLINE_CODES } from "@/lib/forma";
 import { loadShooterRoster, type ShooterRoster } from "@/lib/live-shooter-roster";
 import { stageRemarks } from "@/lib/sius-merge";
-import { teamLinkOnConflict } from "@/lib/mixed-team-link";
+import { alignTeamNumbers, pairKey, teamLinkOnConflict } from "@/lib/mixed-team-link";
 import { isUnrankedRemark } from "@shootermarkt/db/pdf-import-types";
 import { revalidateCompetitionPages } from "@/lib/revalidate-public";
 
@@ -452,13 +452,14 @@ async function processMixedTeamSlots(
     await fetchMixedTeamFromIssf(parseInt(issfId), mixedSlots, competitionId, roster, rows);
   }
 
-  // Same (comp, disc, noc, teamNumber) can appear from both a qual and a final
-  // slot in one run — merge instead of letting the batch insert collide.
-  const merged = new Map<string, typeof mixedTeamResults.$inferInsert>();
+  // Isti tim ume da dođe i iz kvalifikacionog i iz finalnog termina istog prolaza — spoji ga po članovima,
+  // jer broj tima zavisi od redosleda liste u toj fazi.
+  const merged = new Map<string, typeof mixedTeamResults.$inferInsert & { teamNumber: number }>();
   for (const r of rows) {
-    const key = `${r.competitionId}|${r.disciplineId}|${r.category}|${r.nocCode}|${r.teamNumber}`;
+    const row = { ...r, teamNumber: r.teamNumber ?? 1 };
+    const key = `${r.disciplineId}|${r.category}|${pairKey(row)}`;
     const prev = merged.get(key);
-    merged.set(key, { ...prev, ...r, remarkDetails: prev?.remarkDetails || r.remarkDetails ? { ...prev?.remarkDetails, ...r.remarkDetails } : undefined });
+    merged.set(key, { ...prev, ...row, remarkDetails: prev?.remarkDetails || r.remarkDetails ? { ...prev?.remarkDetails, ...r.remarkDetails } : undefined });
   }
   const dedupedRows = [...merged.values()];
   if (dedupedRows.length === 0) return 0;
@@ -466,9 +467,18 @@ async function processMixedTeamSlots(
   const snapshot = JSON.stringify(dedupedRows);
   if (lastWritten.get(snapshotKey) === snapshot) return 0;
 
+  // Tim ostaje u svom redu: broj se uzima od upisanog reda sa istim članovima.
+  const stored = await db.select({
+    disciplineId: mixedTeamResults.disciplineId, category: mixedTeamResults.category, nocCode: mixedTeamResults.nocCode, teamNumber: mixedTeamResults.teamNumber,
+    shooter1Name: mixedTeamResults.shooter1Name, shooter2Name: mixedTeamResults.shooter2Name, shooter1Id: mixedTeamResults.shooter1Id, shooter2Id: mixedTeamResults.shooter2Id,
+  }).from(mixedTeamResults).where(and(eq(mixedTeamResults.competitionId, competitionId), isNull(mixedTeamResults.competitionEventId)));
+  const eventOf = (r: { disciplineId: number; category?: AgeCategory | null }) => `${r.disciplineId}|${r.category}`;
+  const alignedRows = [...new Set(dedupedRows.map(eventOf))].flatMap((event) =>
+    alignTeamNumbers(dedupedRows.filter((r) => eventOf(r) === event), stored.filter((r) => eventOf(r) === event)));
+
   const written = await db
     .insert(mixedTeamResults)
-    .values(dedupedRows)
+    .values(alignedRows)
     .onConflictDoUpdate({
       // live upisuje samo glavni meč (competition_event_id null)
       target: [mixedTeamResults.competitionId, mixedTeamResults.competitionEventId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
