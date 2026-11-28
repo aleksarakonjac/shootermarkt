@@ -1,5 +1,6 @@
 import { parseCategory, type ParsedBilten, type ParsedEvent, type DisciplineCode } from "@shootermarkt/db/pdf-import-types";
 import { normalizeDisciplineCode } from "@shootermarkt/db/discipline";
+import { readRemarks } from "./sius-layout";
 
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
@@ -54,7 +55,7 @@ Za svaki event (tabela) u PDF-u izvuci:
     total — ukupan rezultat
     inners — broj centralnih desetki ("inner tens"), zapisan kao broj pored ukupnog rezultata sa oznakom x/X (npr. "23x" → 23). Prisutan kod Air Pistol (APM/APW) I MK puške trostav (R3PM/R3PW). Ako nema, null.
     qualified — true/false/null
-    remark — oznaka pored rezultata umesto/pored "Q": "RPO" (strelac van nacionalne kvote, ne može u finale bez obzira na plasman), "DSQ" (diskvalifikacija), "DNS" (nije nastupio), "DNF" (nije završio). Null ako nema oznake.
+    remark — oznaka pored rezultata umesto/pored "Q": "RPO" (strelac van nacionalne kvote, ne može u finale bez obzira na plasman), "DSQ" (diskvalifikacija), "DNS" (nije nastupio), "DNF" (nije završio). Null ako nema oznake. Godište odštampano u koloni Rem/Remarks nije oznaka — upiši ga u birth_year.
 
 Pravila:
 - Ignoriši TEAM, MIXED TEAM i KONTROLNI MEČ tabele
@@ -222,23 +223,28 @@ export async function parsePdfWithGemini(pdfBuffer: Buffer): Promise<ParsedBilte
       stage: e.stage === "final" ? "final" : "qualification",
       category: parseCategory(e.category),
       isInternational: e.is_international ?? false,
-      results: e.results.map((r) => ({
-        rank: r.rank,
-        bibNumber: r.bib_number,
-        lastName: r.last_name,
-        firstName: r.first_name,
-        teamNoc: (r.team_noc ?? "").toUpperCase(),
-        clubName: r.club_name ?? undefined,
-        birthYear: r.birth_year ?? null,
-        series: r.series ?? [],
-        seriesLabels: r.series_labels ?? null,
-        total: r.total,
-        inners: r.inners ?? null,
-        qualified: r.qualified ?? null,
-        remark: r.remark ?? null,
-        shots: r.shots ?? null,
-        cumulative: r.cumulative ?? null,
-      })),
+      results: e.results.map((r) => {
+        const marks = readRemarks([r.remark ?? ""]);
+        const year = Number(/\b(19|20)\d\d\b/.exec(r.remark ?? "")?.[0]) || null;
+        return {
+          rank: r.rank,
+          bibNumber: r.bib_number,
+          lastName: r.last_name,
+          firstName: r.first_name,
+          teamNoc: (r.team_noc ?? "").toUpperCase(),
+          clubName: r.club_name ?? undefined,
+          birthYear: r.birth_year ?? year,
+          series: r.series ?? [],
+          seriesLabels: r.series_labels ?? null,
+          total: r.total,
+          inners: r.inners ?? null,
+          qualified: r.qualified ?? (marks.qualified || null),
+          remark: marks.remark ?? (marks.extras?.shootOff ? "SO" : null),
+          extras: marks.extras,
+          shots: r.shots ?? null,
+          cumulative: r.cumulative ?? null,
+        };
+      }),
     }));
 
   return { events, rawText };

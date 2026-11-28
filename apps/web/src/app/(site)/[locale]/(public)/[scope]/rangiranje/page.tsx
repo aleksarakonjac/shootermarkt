@@ -2,6 +2,7 @@ export const revalidate = 300;
 
 import { db } from "@shootermarkt/db";
 import { shooters, clubs, results, disciplines, competitions, shooterFormaCache } from "@shootermarkt/db/schema";
+import { displayNoc } from "@shootermarkt/db/noc-list";
 import { eq, isNotNull, and, inArray, asc } from "drizzle-orm";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { ScopedLink } from "../../components/ScopedLink";
@@ -126,7 +127,7 @@ export default async function RangiranjeePage({ params, searchParams }: Props) {
         shooterId: r.shooterId,
         firstName: r.firstName,
         lastName: r.lastName,
-        nationality: r.nationality,
+        nationality: displayNoc(r.nationality),
         clubName: r.clubName,
         category: r.birthYear ? computeAgeCategoryFromBirthYear(r.birthYear) : (r.category as AgeCategory),
         bestInners: null,

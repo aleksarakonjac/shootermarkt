@@ -39,7 +39,7 @@ function teamCountry(nocCode: string) {
 function NationChip({ noc, flags, teamNumber, className }: { noc: string; flags: ReactNode[]; teamNumber: number; className: string }) {
   const codes = noc.split("/");
   return (
-    <span className={`${className} shrink-0 flex-col items-start gap-0.5 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-semibold text-[var(--ink)]`}>
+    <span className={`${className} shrink-0 flex-col items-start gap-0.5 rounded bg-[var(--surface-2)] px-1.5 py-0.5 font-[family-name:var(--font-jetbrains-mono)] text-[0.65rem] font-bold text-[var(--ink)]`}>
       {codes.map((code, i) => (
         <span key={code} className="flex items-center gap-1 whitespace-nowrap">
           {flags[i]}{code}{i === codes.length - 1 && <>{" "}<span className="text-[var(--subtle)]">{teamNumber}</span></>}
@@ -189,7 +189,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
       const body = (
           <SheetFrame en={en} header={<SheetStickyBar title={title} />} onPrev={si > 0 ? () => setSheetId(sorted[si - 1].id) : undefined} onNext={si < sorted.length - 1 ? () => setSheetId(sorted[si + 1].id) : undefined}>
             <div className="pr-10 sm:hidden">
-              <h2 aria-live="polite" className="text-xl font-semibold leading-tight text-[var(--ink)] break-words">{title}</h2>
+              <h2 aria-live="polite" className="text-xl font-bold leading-tight text-[var(--ink)] break-words"><span className="font-normal text-[var(--muted)]">{en ? "Team:" : "Tim:"}</span> {title}</h2>
               <p className="mt-1 flex items-center gap-2 text-base text-[var(--muted)]"><NocChip nationality={st.nocCode} /></p>
             </div>
             <SheetStats items={[
@@ -269,6 +269,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
         const cell = `flex items-center px-2 py-2.5 text-sm transition-colors sm:px-3 ${!isLast || isExpanded ? "border-b border-[var(--border)]" : ""}`;
         const memberCell = `flex min-w-0 items-center px-2 py-1.5 text-sm transition-colors sm:px-3`;
         const rounds = isMatch ? roundOutcomes(team) : null; const { noc, name: countryName, flags } = teamCountry(team.nocCode);
+        const teamName = team.clubName ?? `${countryName} ${team.teamNumber}`;
         // DSQ/DNS/DNF/RPO idu uz ukupan zbir: bez zbira (0.0 ne nosi informaciju) zamenjuju ga, a sa zbirom stoje kao mali label iznad.
         const status = remark(team) && STATUS_MARKS.has(remark(team)!) ? remark(team)! : null;
         const hasTotal = total(team) != null && Number(total(team)) > 0;
@@ -278,7 +279,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
           <div role="row" className={`group ${hasSeries || desktop ? "cursor-pointer" : ""} ${flashing.has(team.id) ? "result-row-flash" : ""}`} style={{ display: "contents" }} onClick={desktop ? () => setSheetId(sheetId === team.id ? null : team.id) : hasSeries ? () => toggle(team.id) : undefined}>
             <div className={`${cell} max-sm:!px-1.5 justify-end font-[family-name:var(--font-jetbrains-mono)] tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>{teamRank == null ? <span className="text-[var(--subtle)]">—</span> : isFinal && showMedals && teamRank <= 3 ? <span className="flex w-full justify-center"><MedalIcon rank={teamRank} /></span> : <span className={teamRank <= 3 && !isFinal ? "font-bold text-[var(--ink)]" : "text-[var(--muted)]"}>{teamRank}</span>}</div>
             <div className={`${cell} min-w-0 group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
-              <span className="hidden sm:inline min-w-0 truncate text-sm text-[var(--ink)]">{team.clubName ?? `${countryName} ${team.teamNumber}`}</span>
+              <span className="hidden sm:inline min-w-0 truncate text-sm font-bold text-[var(--ink)]">{teamName}</span>
             </div>
             <div className={`${cell} group-hover:bg-[var(--surface-2)]`} style={{ gridRow: `${r1} / span 2`, background: rowBg }}>
               <button type="button" onClick={(event) => { event.stopPropagation(); setSheetId(team.id); }} aria-label={`${en ? "Details" : "Detalji"}: ${noc} ${team.teamNumber}`} className="flex min-h-11 min-w-0 items-center sm:hidden"><NationChip noc={noc} flags={flags} teamNumber={team.teamNumber} className="flex" /></button>
@@ -295,7 +296,7 @@ export function MixedTeamQualTable({ teams, apparatus, stage = "qual", showMedal
             {hasSeries && seriesHeaders.map((_, i) => { const s2 = detail2(team)?.series; const v = s2?.[i]; return <div key={i} className={`hidden sm:flex ${cell} justify-end font-[family-name:var(--font-jetbrains-mono)] text-sm tabular-nums group-hover:bg-[var(--surface-2)]`} style={{ gridRow: r2, background: rowBg }}>{v != null ? <span className={!isFinal && v === Math.max(...(s2 ?? [])) ? "font-semibold text-[var(--ink)]" : "text-[var(--muted)]"}>{fmt(v)}</span> : !isFinal ? <span className="text-[var(--subtle)]">—</span> : null}</div>; })}
             <div className={subtotalCell} style={{ gridRow: r2, background: rowBg }}>{shooterTotal2(team) != null ? fmt(shooterTotal2(team)!) : <span className="text-[var(--subtle)]">—</span>}</div>
           </div>
-          <AnimatePresence initial={false}>{hasSeries && isExpanded && <motion.div role="row" initial={reducedMotion ? false : { height: 0, opacity: 0, y: -4 }} animate={{ height: "auto", opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { height: 0, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : 0.2 }} style={{ gridColumn: "1 / -1", gridRow: accordionRow, background: rowBg }} className={`min-h-0 overflow-hidden px-3 ${isMatch ? "" : "sm:hidden"} ${isLast ? "" : "border-b border-[var(--border)]"}`}>{rounds ? <MatchRoundsGrid rows={[{ name: team.shooter1Name, shots: detail1(team)?.series ?? [] }, { name: team.shooter2Name, shots: detail2(team)?.series ?? [] }]} sums={rounds.sums} won={rounds.won} fmt={fmt} /> : <div className="flex flex-col gap-2 py-2.5">{[{ name: team.shooter1Name, detail: detail1(team) }, { name: team.shooter2Name, detail: detail2(team) }].map(({ name, detail }, memberIndex) => detail?.series.length ? <div key={memberIndex} className="flex min-w-0 flex-col gap-1"><span className="truncate text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{name ?? "—"}</span><div className="grid gap-1.5" style={seriesGridStyle(seriesLen)}>{detail.series.map((value, seriesIndex) => <SeriesBox key={seriesIndex} text={fmt(value)} best={!isFinal && value === Math.max(...detail.series)} onSurface={index % 2 === 1} />)}</div></div> : null)}</div>}</motion.div>}</AnimatePresence>
+          <AnimatePresence initial={false}>{hasSeries && isExpanded && <motion.div role="row" initial={reducedMotion ? false : { height: 0, opacity: 0, y: -4 }} animate={{ height: "auto", opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { height: 0, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : 0.2 }} style={{ gridColumn: "1 / -1", gridRow: accordionRow, background: rowBg }} className={`min-h-0 overflow-hidden px-3 ${isMatch ? "" : "sm:hidden"} ${isLast ? "" : "border-b border-[var(--border)]"}`}><p className="pt-2.5 text-sm font-bold text-[var(--ink)] break-words sm:hidden">{teamName}</p>{rounds ? <MatchRoundsGrid rows={[{ name: team.shooter1Name, shots: detail1(team)?.series ?? [] }, { name: team.shooter2Name, shots: detail2(team)?.series ?? [] }]} sums={rounds.sums} won={rounds.won} fmt={fmt} /> : <div className="flex flex-col gap-2 py-2.5">{[{ name: team.shooter1Name, detail: detail1(team) }, { name: team.shooter2Name, detail: detail2(team) }].map(({ name, detail }, memberIndex) => detail?.series.length ? <div key={memberIndex} className="flex min-w-0 flex-col gap-1"><span className="truncate text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--subtle)]">{name ?? "—"}</span><div className="grid gap-1.5" style={seriesGridStyle(seriesLen)}>{detail.series.map((value, seriesIndex) => <SeriesBox key={seriesIndex} text={fmt(value)} best={!isFinal && value === Math.max(...detail.series)} onSurface={index % 2 === 1} />)}</div></div> : null)}</div>}</motion.div>}</AnimatePresence>
         </div>;
       })}
     </div></div>

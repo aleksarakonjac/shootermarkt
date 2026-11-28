@@ -9,7 +9,7 @@ import { db } from "@shootermarkt/db";
 import { shooters, clubs, results, competitions, shooterFormaCache } from "@shootermarkt/db/schema";
 import { eq, asc, and, isNotNull, inArray, sql, desc, gte } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { NOC_LIST, displayNoc } from "@shootermarkt/db/noc-list";
+import { NOC_LIST, displayNoc, nocsShownAs } from "@shootermarkt/db/noc-list";
 import { MVP_APPARATUS } from "@/lib/mvp-scope";
 import { matchedPreviousLastName, shooterNameLike } from "@/lib/previous-last-name";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
@@ -248,7 +248,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
 
   const sp           = await searchParams;
   const activeQ      = sp.q?.trim() ?? "";
-  const activeZemlja = sp.zemlja === "all" ? "" : (sp.zemlja ?? "");
+  const activeZemlja = sp.zemlja === "all" ? "" : (displayNoc(sp.zemlja) ?? "");
   const isAllCountries = sp.zemlja === "all";
   const activePol    = sp.pol ?? "";
   const activeAparat = sp.aparat ?? "";
@@ -268,7 +268,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
             .map((word) => shooterNameLike(word, "contains"))
         )
       : undefined,
-    activeZemlja ? eq(shooters.nationality, activeZemlja) : undefined,
+    activeZemlja ? inArray(shooters.nationality, nocsShownAs(activeZemlja)) : undefined,
     activePol    ? eq(shooters.gender, activePol) : undefined,
     activeAparat ? eq(shooters.apparatus, activeAparat) : undefined,
     activeGodiste ? eq(shooters.birthYear, Number(activeGodiste)) : undefined,
@@ -365,7 +365,7 @@ export default async function StrelciPage({ params, searchParams }: Props) {
   }
 
   const totalPages    = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-  const availableNocs = nocRows.map((r) => r.noc).filter(Boolean) as string[];
+  const availableNocs = [...new Set(nocRows.map((r) => displayNoc(r.noc)).filter(Boolean))] as string[];
   const availableBirthYears = birthYearRows.map((r) => r.birthYear).filter((year): year is number => year != null);
 
   // Stats bar

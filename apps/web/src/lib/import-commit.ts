@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@shootermarkt/db";
 import { clubs, competitionEvents, competitions, disciplines, results, shooters } from "@shootermarkt/db/schema";
 import { ensureCompetitionEvent } from "@/lib/competition-events";
@@ -132,6 +132,12 @@ export async function commitImportReview(payload: CommitPayload): Promise<Commit
       }
 
       let shooterId = row.shooterId;
+      // postojećem strelcu bilten dopunjuje prazno godište (novog dopunjava ensureShooter)
+      const listed = shooterId ? known.all.find((shooter) => shooter.id === shooterId) : undefined;
+      if (listed && !listed.birthYear && row.birthYear) {
+        await db.update(shooters).set({ birthYear: row.birthYear }).where(and(eq(shooters.id, listed.id), isNull(shooters.birthYear)));
+        listed.birthYear = row.birthYear;
+      }
       if (!shooterId) {
         const meta = DISCIPLINE_META[row.disciplineCode];
         shooterId = await ensureShooter({
