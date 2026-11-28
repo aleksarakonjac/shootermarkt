@@ -270,6 +270,8 @@ export interface ParsedEvent {
 export interface ParsedBilten {
   events: ParsedEvent[];
   mixedTeams?: MixedTeamEntry[];
+  /** Najraniji dan biltena = dan glavnog meča (SIUS PDF). */
+  mainDate?: string;
   /** Delovi biltena koji nisu uvezeni — prikazuju se adminu. */
   warnings?: string[];
   rawText?: string;
