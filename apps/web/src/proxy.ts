@@ -17,7 +17,9 @@ const NO_LOCALE_PREFIX = /^\/(?!sr(?:\/|$)|en(?:\/|$))/;
 function preferenceRedirect(request: NextRequest): NextResponse | null {
   const { pathname } = request.nextUrl;
   if (!NO_LOCALE_PREFIX.test(pathname)) return null;
-  const locale = request.cookies.get('pref_locale')?.value;
+  // A saved choice wins; otherwise the printed flyer QR code (?ref=flyer) lands on Serbian.
+  const locale = request.cookies.get('pref_locale')?.value
+    ?? (request.nextUrl.searchParams.get('ref') === 'flyer' ? 'sr' : undefined);
   if (locale !== 'sr' && locale !== 'en') return null;
   const rawScope = request.cookies.get('pref_scope')?.value;
   const scope = VALID_SCOPES.includes(rawScope ?? '') ? rawScope : 'srb';
