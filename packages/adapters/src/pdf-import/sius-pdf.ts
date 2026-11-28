@@ -144,11 +144,13 @@ export function parseSiusPages(pages: Item[][]): ParsedBilten | null {
     if (n > 1) e.eventName = matchEventName(n, e.eventDate!);
   }
   for (const [final, own] of ownQual) if (own) { final.eventName = own.eventName; final.eventDate = own.eventDate; }
+  const shotOn = new Map(all.map((e) => [e, e.eventDate]));
   for (const e of all) if (isMain.get(e)) { e.eventName = null; e.eventDate = null; }
+  const firstDate = [...shotOn.values()].sort()[0];
   const mixed = parseMixedTeams(teamPages, quals.flatMap((e) => e.results as ParsedShooterResult[]));
   useFinalNameSplit(all, mixed.entries);
   return {
-    events: all, hasFinals,
+    events: all, hasFinals, mainDate: firstDate ?? undefined,
     ...(mixed.entries.length ? { mixedTeams: mixed.entries } : {}),
     ...(mixed.warnings.length ? { warnings: mixed.warnings } : {}),
   };
