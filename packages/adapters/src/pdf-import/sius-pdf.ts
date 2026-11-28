@@ -245,9 +245,12 @@ function parseRows(items: Item[]): ParsedShooterResult[] {
   const end = items.find((it) => it.str === "Summary")?.y ?? items.find((it) => it.str.startsWith("Version of"))?.y ?? 0;
 
   const body = items.filter((it) => it.y < rank.y - 12 && it.y > end + 5);
+  const inName = (it: Item) => it.x >= name.x - 5 && it.x < noc.x - 5;
   const anchors = body
-    // red počinje imenom koje ima startni broj u istom redu: "ZIVKOVIC Andrija" ili "Gorša Petar"
-    .filter((it) => it.x >= name.x - 5 && it.x < noc.x - 5 && /^\p{Lu}\S* \S/u.test(it.str)
+    // red počinje imenom koje ima startni broj u istom redu: "ZIVKOVIC Andrija" ili "Gorša Petar";
+    // dugo ime se prelama pa u prvom redu ostane samo prezime
+    .filter((it) => inName(it) && /^\p{Lu}/u.test(it.str)
+      && (/ \S/.test(it.str) || body.some((next) => inName(next) && next.y < it.y - 3 && next.y > it.y - 14))
       && body.some((b) => b.x >= bib.x - 5 && b.x < name.x - 5 && Math.abs(b.y - it.y) <= 3 && /^\d+$/.test(b.str)))
     .sort((a, b) => b.y - a.y);
 
@@ -280,7 +283,7 @@ function parseRows(items: Item[]): ParsedShooterResult[] {
     return {
       rank: rankStr && /^\d+$/.test(rankStr) ? Number(rankStr) : null,
       bibNumber: bibStr && /^\d+$/.test(bibStr) ? Number(bibStr) : undefined,
-      ...splitName(anchor.str),
+      ...splitName([anchor, ...col(name.x - 5, noc.x - 5, wrap)].map((it) => it.str).join(" ")),
       ...nation,
       birthYear,
       series: scores.slice(0, -1).map((m) => Number(m[1])),
@@ -304,13 +307,15 @@ function parseAirFinalRows(items: Item[]): ParsedFinalResult[] | null {
   const end = header("Legend")?.y ?? items.find((it) => it.str.startsWith("Version of"))?.y ?? 0;
   const body = items.filter((it) => it.y < rank.y - 3 && it.y > end + 3);
   const anchors = body.filter((it) => it.x < rank.x + 12 && /^\d+$/.test(it.str)).sort((a, b) => b.y - a.y);
+  // zbirovi i hici počinju levo od zaglavlja prve kolone, u širem finalu i za više od 10 pt
+  const scoresX = stage.x - 20;
 
   const rows: ParsedFinalResult[] = [];
   for (const [i, anchor] of anchors.entries()) {
     const nextY = anchors[i + 1]?.y ?? -Infinity;
     const block = body.filter((it) => it.y <= anchor.y + 3 && it.y > nextY + 3);
     const col = (from: number, to: number) => block.filter((it) => it.x >= from && it.x < to).sort((a, b) => b.y - a.y || a.x - b.x);
-    const scores = col(stage.x - 5, remarks.x - 5).filter((it) => DECIMAL.test(it.str));
+    const scores = col(scoresX, remarks.x - 5).filter((it) => DECIMAL.test(it.str));
     const onFirstLine = (it: Item) => Math.abs(it.y - anchor.y) <= 3;
     const cumulative = scores.filter(onFirstLine).sort((a, b) => a.x - b.x).map((it) => Number(it.str));
     const shotSum = scores.filter((it) => !onFirstLine(it)).reduce((sum, it) => sum + Number(it.str), 0);
@@ -321,7 +326,7 @@ function parseAirFinalRows(items: Item[]): ParsedFinalResult[] | null {
     const verified = total == null ? isUnrankedRemark(remark) : Math.abs(shotSum - total) < 0.05;
     if (Number(anchor.str) !== i + 1 || !fullName || !verified) return null;
 
-    const nation = clubNation(col(noc.x - 10, stage.x - 5).map((it) => it.str).join(" "));
+    const nation = clubNation(col(noc.x - 10, scoresX).map((it) => it.str).join(" "));
     rows.push({
       rank: i + 1,
       ...splitName(fullName),

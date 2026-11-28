@@ -74,7 +74,8 @@ function parseTeamPage(items: Item[], isFinal: boolean): Team[] | null {
       athletes: athletes as Athlete[],
     });
   }
-  return teams.length ? teams : null;
+  // poslednja strana liste ume da nosi samo zbir i legendu
+  return teams.length || !body.some(startsAthlete) ? teams : null;
 }
 
 const athleteKey = (name: string) => name.toLowerCase();
