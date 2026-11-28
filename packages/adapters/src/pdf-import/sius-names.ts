@@ -13,7 +13,8 @@ export function splitName(full: string): Person & { fullName?: string } {
   const title = (w: string) => w.toLowerCase().replace(/(^|[-' ])\p{L}/gu, (c) => c.toUpperCase());
   return {
     lastName: title(words.slice(0, cut).join(" ")),
-    firstName: words.slice(cut).join(" "),
+    // sve velikim slovima (prelomljeno ime): i ime dobija obična slova
+    firstName: firstLower === -1 ? title(words.slice(cut).join(" ")) : words.slice(cut).join(" "),
     ...(firstLower === 0 && words.length > 2 ? { fullName: full } : {}),
   };
 }

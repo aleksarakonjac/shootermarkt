@@ -48,10 +48,15 @@ export function matchTeamMembers(teamResults: TeamResultEntry[], mixed: MixedTea
       const [mNoc, fNoc = mNoc] = t.nocCode.split("/");
       const m = resolve({ firstName: t.mFirstName, lastName: t.mLastName, teamNoc: mNoc }, t.disciplineCode, t.category, t.eventDate);
       const f = resolve({ firstName: t.fFirstName, lastName: t.fLastName, teamNoc: fNoc }, t.disciplineCode, t.category, t.eventDate);
+      // redosled članova nije pol (međunarodni miks navodi ženu prvu): pol daje pojedinačna lista
+      const listed = (firstName: string, lastName: string) => rowByName.get(rowKey({ firstName, lastName }, t.disciplineCode))?.gender;
+      const opposite = (gender: "M" | "F") => (gender === "M" ? "F" : "M");
+      const fListed = listed(t.fFirstName, t.fLastName);
+      const mGender = listed(t.mFirstName, t.mLastName) ?? (fListed ? opposite(fListed) : "M");
       return {
         ...t, createMissing: true,
-        mShooterId: m.shooterId, mIsNew: m.isNew, mSuggestedShooterId: m.suggestedShooterId, mSuggestedName: m.suggestedName, mGender: "M" as const,
-        fShooterId: f.shooterId, fIsNew: f.isNew, fSuggestedShooterId: f.suggestedShooterId, fSuggestedName: f.suggestedName, fGender: "F" as const,
+        mShooterId: m.shooterId, mIsNew: m.isNew, mSuggestedShooterId: m.suggestedShooterId, mSuggestedName: m.suggestedName, mGender,
+        fShooterId: f.shooterId, fIsNew: f.isNew, fSuggestedShooterId: f.suggestedShooterId, fSuggestedName: f.suggestedName, fGender: fListed ?? opposite(mGender),
       };
     }),
   };
