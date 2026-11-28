@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { effectiveFocusPriority } from "./competition-priority";
-import { formatTickerNextTime, isElimRoundLive,selectHomepageFocusCompetitions, getTickerScheduleState, getTickerScheduleStatus, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectHomepageDisplayPhases, selectTickerCompletedSlots, selectTickerUpcoming } from "./homepage-data";
+import { formatTickerNextTime, isElimRoundLive,selectHomepageFocusCompetitions, getTickerScheduleState, getTickerScheduleStatus, groupTopFormaScores, isCompetitionLive, selectHomepageCurrentPhases, selectHomepageDisplayPhases, selectTickerCompletedSlots, selectTickerUpcoming, slotsPerMatch } from "./homepage-data";
 import { getTickerSlotEnd, isTickerSlotLive } from "./ticker-schedule";
 
 describe("selectTickerUpcoming", () => {
@@ -225,5 +225,34 @@ describe("competition focus priority", () => {
       const out = selectHomepageFocusCompetitions([worldCup], "2026-10-15", none, 3, [pin(99, 0)]);
       expect(out.map((c) => c.id)).toEqual([1]);
     });
+  });
+});
+
+describe("slotsPerMatch", () => {
+  const competition = { date: "2026-11-27", dateEnd: "2026-11-28", timezone: "Europe/Belgrade" };
+  const codes = new Map([[1, "APM"]]);
+  const events = [{ id: 7, date: "2026-11-28" }];
+  const row = (competitionEventId: number | null) => ({ disciplineId: 1, category: "senior", competitionEventId, qualRank: 1, elimRank: null, finalRank: null });
+  const slot = (day: string, stage = "qual") => ({ discCode: "APM", disciplineId: 1, stage, category: "senior", startTime: new Date(`${day}T09:00:00Z`), endTime: new Date(`${day}T11:00:00Z`) });
+  const pairs = (slots: Array<{ eventId: number | null; stage: string; startTime: Date }>) => slots.map((s) => `${s.eventId}:${s.stage}:${s.startTime.toISOString().slice(0, 10)}`);
+
+  it("jedan meč dobija sve svoje termine, bez obzira na dan", () => {
+    expect(pairs(slotsPerMatch(competition, events, [slot("2026-11-27"), slot("2026-11-28", "final")], [row(7)], [], codes))).toEqual(["7:qual:2026-11-27", "7:final:2026-11-28"]);
+  });
+  it("dva meča iste discipline dele termine po danu", () => {
+    expect(pairs(slotsPerMatch(competition, events, [slot("2026-11-27"), slot("2026-11-28")], [row(null), row(7)], [], codes))).toEqual(["null:qual:2026-11-27", "7:qual:2026-11-28"]);
+  });
+  it("termin posle dana meča (finale sutradan) ostaje tom meču", () => {
+    const slots = slotsPerMatch(competition, [{ id: 7, date: "2026-11-27" }, { id: 8, date: "2026-11-28" }], [slot("2026-11-27"), slot("2026-11-28"), slot("2026-11-29", "final")], [row(7), row(8)], [], codes);
+    expect(pairs(slots)).toEqual(["7:qual:2026-11-27", "8:qual:2026-11-28", "8:final:2026-11-29"]);
+  });
+  it("bez rasporeda svaki meč dobija fazu iz rezultata sa svojim datumom", () => {
+    expect(pairs(slotsPerMatch(competition, events, [], [row(null), row(7)], [], codes))).toEqual(["null:qual:2026-11-27", "7:qual:2026-11-28"]);
+  });
+  it("meč bez svog termina ne nestaje sa kartice", () => {
+    expect(pairs(slotsPerMatch(competition, events, [slot("2026-11-28")], [row(null), row(7)], [], codes))).toEqual(["7:qual:2026-11-28", "null:qual:2026-11-27"]);
+  });
+  it("termin bez rezultata ostaje (faza u toku)", () => {
+    expect(pairs(slotsPerMatch(competition, events, [slot("2026-11-28")], [], [], codes))).toEqual(["null:qual:2026-11-28"]);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSiusFinalDetails } from "./final-detail";
-import { hasNoFinalMark, noFinalKey, shouldShowFinalMedals, shouldShowQualMedals } from "./final-medals";
+import { noFinalKey, shouldShowFinalMedals, shouldShowQualMedals } from "./final-medals";
 
 const at = (iso: string) => new Date(iso);
 const slot = { startTime: "2026-10-15T10:00:00Z", endTime: "2026-10-15T10:45:00Z" };
@@ -35,10 +35,8 @@ describe("bez finala", () => {
     expect(shouldShowQualMedals([])).toBe(true);
   });
 
-  it("ključ nosi meč, a kartica ga prepoznaje u bilo kom meču iste kategorije", () => {
+  it("ključ nosi meč", () => {
     expect(noFinalKey("ARM", null, "senior")).toBe("ARM|senior");
     expect(noFinalKey("ARM", 12, "senior")).toBe("ARM@12|senior");
-    expect(hasNoFinalMark(["ARM@12|senior"], "ARM", "senior")).toBe(true);
-    expect(hasNoFinalMark(["ARM|junior"], "ARM", "senior")).toBe(false);
   });
 });
