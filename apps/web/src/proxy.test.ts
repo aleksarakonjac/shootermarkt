@@ -25,4 +25,15 @@ describe("proxy redirects keep the query string", () => {
     );
   });
 
+  it("flyer QR without a saved choice → Serbian", async () => {
+    expect(await location("https://shootermarkt.com/?ref=flyer")).toBe(
+      "https://shootermarkt.com/sr/srb?ref=flyer",
+    );
+  });
+
+  it("flyer QR with a saved English choice → stays English", async () => {
+    expect(await location("https://shootermarkt.com/?ref=flyer", "pref_locale=en")).toBe(
+      "https://shootermarkt.com/en/srb?ref=flyer",
+    );
+  });
 });
