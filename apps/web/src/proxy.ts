@@ -22,7 +22,7 @@ function preferenceRedirect(request: NextRequest): NextResponse | null {
   const rawScope = request.cookies.get('pref_scope')?.value;
   const scope = VALID_SCOPES.includes(rawScope ?? '') ? rawScope : 'srb';
   const rest = pathname === '/' ? '' : pathname;
-  return NextResponse.redirect(new URL(`/${locale}/${scope}${rest}`, request.url), 307);
+  return NextResponse.redirect(withSearch(`/${locale}/${scope}${rest}`, request), 307);
 }
 
 function scopeRedirect(request: NextRequest): NextResponse | null {
@@ -33,7 +33,14 @@ function scopeRedirect(request: NextRequest): NextResponse | null {
   const firstSegment = rest.split('/').filter(Boolean)[0];
   if (firstSegment && VALID_SCOPES.includes(firstSegment)) return null;
   const target = rest && rest !== '/' ? `/${locale}/srb${rest}` : `/${locale}/srb`;
-  return NextResponse.redirect(new URL(target, request.url), 308);
+  return NextResponse.redirect(withSearch(target, request), 308);
+}
+
+// Keep the query string (e.g. ?ref=flyer from the printed QR code) across redirects.
+function withSearch(pathname: string, request: NextRequest): URL {
+  const url = new URL(pathname, request.url);
+  url.search = request.nextUrl.search;
+  return url;
 }
 
 export async function proxy(request: NextRequest) {
