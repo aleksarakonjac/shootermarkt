@@ -15,8 +15,9 @@ import { TopFormaClient } from "./top-forma-client";
 import { useHomepageDataStatus } from "./homepage-data-status";
 import { LEVEL_STYLE } from "@/lib/competition-utils";
 import { MainSkeleton, TickerSkeleton } from "./homepage-skeleton";
-import { isSportPistolCode, MIXED_TEAM_CODES, qualHasDecimals } from "@shootermarkt/db/pdf-import-types";
+import { isSportPistolCode, MIXED_TEAM_CODES, qualHasDecimals, type AgeCategory } from "@shootermarkt/db/pdf-import-types";
 import type { HomepageMainData } from "@/lib/homepage-data";
+import { categoryLabel } from "@/lib/match-name";
 
 type ResultPlace = { firstName: string; lastName: string; clubName: string | null; nationality: string | null; countryCode2: string | null; qualRank: number | null; qualTotal: number; finalTotal: number | null; finalRank: number | null; rpo?: boolean };
 
@@ -205,11 +206,9 @@ export function HomepageTickerClient() {
 }
 
 type PhaseKeyInput = { stage: string; elimRound?: number | null; category: string };
-/** Oznake starosnih kategorija na In focus karticama (en, sr); senior je bez oznake. */
-const CATEGORY_BADGE: Record<string, [string, string] | null> = {
-  senior: null, open: null,
-  junior: ["JUNIOR", "JUNIORI"], mladji_junior: ["U-18", "MLAĐI JUNIORI"], kadet: ["U-16", "KADETI"],
-  mladji_senior: ["U-23", "MLAĐI SENIORI"], pionir: ["PIONEER", "PIONIRI"], master: ["MASTER", "MASTERI"],
+/** Starosne kategorije sa oznakom na In focus karticama (en tekst; sr uzima pun naziv sa uzrastom). Senior i open su bez oznake. */
+const CATEGORY_BADGE_EN: Record<string, string> = {
+  junior: "JUNIOR", mladji_junior: "U-18", kadet: "U-16", mladji_senior: "U-23", pionir: "PIONEER", master: "MASTER",
 };
 
 /** Lokacija + oznaka države (zastava i NOC) uz naziv takmičenja. */
@@ -341,13 +340,14 @@ export function HomepageMainClient({ initialData }: { initialData?: HomepageMain
             .toSorted((a, b) => Number(b.stage === "final") - Number(a.stage === "final"));
           if (shownPhases.length === 0) return null;
           const discBadge = <span className="shrink-0 inline-block leading-none font-[family-name:var(--font-barlow-condensed)] text-[17px] font-bold uppercase tracking-[0.04em] text-[var(--ink)]">{DISC_FULL_NAMES[disc.discCode]?.[locale === "en" ? "en" : "sr"] ?? disc.discCode}</span>;
-          const categoryLabel = CATEGORY_BADGE[disc.category]?.[locale === "en" ? 0 : 1] ?? null;
-          const junBadge = categoryLabel ? <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>{categoryLabel}</span> : null;
+          const badgeEn = CATEGORY_BADGE_EN[disc.category];
+          const ageBadge = badgeEn && (locale === "en" ? badgeEn : categoryLabel(disc.category as AgeCategory, "sr"));
+          const junBadge = ageBadge ? <span className="shrink-0 text-xs font-extrabold uppercase tracking-wider px-1 py-0.5 rounded" style={{ background: "var(--level-regional-bg)", color: "var(--level-regional-fg)" }}>{ageBadge}</span> : null;
           const liveBadge = disc.isLive ? <LiveBadge className="inline-flex shrink-0 rounded bg-[var(--brand-primary)] px-1.5 py-0.5 text-xs font-extrabold uppercase tracking-wider text-white">LIVE</LiveBadge> : null;
           return (
             <div key={`${disc.discCode}:${disc.category}`} className="py-2 first:pt-0 last:pb-0 flex flex-col gap-1.5">
               {/* Naziv discipline vodi na prvu prikazanu fazu (finale ako postoji, inače kvalifikacije). */}
-              <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="relative flex w-fit items-center gap-1 no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']">{discBadge}{junBadge}<ArrowUpRight size={15} strokeWidth={2.25} aria-hidden="true" className="shrink-0 text-[var(--muted)]" />{disc.awardsQuota && <span title={locale === "en" ? "Olympic quota places awarded" : "Dodeljuju se olimpijske kvote"} className="ml-0.5 flex"><OlympicRings height={12} /></span>}</ScopedLink>
+              <ScopedLink href={phaseHref(competitionId, disc.discCode, shownPhases[0].stage, shownPhases[0].category)} className="relative flex w-fit max-w-full flex-wrap items-center gap-1 no-underline hover:opacity-80 transition-opacity after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']">{discBadge}<span className="flex items-center gap-1">{junBadge}<ArrowUpRight size={15} strokeWidth={2.25} aria-hidden="true" className="shrink-0 text-[var(--muted)]" /></span>{disc.awardsQuota && <span title={locale === "en" ? "Olympic quota places awarded" : "Dodeljuju se olimpijske kvote"} className="ml-0.5 flex"><OlympicRings height={12} /></span>}</ScopedLink>
               {shownPhases.map((phase) => {
                 const decimals = phase.stage === "elimination" || (!qualHasDecimals(disc.discCode) && phase.stage !== "final") || isSportPistolCode(disc.discCode) ? 0 : 1;
                 const stageBadge = <span className="shrink-0 font-[family-name:var(--font-jetbrains-mono)] text-xs font-bold px-1 py-0.5 rounded bg-[var(--surface-2)] text-[var(--ink)]">{phase.stage === "elimination" ? `E${phase.elimRound ?? ""}` : phase.stage === "final" ? "F" : "Q"}</span>;
