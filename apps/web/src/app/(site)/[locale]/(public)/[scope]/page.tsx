@@ -43,9 +43,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     <HomepageTickerClient />
     <div className="mx-auto max-w-7xl px-4 pt-5 pb-8 sm:px-6 lg:px-8">
       <HomepageRetryNotice />
-      <FirstVisitIntro />
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2"><HomepageBlockBoundary><Suspense fallback={<HomepageMainLoading />}><HomepageMain data={homepageData} /></Suspense></HomepageBlockBoundary></div>
+        <div className="lg:col-span-2"><FirstVisitIntro /><HomepageBlockBoundary><Suspense fallback={<HomepageMainLoading />}><HomepageMain data={homepageData} /></Suspense></HomepageBlockBoundary></div>
         <aside className="flex flex-col gap-8"><HomepageBlockBoundary silent><Suspense fallback={null}><HomepageSidebarNews data={homepageData} /></Suspense></HomepageBlockBoundary><CalendarModule /><QuickH2HClient /></aside>
       </div>
     </div>
