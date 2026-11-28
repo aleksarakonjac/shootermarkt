@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSiusFinalDetails } from "./final-detail";
-import { shouldShowFinalMedals } from "./final-medals";
+import { hasNoFinalMark, noFinalKey, shouldShowFinalMedals, shouldShowQualMedals } from "./final-medals";
 
 const at = (iso: string) => new Date(iso);
 const slot = { startTime: "2026-10-15T10:00:00Z", endTime: "2026-10-15T10:45:00Z" };
@@ -22,5 +22,23 @@ describe("shouldShowFinalMedals", () => {
     const finished = buildSiusFinalDetails("R3PM", [{ series: series(5) }, { series: series(5) }, { series: series(4) }]);
     expect(shouldShowFinalMedals(slot, unfinished, at("2026-10-15T10:30:00Z"))).toBe(false);
     expect(shouldShowFinalMedals(slot, finished, at("2026-10-15T10:30:00Z"))).toBe(true);
+  });
+});
+
+describe("bez finala", () => {
+  const slot = (start: string, end: string) => ({ startTime: start, endTime: end });
+  const relays = [slot("2026-01-01T09:00:00Z", "2026-01-01T10:00:00Z"), slot("2026-01-01T12:00:00Z", "2026-01-01T13:00:00Z")];
+
+  it("medalje tek posle poslednje partije; bez satnice odmah", () => {
+    expect(shouldShowQualMedals(relays, new Date("2026-01-01T11:00:00Z"))).toBe(false);
+    expect(shouldShowQualMedals(relays, new Date("2026-01-01T13:30:00Z"))).toBe(true);
+    expect(shouldShowQualMedals([])).toBe(true);
+  });
+
+  it("ključ nosi meč, a kartica ga prepoznaje u bilo kom meču iste kategorije", () => {
+    expect(noFinalKey("ARM", null, "senior")).toBe("ARM|senior");
+    expect(noFinalKey("ARM", 12, "senior")).toBe("ARM@12|senior");
+    expect(hasNoFinalMark(["ARM@12|senior"], "ARM", "senior")).toBe(true);
+    expect(hasNoFinalMark(["ARM|junior"], "ARM", "senior")).toBe(false);
   });
 });

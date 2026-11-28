@@ -6,6 +6,7 @@ import { effectiveFocusPriority } from "@/lib/competition-priority";
 import { rankedFormaCacheFilter } from "@/lib/forma-query";
 import { buildCompetitionScopeFilter, type Scope } from "@/lib/scope";
 import { medalStage } from "@/lib/medal-phase";
+import { hasNoFinalMark, isQualOnlyDiscipline } from "@/lib/final-medals";
 import { getTickerSlotEnd, isTickerSlotLive } from "@/lib/ticker-schedule";
 import { splitDisplayName } from "@shootermarkt/adapters/sius/public-adapter";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
@@ -528,7 +529,9 @@ export async function getHomepageMain(scope: Scope) {
       // Serbian shooter who appeared in E but has no qualification result.
       const visiblePhases = selectHomepageDisplayPhases(group.phases, scope);
       const stateOf = (phase?: (typeof group.phases)[number]) => phase && { isLive: phase.isLive, hasResults: phase.top3.length > 0 };
+      const markedNoFinal = hasNoFinalMark(competition.noFinalGroups, group.discCode, group.category);
       const medal = medalStage({
+        markedNoFinal,
         discCode: group.discCode,
         level: competition.level,
         competitionOver: (competition.dateEnd ?? competition.date) < today,
@@ -541,6 +544,7 @@ export async function getHomepageMain(scope: Scope) {
       isJunior: group.isJunior,
       category: group.category,
       isLive: group.isLive,
+      noFinal: isQualOnlyDiscipline(group.discCode) || (markedNoFinal && !group.phases.some((p) => p.stage === "final" && p.top3.length > 0)),
       awardsQuota: group.category === "senior" && quotaKeys.has(`${competition.id}:${group.discCode}`),
       phases: visiblePhases.map((phase) => ({
         stage: phase.stage,

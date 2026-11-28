@@ -27,7 +27,7 @@ import { TeamResultsTable } from "@/components/result-display/TeamResultsTable";
 import type { TeamRow } from "@/lib/competition-teams";
 import { startNavigationProgress, finishNavigationProgress } from "@/components/NavigationProgress";
 import { isOlympicDiscipline } from "@/lib/olympic-disciplines";
-import { isQualOnlyDiscipline, shouldShowFinalMedals, type FinalSlot } from "@/lib/final-medals";
+import { isQualOnlyDiscipline, shouldShowFinalMedals, shouldShowQualMedals, type FinalSlot } from "@/lib/final-medals";
 import { normalizeFinalDetailsForDisplay } from "@/lib/final-detail";
 import { categoryLabel, localizeMatchName } from "@/lib/match-name";
 import { disciplineFamily, filterOptions, matchesFilters, type Facets, type Family, type Filters, type Gender } from "@/lib/competition-result-filters";
@@ -127,6 +127,8 @@ interface Props {
   finalSlots?: Array<FinalSlot & { disciplineCode: string; category: string }>;
   /** Satnica kvalifikacija: za discipline bez finala medalje se prikazuju tek kad su kvalifikacije gotove. */
   qualSlots?: Array<FinalSlot & { disciplineCode: string; category: string }>;
+  /** Admin oznake "nema finala" (`noFinalKey`). */
+  noFinalGroups?: string[];
   /** Prvi i poslednji dan takmičenja (ISO): dok traje pregled je po danima, posle po puška/pištolj. */
   dateFrom?: string;
   dateTo?: string | null;
@@ -266,7 +268,7 @@ function CompetitionResultsWithSearch(props: Props) {
   return <CompetitionResultsView {...props} search={useSearchParams().toString()} />;
 }
 
-function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel, timezone, finalSlots = [], qualSlots = [], liveWindows = NO_WINDOWS, dateFrom, dateTo, endedOnServer = false, search }: Props & { search: string }) {
+function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel, timezone, finalSlots = [], qualSlots = [], noFinalGroups = [], liveWindows = NO_WINDOWS, dateFrom, dateTo, endedOnServer = false, search }: Props & { search: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const detailRef = useRef<HTMLDivElement>(null);
@@ -417,6 +419,7 @@ function CompetitionResultsView({ groups, mixedGroups, locale, competitionLevel,
             competitionLevel={competitionLevel}
             finalSlots={finalSlots}
             qualSlots={qualSlots}
+            noFinalGroups={noFinalGroups}
             onRefresh={refreshNow}
             refreshing={refreshing}
             onBack={() => {
@@ -911,6 +914,7 @@ function CompetitionDetail({
   competitionLevel,
   finalSlots,
   qualSlots,
+  noFinalGroups,
   onRefresh,
   refreshing,
   onBack,
@@ -923,6 +927,7 @@ function CompetitionDetail({
   competitionLevel?: string;
   finalSlots: NonNullable<Props["finalSlots"]>;
   qualSlots: NonNullable<Props["qualSlots"]>;
+  noFinalGroups: string[];
   onRefresh: () => void;
   refreshing: boolean;
   onBack: () => void;
@@ -1119,11 +1124,11 @@ function CompetitionDetail({
     now,
   );
 
-  // Discipline bez finala: medalje u tabeli kvalifikacija, kad su kvalifikacije završene.
-  const qualSlot = selection.kind === "individual"
-    ? qualSlots.find((slot) => slot.disciplineCode === selection.disciplineCode && slot.category === selection.category)
-    : undefined;
-  const showQualMedals = selection.kind === "individual" && isQualOnlyDiscipline(selection.disciplineCode) && shouldShowFinalMedals(qualSlot, [], now);
+  // Bez finala (format discipline ili admin oznaka): medalje u tabeli kvalifikacija, kad su kvalifikacije završene.
+  const showQualMedals = selection.kind === "individual"
+    && (isQualOnlyDiscipline(selection.disciplineCode.split("@")[0])
+      || (!hasFinal && noFinalGroups.includes(`${selection.disciplineCode}|${selection.category}`)))
+    && shouldShowQualMedals(qualSlots.filter((slot) => slot.disciplineCode === selection.disciplineCode && slot.category === selection.category), now);
 
   const teamRows = catGroup?.teams ?? [];
 

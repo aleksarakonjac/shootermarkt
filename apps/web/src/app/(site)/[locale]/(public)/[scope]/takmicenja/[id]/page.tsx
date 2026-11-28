@@ -503,7 +503,7 @@ export default async function CompetitionPage({ params }: Props) {
           {/* Telefon: pretraga faze (ResultSearch) se portuje ovde, desno od naslova. */}
           <div id="results-search-slot" className="flex min-w-0 flex-1 justify-end sm:hidden" />
         </div>
-        <CompetitionResultsClient formaByKey={formaByKey} groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} timezone={comp.timezone ?? undefined} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} qualSlots={scheduleSlots.filter((slot) => slot.stage === "qual")} dateFrom={comp.date} dateTo={comp.dateEnd} endedOnServer={endedOnServer} liveWindows={scheduleSlots} />
+        <CompetitionResultsClient formaByKey={formaByKey} groups={groups} mixedGroups={mixedGroups} competitionId={comp.id} locale={locale} competitionLevel={comp.level} timezone={comp.timezone ?? undefined} finalSlots={scheduleSlots.filter((slot) => slot.stage === "final")} qualSlots={scheduleSlots.filter((slot) => slot.stage.startsWith("qual"))} noFinalGroups={comp.noFinalGroups} dateFrom={comp.date} dateTo={comp.dateEnd} endedOnServer={endedOnServer} liveWindows={scheduleSlots} />
       </div>
 
       <RelatedNewsSection type="competition" refId={compId} locale={locale} />

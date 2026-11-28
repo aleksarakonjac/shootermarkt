@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CompetitionResultGroup } from "@/app/api/admin/competitions/[id]/results/route";
+import { noFinalKey } from "@/lib/final-medals";
 
 const CATEGORY_LABELS: Record<string, string> = {
   senior: "Seniori", junior: "Juniori", youth_junior: "Mlađi juniori", cadet: "Kadeti", u23: "U23",
@@ -56,6 +57,26 @@ export function ResultsManager({ competitionId }: { competitionId: number }) {
     }
   }
 
+  async function toggleNoFinal(group: CompetitionResultGroup, noFinal: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/competitions/${competitionId}/results`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: noFinalKey(group.code, group.eventId, group.category), noFinal }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Greška pri čuvanju");
+      await load();
+      router.refresh();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const disciplineTotal = (g: CompetitionResultGroup) =>
     (groups ?? []).filter((x) => x.kind === g.kind && x.disciplineId === g.disciplineId).reduce((s, x) => s + x.count, 0);
 
@@ -69,7 +90,7 @@ export function ResultsManager({ competitionId }: { competitionId: number }) {
   return (
     <div className="mt-8 rounded-xl border border-[var(--border)] p-5">
       <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1">Rezultati</h2>
-      <p className="text-xs text-[var(--muted)] mb-4">Briši rezultate cele discipline ili samo jednog meča/kategorije. Takmičenje i ostale discipline ostaju.</p>
+      <p className="text-xs text-[var(--muted)] mb-4">&bdquo;Bez finala&ldquo;: medalje se dodeljuju posle kvalifikacija. Brisanje cele discipline ili jednog meča/kategorije ne dira takmičenje ni ostale discipline.</p>
 
       {error && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       {groups === null && !error && <p className="text-sm text-[var(--muted)]">Učitavam…</p>}
@@ -92,7 +113,7 @@ export function ResultsManager({ competitionId }: { competitionId: number }) {
                   Obriši disciplinu
                 </button>
               </div>
-              {list.length > 1 || first.eventName || first.category !== "senior" ? (
+              {first.kind === "individual" || list.length > 1 || first.eventName || first.category !== "senior" ? (
                 <ul className="divide-y divide-[var(--border)]">
                   {list.map((g) => (
                     <li key={groupKey(g)} className="flex items-center justify-between gap-3 px-3 py-1.5 text-sm">
@@ -101,13 +122,21 @@ export function ResultsManager({ competitionId }: { competitionId: number }) {
                         {g.kind === "mixed" ? " · tim" : ""}
                         <span className="text-[var(--muted)]"> · {g.count}</span>
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setPending({ scope: "group", group: g })}
-                        className="shrink-0 text-xs font-semibold text-red-600 hover:underline"
-                      >
-                        Obriši
-                      </button>
+                      <span className="flex shrink-0 items-center gap-4">
+                        {g.kind === "individual" && (
+                          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-[var(--muted)]">
+                            <input type="checkbox" checked={g.noFinal ?? false} disabled={busy} onChange={(e) => void toggleNoFinal(g, e.target.checked)} />
+                            Bez finala
+                          </label>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setPending({ scope: "group", group: g })}
+                          className="text-xs font-semibold text-red-600 hover:underline"
+                        >
+                          Obriši
+                        </button>
+                      </span>
                     </li>
                   ))}
                 </ul>
