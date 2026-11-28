@@ -1,4 +1,5 @@
-export const revalidate = 86400;
+// Satni revalidate: istaknuto takmičenje „u toku" zavisi od današnjeg datuma.
+export const revalidate = 3600;
 
 import type { CSSProperties, ReactNode } from "react";
 import type { Metadata } from "next";
@@ -55,6 +56,7 @@ const TEXT = {
     qualPlace: "Mesto u kvalifikacijama",
     totalLabel: "ukupno",
     rankingClose: "Zaključenje liste",
+    live: "U toku",
   },
   en: {
     title: "Olympic quotas · LA 2028",
@@ -80,6 +82,7 @@ const TEXT = {
     qualPlace: "Place in qualification",
     totalLabel: "total",
     rankingClose: "List closes",
+    live: "Live",
   },
 };
 
@@ -161,6 +164,10 @@ export default async function OlympicQuotasPage({ params }: Props) {
   const serbian = overview.disciplines.flatMap((d) =>
     d.slots.flatMap((s) => (s.holder?.nationality === "SRB" ? [{ code: d.code, slot: s, holder: s.holder }] : []))
   );
+
+  // Takmičenja sa kvotama koja traju danas (po beogradskom datumu): izdvajaju se iznad svega.
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Belgrade" });
+  const ongoing = overview.sources.filter((s) => s.kind === "competition" && s.date != null && s.date <= today && today <= (s.dateEnd ?? s.date));
 
   const codes = overview.disciplines.map((d) => d.code);
   const gridCols = `minmax(0,1fr) repeat(${codes.length}, 3.5rem) 3.75rem`;
@@ -295,6 +302,16 @@ export default async function OlympicQuotasPage({ params }: Props) {
     );
   }
 
+  /** Mesta jednog izvora po disciplinama: tri kolone na širokom ekranu, zbijeniji redovi strelaca. */
+  const sourceGrid = (s: QuotaSource) => (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {s.disciplines.map((d) => (
+        <DisciplineBlock key={d.code} code={d.code} awarded={d.awarded} places={d.places} slots={d.slots} showSource={false} compact
+          href={s.competitionId != null ? `/takmicenja/${s.competitionId}?result=individual&disc=${d.code}&stage=${d.slots[0]?.basis === "qualification" ? "qual" : "final"}&category=senior` : undefined} />
+      ))}
+    </div>
+  );
+
   const ledger = (
     <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)]">
       {/* Zaglavlje kolona: discipline (samo desktop; na telefonu svaki red nosi svoje oznake) */}
@@ -362,13 +379,7 @@ export default async function OlympicQuotasPage({ params }: Props) {
                 }
               >
                 <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 pb-3 pt-4">
-                  {/* Tri kolone na širokom ekranu, zbijeniji redovi strelaca. */}
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {s.disciplines.map((d) => (
-                      <DisciplineBlock key={d.code} code={d.code} awarded={d.awarded} places={d.places} slots={d.slots} showSource={false} compact
-                        href={s.competitionId != null ? `/takmicenja/${s.competitionId}?result=individual&disc=${d.code}&stage=${d.slots[0]?.basis === "qualification" ? "qual" : "final"}&category=senior` : undefined} />
-                    ))}
-                  </div>
+                  {sourceGrid(s)}
                 </div>
               </Disclosure>
             </li>
@@ -510,6 +521,34 @@ export default async function OlympicQuotasPage({ params }: Props) {
           <p className="rounded-xl border border-[var(--border)] bg-[var(--surface)] py-16 text-center text-sm text-[var(--muted)]">{t.empty}</p>
         ) : (
           <>
+            {ongoing.map((s) => (
+              <section key={s.key} className="mb-12 overflow-hidden rounded-xl border border-[var(--live-border)]" aria-labelledby={`live-${s.key}`}>
+                <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-4">
+                  <div className="min-w-0">
+                    <p className="mb-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                      <span className={`inline-flex items-center gap-1.5 rounded border border-[var(--live-border)] px-1.5 py-px text-xs font-extrabold uppercase tracking-[0.06em] text-[var(--brand-primary)] ${DISPLAY}`}>
+                        <span aria-hidden="true" className="h-[5px] w-[5px] rounded-full bg-[var(--brand-primary)] motion-safe:animate-[ticker-pulse_1.4s_ease-in-out_infinite]" />
+                        {t.live}
+                      </span>
+                      <span className={`text-xs font-semibold tabular-nums text-[var(--muted)] ${MONO}`}>{fmtRange(s.date!, s.dateEnd)}</span>
+                    </p>
+                    <h2 id={`live-${s.key}`} className={`${DISPLAY} text-2xl font-bold uppercase text-[var(--ink)] [text-wrap:balance]`} style={{ letterSpacing: "-0.02em" }}>{sourceName(s)}</h2>
+                    {place(s) && (
+                      <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-[var(--ink)]">
+                        {s.countryCode2 && <span aria-hidden="true" className={`fi fi-${s.countryCode2.toLowerCase()} shrink-0`} style={{ width: 16, height: 11, borderRadius: 2, display: "inline-block" }} />}
+                        {place(s)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <span className={`text-sm tabular-nums text-[var(--ink)] ${MONO}`}>{t.awardedOf(s.disciplines.reduce((n, d) => n + d.awarded, 0), s.disciplines.reduce((n, d) => n + d.places, 0))}</span>
+                    <ScopedLink href={`/takmicenja/${s.competitionId}`} className="text-sm font-semibold text-[var(--brand-primary)] hover:underline">{t.openCompetition} →</ScopedLink>
+                  </div>
+                </div>
+                <div className="border-t border-[var(--border)] bg-[var(--surface)] p-4">{sourceGrid(s)}</div>
+              </section>
+            ))}
+
             {scope === "srb" && (
               <section className="mb-12" aria-labelledby="serbia-quotas">
                 <SectionTitle id="serbia-quotas">
