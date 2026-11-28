@@ -13,6 +13,7 @@ import { recomputeFormaCache } from "@/lib/forma-cache";
 import { FORMA_DISCIPLINE_CODES } from "@/lib/forma";
 import { loadShooterRoster, type ShooterRoster } from "@/lib/live-shooter-roster";
 import { stageRemarks } from "@/lib/sius-merge";
+import { teamLinkOnConflict } from "@/lib/mixed-team-link";
 import { isUnrankedRemark } from "@shootermarkt/db/pdf-import-types";
 import { revalidateCompetitionPages } from "@/lib/revalidate-public";
 
@@ -472,8 +473,8 @@ async function processMixedTeamSlots(
       // live upisuje samo glavni meč (competition_event_id null)
       target: [mixedTeamResults.competitionId, mixedTeamResults.competitionEventId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
       set: {
-        shooter1Id: sql`coalesce(excluded.shooter1_id, ${mixedTeamResults.shooter1Id})`,
-        shooter2Id: sql`coalesce(excluded.shooter2_id, ${mixedTeamResults.shooter2Id})`,
+        shooter1Id: teamLinkOnConflict(1, "incoming"),
+        shooter2Id: teamLinkOnConflict(2, "incoming"),
         shooter1Name: sql`excluded.shooter1_name`,
         shooter2Name: sql`excluded.shooter2_name`,
         shooter1Detail: sql`coalesce(excluded.shooter1_detail, ${mixedTeamResults.shooter1Detail})`,

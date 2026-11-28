@@ -6,7 +6,7 @@ import { eventTypeFromName } from "@/lib/competition-filters";
 import { ensureCompetitionEvent } from "@/lib/competition-events";
 import { formatDateSr } from "@/lib/date-utils";
 import { shooterResultCount } from "@/lib/import-commit";
-import { linkTeamMembers } from "@/lib/mixed-team-link";
+import { linkTeamMembers, teamLinkOnConflict } from "@/lib/mixed-team-link";
 import { changedColumns, changedParts, type ImportStatus } from "@/lib/import-diff";
 import { commitMixedStages, toFinalCommit, toQualCommit } from "@/app/(site)/(admin)/admin/rezultati/_shared/commitMixedTeams";
 import { isUnrankedRemark, type CompetitionLevel, type EventType, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
@@ -221,10 +221,10 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
           target: [mixedTeamResults.competitionId, mixedTeamResults.competitionEventId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
           set: {
             ...columns,
-            // postojeća veza (live cron, ručno povezivanje) se ne gazi
+            // postojeća veza (live cron, ručno povezivanje) se ne gazi dok je isti strelac na tom mestu
             ...(isFinals ? {} : {
-              shooter1Id: sql`coalesce(${mixedTeamResults.shooter1Id}, excluded.shooter1_id)`,
-              shooter2Id: sql`coalesce(${mixedTeamResults.shooter2Id}, excluded.shooter2_id)`,
+              shooter1Id: teamLinkOnConflict(1, "stored"),
+              shooter2Id: teamLinkOnConflict(2, "stored"),
             }),
             remarkDetails: mergeRemarkDetails,
           },
