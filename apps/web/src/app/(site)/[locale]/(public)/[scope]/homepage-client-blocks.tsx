@@ -83,9 +83,9 @@ function InlinePlaces({ entries, score, decimals, prefix, renderAff, reserveTogg
       </div>
     )}
     <div className="pointer-events-none absolute invisible whitespace-nowrap" aria-hidden="true">
-      <div ref={allPlacesRef} className="flex w-max items-center gap-x-3">{prefix}{entries.map(place)}</div>
-      <div ref={firstSecondRef} className="flex w-max items-center gap-x-3">{prefix}{place(entries[0], 0)}{entries[1] && place(entries[1], 1)}</div>
-      <div ref={secondThirdRef} className="flex w-max items-center gap-x-3">{entries[1] && place(entries[1], 1)}{entries[2] && place(entries[2], 2)}</div>
+      <div ref={allPlacesRef} className="flex w-max items-center gap-x-2 sm:gap-x-3">{prefix}{entries.map(place)}</div>
+      <div ref={firstSecondRef} className="flex w-max items-center gap-x-2 sm:gap-x-3">{prefix}{place(entries[0], 0)}{entries[1] && place(entries[1], 1)}</div>
+      <div ref={secondThirdRef} className="flex w-max items-center gap-x-2 sm:gap-x-3">{entries[1] && place(entries[1], 1)}{entries[2] && place(entries[2], 2)}</div>
     </div>
   </div>;
 }
