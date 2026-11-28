@@ -76,14 +76,14 @@ export function FirstVisitIntro() {
         </h2>
 
         {/* -my-3 cancels the 44px hit area so the visible text sits on the panel's padding */}
-        <ul className="-my-3 flex flex-wrap gap-x-5 lg:shrink-0">
+        <ul className="-my-3 flex flex-wrap gap-x-4 sm:gap-x-5 lg:shrink-0">
           {LINKS.map(({ href, key }) => (
             <li key={key}>
               <ScopedLink
                 href={href}
                 onClick={markSeen}
                 title={t(`links.${key}.desc`)}
-                className="group flex min-h-11 items-center gap-1 text-[0.95rem] font-semibold hover:text-[var(--brand-primary)]"
+                className="group flex min-h-11 items-center gap-1 text-sm font-semibold hover:text-[var(--brand-primary)] sm:text-[0.95rem]"
               >
                 {t(`links.${key}.label`)}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-[var(--brand-primary)] transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none">
