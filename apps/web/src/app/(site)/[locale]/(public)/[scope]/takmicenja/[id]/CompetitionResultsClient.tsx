@@ -558,7 +558,7 @@ function CompetitionOverview({
                         {hasElim && <PhaseBadge label="E" elim />}
                         {hasQual && <PhaseBadge label="Q" active />}
                         {hasFinal && <PhaseBadge label="F" accent />}
-                        {!!cat.teams?.length && <PhaseBadge label="T" accent />}
+                        {!!cat.teams?.length && <PhaseBadge label="T" team />}
                         <ChevronRight size={14} className="text-[var(--subtle)] group-hover:text-[var(--ink)] transition-colors duration-150 ml-0.5" aria-hidden="true" />
                       </div>
                     </button>
@@ -811,7 +811,7 @@ function SingleCatRows({
           className="w-full flex items-center justify-between gap-3 px-4 py-3.5 bg-[var(--surface)] hover:bg-[var(--surface-2)] transition-colors duration-150 group text-left"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <PhaseBadge label="T" accent />
+            <PhaseBadge label="T" team />
             <span className="text-sm font-semibold text-[var(--ink)] truncate">
               {(PHASE_LABELS[locale] ?? PHASE_LABELS.en).team}
             </span>
@@ -833,20 +833,23 @@ function PhaseBadge({
   active = false,
   accent = false,
   elim = false,
+  team = false,
 }: {
   label: string;
   active?: boolean;
   accent?: boolean;
   elim?: boolean;
+  team?: boolean;
 }) {
-  if (elim) {
+  if (elim || team) {
+    const hue = team ? 300 : 30;
     return (
       <span
         className="inline-flex w-6 justify-center items-center px-2 py-0.5 rounded text-[0.7rem] font-bold uppercase tracking-wide font-[family-name:var(--font-jetbrains-mono)]"
         style={{
-          background: "color-mix(in oklch, oklch(0.65 0.15 30) 12%, transparent)",
-          color: "oklch(0.55 0.15 30)",
-          border: "1px solid color-mix(in oklch, oklch(0.65 0.15 30) 25%, transparent)",
+          background: `color-mix(in oklch, oklch(0.65 0.15 ${hue}) 12%, transparent)`,
+          color: `oklch(0.55 0.15 ${hue})`,
+          border: `1px solid color-mix(in oklch, oklch(0.65 0.15 ${hue}) 25%, transparent)`,
         }}
       >
         {label}
