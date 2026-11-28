@@ -84,6 +84,7 @@ export async function parsePdfImport(pdfBuffer: Buffer) {
         qualSeries: result.series,
         qualified: result.qualified ?? null,
         remark: result.remark ?? null,
+        remarkDetails: result.extras ? { qual: result.extras } : undefined,
       };
       if (event.guest) {
         // ponytail: gosti nemaju svoje polje u bazi — preskočeni po defaultu, admin može da ih uključi

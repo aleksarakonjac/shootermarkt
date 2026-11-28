@@ -31,6 +31,47 @@ describe("youth individual list", () => {
   });
 });
 
+describe("remarks column", () => {
+  const list = (items: Item[]) => parseSiusPages([[
+    ...head("APM", "U16", "Q100000IA2711261315.400000.APM.0.001.pdf"),
+    ...row(689, "215:NOC"), ...row(684, "55:Rank", "81:Bib No", "113:Name", "243:Team", "476:Total", "510:Rem"), ...row(679, "215:Code"), ...series(676, 327, [1, 2, 3, 4, 5, 6]),
+    ...items,
+  ]])!.events[0].results as ParsedShooterResult[];
+  const shooter = (y: number, rank: number, total?: string) => [
+    ...row(y, `72:${rank}`, `85:${1000 + rank}`, "112:STRELAC Test", "214:SRB", "243:Klub", ...(total ? [`477:${total}`] : [])),
+    ...(total ? series(y, 325, [85, 83, 86, 88, 79, 64]) : []),
+  ];
+  const stack = (y: number, ...letters: string[]) => letters.flatMap((str, i) => row(y - i * 9.4, `511:${str}`));
+
+  it("reads a status stacked letter by letter, with the birth year under it", () => {
+    const [dnf, dns] = list([
+      ...shooter(655, 1, "485- 6x D"), ...stack(645.6, "N", "F", "20", "11"),
+      ...shooter(601, 2), ...stack(601, "D", "N", "S", "20", "10"),
+    ]);
+    expect(dnf).toMatchObject({ total: 485, inners: 6, remark: "DNF", birthYear: 2011 });
+    expect(dns).toMatchObject({ total: null, remark: "DNS", birthYear: 2010 });
+  });
+
+  it("splits Q, status, record and shoot-off printed beside the total; birth year is never a remark", () => {
+    const rows = list([
+      ...shooter(655, 1, "485- 6x Q QNR 2011"),
+      ...shooter(630, 2, "485- 6x Q SO 2010"),
+      ...shooter(605, 3, "485- 6x DSQ 2009"),
+      ...shooter(580, 4, "485- 6x RPO 2008"),
+      ...shooter(555, 5, "485- 6x +10.4 2008"),
+      ...shooter(530, 6, "485- 6x 2008"),
+    ]);
+    expect(rows.map((r) => [r.total, r.remark, r.qualified, r.extras ?? null, r.birthYear])).toEqual([
+      [485, null, true, { record: "QNR" }, 2011],
+      [485, null, true, { shootOff: "SO" }, 2010],
+      [485, "DSQ", null, null, 2009],
+      [485, "RPO", null, null, 2008],
+      [485, null, null, { shootOff: "+10.4" }, 2008],
+      [485, null, null, null, 2008],
+    ]);
+  });
+});
+
 describe("youth team list", () => {
   const member = (y: number, bib: string, name: string, group: string, scores: number[], total: string) =>
     [...row(y, `85:${bib}`, `112:${name}`, `256:${group}`, `466:${total}`), ...series(y, 315, scores)];

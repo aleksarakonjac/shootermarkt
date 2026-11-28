@@ -208,6 +208,8 @@ export interface ParsedShooterResult {
   qualified?: boolean | null;
   /** ISSF/SIUS remark: RPO, DSQ, DNS, DNF, SO */
   remark?: string | null;
+  /** Kazna / shoot-off / rekord uz rezultat. */
+  extras?: StageRemarks;
   /** Ceo zapis imena kad je podela samo pretpostavka. */
   fullName?: string;
   /** Bilten ne navodi državu (samo klub ili goli kod). */
@@ -287,6 +289,8 @@ export interface ParsedFinalResult {
   total: number | null;
   /** DNS/DNF/DSQ ili "SO" (ispao posle shoot-off-a) */
   remark?: string | null;
+  /** Kazna / shoot-off / rekord u finalu. */
+  extras?: StageRemarks;
   /** Ceo zapis imena kad je podela samo pretpostavka. */
   fullName?: string;
   /** Zbirovi po seriji/fazi finala iz biltena. */
@@ -461,6 +465,7 @@ export function mergeFinalsIntoRows(
       row.finalRank = rawResult.rank;
       row.finalRemark = isUnrankedRemark(rawResult.remark) ? rawResult.remark : null;
       row.finalShootOff = rawResult.remark === "SO" ? true : null;
+      if (rawResult.extras) row.remarkDetails = { ...row.remarkDetails, final: rawResult.extras };
       row.finalSeries = rawResult.series ?? null;
       row.finalSeriesLabels = rawResult.seriesLabels ?? null;
       row.finalShots = rawResult.shots ?? null;

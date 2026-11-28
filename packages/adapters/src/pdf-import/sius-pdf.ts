@@ -2,7 +2,7 @@ import { getDocumentProxy } from "unpdf";
 import { isUnrankedRemark, matchEventName, parseCategory, type AgeCategory, type MixedTeamEntry, type ParsedBilten, type ParsedEvent, type ParsedFinalResult, type ParsedShooterResult } from "@shootermarkt/db/pdf-import-types";
 import { normalizeDisciplineCode } from "@shootermarkt/db/discipline";
 import { glyphFixes } from "./sius-fonts";
-import { clubNation, scoreText, SCORE, topmost, type Item } from "./sius-layout";
+import { clubNation, readRemarks, scoreText, SCORE, topmost, type Item } from "./sius-layout";
 import { splitName } from "./sius-names";
 import { parseMixedTeams, type TeamPage } from "./sius-teams";
 import { parseClubTeams, type ClubTeamPage } from "./sius-club-teams";
@@ -25,7 +25,7 @@ const LIST_CODES: Record<string, { category: AgeCategory; guest?: boolean }> = {
   "20": { category: "junior" },
   "10": { category: "senior", guest: true },
 };
-const REMARKS = /^(Q|DNS|DNF|DSQ|RPO|DN|S|F)$/;
+const YEAR = /^(19|20)\d\d$/;
 const AIR = /^(AR|AP)[MW]$/;
 const DECIMAL = /^\d+(?:\.\d)?$/;
 
@@ -270,27 +270,36 @@ function parseRows(items: Item[]): ParsedShooterResult[] {
     const nation = stated ? { teamNoc: stated, clubName: stated === "SRB" ? text(team!.x - 5, scoresX) || undefined : undefined } : clubNation(text(noc.x - 5, clubTo));
 
     const right = col(scoresX, Infinity);
-    const scored = right.filter((it) => SCORE.test(scoreText(it.str)));
+    const isScore = (it: Item) => SCORE.test(scoreText(it.str)) && !YEAR.test(it.str);
+    const scored = right.filter(isScore);
     const scores = scored.map((it) => SCORE.exec(scoreText(it.str))!);
-    // godište uz zbir; u uskoj koloni se prelama ("20" uz zbir, "11" red niže)
-    const [, year] = /\s((?:19|20)(?:\d\d)?)$/.exec(scored.at(-1)?.str ?? "") ?? [];
-    const rest = year?.length === 2 ? col(scoresX, Infinity, wrap).find((it) => /^\d\d$/.test(it.str))?.str : "";
-    const birthYear = year && rest !== undefined ? Number(year + rest) : null;
-    const remarks = [...right, ...col(scoresX, Infinity, wrap)].map((it) => it.str).filter((s) => REMARKS.test(s));
-    const remark = remarks.filter((r) => r !== "Q").join("") || null;
     const total = scores.at(-1);
+    const totalItem = scored.at(-1);
+    // Remarks kolona ide i naniže, red po red ("D" / "N" / "F" / "20" / "11"), dublje od preloma naziva kluba
+    const remarksX = totalItem?.x ?? ((header("Rem") ?? header("Remarks"))?.x ?? Infinity) - 8;
+    const stack: Item[] = [];
+    for (const it of body.filter((b) => b.x >= remarksX - 3 && b.y < anchor.y - 3 && b.y > nextY + 3).sort((a, b) => b.y - a.y)) {
+      if ((stack.at(-1)?.y ?? anchor.y) - it.y > 12) break;
+      stack.push(it);
+    }
+    const marked = [...new Set([...right.filter((it) => !isScore(it)), ...col(scoresX, Infinity, wrap), ...stack])].sort((a, b) => b.y - a.y || a.x - b.x);
+    const words = [totalItem ? totalItem.str.slice(scoreText(totalItem.str).length) : "", ...marked.map((it) => it.str)].flatMap((w) => w.split(/\s+/)).filter(Boolean);
+    // godište stoji uz zbir ili ispod njega; u uskoj koloni se prelama ("20" pa "11")
+    const year = words.filter((w) => /^\d\d(\d\d)?$/.test(w)).join("").slice(0, 4);
+    const marks = readRemarks(words);
 
     return {
       rank: rankStr && /^\d+$/.test(rankStr) ? Number(rankStr) : null,
       bibNumber: bibStr && /^\d+$/.test(bibStr) ? Number(bibStr) : undefined,
       ...splitName([anchor, ...col(name.x - 5, noc.x - 5, wrap)].map((it) => it.str).join(" ")),
       ...nation,
-      birthYear,
+      birthYear: YEAR.test(year) ? Number(year) : null,
       series: scores.slice(0, -1).map((m) => Number(m[1])),
       total: total ? Number(total[1]) : null,
       inners: total?.[2] ? Number(total[2]) : null,
-      qualified: remarks.includes("Q") ? true : null,
-      remark,
+      qualified: marks.qualified ? true : null,
+      remark: marks.remark,
+      extras: marks.extras,
     };
   });
 }
@@ -320,7 +329,8 @@ function parseAirFinalRows(items: Item[]): ParsedFinalResult[] | null {
     const cumulative = scores.filter(onFirstLine).sort((a, b) => a.x - b.x).map((it) => Number(it.str));
     const shotSum = scores.filter((it) => !onFirstLine(it)).reduce((sum, it) => sum + Number(it.str), 0);
     const total = cumulative.at(-1) ?? null;
-    const remark = col(remarks.x - 5, Infinity).map((it) => it.str).join(" ") || null;
+    const marks = readRemarks(col(remarks.x - 5, Infinity).map((it) => it.str));
+    const remark = marks.remark ?? (marks.extras?.shootOff ? "SO" : null);
     const fullName = col(name.x - 5, noc.x - 10).map((it) => it.str).join(" ");
 
     const verified = total == null ? isUnrankedRemark(remark) : Math.abs(shotSum - total) < 0.05;
@@ -336,6 +346,7 @@ function parseAirFinalRows(items: Item[]): ParsedFinalResult[] | null {
       // S1, S2 (po 5 hitaca), pa parovi 11–12, 13–14… — isti nazivi kao u lib/final-detail.ts
       seriesLabels: total == null ? null : cumulative.map((_, n) => (n < 2 ? `S${n + 1}` : `${7 + 2 * n}–${8 + 2 * n}`)),
       remark,
+      extras: marks.extras,
     });
   }
   return rows.length ? rows : null;
