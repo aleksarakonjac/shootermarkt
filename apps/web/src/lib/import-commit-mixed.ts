@@ -7,8 +7,8 @@ import { ensureCompetitionEvent } from "@/lib/competition-events";
 import { formatDateSr } from "@/lib/date-utils";
 import { ensureShooter, loadKnownShooters, shooterResultCount } from "@/lib/ensure-shooter";
 import { pickMemberShooter } from "@/lib/team-member-link";
-import { linkTeamMembers } from "@/lib/mixed-team-link";
-import { asIssfId } from "@shootermarkt/db/name-match";
+import { isIssfLink, linkTeamMembers, teamLinkOnConflict } from "@/lib/mixed-team-link";
+import { asIssfId, foldName } from "@shootermarkt/db/name-match";
 import { changedColumns, changedParts, type ImportStatus } from "@/lib/import-diff";
 import { commitMixedStages, toFinalCommit, toQualCommit } from "@/app/(site)/(admin)/admin/rezultati/_shared/commitMixedTeams";
 import { isUnrankedRemark, type CompetitionLevel, type EventType, type StageRemarks } from "@shootermarkt/db/pdf-import-types";
@@ -216,17 +216,29 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
       const key = teamKey(e.nocCode, e.teamNumber);
       const old = existing.get(key);
       const links: { shooter1Id?: number | null; shooter2Id?: number | null } = isFinals ? {} : linkTeamMembers(e, e.nocCode, candidates, { category, date: matchDate });
+      // pre dopune ispod: samo veze koje je našao ISSF ID
+      const byIssfId = { 1: isIssfLink(e.mIssfId, links.shooter1Id, candidates), 2: isIssfLink(e.fIssfId, links.shooter2Id, candidates) };
       if (known && e.createMissing) {
         const [mNoc, fNoc = mNoc] = e.nocCode.split("/");
-        const member = async (firstName: string, lastName: string, shooterId: number | undefined, before: unknown, linked: number | null | undefined, teamNoc: string, gender: "M" | "F", issfId: string | null) =>
-          pickMemberShooter({ firstName, lastName, shooterId }, (before as number | null) ?? null, individuals)
-          ?? linked
-          ?? (firstName.trim() && lastName.trim() ? await ensureShooter({ firstName, lastName, teamNoc, gender, apparatus: disc.apparatus, issfId }, known, { category, date: matchDate }) : null);
-        links.shooter1Id = await member(e.m_firstName ?? "", e.m_lastName ?? "", e.mShooterId, old?.shooter1Id, links.shooter1Id, mNoc, e.mGender ?? "M", asIssfId(e.mIssfId));
-        links.shooter2Id = await member(e.f_firstName ?? "", e.f_lastName ?? "", e.fShooterId, old?.shooter2Id, links.shooter2Id, fNoc, e.fGender ?? "F", asIssfId(e.fIssfId));
+        const member = async (slot: 1 | 2, firstName: string, lastName: string, shooterId: number | undefined, teamNoc: string, gender: "M" | "F", issfId: string | null) => {
+          const linked = links[`shooter${slot}Id`];
+          if (byIssfId[slot]) return linked;
+          // redni broj tima prati plasman: upisana veza važi samo dok je na tom mestu isto ime (kao teamLinkOnConflict)
+          const storedName = old?.[`shooter${slot}Name`] as string | null | undefined;
+          const sameName = !storedName || foldName(storedName) === foldName(`${lastName} ${firstName}`.trim());
+          const stored = sameName ? (old?.[`shooter${slot}Id`] as number | null | undefined) ?? null : null;
+          return pickMemberShooter({ firstName, lastName, shooterId }, stored, individuals)
+            ?? linked
+            ?? (firstName.trim() && lastName.trim() ? await ensureShooter({ firstName, lastName, teamNoc, gender, apparatus: disc.apparatus, issfId }, known, { category, date: matchDate }) : null);
+        };
+        links.shooter1Id = await member(1, e.m_firstName ?? "", e.m_lastName ?? "", e.mShooterId, mNoc, e.mGender ?? "M", asIssfId(e.mIssfId));
+        links.shooter2Id = await member(2, e.f_firstName ?? "", e.f_lastName ?? "", e.fShooterId, fNoc, e.fGender ?? "F", asIssfId(e.fIssfId));
       }
-      // nova veza sa profilom je izmena i kad su rezultati isti (timovi uvezeni pre povezivanja)
-      const newLink = old && !isFinals && ((!old.shooter1Id && links.shooter1Id) || (!old.shooter2Id && links.shooter2Id));
+      // nova veza sa profilom (ili druga po ISSF ID-u) je izmena i kad su rezultati isti
+      const newLink = old && ([1, 2] as const).some((slot) => {
+        const next = links[`shooter${slot}Id`], prev = old[`shooter${slot}Id`];
+        return next && (!prev || (byIssfId[slot] && prev !== next));
+      });
       if (old && !newLink && teamChanges(old, e, isFinals).length === 0) { unchanged++; continue; }
       const columns = stageColumns(e, isFinals);
       await db
@@ -247,10 +259,10 @@ export async function commitMixedTeamEntries(input: MixedCommitInput) {
           target: [mixedTeamResults.competitionId, mixedTeamResults.competitionEventId, mixedTeamResults.disciplineId, mixedTeamResults.category, mixedTeamResults.nocCode, mixedTeamResults.teamNumber],
           set: {
             ...columns,
-            // postojeća veza (live cron, ručno povezivanje) se ne gazi
+            // postojeća veza (live cron, ručno povezivanje) se ne gazi dok je isti strelac na tom mestu i ISSF ID ne kaže drugo
             ...(isFinals ? {} : {
-              shooter1Id: sql`coalesce(${mixedTeamResults.shooter1Id}, excluded.shooter1_id)`,
-              shooter2Id: sql`coalesce(${mixedTeamResults.shooter2Id}, excluded.shooter2_id)`,
+              shooter1Id: teamLinkOnConflict(1, byIssfId[1] ? "incoming" : "stored"),
+              shooter2Id: teamLinkOnConflict(2, byIssfId[2] ? "incoming" : "stored"),
             }),
             remarkDetails: mergeRemarkDetails,
           },
