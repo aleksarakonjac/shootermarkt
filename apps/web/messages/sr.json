@@ -504,10 +504,9 @@
   },
   "intro": {
     "eyebrow": "Prvi put ovde?",
-    "title": "Rezultati srpskih strelaca na jednom mestu",
+    "title": "Rezultati streljaštva na jednom mestu",
     "body": "Sva takmičenja sa serijama, finalima i plasmanom, uz profil svakog strelca sa celom istorijom nastupa.",
     "close": "Zatvori",
-    "language": "Jezik / Language",
     "links": {
       "competitions": {
         "label": "Takmičenja",

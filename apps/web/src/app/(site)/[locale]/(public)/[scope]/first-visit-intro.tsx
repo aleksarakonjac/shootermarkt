@@ -48,49 +48,48 @@ export function FirstVisitIntro() {
   return (
     <section
       aria-labelledby="first-visit-intro-title"
-      className="first-visit-intro relative mb-6 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-4 pr-12 text-[var(--ink)] sm:p-6 sm:pr-14"
+      className="first-visit-intro mb-6 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-4 pt-3 pb-2 text-[var(--ink)] sm:px-6 sm:pt-4"
     >
-      <button
-        type="button"
-        onClick={close}
-        aria-label={t("close")}
-        className="absolute top-2 right-2 flex size-10 items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] sm:top-3 sm:right-3"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <path d="M18 6 6 18M6 6l12 12" />
-        </svg>
-      </button>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)]">
+          {t("eyebrow")}
+        </p>
+        <div className="flex items-center gap-1">
+          <LocaleSwitcher />
+          <button
+            type="button"
+            onClick={close}
+            aria-label={t("close")}
+            className="-mr-2 flex size-10 items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-8">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--brand-primary)] font-[family-name:var(--font-jetbrains-mono)]">
-            {t("eyebrow")}
-          </p>
+      <div className="mt-1 lg:flex lg:items-end lg:justify-between lg:gap-8">
+        <div className="min-w-0">
           <h2
             id="first-visit-intro-title"
-            className="mt-1 text-[1.5rem] leading-[1.05] font-extrabold uppercase font-[family-name:var(--font-display)] text-balance sm:text-[2rem]"
+            className="text-[1.35rem] leading-[1.05] font-extrabold uppercase font-[family-name:var(--font-display)] text-balance sm:text-[1.75rem]"
           >
             {t("title")}
           </h2>
-          <p className="mt-2 hidden max-w-prose text-sm leading-relaxed text-[var(--muted)] sm:block">{t("body")}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span className="text-sm font-semibold">{t("language")}</span>
-            <LocaleSwitcher />
-          </div>
+          <p className="mt-1 hidden max-w-prose text-sm leading-relaxed text-[var(--muted)] sm:block">{t("body")}</p>
         </div>
 
-        <ul className="divide-y divide-[var(--border)] border-y border-[var(--border)] self-end">
+        <ul className="mt-1 flex flex-wrap gap-x-5 lg:mt-0 lg:shrink-0">
           {LINKS.map(({ href, key }) => (
             <li key={key}>
               <ScopedLink
                 href={href}
                 onClick={markSeen}
-                className="flex min-h-11 items-center justify-between gap-3 text-sm hover:text-[var(--brand-primary)]"
+                title={t(`links.${key}.desc`)}
+                className="flex min-h-11 items-center gap-1.5 text-sm font-semibold hover:text-[var(--brand-primary)]"
               >
-                <span>
-                  <span className="font-semibold">{t(`links.${key}.label`)}</span>
-                  <span className="text-[var(--muted)]"> · {t(`links.${key}.desc`)}</span>
-                </span>
+                {t(`links.${key}.label`)}
                 <span aria-hidden="true" className="text-[var(--brand-primary)]">→</span>
               </ScopedLink>
             </li>

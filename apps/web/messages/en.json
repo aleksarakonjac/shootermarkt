@@ -504,10 +504,9 @@
   },
   "intro": {
     "eyebrow": "First time here?",
-    "title": "Serbian shooting results in one place",
+    "title": "Shooting results in one place",
     "body": "Every competition with series, finals and rankings, plus a profile for each shooter with their full match history.",
     "close": "Close",
-    "language": "Language / Jezik",
     "links": {
       "competitions": {
         "label": "Competitions",
