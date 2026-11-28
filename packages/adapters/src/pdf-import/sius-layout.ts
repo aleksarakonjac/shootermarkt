@@ -20,3 +20,15 @@ export function clubNation(club: string) {
   // država nije navedena: SRB važi za domaći bilten, strani ispravlja resolveNations
   return { teamNoc: "SRB", clubName: club || undefined, nationUnstated: true };
 }
+
+/** Uz zbir u istoj stavci umeju da stoje oznake i godište: "630.2 J", "553.5 DNF J", "558- 6x 2012", "566-16x 20". */
+export const scoreText = (str: string) => str.replace(/(\s+([A-Z]+|(19|20)(\d\d)?))+$/, "");
+
+const english = new Intl.DisplayNames(["en"], { type: "region" });
+const byName = new Map(NOC_LIST.filter((c) => /^[A-Z]{2}$/.test(c.alpha2)).map((c) => [english.of(c.alpha2)!.toLowerCase(), c.noc]));
+
+/** Tim nazvan po državi ("Bulgaria 2", "AIN 1", "SRB") → njen NOC; naziv kluba → undefined. */
+export function countryNoc(label: string): string | undefined {
+  const stem = label.replace(/\s*\d+$/, "").trim();
+  return NOCS.has(stem) ? stem : byName.get(stem.toLowerCase());
+}

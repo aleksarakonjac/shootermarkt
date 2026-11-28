@@ -1,7 +1,7 @@
 /** Mešoviti timovi (ARMT/APMT) iz SIUS biltena: kvalifikaciona lista i finale, po dva strelca u timu. */
 import { matchEventName, numberTeams, type AgeCategory, type MixedTeamCode, type MixedTeamEntry, type ParsedShooterResult } from "@shootermarkt/db/pdf-import-types";
 import { splitName } from "./sius-names";
-import { clubNation, NOCS, SCORE, topmost, type Item } from "./sius-layout";
+import { clubNation, countryNoc, NOCS, scoreText, SCORE, topmost, type Item } from "./sius-layout";
 
 export interface TeamPage { discipline: MixedTeamCode; isFinal: boolean; category: AgeCategory; date: string; items: Item[] }
 
@@ -49,7 +49,7 @@ function parseTeamPage(items: Item[], isFinal: boolean): Team[] | null {
     const line = (y: number) => block.filter((it) => Math.abs(it.y - y) <= 3).sort((a, b) => a.x - b.x);
     const name = (y: number) => line(y).filter((it) => it.x >= bibLeft && it.x < scoresX).map((it) => it.str).join(" ");
     const scores = (y: number): Scores | null => {
-      const found = line(y).filter((it) => it.x >= scoresX).map((it) => SCORE.exec(it.str)).filter((m): m is RegExpExecArray => !!m);
+      const found = line(y).filter((it) => it.x >= scoresX).map((it) => SCORE.exec(scoreText(it.str))).filter((m): m is RegExpExecArray => !!m);
       const total = found.at(-1);
       return total ? { series: found.slice(0, -1).map((m) => Number(m[1])), total: Number(total[1]), inners: total[2] ? Number(total[2]) : null } : null;
     };
@@ -105,6 +105,7 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
   }
   const nationByAthlete = new Map(individuals.filter((r) => !r.nationUnstated)
     .map((r) => [athleteKey(r.fullName ?? `${r.lastName} ${r.firstName}`), r.teamNoc]));
+  const hasCountryTeams = parsed.some((p) => p.teams.some((t) => (countryNoc(t.label) ?? "SRB") !== "SRB"));
   /** Država iz biltena; kad je nema, `nationUnstated` pa je rešava resolveNations. */
   const nationOf = (t: Team): { nocCode: string; nationUnstated?: boolean; nationAssumed?: boolean; teamLabel?: string } => {
     const prefix = prefixNoc(t.label);
@@ -113,8 +114,12 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
       const second = /^[A-Za-z]{3}-([A-Z]{3})\b/.exec(t.label)?.[1];
       return second && NOCS.has(second) && second !== prefix ? { nocCode: `${prefix}/${second}`, nationAssumed: true } : { nocCode: prefix };
     }
+    const country = countryNoc(t.label);
+    if (country) return { nocCode: country };
     const own = clubNation(t.label);
     const teamLabel = clubStem(t.label);
+    // deo timova nosi ime države: za ostale (klub ili par iz dve države) admin potvrđuje naciju
+    if (hasCountryTeams) return { nocCode: own.teamNoc, nationUnstated: true, nationAssumed: true, teamLabel };
     // bez ijedne države uz klub: domaći format, "SRB" važi dok resolveNations ne prepozna strani bilten
     if (nationByClub.size === 0) return own.nationUnstated ? { nocCode: own.teamNoc, nationUnstated: true, teamLabel } : { nocCode: own.teamNoc };
     const found = nationByClub.get(teamLabel) ?? t.athletes.map((a) => nationByAthlete.get(athleteKey(a.name))).find(Boolean);
@@ -143,7 +148,7 @@ export function parseMixedTeams(pages: TeamPage[], individuals: ParsedShooterRes
       const [m, f] = t.athletes.map((a) => splitName(a.name));
       return {
         // domaći naziv tima je klub; sa državom uz naziv ("SLO-…") tim predstavlja državu
-        skip: false, ...nationOf(t), ...(prefixNoc(t.label) ? {} : { clubName: t.label }), teamNumber: 1, disciplineCode: discipline, category,
+        skip: false, ...nationOf(t), ...(prefixNoc(t.label) || countryNoc(t.label) ? {} : { clubName: t.label }), teamNumber: 1, disciplineCode: discipline, category,
         eventName, eventDate: date,
         qualRank: null, qualTotal: null, inners: null, qualified: true, finalRank: null, finalTotal: null,
         mIssfId: null, mLastName: m.lastName, mFirstName: m.firstName, mFullName: m.fullName, m_series: [], mInners: null, mTotal: 0,
