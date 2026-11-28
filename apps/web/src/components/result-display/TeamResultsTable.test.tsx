@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { TeamResultsTable } from "./TeamResultsTable";
@@ -23,6 +23,14 @@ describe("TeamResultsTable", () => {
     expect(screen.getByText("Ninkovic").closest("a")?.getAttribute("href")).toBe("/strelci/7");
     expect(screen.getByText("Kondic").closest("a")).toBeNull();
     expect(screen.getByText("1691")).toBeTruthy();
+  });
+
+  it("expands and collapses all teams at once", async () => {
+    render(<TeamResultsTable teams={[team(1), team(2)]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Prikaži sve rezultate" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(6);
+    fireEvent.click(screen.getByRole("button", { name: "Sakrij sve rezultate" }));
+    await waitFor(() => expect(screen.queryByRole("listitem")).toBeNull());
   });
 
   it("gives medals to the first three places only", () => {
